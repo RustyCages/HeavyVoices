@@ -1,21 +1,21 @@
-// Delade auth-helpers. Kräver att supabase-config.js laddats först.
+// Delade auth-helpers. Kräver att supabaseClient-config.js laddats först.
 
 async function signIn(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) throw error;
   return data;
 }
 
 async function signOut() {
-  await supabase.auth.signOut();
+  await supabaseClient.auth.signOut();
   window.location.href = '/';
 }
 
 async function getCurrentMember() {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await supabaseClient.auth.getUser();
   if (!user) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('members')
     .select('id, name, role')
     .eq('id', user.id)

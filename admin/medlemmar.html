@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medlemmar — Heavy Voices Admin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+  th, td { text-align: left; padding: 0.6rem; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-transform: uppercase; }
+  select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.5rem; }
+  .btn-danger { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .success { color: #4ade80; font-size: 0.9rem; }
+  .back-link { display: inline-block; margin-bottom: 1rem; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="/admin/" class="back-link">&larr; Tillbaka till admin</a>
+  <h1>Medlemmar</h1>
+
+  <div class="card">
+    <h3>Bjud in ny medlem</h3>
+    <form id="inviteForm">
+      <input type="text" id="inviteName" placeholder="Namn" required>
+      <input type="email" id="inviteEmail" placeholder="E-post" required>
+      <select id="inviteRole" style="width: 100%; margin-bottom: 0.75rem;">
+        <option value="medlem">Medlem</option>
+        <option value="admin">Admin</option>
+      </select>
+      <button type="submit">Skicka inbjudan</button>
+      <p class="error" id="inviteError"></p>
+      <p class="success" id="inviteSuccess"></p>
+    </form>
+  </div>
+
+  <div class="card" style="margin-top: 1.5rem;">
+    <h3>Alla medlemmar</h3>
+    <table>
+      <thead>
+        <tr><th>Namn</th><th>E-post</th><th>Roll</th><th></th></tr>
+      </thead>
+      <tbody id="membersTableBody">
+        <tr><td colspan="4" class="text-muted">Laddar...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+let currentUserId = null;
+
+async function loadMembers() {
+  const { data: members, error } = await supabaseClient
+    .from('members')
+    .select('id, name, email, role')
+    .order('name');
+
+  const tbody = document.getElementById('membersTableBody');
+
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="4" class="error">Kunde inte hämta medlemmar: ${error.message}</td></tr>`;
+    return;
+  }
+
+  if (!members.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-muted">Inga medlemmar än.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = members.map(m => `
+    <tr>
+      <td>${m.name}</td>
+      <td>${m.email || '—'}</td>
+      <td>
+        <select data-id="${m.id}" class="roleSelect" ${m.id === currentUserId ? 'disabled title="Du kan inte ändra din egen roll"' : ''}>
+          <option value="medlem" ${m.role === 'medlem' ? 'selected' : ''}>Medlem</option>
+          <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
+        </select>
+      </td>
+      <td>
+        <button class="btn-danger removeBtn" data-id="${m.id}" ${m.id === currentUserId ? 'disabled' : ''}>Ta bort</button>
+      </td>
+    </tr>
+  `).join('');
+
+  document.querySelectorAll('.roleSelect').forEach(sel => {
+    sel.addEventListener('change', async (e) => {
+      const id = e.target.dataset.id;
+      const newRole = e.target.value;
+      const { error } = await supabaseClient.from('members').update({ role: newRole }).eq('id', id);
+      if (error) {
+        alert('Kunde inte ändra roll: ' + error.message);
+        loadMembers();
+      }
+    });
+  });
+
+  document.querySelectorAll('.removeBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.id;
+      if (!confirm('Ta bort medlemmen? De förlorar åtkomst till sajten. (Deras inloggningskonto raderas inte, bara medlemskapet.)')) return;
+      const { error } = await supabaseClient.from('members').delete().eq('id', id);
+      if (error) {
+        alert('Kunde inte ta bort: ' + error.message);
+      } else {
+        loadMembers();
+      }
+    });
+  });
+}
+
+document.getElementById('inviteForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('inviteName').value;
+  const email = document.getElementById('inviteEmail').value;
+  const role = document.getElementById('inviteRole').value;
+  const errorEl = document.getElementById('inviteError');
+  const successEl = document.getElementById('inviteSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-member`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name, email, role }),
+    });
+    const result = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = result.error || 'Något gick fel.';
+      return;
+    }
+
+    successEl.textContent = `Inbjudan skickad till ${email}.`;
+    document.getElementById('inviteForm').reset();
+    loadMembers();
+  } catch (err) {
+    errorEl.textContent = 'Kunde inte nå servern: ' + err.message;
+  }
+});
+
+(async () => {
+  const member = await requireAuth('admin');
+  if (member) {
+    currentUserId = member.id;
+    loadMembers();
+  }
+})();
+</script>
+
+</body>
+</html>

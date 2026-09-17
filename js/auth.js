@@ -1,4 +1,4 @@
-// Delade auth-helpers. Kräver att supabaseClient-config.js laddats först.
+// Delade auth-helpers. Kräver att supabase-config.js laddats först.
 
 async function signIn(email, password) {
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
@@ -17,7 +17,7 @@ async function getCurrentMember() {
 
   const { data, error } = await supabaseClient
     .from('members')
-    .select('id, name, role')
+    .select('id, name, role, status')
     .eq('id', user.id)
     .single();
 
@@ -31,6 +31,11 @@ async function requireAuth(requiredRole = null) {
 
   if (!member) {
     window.location.href = '/?login=required';
+    return null;
+  }
+
+  if (member.status !== 'approved') {
+    window.location.href = '/vantar.html';
     return null;
   }
 

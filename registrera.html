@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registrera dig — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .success { color: #4ade80; font-size: 0.9rem; }
+  select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.9rem; width: 100%; margin-bottom: 0.75rem; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Registrera dig</h1>
+  <p class="text-muted">Ditt konto måste godkännas av en admin innan du kan logga in.</p>
+
+  <div class="card" style="max-width: 400px; margin-top: 1.5rem;">
+    <form id="registerForm">
+      <input type="text" id="regName" placeholder="Namn" required>
+      <input type="email" id="regEmail" placeholder="E-post" required>
+      <select id="regStamma" required>
+        <option value="" disabled selected>Välj din stämma</option>
+        <option value="Sopran">Sopran</option>
+        <option value="Alt">Alt</option>
+        <option value="Tenor">Tenor</option>
+        <option value="Bas">Bas</option>
+        <option value="Osäker">Vet inte / osäker</option>
+      </select>
+      <input type="password" id="regPassword" placeholder="Lösenord (minst 6 tecken)" required minlength="6">
+      <button type="submit">Registrera</button>
+      <p class="error" id="regError"></p>
+      <p class="success" id="regSuccess"></p>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script>
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('regName').value;
+  const email = document.getElementById('regEmail').value;
+  const stamma = document.getElementById('regStamma').value;
+  const password = document.getElementById('regPassword').value;
+  const errorEl = document.getElementById('regError');
+  const successEl = document.getElementById('regSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/register-member`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name, email, stamma, password }),
+    });
+    const result = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = result.error || 'Något gick fel.';
+      return;
+    }
+
+    successEl.textContent = 'Tack! Ditt konto väntar nu på godkännande. Du får inget mejl - hör av dig till admin om det dröjer.';
+    document.getElementById('registerForm').reset();
+    document.getElementById('registerForm').style.display = 'none';
+  } catch (err) {
+    errorEl.textContent = 'Kunde inte nå servern: ' + err.message;
+  }
+});
+</script>
+
+</body>
+</html>

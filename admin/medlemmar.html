@@ -53,10 +53,10 @@
     <h3>Alla medlemmar</h3>
     <table>
       <thead>
-        <tr><th>Namn</th><th>E-post</th><th>Roll</th><th></th></tr>
+        <tr><th>Namn</th><th>E-post</th><th>Stämma</th><th>Status</th><th>Roll</th><th></th></tr>
       </thead>
       <tbody id="membersTableBody">
-        <tr><td colspan="4" class="text-muted">Laddar...</td></tr>
+        <tr><td colspan="6" class="text-muted">Laddar...</td></tr>
       </tbody>
     </table>
   </div>
@@ -71,18 +71,19 @@ let currentUserId = null;
 async function loadMembers() {
   const { data: members, error } = await supabaseClient
     .from('members')
-    .select('id, name, email, role')
+    .select('id, name, email, role, stamma, status')
+    .order('status')
     .order('name');
 
   const tbody = document.getElementById('membersTableBody');
 
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="4" class="error">Kunde inte hämta medlemmar: ${error.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="error">Kunde inte hämta medlemmar: ${error.message}</td></tr>`;
     return;
   }
 
   if (!members.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-muted">Inga medlemmar än.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="text-muted">Inga medlemmar än.</td></tr>`;
     return;
   }
 
@@ -90,17 +91,32 @@ async function loadMembers() {
     <tr>
       <td>${m.name}</td>
       <td>${m.email || '—'}</td>
+      <td>${m.stamma || '—'}</td>
+      <td>${m.status === 'pending' ? '<span style="color: #facc15;">Väntar</span>' : 'Godkänd'}</td>
       <td>
         <select data-id="${m.id}" class="roleSelect" ${m.id === currentUserId ? 'disabled title="Du kan inte ändra din egen roll"' : ''}>
           <option value="medlem" ${m.role === 'medlem' ? 'selected' : ''}>Medlem</option>
           <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
         </select>
       </td>
-      <td>
+      <td style="white-space: nowrap;">
+        ${m.status === 'pending' ? `<button class="approveBtn" data-id="${m.id}" style="margin-right: 0.4rem;">Godkänn</button>` : ''}
         <button class="btn-danger removeBtn" data-id="${m.id}" ${m.id === currentUserId ? 'disabled' : ''}>Ta bort</button>
       </td>
     </tr>
   `).join('');
+
+  document.querySelectorAll('.approveBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.id;
+      const { error } = await supabaseClient.from('members').update({ status: 'approved' }).eq('id', id);
+      if (error) {
+        alert('Kunde inte godkänna: ' + error.message);
+      } else {
+        loadMembers();
+      }
+    });
+  });
 
   document.querySelectorAll('.roleSelect').forEach(sel => {
     sel.addEventListener('change', async (e) => {

@@ -3,54 +3,67 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sätt lösenord — Heavy Voices</title>
+<title>Mitt konto — Heavy Voices</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  .back-link { display: inline-block; margin-bottom: 1rem; color: var(--text-muted); }
+  .success { color: #4ade80; font-size: 0.9rem; }
+</style>
 </head>
 <body>
 
 <div class="container">
-  <h1>Välkommen till Heavy Voices</h1>
-  <p class="text-muted" id="introText">Sätt ett lösenord för ditt konto.</p>
+  <a href="#" id="backLink" class="back-link">&larr; Tillbaka</a>
+  <h1>Mitt konto</h1>
+  <p class="text-muted" id="welcome"></p>
 
   <div class="card" style="max-width: 360px; margin-top: 1.5rem;">
-    <form id="setPasswordForm">
-      <input type="password" id="password" placeholder="Nytt lösenord (minst 6 tecken)" required minlength="6">
-      <input type="password" id="passwordConfirm" placeholder="Upprepa lösenord" required minlength="6">
-      <button type="submit">Sätt lösenord</button>
-      <p class="error" id="setPasswordError"></p>
+    <h3>Byt lösenord</h3>
+    <form id="changePasswordForm">
+      <input type="password" id="newPassword" placeholder="Nytt lösenord (minst 6 tecken)" required minlength="6">
+      <input type="password" id="newPasswordConfirm" placeholder="Upprepa nytt lösenord" required minlength="6">
+      <button type="submit">Spara nytt lösenord</button>
+      <p class="error" id="changeError"></p>
+      <p class="success" id="changeSuccess"></p>
     </form>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
 <script>
-document.getElementById('setPasswordForm').addEventListener('submit', async (e) => {
+(async () => {
+  const member = await requireAuth();
+  if (member) {
+    document.getElementById('welcome').textContent = `Inloggad som ${member.name}`;
+    document.getElementById('backLink').href = member.role === 'admin' ? '/admin/' : '/medlem/';
+  }
+})();
+
+document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const password = document.getElementById('password').value;
-  const confirm = document.getElementById('passwordConfirm').value;
-  const errorEl = document.getElementById('setPasswordError');
+  const password = document.getElementById('newPassword').value;
+  const confirm = document.getElementById('newPasswordConfirm').value;
+  const errorEl = document.getElementById('changeError');
+  const successEl = document.getElementById('changeSuccess');
   errorEl.textContent = '';
+  successEl.textContent = '';
 
   if (password !== confirm) {
     errorEl.textContent = 'Lösenorden matchar inte.';
     return;
   }
 
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) {
-    errorEl.textContent = 'Länken är ogiltig eller har gått ut. Be admin skicka en ny inbjudan.';
-    return;
-  }
-
   const { error } = await supabaseClient.auth.updateUser({ password });
   if (error) {
-    errorEl.textContent = 'Kunde inte sätta lösenord: ' + error.message;
+    errorEl.textContent = 'Kunde inte byta lösenord: ' + error.message;
     return;
   }
 
-  window.location.href = '/';
+  successEl.textContent = 'Lösenordet är ändrat.';
+  document.getElementById('changePasswordForm').reset();
 });
 </script>
 

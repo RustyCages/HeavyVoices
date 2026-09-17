@@ -105,12 +105,30 @@ async function loadMembers() {
   document.querySelectorAll('.removeBtn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const id = e.target.dataset.id;
-      if (!confirm('Ta bort medlemmen? De förlorar åtkomst till sajten. (Deras inloggningskonto raderas inte, bara medlemskapet.)')) return;
-      const { error } = await supabaseClient.from('members').delete().eq('id', id);
-      if (error) {
-        alert('Kunde inte ta bort: ' + error.message);
-      } else {
+      if (!confirm('Ta bort medlemmen helt? Detta raderar även deras inloggningskonto permanent.')) return;
+
+      const { data: { session } } = await supabaseClient.auth.getSession();
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/remove-member`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ id }),
+        });
+        const result = await res.json();
+
+        if (!res.ok) {
+          alert('Kunde inte ta bort: ' + (result.error || 'Något gick fel.'));
+          return;
+        }
+
         loadMembers();
+      } catch (err) {
+        alert('Kunde inte nå servern: ' + err.message);
       }
     });
   });

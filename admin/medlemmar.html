@@ -31,7 +31,19 @@
         <option value="medlem">Medlem</option>
         <option value="admin">Admin</option>
       </select>
-      <button type="submit">Skicka inbjudan</button>
+
+      <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">
+        <input type="radio" name="inviteMode" value="email" checked style="width: auto; margin-right: 0.4rem;">
+        Skicka inbjudan via mejl (personen sätter eget lösenord)
+      </label>
+      <label style="display: block; margin-bottom: 0.75rem; font-size: 0.9rem;">
+        <input type="radio" name="inviteMode" value="direct" style="width: auto; margin-right: 0.4rem;">
+        Sätt lösenord direkt (inget mejl skickas)
+      </label>
+
+      <input type="password" id="invitePassword" placeholder="Lösenord (minst 6 tecken)" style="display: none;" minlength="6">
+
+      <button type="submit">Lägg till medlem</button>
       <p class="error" id="inviteError"></p>
       <p class="success" id="inviteSuccess"></p>
     </form>
@@ -134,11 +146,21 @@ async function loadMembers() {
   });
 }
 
+document.querySelectorAll('input[name="inviteMode"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    const pwField = document.getElementById('invitePassword');
+    pwField.style.display = e.target.value === 'direct' ? 'block' : 'none';
+    pwField.required = e.target.value === 'direct';
+  });
+});
+
 document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = document.getElementById('inviteName').value;
   const email = document.getElementById('inviteEmail').value;
   const role = document.getElementById('inviteRole').value;
+  const mode = document.querySelector('input[name="inviteMode"]:checked').value;
+  const password = mode === 'direct' ? document.getElementById('invitePassword').value : undefined;
   const errorEl = document.getElementById('inviteError');
   const successEl = document.getElementById('inviteSuccess');
   errorEl.textContent = '';
@@ -154,7 +176,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
         'apikey': SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name, email, role }),
+      body: JSON.stringify({ name, email, role, password }),
     });
     const result = await res.json();
 
@@ -163,8 +185,11 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
       return;
     }
 
-    successEl.textContent = `Inbjudan skickad till ${email}.`;
+    successEl.textContent = mode === 'direct'
+      ? `${name} kan nu logga in direkt med det satta lösenordet.`
+      : `Inbjudan skickad till ${email}.`;
     document.getElementById('inviteForm').reset();
+    document.getElementById('invitePassword').style.display = 'none';
     loadMembers();
   } catch (err) {
     errorEl.textContent = 'Kunde inte nå servern: ' + err.message;

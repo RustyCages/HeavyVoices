@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medlem — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="container">
+  <h1>Mitt konto</h1>
+  <p id="welcome" class="text-muted">Laddar...</p>
+
+  <div class="card">
+    <h3>Stämövning</h3>
+    <p class="text-muted">TODO: lista låtar, stämspelare (samma mönster som choir-mixer-online.html)</p>
+  </div>
+
+  <div class="card" style="margin-top: 1rem;">
+    <h3>Sångtexter</h3>
+    <p class="text-muted">TODO: lyrics-viewer med LRC-synk</p>
+  </div>
+
+  <button id="logoutBtn" style="margin-top: 1.5rem;">Logga ut</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+(async () => {
+  const member = await requireAuth();
+  if (member) {
+    document.getElementById('welcome').textContent = `Inloggad som ${member.name}`;
+  }
+})();
+
+document.getElementById('logoutBtn').addEventListener('click', signOut);
+</script>
+
+</body>
+</html>

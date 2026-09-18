@@ -8,12 +8,24 @@
 <link rel="stylesheet" href="/css/style.css">
 <style>
   .back-link { display: inline-block; margin-bottom: 1rem; color: var(--text-muted); }
-  .track-item { display: flex; align-items: center; justify-content: space-between; padding: 0.7rem 0; border-bottom: 1px solid var(--border); }
-  .track-item:last-child { border-bottom: none; }
-  .track-item.active { color: var(--accent); }
-  select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.5rem; }
-  .player-controls { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; }
-  audio { width: 100%; margin-top: 0.75rem; }
+  .track-card { border-bottom: 1px solid var(--border); }
+  .track-card:last-child { border-bottom: none; }
+  .track-header { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 0; cursor: pointer; list-style: none; }
+  .track-header::-webkit-details-marker { display: none; }
+  .track-header.playing { color: var(--accent); }
+  .mixer-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.5rem 0; }
+  .mixer-row label { width: 70px; color: var(--text-muted); font-size: 0.85rem; flex-shrink: 0; }
+  .mixer-row input[type="range"] { flex: 1; }
+  .mixer-row .vol-value { width: 32px; text-align: right; font-size: 0.8rem; color: var(--text-muted); }
+  .floating-player {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg-elevated); border-top: 1px solid var(--border);
+    padding: 0.8rem 1.2rem; display: none; align-items: center; justify-content: space-between; gap: 1rem;
+    z-index: 50;
+  }
+  .floating-player .now-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; }
+  .floating-player .controls { display: flex; gap: 0.5rem; }
+  .container { padding-bottom: 6rem; }
 </style>
 </head>
 <body>
@@ -23,39 +35,50 @@
   <h1>Spelaren</h1>
 
   <div class="card">
-    <h3 id="nowPlayingTitle">Ingen låt vald</h3>
-    <audio id="audioPlayer" controls></audio>
-    <div class="player-controls">
-      <button id="prevBtn" type="button">&larr; Föregående</button>
-      <button id="nextBtn" type="button">Nästa &rarr;</button>
-    </div>
-  </div>
-
-  <div class="card" style="margin-top: 1.5rem;">
     <h3>Min spellista</h3>
     <div id="playlistSection"><p class="text-muted">Laddar...</p></div>
   </div>
 </div>
 
+<div class="floating-player" id="floatingPlayer">
+  <div class="now-title" id="nowPlayingTitle">–</div>
+  <div class="controls">
+    <button id="prevBtn" type="button">&larr;</button>
+    <button id="playPauseBtn" type="button">Spela</button>
+    <button id="nextBtn" type="button">&rarr;</button>
+  </div>
+</div>
+
+<audio id="audioSopran" preload="none"></audio>
+<audio id="audioAlt" preload="none"></audio>
+<audio id="audioTenor" preload="none"></audio>
+<audio id="audioBas" preload="none"></audio>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script>
+const stemFields = { Sopran: 'stem_sopran_path', Alt: 'stem_alt_path', Tenor: 'stem_tenor_path', Bas: 'stem_bas_path' };
+const volColumns = { Sopran: 'vol_sopran', Alt: 'vol_alt', Tenor: 'vol_tenor', Bas: 'vol_bas' };
+const priorityOrder = ['Sopran', 'Alt', 'Tenor', 'Bas'];
+
+const audios = {
+  Sopran: document.getElementById('audioSopran'),
+  Alt: document.getElementById('audioAlt'),
+  Tenor: document.getElementById('audioTenor'),
+  Bas: document.getElementById('audioBas'),
+};
+
 let playlist = [];
 let currentIndex = -1;
+let isPlaying = false;
 let currentMemberId = null;
-
-const stemFields = {
-  Sopran: 'stem_sopran_path',
-  Alt: 'stem_alt_path',
-  Tenor: 'stem_tenor_path',
-  Bas: 'stem_bas_path',
-};
+let referenceLabel = null;
 
 async function loadPlaylist() {
   const { data, error } = await supabaseClient
     .from('member_playlists')
-    .select('id, song_id, songs(*)')
+    .select('id, song_id, vol_sopran, vol_alt, vol_tenor, vol_bas, songs(*)')
     .eq('member_id', currentMemberId)
     .order('created_at');
 
@@ -72,36 +95,45 @@ async function loadPlaylist() {
     return;
   }
 
-  playlist = data.map(row => ({ playlistId: row.id, song: row.songs, stamma: 'Sopran' }));
+  playlist = data.map(row => ({
+    playlistId: row.id,
+    song: row.songs,
+    volumes: { Sopran: row.vol_sopran, Alt: row.vol_alt, Tenor: row.vol_tenor, Bas: row.vol_bas },
+    signedUrls: null,
+  }));
   renderPlaylist();
 }
 
 function renderPlaylist() {
   const el = document.getElementById('playlistSection');
   el.innerHTML = playlist.map((item, i) => `
-    <div class="track-item ${i === currentIndex ? 'active' : ''}">
-      <div>
-        <strong class="playTrack" data-index="${i}" style="cursor: pointer;">${item.song.title}</strong>
-      </div>
-      <div style="display: flex; align-items: center; gap: 0.5rem;">
-        <select class="stammaSelect" data-index="${i}">
-          ${Object.keys(stemFields).map(s => `<option value="${s}" ${item.stamma === s ? 'selected' : ''}>${s}</option>`).join('')}
-        </select>
-        <button type="button" class="btn-danger removeTrackBtn" data-id="${item.playlistId}" style="padding: 0.3rem 0.6rem; font-size: 0.85rem;">Ta bort</button>
-      </div>
+    <div class="track-card">
+      <details ${i === currentIndex ? 'open' : ''}>
+        <summary class="track-header ${i === currentIndex ? 'playing' : ''}">
+          <span>${item.song.title}</span>
+        </summary>
+        <div style="padding: 0.3rem 0 1rem 0;">
+          ${priorityOrder.map(label => {
+            const has = !!item.song[stemFields[label]];
+            return `
+              <div class="mixer-row">
+                <label>${label}</label>
+                <input type="range" min="0" max="100" value="${item.volumes[label]}"
+                  class="volSlider" data-index="${i}" data-label="${label}" ${has ? '' : 'disabled'}>
+                <span class="vol-value">${has ? item.volumes[label] : '–'}</span>
+              </div>`;
+          }).join('')}
+          <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+            <button type="button" class="playTrackBtn" data-index="${i}">Spela denna låt</button>
+            <button type="button" class="btn-danger removeTrackBtn" data-id="${item.playlistId}">Ta bort</button>
+          </div>
+        </div>
+      </details>
     </div>
   `).join('');
 
-  document.querySelectorAll('.playTrack').forEach(el => {
-    el.addEventListener('click', (e) => playTrack(parseInt(e.target.dataset.index)));
-  });
-
-  document.querySelectorAll('.stammaSelect').forEach(sel => {
-    sel.addEventListener('change', (e) => {
-      const i = parseInt(e.target.dataset.index);
-      playlist[i].stamma = e.target.value;
-      if (i === currentIndex) playTrack(i);
-    });
+  document.querySelectorAll('.playTrackBtn').forEach(btn => {
+    btn.addEventListener('click', (e) => playTrack(parseInt(e.target.dataset.index)));
   });
 
   document.querySelectorAll('.removeTrackBtn').forEach(btn => {
@@ -111,38 +143,107 @@ function renderPlaylist() {
       loadPlaylist();
     });
   });
+
+  document.querySelectorAll('.volSlider').forEach(slider => {
+    slider.addEventListener('input', (e) => {
+      const i = parseInt(e.target.dataset.index);
+      const label = e.target.dataset.label;
+      const value = parseInt(e.target.value);
+      playlist[i].volumes[label] = value;
+      e.target.nextElementSibling.textContent = value;
+      if (i === currentIndex) applyVolumes(i);
+    });
+    slider.addEventListener('change', async (e) => {
+      const i = parseInt(e.target.dataset.index);
+      const label = e.target.dataset.label;
+      const item = playlist[i];
+      await supabaseClient.from('member_playlists')
+        .update({ [volColumns[label]]: item.volumes[label] })
+        .eq('id', item.playlistId);
+    });
+  });
+}
+
+function applyVolumes(index) {
+  const item = playlist[index];
+  for (const label of priorityOrder) {
+    audios[label].volume = (item.volumes[label] || 0) / 100;
+  }
+}
+
+async function ensureSignedUrls(index) {
+  const item = playlist[index];
+  if (item.signedUrls) return item.signedUrls;
+  const urls = {};
+  for (const label of priorityOrder) {
+    const path = item.song[stemFields[label]];
+    if (!path) { urls[label] = null; continue; }
+    const { data: signed } = await supabaseClient.storage.from('heavy-voices-stems').createSignedUrl(path, 3600);
+    urls[label] = signed ? signed.signedUrl : null;
+  }
+  item.signedUrls = urls;
+  return urls;
 }
 
 async function playTrack(index) {
-  if (index < 0 || index >= playlist.length) return;
+  if (index < 0 || index >= playlist.length) { pauseAll(); currentIndex = -1; renderFloatingPlayer(); return; }
+
+  Object.values(audios).forEach(a => a.pause());
+
   currentIndex = index;
   const item = playlist[index];
-  const path = item.song[stemFields[item.stamma]];
-  const titleEl = document.getElementById('nowPlayingTitle');
-  const audioEl = document.getElementById('audioPlayer');
+  const urls = await ensureSignedUrls(index);
 
-  if (!path) {
-    titleEl.textContent = `${item.song.title} — ${item.stamma}-fil saknas`;
-    audioEl.removeAttribute('src');
-    renderPlaylist();
-    return;
+  referenceLabel = priorityOrder.find(l => urls[l]) || null;
+
+  for (const label of priorityOrder) {
+    if (urls[label]) {
+      audios[label].src = urls[label];
+      audios[label].currentTime = 0;
+    } else {
+      audios[label].removeAttribute('src');
+    }
   }
+  applyVolumes(index);
 
-  const { data: signed } = await supabaseClient.storage
-    .from('heavy-voices-stems')
-    .createSignedUrl(path, 3600);
-
-  titleEl.textContent = `${item.song.title} — ${item.stamma}`;
-  if (signed) {
-    audioEl.src = signed.signedUrl;
-    audioEl.play();
-  }
+  await Promise.all(priorityOrder.map(label => urls[label] ? audios[label].play().catch(() => {}) : Promise.resolve()));
+  isPlaying = true;
+  renderFloatingPlayer();
   renderPlaylist();
 }
 
+function pauseAll() {
+  Object.values(audios).forEach(a => a.pause());
+  isPlaying = false;
+  renderFloatingPlayer();
+}
+
+function resumeAll() {
+  Object.values(audios).forEach(a => { if (a.src) a.play().catch(() => {}); });
+  isPlaying = true;
+  renderFloatingPlayer();
+}
+
+function renderFloatingPlayer() {
+  const bar = document.getElementById('floatingPlayer');
+  if (currentIndex < 0 || !playlist[currentIndex]) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  document.getElementById('nowPlayingTitle').textContent = playlist[currentIndex].song.title;
+  document.getElementById('playPauseBtn').textContent = isPlaying ? 'Pausa' : 'Spela';
+}
+
+document.getElementById('playPauseBtn').addEventListener('click', () => {
+  if (currentIndex < 0) return;
+  isPlaying ? pauseAll() : resumeAll();
+});
 document.getElementById('prevBtn').addEventListener('click', () => playTrack(currentIndex - 1));
 document.getElementById('nextBtn').addEventListener('click', () => playTrack(currentIndex + 1));
-document.getElementById('audioPlayer').addEventListener('ended', () => playTrack(currentIndex + 1));
+
+Object.entries(audios).forEach(([label, a]) => {
+  a.addEventListener('ended', () => {
+    if (label === referenceLabel) playTrack(currentIndex + 1);
+  });
+});
 
 (async () => {
   const member = await requireAuth();

@@ -6,6 +6,10 @@
 <title>Medlem — Heavy Voices</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  .song-link { display: block; padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+  .song-link:last-child { border-bottom: none; }
+</style>
 </head>
 <body>
 
@@ -14,16 +18,17 @@
   <p id="welcome" class="text-muted">Laddar...</p>
 
   <div class="card">
-    <h3>Stämövning</h3>
-    <p class="text-muted">TODO: lista låtar, stämspelare (samma mönster som choir-mixer-online.html)</p>
+    <h3>Repertoar</h3>
+    <div id="repertoireSection"><p class="text-muted">Laddar...</p></div>
   </div>
 
   <div class="card" style="margin-top: 1rem;">
-    <h3>Sångtexter</h3>
-    <p class="text-muted">TODO: lyrics-viewer med LRC-synk</p>
+    <h3>Spelaren</h3>
+    <p class="text-muted">Din spellista med stämfiler</p>
+    <a href="/medlem/spelare.html"><button type="button">Öppna spelaren</button></a>
   </div>
+
   <a href="/konto.html"><button type="button" style="margin-top: 1.5rem; margin-right: 0.5rem; background: transparent; border: 1px solid var(--border);">Mitt konto</button></a>
-  
   <button id="logoutBtn" style="margin-top: 1.5rem;">Logga ut</button>
 </div>
 
@@ -31,10 +36,34 @@
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script>
+async function loadRepertoire() {
+  const { data: songs, error } = await supabaseClient
+    .from('songs')
+    .select('id, title')
+    .order('title');
+
+  const el = document.getElementById('repertoireSection');
+
+  if (error) {
+    el.innerHTML = `<p class="error">Kunde inte hämta repertoaren: ${error.message}</p>`;
+    return;
+  }
+
+  if (!songs.length) {
+    el.innerHTML = `<p class="text-muted">Inga låtar tillagda än.</p>`;
+    return;
+  }
+
+  el.innerHTML = songs.map(s => `
+    <a class="song-link" href="/medlem/latar.html?id=${s.id}">${s.title}</a>
+  `).join('');
+}
+
 (async () => {
   const member = await requireAuth();
   if (member) {
     document.getElementById('welcome').textContent = `Inloggad som ${member.name}`;
+    loadRepertoire();
   }
 })();
 

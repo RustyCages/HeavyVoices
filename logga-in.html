@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logga in — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="container">
+  <p><a href="/" class="text-muted">&larr; Tillbaka</a></p>
+  <h1>Logga in</h1>
+
+  <div class="card" style="max-width: 360px; margin-top: 1.5rem;">
+    <form id="loginForm">
+      <input type="email" id="email" placeholder="E-post" required>
+      <input type="password" id="password" placeholder="Lösenord" required>
+      <button type="submit">Logga in</button>
+      <p class="error" id="loginError"></p>
+    </form>
+    <p class="text-muted" style="margin-top: 1rem; font-size: 0.85rem;">Ny i kören? <a href="/registrera.html">Registrera dig här</a>.</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const errorEl = document.getElementById('loginError');
+  errorEl.textContent = '';
+
+  try {
+    await signIn(email, password);
+    const member = await getCurrentMember();
+    if (!member || member.status !== 'approved') {
+      window.location.href = '/vantar.html';
+      return;
+    }
+    window.location.href = member.role === 'admin' ? '/admin/' : '/medlem/';
+  } catch (err) {
+    errorEl.textContent = 'Fel e-post eller lösenord.';
+  }
+});
+</script>
+
+</body>
+</html>

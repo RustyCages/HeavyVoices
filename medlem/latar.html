@@ -64,7 +64,7 @@ async function loadSong() {
     return;
   }
 
-    document.getElementById('songTitle').textContent = song.title;
+  document.getElementById('songTitle').textContent = song.title;
   document.getElementById('lyricsSection').textContent = song.lyrics_plain || (song.lyrics_pdf_path ? '' : 'Ingen text tillagd än.');
 
   if (song.lyrics_pdf_path) {

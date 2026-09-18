@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Låt — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .back-link { display: inline-block; margin-bottom: 1rem; color: var(--text-muted); }
+  .success { color: #4ade80; font-size: 0.9rem; }
+  .lyrics { white-space: pre-wrap; line-height: 1.7; }
+  audio { width: 100%; margin: 0.3rem 0; }
+  .stem-row { margin-bottom: 0.75rem; }
+  .stem-row label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.2rem; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="/medlem/" class="back-link">&larr; Tillbaka till repertoar</a>
+  <h1 id="songTitle">Laddar...</h1>
+  <button id="addToPlaylistBtn" type="button" style="margin-bottom: 1.5rem;">Lägg till i spellista</button>
+  <p class="success" id="addSuccess"></p>
+
+  <div class="card">
+    <h3>Noter</h3>
+    <div id="sheetMusicSection"><p class="text-muted">Laddar...</p></div>
+  </div>
+
+  <div class="card" style="margin-top: 1.5rem;">
+    <h3>Text</h3>
+    <div class="lyrics" id="lyricsSection"><p class="text-muted">Laddar...</p></div>
+  </div>
+
+  <div class="card" style="margin-top: 1.5rem;">
+    <h3>Stämfiler</h3>
+    <div id="stemsSection"><p class="text-muted">Laddar...</p></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const songId = params.get('id');
+let currentMemberId = null;
+
+async function loadSong() {
+  if (!songId) {
+    document.getElementById('songTitle').textContent = 'Ingen låt vald.';
+    return;
+  }
+
+  const { data: song, error } = await supabaseClient
+    .from('songs')
+    .select('*')
+    .eq('id', songId)
+    .single();
+
+  if (error || !song) {
+    document.getElementById('songTitle').textContent = 'Kunde inte hitta låten.';
+    return;
+  }
+
+  document.getElementById('songTitle').textContent = song.title;
+  document.getElementById('lyricsSection').textContent = song.lyrics_plain || 'Ingen text tillagd än.';
+
+  const sheetEl = document.getElementById('sheetMusicSection');
+  if (song.sheet_music_path) {
+    const { data: signed } = await supabaseClient.storage
+      .from('heavy-voices-noter')
+      .createSignedUrl(song.sheet_music_path, 3600);
+    sheetEl.innerHTML = signed
+      ? `<a href="${signed.signedUrl}" target="_blank"><button type="button">Öppna noter (PDF)</button></a>`
+      : `<p class="text-muted">Kunde inte hämta noter.</p>`;
+  } else {
+    sheetEl.innerHTML = `<p class="text-muted">Inga noter uppladdade än.</p>`;
+  }
+
+  const stems = [
+    { key: 'stem_sopran_path', label: 'Sopran' },
+    { key: 'stem_alt_path', label: 'Alt' },
+    { key: 'stem_tenor_path', label: 'Tenor' },
+    { key: 'stem_bas_path', label: 'Bas' },
+  ];
+
+  const stemsEl = document.getElementById('stemsSection');
+  let stemsHtml = '';
+  let anyStems = false;
+
+  for (const stem of stems) {
+    const path = song[stem.key];
+    stemsHtml += `<div class="stem-row"><label>${stem.label}</label>`;
+    if (path) {
+      anyStems = true;
+      const { data: signed } = await supabaseClient.storage
+        .from('heavy-voices-stems')
+        .createSignedUrl(path, 3600);
+      stemsHtml += signed
+        ? `<audio controls src="${signed.signedUrl}"></audio>`
+        : `<p class="text-muted">Kunde inte hämta filen.</p>`;
+    } else {
+      stemsHtml += `<p class="text-muted" style="margin: 0;">Inte uppladdad än.</p>`;
+    }
+    stemsHtml += `</div>`;
+  }
+
+  stemsEl.innerHTML = anyStems ? stemsHtml : `<p class="text-muted">Inga stämfiler uppladdade än.</p>` + stemsHtml;
+}
+
+document.getElementById('addToPlaylistBtn').addEventListener('click', async () => {
+  const successEl = document.getElementById('addSuccess');
+  const { error } = await supabaseClient
+    .from('member_playlists')
+    .insert({ member_id: currentMemberId, song_id: songId });
+
+  if (error) {
+    if (error.code === '23505') {
+      successEl.textContent = 'Redan i din spellista.';
+    } else {
+      successEl.textContent = 'Kunde inte lägga till: ' + error.message;
+    }
+    return;
+  }
+  successEl.textContent = 'Tillagd i spellistan.';
+});
+
+(async () => {
+  const member = await requireAuth();
+  if (member) {
+    currentMemberId = member.id;
+    loadSong();
+  }
+})();
+</script>
+
+</body>
+</html>

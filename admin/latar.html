@@ -130,7 +130,7 @@ async function loadSongs() {
     });
   });
 
-  document.querySelectorAll('.fileInput').forEach(input => {
+    document.querySelectorAll('.fileInput').forEach(input => {
     input.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -139,7 +139,11 @@ async function loadSongs() {
       const bucket = e.target.dataset.bucket;
       const errEl = document.querySelector(`.uploadError[data-id="${id}"]`);
       const statusEl = e.target.nextElementSibling;
-      errEl.textContent = 'Laddar upp...';
+      errEl.textContent = '';
+      if (statusEl) {
+        statusEl.textContent = `Vald: ${file.name} — laddar upp...`;
+        statusEl.className = 'status-missing';
+      }
 
       const ext = file.name.split('.').pop();
       const path = `${id}/${kind}.${ext}`;
@@ -150,6 +154,7 @@ async function loadSongs() {
 
       if (uploadError) {
         errEl.textContent = 'Uppladdning misslyckades: ' + uploadError.message;
+        if (statusEl) { statusEl.textContent = 'saknas'; statusEl.className = 'status-missing'; }
         return;
       }
 
@@ -163,9 +168,8 @@ async function loadSongs() {
         return;
       }
 
-      errEl.textContent = '';
       if (statusEl) {
-        statusEl.textContent = '✓ uppladdad';
+        statusEl.textContent = `✓ uppladdad (${file.name})`;
         statusEl.className = 'status-ok';
       }
     });

@@ -17,6 +17,7 @@
   .field-row input[type="file"] { flex: 1; font-size: 0.85rem; }
   .status-ok { color: #4ade80; font-size: 0.8rem; }
   .status-missing { color: var(--text-muted); font-size: 0.8rem; }
+  .open-link { font-size: 0.8rem; white-space: nowrap; }
   textarea {
     width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
     border-radius: 6px; padding: 0.6rem 0.9rem; font-family: inherit; min-height: 100px; margin-bottom: 0.5rem;
@@ -24,6 +25,7 @@
   .btn-small { padding: 0.35rem 0.8rem; font-size: 0.85rem; }
   .btn-danger { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
   details > summary { cursor: pointer; margin-top: 0.6rem; color: var(--text-muted); font-size: 0.85rem; }
+  h4.section-heading { margin: 1.2rem 0 0.3rem 0; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 </style>
 </head>
 <body>
@@ -52,6 +54,44 @@
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script>
+const DOC_FIELDS = [
+  { kind: 'sheet_music_path', label: 'Noter (PDF)', accept: 'application/pdf' },
+  { kind: 'lyrics_pdf_path', label: 'Sångtext (PDF)', accept: '.pdf,application/pdf' },
+];
+const STAMTEXT_FIELDS = [
+  { kind: 'lyrics_sopran_path', label: 'Sopran' },
+  { kind: 'lyrics_alt_path', label: 'Alt' },
+  { kind: 'lyrics_tenor_path', label: 'Tenor' },
+  { kind: 'lyrics_bas_path', label: 'Bas' },
+];
+const STEM_FIELDS = [
+  { kind: 'stem_sopran_path', label: 'Sopran' },
+  { kind: 'stem_alt_path', label: 'Alt' },
+  { kind: 'stem_tenor_path', label: 'Tenor' },
+  { kind: 'stem_bas_path', label: 'Bas' },
+];
+
+function docRow(s, field, bucket) {
+  const has = !!s[field.kind];
+  return `
+    <div class="field-row">
+      <label>${field.label}</label>
+      <input type="file" accept="${field.accept || '.pdf,.docx'}" class="fileInput" data-id="${s.id}" data-kind="${field.kind}" data-bucket="${bucket}">
+      <span class="fileStatus ${has ? 'status-ok' : 'status-missing'}" data-id="${s.id}" data-kind="${field.kind}">${has ? '✓ uppladdad' : 'saknas'}</span>
+      <a class="open-link" data-id="${s.id}" data-kind="${field.kind}" data-bucket="${bucket}" href="#" target="_blank" style="display: ${has ? 'inline' : 'none'};">Öppna</a>
+    </div>`;
+}
+
+function stemRow(s, field) {
+  const has = !!s[field.kind];
+  return `
+    <div class="field-row">
+      <label>${field.label}</label>
+      <input type="file" accept="audio/*" class="fileInput" data-id="${s.id}" data-kind="${field.kind}" data-bucket="heavy-voices-stems">
+      <span class="fileStatus ${has ? 'status-ok' : 'status-missing'}" data-id="${s.id}" data-kind="${field.kind}">${has ? '✓ uppladdad' : 'saknas'}</span>
+    </div>`;
+}
+
 async function loadSongs() {
   const { data: songs, error } = await supabaseClient
     .from('songs')
@@ -78,43 +118,23 @@ async function loadSongs() {
         <summary>Redigera text och filer</summary>
 
         <div style="margin-top: 0.75rem;">
+          <h4 class="section-heading">Sångtext (redigerbar)</h4>
           <textarea data-id="${s.id}" class="lyricsField" placeholder="Sångtext">${s.lyrics_plain || ''}</textarea>
-          <p class="text-muted lyricsPdfNote" data-id="${s.id}" style="font-size: 0.8rem; margin: -0.3rem 0 0.5rem 0; ${s.lyrics_pdf_path ? '' : 'display: none;'}">
-            PDF uppladdad — texten ovan går inte att redigera utifrån PDF:en här.
-          </p>
+          <div class="field-row" style="margin-bottom: 0.75rem;">
+            <label>Läs in Word</label>
+            <input type="file" accept=".docx" class="docxInput" data-id="${s.id}">
+            <span class="docxStatus" data-id="${s.id}"></span>
+          </div>
           <button type="button" class="saveLyricsBtn btn-small" data-id="${s.id}">Spara text</button>
 
-          <div class="field-row">
-            <label>Text (Word/PDF)</label>
-            <input type="file" accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="lyricsFileInput" data-id="${s.id}">
-            <span class="lyricsFileStatus ${s.lyrics_pdf_path ? 'status-ok' : 'status-missing'}" data-id="${s.id}">${s.lyrics_pdf_path ? '✓ PDF uppladdad' : 'ingen PDF'}</span>
-          </div>
+          <h4 class="section-heading">Noter &amp; sångtext som fil</h4>
+          ${DOC_FIELDS.map(f => docRow(s, f, 'heavy-voices-noter')).join('')}
 
-          <div class="field-row">
-            <label>Noter (PDF)</label>
-            <input type="file" accept="application/pdf" class="fileInput" data-id="${s.id}" data-kind="sheet_music_path" data-bucket="heavy-voices-noter">
-            <span class="${s.sheet_music_path ? 'status-ok' : 'status-missing'}">${s.sheet_music_path ? '✓ uppladdad' : 'saknas'}</span>
-          </div>
-          <div class="field-row">
-            <label>Sopran</label>
-            <input type="file" accept="audio/*" class="fileInput" data-id="${s.id}" data-kind="stem_sopran_path" data-bucket="heavy-voices-stems">
-            <span class="${s.stem_sopran_path ? 'status-ok' : 'status-missing'}">${s.stem_sopran_path ? '✓ uppladdad' : 'saknas'}</span>
-          </div>
-          <div class="field-row">
-            <label>Alt</label>
-            <input type="file" accept="audio/*" class="fileInput" data-id="${s.id}" data-kind="stem_alt_path" data-bucket="heavy-voices-stems">
-            <span class="${s.stem_alt_path ? 'status-ok' : 'status-missing'}">${s.stem_alt_path ? '✓ uppladdad' : 'saknas'}</span>
-          </div>
-          <div class="field-row">
-            <label>Tenor</label>
-            <input type="file" accept="audio/*" class="fileInput" data-id="${s.id}" data-kind="stem_tenor_path" data-bucket="heavy-voices-stems">
-            <span class="${s.stem_tenor_path ? 'status-ok' : 'status-missing'}">${s.stem_tenor_path ? '✓ uppladdad' : 'saknas'}</span>
-          </div>
-          <div class="field-row">
-            <label>Bas</label>
-            <input type="file" accept="audio/*" class="fileInput" data-id="${s.id}" data-kind="stem_bas_path" data-bucket="heavy-voices-stems">
-            <span class="${s.stem_bas_path ? 'status-ok' : 'status-missing'}">${s.stem_bas_path ? '✓ uppladdad' : 'saknas'}</span>
-          </div>
+          <h4 class="section-heading">Stämtexter (per stämma, visas bara - redigeras ej här)</h4>
+          ${STAMTEXT_FIELDS.map(f => docRow(s, f, 'heavy-voices-noter')).join('')}
+
+          <h4 class="section-heading">Stämfiler (ljud)</h4>
+          ${STEM_FIELDS.map(f => stemRow(s, f)).join('')}
 
           <button type="button" class="btn-danger btn-small deleteSongBtn" data-id="${s.id}" style="margin-top: 0.75rem;">Ta bort låt</button>
           <button type="button" class="btn-small closeDetailsBtn" data-id="${s.id}" style="margin-top: 0.75rem; margin-left: 0.5rem; background: transparent; border: 1px solid var(--border);">OK / Stäng</button>
@@ -124,83 +144,49 @@ async function loadSongs() {
     </div>
   `).join('');
 
+  for (const s of songs) {
+    for (const field of [...DOC_FIELDS, ...STAMTEXT_FIELDS]) {
+      const path = s[field.kind];
+      if (!path) continue;
+      const { data: signed } = await supabaseClient.storage
+        .from('heavy-voices-noter')
+        .createSignedUrl(path, 3600);
+      if (signed) {
+        const link = document.querySelector(`.open-link[data-id="${s.id}"][data-kind="${field.kind}"]`);
+        if (link) { link.href = signed.signedUrl; link.style.display = 'inline'; }
+      }
+    }
+  }
+
   document.querySelectorAll('.saveLyricsBtn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const id = e.target.dataset.id;
       const text = document.querySelector(`.lyricsField[data-id="${id}"]`).value;
-      const { error } = await supabaseClient.from('songs').update({ lyrics_plain: text, lyrics_pdf_path: null }).eq('id', id);
-      if (error) {
-        alert('Kunde inte spara: ' + error.message);
-        return;
-      }
+      const { error } = await supabaseClient.from('songs').update({ lyrics_plain: text }).eq('id', id);
+      if (error) { alert('Kunde inte spara: ' + error.message); return; }
       btn.textContent = 'Sparat!';
       setTimeout(() => btn.textContent = 'Spara text', 1500);
-      const noteEl = document.querySelector(`.lyricsPdfNote[data-id="${id}"]`);
-      const statusEl = document.querySelector(`.lyricsFileStatus[data-id="${id}"]`);
-      if (noteEl) noteEl.style.display = 'none';
-      if (statusEl) { statusEl.textContent = 'ingen PDF'; statusEl.className = 'lyricsFileStatus status-missing'; }
     });
   });
 
-  document.querySelectorAll('.lyricsFileInput').forEach(input => {
+  document.querySelectorAll('.docxInput').forEach(input => {
     input.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
       const id = e.target.dataset.id;
-      const ext = file.name.split('.').pop().toLowerCase();
       const textarea = document.querySelector(`.lyricsField[data-id="${id}"]`);
-      const noteEl = document.querySelector(`.lyricsPdfNote[data-id="${id}"]`);
-      const statusEl = document.querySelector(`.lyricsFileStatus[data-id="${id}"]`);
-      const errEl = document.querySelector(`.uploadError[data-id="${id}"]`);
-      errEl.textContent = '';
-
-      if (ext === 'docx') {
-        statusEl.textContent = 'Läser Word-fil...';
-        try {
-          const arrayBuffer = await file.arrayBuffer();
-          const result = await mammoth.extractRawText({ arrayBuffer });
-          textarea.value = result.value;
-          statusEl.textContent = 'Text inläst — granska och klicka Spara text';
-          statusEl.className = 'lyricsFileStatus status-ok';
-        } catch (err) {
-          errEl.textContent = 'Kunde inte läsa Word-filen: ' + err.message;
-          statusEl.textContent = 'ingen PDF';
-          statusEl.className = 'lyricsFileStatus status-missing';
-        }
-        return;
+      const statusEl = document.querySelector(`.docxStatus[data-id="${id}"]`);
+      statusEl.textContent = 'Läser...';
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        textarea.value = result.value;
+        statusEl.textContent = 'Inläst — granska och klicka Spara text';
+        statusEl.className = 'docxStatus status-ok';
+      } catch (err) {
+        statusEl.textContent = 'Kunde inte läsa filen: ' + err.message;
+        statusEl.className = 'docxStatus';
       }
-
-      if (ext === 'pdf') {
-        statusEl.textContent = 'Laddar upp PDF...';
-        const path = `${id}/lyrics.pdf`;
-        const { error: uploadError } = await supabaseClient.storage
-          .from('heavy-voices-noter')
-          .upload(path, file, { upsert: true });
-
-        if (uploadError) {
-          errEl.textContent = 'Uppladdning misslyckades: ' + uploadError.message;
-          statusEl.textContent = 'ingen PDF';
-          statusEl.className = 'lyricsFileStatus status-missing';
-          return;
-        }
-
-        const { error: updateError } = await supabaseClient
-          .from('songs')
-          .update({ lyrics_pdf_path: path })
-          .eq('id', id);
-
-        if (updateError) {
-          errEl.textContent = 'Kunde inte spara filväg: ' + updateError.message;
-          return;
-        }
-
-        statusEl.textContent = '✓ PDF uppladdad';
-        statusEl.className = 'lyricsFileStatus status-ok';
-        if (noteEl) noteEl.style.display = 'block';
-        return;
-      }
-
-      errEl.textContent = 'Filtypen stöds inte — använd .docx eller .pdf.';
     });
   });
 
@@ -218,12 +204,10 @@ async function loadSongs() {
       const kind = e.target.dataset.kind;
       const bucket = e.target.dataset.bucket;
       const errEl = document.querySelector(`.uploadError[data-id="${id}"]`);
-      const statusEl = e.target.nextElementSibling;
+      const statusEl = document.querySelector(`.fileStatus[data-id="${id}"][data-kind="${kind}"]`);
+      const linkEl = document.querySelector(`.open-link[data-id="${id}"][data-kind="${kind}"]`);
       errEl.textContent = '';
-      if (statusEl) {
-        statusEl.textContent = `Vald: ${file.name} — laddar upp...`;
-        statusEl.className = 'status-missing';
-      }
+      if (statusEl) { statusEl.textContent = `Vald: ${file.name} — laddar upp...`; statusEl.className = 'fileStatus status-missing'; }
 
       const ext = file.name.split('.').pop();
       const path = `${id}/${kind}.${ext}`;
@@ -234,7 +218,7 @@ async function loadSongs() {
 
       if (uploadError) {
         errEl.textContent = 'Uppladdning misslyckades: ' + uploadError.message;
-        if (statusEl) { statusEl.textContent = 'saknas'; statusEl.className = 'status-missing'; }
+        if (statusEl) { statusEl.textContent = 'saknas'; statusEl.className = 'fileStatus status-missing'; }
         return;
       }
 
@@ -248,44 +232,6 @@ async function loadSongs() {
         return;
       }
 
-      if (statusEl) {
-        statusEl.textContent = `✓ uppladdad (${file.name})`;
-        statusEl.className = 'status-ok';
-      }
-    });
-  });
+      if (statusEl) { statusEl.textContent = `✓ uppladdad (${file.name})`; statusEl.className = 'fileStatus status-ok'; }
 
-  document.querySelectorAll('.deleteSongBtn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const id = e.target.dataset.id;
-      if (!confirm('Ta bort låten permanent? Filer i storage måste rensas manuellt separat.')) return;
-      const { error } = await supabaseClient.from('songs').delete().eq('id', id);
-      if (error) alert('Kunde inte ta bort: ' + error.message);
-      else loadSongs();
-    });
-  });
-}
-
-document.getElementById('addSongForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const title = document.getElementById('newTitle').value;
-  const errorEl = document.getElementById('addError');
-  errorEl.textContent = '';
-
-  const { error } = await supabaseClient.from('songs').insert({ title });
-  if (error) {
-    errorEl.textContent = error.message;
-    return;
-  }
-  document.getElementById('addSongForm').reset();
-  loadSongs();
-});
-
-(async () => {
-  const member = await requireAuth('admin');
-  if (member) loadSongs();
-})();
-</script>
-
-</body>
-</html>
+      if (linkEl) {

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spelaren — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .back-link { display: inline-block; margin-bottom: 1rem; color: var(--text-muted); }
+  .track-item { display: flex; align-items: center; justify-content: space-between; padding: 0.7rem 0; border-bottom: 1px solid var(--border); }
+  .track-item:last-child { border-bottom: none; }
+  .track-item.active { color: var(--accent); }
+  select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.5rem; }
+  .player-controls { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; }
+  audio { width: 100%; margin-top: 0.75rem; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="/medlem/" class="back-link">&larr; Tillbaka</a>
+  <h1>Spelaren</h1>
+
+  <div class="card">
+    <h3 id="nowPlayingTitle">Ingen låt vald</h3>
+    <audio id="audioPlayer" controls></audio>
+    <div class="player-controls">
+      <button id="prevBtn" type="button">&larr; Föregående</button>
+      <button id="nextBtn" type="button">Nästa &rarr;</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 1.5rem;">
+    <h3>Min spellista</h3>
+    <div id="playlistSection"><p class="text-muted">Laddar...</p></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+let playlist = [];
+let currentIndex = -1;
+let currentMemberId = null;
+
+const stemFields = {
+  Sopran: 'stem_sopran_path',
+  Alt: 'stem_alt_path',
+  Tenor: 'stem_tenor_path',
+  Bas: 'stem_bas_path',
+};
+
+async function loadPlaylist() {
+  const { data, error } = await supabaseClient
+    .from('member_playlists')
+    .select('id, song_id, songs(*)')
+    .eq('member_id', currentMemberId)
+    .order('created_at');
+
+  const el = document.getElementById('playlistSection');
+
+  if (error) {
+    el.innerHTML = `<p class="error">Kunde inte hämta spellistan: ${error.message}</p>`;
+    return;
+  }
+
+  if (!data.length) {
+    el.innerHTML = `<p class="text-muted">Din spellista är tom. Lägg till låtar från repertoaren.</p>`;
+    playlist = [];
+    return;
+  }
+
+  playlist = data.map(row => ({ playlistId: row.id, song: row.songs, stamma: 'Sopran' }));
+  renderPlaylist();
+}
+
+function renderPlaylist() {
+  const el = document.getElementById('playlistSection');
+  el.innerHTML = playlist.map((item, i) => `
+    <div class="track-item ${i === currentIndex ? 'active' : ''}">
+      <div>
+        <strong class="playTrack" data-index="${i}" style="cursor: pointer;">${item.song.title}</strong>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <select class="stammaSelect" data-index="${i}">
+          ${Object.keys(stemFields).map(s => `<option value="${s}" ${item.stamma === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+        <button type="button" class="btn-danger removeTrackBtn" data-id="${item.playlistId}" style="padding: 0.3rem 0.6rem; font-size: 0.85rem;">Ta bort</button>
+      </div>
+    </div>
+  `).join('');
+
+  document.querySelectorAll('.playTrack').forEach(el => {
+    el.addEventListener('click', (e) => playTrack(parseInt(e.target.dataset.index)));
+  });
+
+  document.querySelectorAll('.stammaSelect').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+      const i = parseInt(e.target.dataset.index);
+      playlist[i].stamma = e.target.value;
+      if (i === currentIndex) playTrack(i);
+    });
+  });
+
+  document.querySelectorAll('.removeTrackBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.id;
+      await supabaseClient.from('member_playlists').delete().eq('id', id);
+      loadPlaylist();
+    });
+  });
+}
+
+async function playTrack(index) {
+  if (index < 0 || index >= playlist.length) return;
+  currentIndex = index;
+  const item = playlist[index];
+  const path = item.song[stemFields[item.stamma]];
+  const titleEl = document.getElementById('nowPlayingTitle');
+  const audioEl = document.getElementById('audioPlayer');
+
+  if (!path) {
+    titleEl.textContent = `${item.song.title} — ${item.stamma}-fil saknas`;
+    audioEl.removeAttribute('src');
+    renderPlaylist();
+    return;
+  }
+
+  const { data: signed } = await supabaseClient.storage
+    .from('heavy-voices-stems')
+    .createSignedUrl(path, 3600);
+
+  titleEl.textContent = `${item.song.title} — ${item.stamma}`;
+  if (signed) {
+    audioEl.src = signed.signedUrl;
+    audioEl.play();
+  }
+  renderPlaylist();
+}
+
+document.getElementById('prevBtn').addEventListener('click', () => playTrack(currentIndex - 1));
+document.getElementById('nextBtn').addEventListener('click', () => playTrack(currentIndex + 1));
+document.getElementById('audioPlayer').addEventListener('ended', () => playTrack(currentIndex + 1));
+
+(async () => {
+  const member = await requireAuth();
+  if (member) {
+    currentMemberId = member.id;
+    loadPlaylist();
+  }
+})();
+</script>
+
+</body>
+</html>

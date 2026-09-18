@@ -30,7 +30,7 @@ async function requireAuth(requiredRole = null) {
   const member = await getCurrentMember();
 
   if (!member) {
-    window.location.href = '/?login=required';
+    window.location.href = '/logga-in.html';
     return null;
   }
 

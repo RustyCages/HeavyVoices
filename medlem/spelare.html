@@ -54,9 +54,9 @@
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script>
-const stemFields = { Sopran: 'stem_sopran_path', Alt: 'stem_alt_path', Tenor: 'stem_tenor_path', Bas: 'stem_bas_path' };
-const volColumns = { Sopran: 'vol_sopran', Alt: 'vol_alt', Tenor: 'vol_tenor', Bas: 'vol_bas' };
-const priorityOrder = ['Sopran', 'Alt', 'Tenor', 'Bas'];
+const stemFields = { Backtrack: 'stem_backtrack_path', Sopran: 'stem_sopran_path', Alt: 'stem_alt_path', Tenor: 'stem_tenor_path', Bas: 'stem_bas_path' };
+const volColumns = { Backtrack: 'vol_backtrack', Sopran: 'vol_sopran', Alt: 'vol_alt', Tenor: 'vol_tenor', Bas: 'vol_bas' };
+const priorityOrder = ['Backtrack', 'Sopran', 'Alt', 'Tenor', 'Bas'];
 
 let playlist = [];
 let currentIndex = -1;
@@ -86,7 +86,7 @@ function ensureAudioContext() {
 async function loadPlaylist() {
   const { data, error } = await supabaseClient
     .from('member_playlists')
-    .select('id, song_id, vol_sopran, vol_alt, vol_tenor, vol_bas, songs(*)')
+    .select('id, song_id, vol_backtrack, vol_sopran, vol_alt, vol_tenor, vol_bas, songs(*)')
     .eq('member_id', currentMemberId)
     .order('created_at');
 
@@ -106,7 +106,7 @@ async function loadPlaylist() {
   playlist = data.map(row => ({
     playlistId: row.id,
     song: row.songs,
-    volumes: { Sopran: row.vol_sopran, Alt: row.vol_alt, Tenor: row.vol_tenor, Bas: row.vol_bas },
+    volumes: { Backtrack: row.vol_backtrack, Sopran: row.vol_sopran, Alt: row.vol_alt, Tenor: row.vol_tenor, Bas: row.vol_bas },
     signedUrls: null,
     buffers: null,
   }));

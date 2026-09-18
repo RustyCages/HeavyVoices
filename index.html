@@ -6,46 +6,40 @@
 <title>Heavy Voices</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+  }
+  .logo { font-size: 1.8rem; letter-spacing: 0.05em; }
+  .top-bar a button { padding: 0.5rem 1.2rem; }
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 60vh;
+    padding: 2rem 1.5rem;
+  }
+  .hero h1 { font-size: 3rem; margin-bottom: 0.5rem; }
+  .hero p { color: var(--text-muted); max-width: 480px; margin-bottom: 1.5rem; }
+</style>
 </head>
 <body>
 
-<div class="container">
-  <h1>Heavy Voices</h1>
-  <p class="text-muted">Placeholder-landningssida — byt ut text, bilder och färger mot riktigt innehåll.</p>
-
-  <div class="card" style="max-width: 360px; margin-top: 2rem;">
-    <h3>Medlemslogin</h3>
-    <form id="loginForm">
-      <input type="email" id="email" placeholder="E-post" required>
-      <input type="password" id="password" placeholder="Lösenord" required>
-      <button type="submit">Logga in</button>
-      <p class="error" id="loginError"></p>
-    </form>
-    <p class="text-muted" style="margin-top: 1rem; font-size: 0.85rem;">Ny i kören? <a href="/registrera.html">Registrera dig här</a>.</p>
-  </div>
+<div class="top-bar">
+  <div class="logo">HEAVY VOICES</div>
+  <a href="/logga-in.html"><button type="button">Logga in</button></a>
 </div>
-     
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="/js/supabase-config.js"></script>
-<script src="/js/auth.js"></script>
-<script>
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-  const errorEl = document.getElementById('loginError');
-  errorEl.textContent = '';
-
-  try {
-    await signIn(email, password);
-    const member = await getCurrentMember();
-    window.location.href = member?.role === 'admin' ? '/admin/' : '/medlem/';
-  } catch (err) {
-    errorEl.textContent = 'Fel e-post eller lösenord.';
-  }
-});
-</script>
+<div class="hero">
+  <h1>Heavy Voices</h1>
+  <p>Placeholder-text — byt ut mot en kort beskrivning av kören, vad ni sjunger och var ni håller till.</p>
+  <a href="/registrera.html"><button type="button" style="background: transparent; border: 1px solid var(--border);">Bli medlem</button></a>
+</div>
 
 </body>
 </html>

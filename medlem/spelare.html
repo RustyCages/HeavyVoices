@@ -26,6 +26,7 @@
   .floating-player .now-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; }
   .floating-player .controls { display: flex; gap: 0.5rem; }
   .container { padding-bottom: 6rem; }
+  .loading-note { font-size: 0.8rem; color: var(--text-muted); }
 </style>
 </head>
 <body>
@@ -49,11 +50,6 @@
   </div>
 </div>
 
-<audio id="audioSopran" preload="none"></audio>
-<audio id="audioAlt" preload="none"></audio>
-<audio id="audioTenor" preload="none"></audio>
-<audio id="audioBas" preload="none"></audio>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
@@ -62,18 +58,30 @@ const stemFields = { Sopran: 'stem_sopran_path', Alt: 'stem_alt_path', Tenor: 's
 const volColumns = { Sopran: 'vol_sopran', Alt: 'vol_alt', Tenor: 'vol_tenor', Bas: 'vol_bas' };
 const priorityOrder = ['Sopran', 'Alt', 'Tenor', 'Bas'];
 
-const audios = {
-  Sopran: document.getElementById('audioSopran'),
-  Alt: document.getElementById('audioAlt'),
-  Tenor: document.getElementById('audioTenor'),
-  Bas: document.getElementById('audioBas'),
-};
-
 let playlist = [];
 let currentIndex = -1;
 let isPlaying = false;
 let currentMemberId = null;
+
+let audioCtx = null;
+let gainNodes = {};
+let activeSources = {};
 let referenceLabel = null;
+let playbackStartTime = 0;
+let playbackOffset = 0;
+let manualStop = false;
+
+function ensureAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    for (const label of priorityOrder) {
+      const gain = audioCtx.createGain();
+      gain.connect(audioCtx.destination);
+      gainNodes[label] = gain;
+    }
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
 
 async function loadPlaylist() {
   const { data, error } = await supabaseClient
@@ -100,6 +108,7 @@ async function loadPlaylist() {
     song: row.songs,
     volumes: { Sopran: row.vol_sopran, Alt: row.vol_alt, Tenor: row.vol_tenor, Bas: row.vol_bas },
     signedUrls: null,
+    buffers: null,
   }));
   renderPlaylist();
 }
@@ -123,9 +132,10 @@ function renderPlaylist() {
                 <span class="vol-value">${has ? item.volumes[label] : '–'}</span>
               </div>`;
           }).join('')}
-          <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+          <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
             <button type="button" class="playTrackBtn" data-index="${i}">Spela denna låt</button>
             <button type="button" class="btn-danger removeTrackBtn" data-id="${item.playlistId}">Ta bort</button>
+            <span class="loading-note" data-index="${i}"></span>
           </div>
         </div>
       </details>
@@ -133,7 +143,7 @@ function renderPlaylist() {
   `).join('');
 
   document.querySelectorAll('.playTrackBtn').forEach(btn => {
-    btn.addEventListener('click', (e) => playTrack(parseInt(e.target.dataset.index)));
+    btn.addEventListener('click', (e) => playAt(parseInt(e.target.dataset.index), 0));
   });
 
   document.querySelectorAll('.removeTrackBtn').forEach(btn => {
@@ -151,7 +161,9 @@ function renderPlaylist() {
       const value = parseInt(e.target.value);
       playlist[i].volumes[label] = value;
       e.target.nextElementSibling.textContent = value;
-      if (i === currentIndex) applyVolumes(i);
+      if (i === currentIndex && gainNodes[label]) {
+        gainNodes[label].gain.value = value / 100;
+      }
     });
     slider.addEventListener('change', async (e) => {
       const i = parseInt(e.target.dataset.index);
@@ -162,13 +174,6 @@ function renderPlaylist() {
         .eq('id', item.playlistId);
     });
   });
-}
-
-function applyVolumes(index) {
-  const item = playlist[index];
-  for (const label of priorityOrder) {
-    audios[label].volume = (item.volumes[label] || 0) / 100;
-  }
 }
 
 async function ensureSignedUrls(index) {
@@ -185,43 +190,102 @@ async function ensureSignedUrls(index) {
   return urls;
 }
 
-async function playTrack(index) {
-  if (index < 0 || index >= playlist.length) { pauseAll(); currentIndex = -1; renderFloatingPlayer(); return; }
+async function ensureBuffers(index) {
+  const item = playlist[index];
+  if (item.buffers) return item.buffers;
 
-  Object.values(audios).forEach(a => a.pause());
+  const note = document.querySelector(`.loading-note[data-index="${index}"]`);
+  if (note) note.textContent = 'Laddar ljud...';
+
+  const urls = await ensureSignedUrls(index);
+  const buffers = {};
+
+  await Promise.all(priorityOrder.map(async (label) => {
+    if (!urls[label]) { buffers[label] = null; return; }
+    try {
+      const res = await fetch(urls[label]);
+      const arrayBuffer = await res.arrayBuffer();
+      buffers[label] = await audioCtx.decodeAudioData(arrayBuffer);
+    } catch (err) {
+      buffers[label] = null;
+    }
+  }));
+
+  item.buffers = buffers;
+  if (note) note.textContent = '';
+  return buffers;
+}
+
+function stopSources() {
+  for (const label of Object.keys(activeSources)) {
+    const source = activeSources[label];
+    source.onended = null;
+    try { source.stop(); } catch (e) {}
+  }
+  activeSources = {};
+}
+
+async function playAt(index, offsetSeconds) {
+  if (index < 0 || index >= playlist.length) {
+    stopSources();
+    isPlaying = false;
+    currentIndex = -1;
+    renderFloatingPlayer();
+    return;
+  }
+
+  ensureAudioContext();
+  manualStop = true;
+  stopSources();
 
   currentIndex = index;
   const item = playlist[index];
-  const urls = await ensureSignedUrls(index);
 
-  referenceLabel = priorityOrder.find(l => urls[l]) || null;
+  const buffers = await ensureBuffers(index);
+
+  referenceLabel = priorityOrder.find(l => buffers[l]) || null;
+  if (!referenceLabel) {
+    alert('Inga stämfiler uppladdade för den här låten.');
+    return;
+  }
+
+  const startAt = audioCtx.currentTime + 0.15;
 
   for (const label of priorityOrder) {
-    if (urls[label]) {
-      audios[label].src = urls[label];
-      audios[label].currentTime = 0;
-    } else {
-      audios[label].removeAttribute('src');
-    }
+    if (!buffers[label]) continue;
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffers[label];
+    source.connect(gainNodes[label]);
+    gainNodes[label].gain.value = (item.volumes[label] || 0) / 100;
+    source.start(startAt, offsetSeconds);
+    activeSources[label] = source;
   }
-  applyVolumes(index);
 
-  await Promise.all(priorityOrder.map(label => urls[label] ? audios[label].play().catch(() => {}) : Promise.resolve()));
+  manualStop = false;
+  activeSources[referenceLabel].onended = () => {
+    if (!manualStop) playAt(currentIndex + 1, 0);
+  };
+
+  playbackStartTime = startAt;
+  playbackOffset = offsetSeconds;
   isPlaying = true;
   renderFloatingPlayer();
   renderPlaylist();
 }
 
 function pauseAll() {
-  Object.values(audios).forEach(a => a.pause());
+  if (currentIndex < 0) return;
+  manualStop = true;
+  const elapsed = Math.max(0, audioCtx.currentTime - playbackStartTime + playbackOffset);
+  stopSources();
+  playbackOffset = elapsed;
   isPlaying = false;
   renderFloatingPlayer();
 }
 
 function resumeAll() {
-  Object.values(audios).forEach(a => { if (a.src) a.play().catch(() => {}); });
-  isPlaying = true;
-  renderFloatingPlayer();
+  if (currentIndex < 0) return;
+  playAt(currentIndex, playbackOffset);
 }
 
 function renderFloatingPlayer() {
@@ -236,14 +300,8 @@ document.getElementById('playPauseBtn').addEventListener('click', () => {
   if (currentIndex < 0) return;
   isPlaying ? pauseAll() : resumeAll();
 });
-document.getElementById('prevBtn').addEventListener('click', () => playTrack(currentIndex - 1));
-document.getElementById('nextBtn').addEventListener('click', () => playTrack(currentIndex + 1));
-
-Object.entries(audios).forEach(([label, a]) => {
-  a.addEventListener('ended', () => {
-    if (label === referenceLabel) playTrack(currentIndex + 1);
-  });
-});
+document.getElementById('prevBtn').addEventListener('click', () => playAt(currentIndex - 1, 0));
+document.getElementById('nextBtn').addEventListener('click', () => playAt(currentIndex + 1, 0));
 
 (async () => {
   const member = await requireAuth();

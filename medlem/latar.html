@@ -65,7 +65,17 @@ async function loadSong() {
   }
 
   document.getElementById('songTitle').textContent = song.title;
-  document.getElementById('lyricsSection').textContent = song.lyrics_plain || 'Ingen text tillagd än.';
+  document.getElementById('lyricsSection').textContent = song.lyrics_plain || (song.lyrics_pdf_path ? '' : 'Ingen text tillagd än.');
+
+  if (song.lyrics_pdf_path) {
+    const { data: signedLyrics } = await supabaseClient.storage
+      .from('heavy-voices-noter')
+      .createSignedUrl(song.lyrics_pdf_path, 3600);
+    if (signedLyrics) {
+      document.getElementById('lyricsSection').insertAdjacentHTML('beforeend',
+        `<p style="margin-top: 0.75rem;"><a href="${signedLyrics.signedUrl}" target="_blank"><button type="button">Öppna text (PDF)</button></a></p>`);
+    }
+  }
 
   const sheetEl = document.getElementById('sheetMusicSection');
   if (song.sheet_music_path) {

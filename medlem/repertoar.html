@@ -1,1 +1,78 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Repertoar — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .song-card { border-bottom: 1px solid var(--border); }
+  .song-card:last-child { border-bottom: none; }
+  .song-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 1rem 0; cursor: pointer; list-style: none;
+  }
+  .song-header::-webkit-details-marker { display: none; }
+  .song-header .title { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 0.03em; }
+  .song-header .arrow { transition: transform 0.15s; color: var(--text-muted); font-size: 1.1rem; }
+  details[open] .song-header .arrow { transform: rotate(180deg); }
+  .song-body { padding: 0 0 1.2rem 0; display: flex; gap: 0.6rem; }
+</style>
+</head>
+<body>
 
+<div class="container">
+  <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
+  <h1>Repertoar</h1>
+
+  <div class="card">
+    <div id="repertoireSection"><p class="text-muted">Laddar...</p></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+async function loadRepertoire() {
+  const { data: songs, error } = await supabaseClient
+    .from('songs')
+    .select('id, title')
+    .order('title');
+
+  const el = document.getElementById('repertoireSection');
+
+  if (error) {
+    el.innerHTML = `<p class="error">Kunde inte hämta repertoaren: ${error.message}</p>`;
+    return;
+  }
+
+  if (!songs.length) {
+    el.innerHTML = `<p class="text-muted">Inga låtar tillagda än.</p>`;
+    return;
+  }
+
+  el.innerHTML = songs.map(s => `
+    <div class="song-card">
+      <details>
+        <summary class="song-header">
+          <span class="title">${s.title}</span>
+          <span class="arrow">&#9660;</span>
+        </summary>
+        <div class="song-body">
+          <a href="/medlem/latar.html?id=${s.id}"><button type="button">Öppna låt</button></a>
+        </div>
+      </details>
+    </div>
+  `).join('');
+}
+
+(async () => {
+  const member = await requireAuth();
+  if (member) loadRepertoire();
+})();
+</script>
+
+</body>
+</html>

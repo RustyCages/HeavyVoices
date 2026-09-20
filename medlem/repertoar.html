@@ -32,20 +32,26 @@
 <body>
 
 <div class="container">
-  <div class="top-nav">
+   <div class="top-nav">
     <a href="/medlem/spelare.html" class="top-nav-link">Spellistor</a>
     <a href="/medlem/repertoar.html" class="top-nav-link active">Repertoar</a>
-    <a href="/medlem/skapa-spellista.html" class="top-nav-link">Skapa spellista</a>
   </div>
 
-  <a href="/medlem/spelare.html" class="back-btn">&larr; Tillbaka till Spelaren</a>
+  <a href="/medlem/spelare.html" class="back-btn">&larr; Tillbaka till Spellistor</a>
   <h1>Repertoar</h1>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <h3>Skapa ny spellista</h3>
+    <form id="quickCreateForm" style="display: flex; gap: 0.5rem;">
+      <input type="text" id="quickPlName" placeholder="Namn på spellistan" required style="margin-bottom: 0;">
+      <button type="submit">Skapa</button>
+    </form>
+    <p class="error" id="quickCreateError"></p>
+  </div>
 
   <div class="card">
     <div id="repertoireSection"><p class="text-muted">Laddar...</p></div>
   </div>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
@@ -118,9 +124,6 @@ async function loadRepertoire() {
   document.querySelectorAll('.addSelectedBtn').forEach(btn => {
     btn.addEventListener('click', (e) => addToPlaylist(e.target.dataset.id, false));
   });
-  document.querySelectorAll('.addAllBtn').forEach(btn => {
-    btn.addEventListener('click', (e) => addToPlaylist(e.target.dataset.id, true));
-  });
 }
 
 function playlistOptionsHtml(songId) {
@@ -163,9 +166,9 @@ function renderSongCard(s) {
               `).join('')}
             </div>
             <div class="add-row">
-              ${playlistOptionsHtml(s.id)}
+            <div class="add-row">
               <button type="button" class="addSelectedBtn btn-small" data-id="${s.id}">Lägg till valda i spellista</button>
-              <button type="button" class="addAllBtn btn-small" data-id="${s.id}" style="background: transparent; border: 1px solid var(--border);">Lägg till alla stämmor</button>
+              ${playlistOptionsHtml(s.id)}
             </div>
             <p class="success" id="addSuccess-${s.id}"></p>
             <p class="error" id="addError-${s.id}"></p>
@@ -250,7 +253,24 @@ async function addToPlaylist(songId, selectAll) {
 
   successEl.textContent = 'Tillagd i spellistan.';
 }
+document.getElementById('quickCreateForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('quickPlName').value.trim();
+  const errorEl = document.getElementById('quickCreateError');
+  errorEl.textContent = '';
 
+  const { data, error } = await supabaseClient
+    .from('playlists').insert({ member_id: currentMemberId, name }).select().single();
+
+  if (error) { errorEl.textContent = error.message; return; }
+
+  playlists.push(data);
+  document.getElementById('quickPlName').value = '';
+  // Uppdatera dropdown-listorna i redan öppnade låtkort
+  document.querySelectorAll('.playlistSelect').forEach(sel => {
+    sel.insertAdjacentHTML('beforeend', `<option value="${data.id}">${data.name}</option>`);
+  });
+});
 (async () => {
   const member = await requireAuth();
   if (member) {

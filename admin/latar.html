@@ -236,3 +236,43 @@ async function loadSongs() {
       if (statusEl) { statusEl.textContent = `✓ uppladdad (${file.name})`; statusEl.className = 'fileStatus status-ok'; }
 
       if (linkEl) {
+        const { data: signed } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 3600);
+        if (signed) { linkEl.href = signed.signedUrl; linkEl.style.display = 'inline'; }
+      }
+    });
+  });
+
+  document.querySelectorAll('.deleteSongBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.id;
+      if (!confirm('Ta bort låten permanent? Filer i storage måste rensas manuellt separat.')) return;
+      const { error } = await supabaseClient.from('songs').delete().eq('id', id);
+      if (error) alert('Kunde inte ta bort: ' + error.message);
+      else loadSongs();
+    });
+  });
+}
+
+document.getElementById('addSongForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const title = document.getElementById('newTitle').value;
+  const errorEl = document.getElementById('addError');
+  errorEl.textContent = '';
+
+  const { error } = await supabaseClient.from('songs').insert({ title });
+  if (error) {
+    errorEl.textContent = error.message;
+    return;
+  }
+  document.getElementById('addSongForm').reset();
+  loadSongs();
+});
+
+(async () => {
+  const member = await requireAuth('admin');
+  if (member) loadSongs();
+})();
+</script>
+
+</body>
+</html>

@@ -63,7 +63,10 @@
     <a href="/medlem/spelare.html" class="back-btn">&larr; Tillbaka till spellistor</a>
     <div class="header-row">
       <h1 id="playlistTitle">Spellista</h1>
-      <button type="button" id="playAllBtn">Spela listan</button>
+      <div style="display: flex; gap: 0.5rem;">
+        <button type="button" id="playAllBtn">Spela listan</button>
+        <button type="button" id="deletePlaylistBtn" class="btn-danger">Radera spellista</button>
+      </div>
     </div>
     <div class="card">
       <div id="tracksSection"><p class="text-muted">Laddar...</p></div>
@@ -156,12 +159,21 @@ async function loadPlaylistsList() {
     el.innerHTML = `<p class="text-muted">Du har inga spellistor än. <a href="/medlem/skapa-spellista.html">Skapa en</a> eller lägg till låtar från <a href="/medlem/repertoar.html">Repertoaren</a>.</p>`;
     return;
   }
-
+  
   el.innerHTML = data.map(p => `
     <div class="playlist-card">
       <a href="/medlem/spelare.html?playlist=${p.id}">${p.name}</a>
+      <button type="button" class="btn-danger deletePlaylistCardBtn" data-id="${p.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Radera</button>
     </div>
   `).join('');
+
+  document.querySelectorAll('.deletePlaylistCardBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      if (!confirm('Radera spellistan permanent?')) return;
+      await supabaseClient.from('playlists').delete().eq('id', e.target.dataset.id);
+      loadPlaylistsList();
+    });
+  });
 }
 
 async function loadPlaylistDetail() {
@@ -210,6 +222,7 @@ function renderTracks() {
         <summary class="track-header ${i === currentIndex ? 'playing' : ''}">
           <span class="title">${item.song.title}</span>
           <button type="button" class="quick-play" data-index="${i}">&#9658; Spela</button>
+          <span class="arrow">&#9660;</span>
         </summary>
         <div style="padding: 0.3rem 0 1rem 0;">
           ${priorityOrder.map(label => {

@@ -283,13 +283,27 @@ function renderTracks() {
         gainNodes[label].gain.value = value / 100;
       }
     });
-    slider.addEventListener('change', async (e) => {
+     slider.addEventListener('change', async (e) => {
       const i = parseInt(e.target.dataset.index);
       const label = e.target.dataset.label;
       const item = tracks[i];
       await supabaseClient.from('playlist_songs')
         .update({ [volColumns[label]]: item.volumes[label] })
         .eq('id', item.playlistSongId);
+    });
+  });
+
+  document.querySelectorAll('.muteBtn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const i = parseInt(e.target.dataset.index);
+      const label = e.target.dataset.label;
+      const item = tracks[i];
+      item.muted = item.muted || {};
+      item.muted[label] = !item.muted[label];
+      e.target.classList.toggle('active', item.muted[label]);
+      if (i === currentIndex && gainNodes[label]) {
+        gainNodes[label].gain.value = item.muted[label] ? 0 : (item.volumes[label] || 0) / 100;
+      }
     });
   });
 }
@@ -476,7 +490,11 @@ progressSlider.addEventListener('change', (e) => {
 });
 
 document.getElementById('playAllBtn').addEventListener('click', () => playAt(0, 0));
-
+document.getElementById('deletePlaylistBtn').addEventListener('click', async () => {
+  if (!confirm('Radera hela spellistan permanent?')) return;
+  await supabaseClient.from('playlists').delete().eq('id', playlistId);
+  window.location.href = '/medlem/spelare.html';
+});
 (async () => {
   const member = await requireAuth();
   if (!member) return;

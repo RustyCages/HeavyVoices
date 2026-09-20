@@ -7,7 +7,6 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
 <style>
-  .back-link { display: inline-block; margin-bottom: 1rem; color: var(--text-muted); }
   .track-card { border-bottom: 1px solid var(--border); }
   .track-card:last-child { border-bottom: none; }
   .track-header { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 0; cursor: pointer; list-style: none; }
@@ -17,36 +16,39 @@
   .mixer-row label { width: 70px; color: var(--text-muted); font-size: 0.85rem; flex-shrink: 0; }
   .mixer-row input[type="range"] { flex: 1; }
   .mixer-row .vol-value { width: 32px; text-align: right; font-size: 0.8rem; color: var(--text-muted); }
-  .floating-player {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    background: var(--bg-elevated); border-top: 1px solid var(--border);
-    padding: 0.8rem 1.2rem; display: none; align-items: center; justify-content: space-between; gap: 1rem;
-    z-index: 50;
-  }
-  .floating-player .now-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; }
-  .floating-player .controls { display: flex; gap: 0.5rem; }
-  .container { padding-bottom: 6rem; }
+  .stem-filename { font-size: 0.75rem; color: var(--text-muted); margin: -0.3rem 0 0.4rem 76px; word-break: break-all; }
+  .player-panel { margin-bottom: 1.5rem; }
+  .player-panel .now-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; margin-bottom: 0.5rem; }
+  .player-panel .controls { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.6rem; }
+  .progress-row { display: flex; align-items: center; gap: 0.6rem; }
+  .progress-row input[type="range"] { flex: 1; }
+  .progress-row .time { font-size: 0.8rem; color: var(--text-muted); width: 40px; text-align: center; }
   .loading-note { font-size: 0.8rem; color: var(--text-muted); }
 </style>
 </head>
 <body>
 
 <div class="container">
-  <a href="/medlem/" class="back-link">&larr; Tillbaka</a>
+  <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
   <h1>Spelaren</h1>
+
+  <div class="card player-panel">
+    <div class="now-title" id="nowPlayingTitle">Ingen låt vald</div>
+    <div class="controls">
+      <button id="prevBtn" type="button">&larr;</button>
+      <button id="playPauseBtn" type="button">Spela</button>
+      <button id="nextBtn" type="button">&rarr;</button>
+    </div>
+    <div class="progress-row">
+      <span class="time" id="timeElapsed">0:00</span>
+      <input type="range" id="progressSlider" min="0" max="100" value="0" step="0.1">
+      <span class="time" id="timeTotal">0:00</span>
+    </div>
+  </div>
 
   <div class="card">
     <h3>Min spellista</h3>
     <div id="playlistSection"><p class="text-muted">Laddar...</p></div>
-  </div>
-</div>
-
-<div class="floating-player" id="floatingPlayer">
-  <div class="now-title" id="nowPlayingTitle">–</div>
-  <div class="controls">
-    <button id="prevBtn" type="button">&larr;</button>
-    <button id="playPauseBtn" type="button">Spela</button>
-    <button id="nextBtn" type="button">&rarr;</button>
   </div>
 </div>
 
@@ -70,6 +72,23 @@ let referenceLabel = null;
 let playbackStartTime = 0;
 let playbackOffset = 0;
 let manualStop = false;
+let currentDuration = 0;
+let isSeeking = false;
+let progressTimer = null;
+
+function stemFilename(path) {
+  if (!path) return '';
+  const base = path.split('/').pop();
+  const parts = base.split('__');
+  return parts.length > 1 ? decodeURIComponent(parts.slice(1).join('__')) : base;
+}
+
+function formatTime(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 function ensureAudioContext() {
   if (!audioCtx) {
@@ -100,6 +119,7 @@ async function loadPlaylist() {
   if (!data.length) {
     el.innerHTML = `<p class="text-muted">Din spellista är tom. Lägg till låtar från repertoaren.</p>`;
     playlist = [];
+    renderPlayerPanel();
     return;
   }
 
@@ -110,7 +130,11 @@ async function loadPlaylist() {
     signedUrls: null,
     buffers: null,
   }));
+
+  if (currentIndex === -1) currentIndex = 0;
+
   renderPlaylist();
+  renderPlayerPanel();
 }
 
 function renderPlaylist() {
@@ -123,14 +147,17 @@ function renderPlaylist() {
         </summary>
         <div style="padding: 0.3rem 0 1rem 0;">
           ${priorityOrder.map(label => {
-            const has = !!item.song[stemFields[label]];
+            const path = item.song[stemFields[label]];
+            const has = !!path;
             return `
               <div class="mixer-row">
                 <label>${label}</label>
                 <input type="range" min="0" max="100" value="${item.volumes[label]}"
                   class="volSlider" data-index="${i}" data-label="${label}" ${has ? '' : 'disabled'}>
                 <span class="vol-value">${has ? item.volumes[label] : '–'}</span>
-              </div>`;
+              </div>
+              ${has ? `<div class="stem-filename">${stemFilename(path)}</div>` : ''}
+            `;
           }).join('')}
           <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
             <button type="button" class="playTrackBtn" data-index="${i}">Spela denna låt</button>
@@ -174,6 +201,18 @@ function renderPlaylist() {
         .eq('id', item.playlistId);
     });
   });
+}
+
+function renderPlayerPanel() {
+  const title = document.getElementById('nowPlayingTitle');
+  if (currentIndex < 0 || !playlist[currentIndex]) {
+    title.textContent = playlist.length ? 'Välj en låt' : 'Din spellista är tom';
+    document.getElementById('playPauseBtn').disabled = true;
+    return;
+  }
+  document.getElementById('playPauseBtn').disabled = false;
+  title.textContent = playlist[currentIndex].song.title;
+  document.getElementById('playPauseBtn').textContent = isPlaying ? 'Pausa' : 'Spela';
 }
 
 async function ensureSignedUrls(index) {
@@ -229,8 +268,8 @@ async function playAt(index, offsetSeconds) {
   if (index < 0 || index >= playlist.length) {
     stopSources();
     isPlaying = false;
-    currentIndex = -1;
-    renderFloatingPlayer();
+    stopProgressTimer();
+    renderPlayerPanel();
     return;
   }
 
@@ -246,8 +285,12 @@ async function playAt(index, offsetSeconds) {
   referenceLabel = priorityOrder.find(l => buffers[l]) || null;
   if (!referenceLabel) {
     alert('Inga stämfiler uppladdade för den här låten.');
+    renderPlaylist();
     return;
   }
+  currentDuration = buffers[referenceLabel].duration;
+  document.getElementById('progressSlider').max = currentDuration;
+  document.getElementById('timeTotal').textContent = formatTime(currentDuration);
 
   const startAt = audioCtx.currentTime + 0.15;
 
@@ -269,7 +312,8 @@ async function playAt(index, offsetSeconds) {
   playbackStartTime = startAt;
   playbackOffset = offsetSeconds;
   isPlaying = true;
-  renderFloatingPlayer();
+  startProgressTimer();
+  renderPlayerPanel();
   renderPlaylist();
 }
 
@@ -280,7 +324,8 @@ function pauseAll() {
   stopSources();
   playbackOffset = elapsed;
   isPlaying = false;
-  renderFloatingPlayer();
+  stopProgressTimer();
+  renderPlayerPanel();
 }
 
 function resumeAll() {
@@ -288,12 +333,19 @@ function resumeAll() {
   playAt(currentIndex, playbackOffset);
 }
 
-function renderFloatingPlayer() {
-  const bar = document.getElementById('floatingPlayer');
-  if (currentIndex < 0 || !playlist[currentIndex]) { bar.style.display = 'none'; return; }
-  bar.style.display = 'flex';
-  document.getElementById('nowPlayingTitle').textContent = playlist[currentIndex].song.title;
-  document.getElementById('playPauseBtn').textContent = isPlaying ? 'Pausa' : 'Spela';
+function startProgressTimer() {
+  stopProgressTimer();
+  progressTimer = setInterval(() => {
+    if (!isPlaying || isSeeking) return;
+    const elapsed = audioCtx.currentTime - playbackStartTime + playbackOffset;
+    document.getElementById('progressSlider').value = Math.min(elapsed, currentDuration);
+    document.getElementById('timeElapsed').textContent = formatTime(elapsed);
+  }, 250);
+}
+
+function stopProgressTimer() {
+  if (progressTimer) clearInterval(progressTimer);
+  progressTimer = null;
 }
 
 document.getElementById('playPauseBtn').addEventListener('click', () => {
@@ -302,6 +354,17 @@ document.getElementById('playPauseBtn').addEventListener('click', () => {
 });
 document.getElementById('prevBtn').addEventListener('click', () => playAt(currentIndex - 1, 0));
 document.getElementById('nextBtn').addEventListener('click', () => playAt(currentIndex + 1, 0));
+
+const progressSlider = document.getElementById('progressSlider');
+progressSlider.addEventListener('input', (e) => {
+  isSeeking = true;
+  document.getElementById('timeElapsed').textContent = formatTime(parseFloat(e.target.value));
+});
+progressSlider.addEventListener('change', (e) => {
+  isSeeking = false;
+  if (currentIndex < 0) return;
+  playAt(currentIndex, parseFloat(e.target.value));
+});
 
 (async () => {
   const member = await requireAuth();

@@ -62,3 +62,18 @@ button {
 button:hover { opacity: 0.9; }
 
 .error { color: var(--accent); font-size: 0.9rem; }
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  background: var(--bg-elevated);
+}
+.back-btn:hover { border-color: var(--accent); color: var(--accent); }lor: var(--accent); font-size: 0.9rem; }

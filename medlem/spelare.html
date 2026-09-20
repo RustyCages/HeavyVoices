@@ -22,7 +22,7 @@
   .track-header .arrow { transition: transform 0.15s; color: var(--text-muted); }
 details[open] .track-header .arrow { transform: rotate(180deg); }
   .quick-play { padding: 0.3rem 0.6rem; font-size: 0.8rem; background: transparent; border: 1px solid var(--border); }
-
+.muteBtn.active { border-color: var(--accent); color: var(--accent); background: rgba(224,36,36,0.1); }
   .mixer-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.5rem 0; }
   .mixer-row label { width: 70px; color: var(--text-muted); font-size: 0.85rem; flex-shrink: 0; }
   .mixer-row input[type="range"] { flex: 1; }
@@ -237,6 +237,7 @@ function renderTracks() {
                 <input type="range" min="0" max="100" value="${item.volumes[label]}"
                   class="volSlider" data-index="${i}" data-label="${label}" ${has ? '' : 'disabled'}>
                 <span class="vol-value">${has ? item.volumes[label] : '–'}</span>
+                <button type="button" class="muteBtn ${item.muted && item.muted[label] ? 'active' : ''}" data-index="${i}" data-label="${label}" ${has ? '' : 'disabled'} style="padding: 0.25rem 0.6rem; font-size: 0.75rem; background: transparent; border: 1px solid var(--border);">Mute</button>
               </div>
               ${has ? `<div class="stem-filename">${stemFilename(path)}</div>` : ''}
             `;
@@ -377,7 +378,7 @@ async function playAt(index, offsetSeconds) {
     const source = audioCtx.createBufferSource();
     source.buffer = buffers[label];
     source.connect(gainNodes[label]);
-    gainNodes[label].gain.value = (item.volumes[label] || 0) / 100;
+    gainNodes[label].gain.value = (item.muted && item.muted[label]) ? 0 : (item.volumes[label] || 0) / 100;
     source.start(startAt, offsetSeconds);
     activeSources[label] = source;
   }

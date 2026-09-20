@@ -7,48 +7,81 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
 <style>
+  .playlist-card { display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 0; border-bottom: 1px solid var(--border); }
+  .playlist-card:last-child { border-bottom: none; }
+  .playlist-card a { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 0.03em; }
+  .header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
+
   .track-card { border-bottom: 1px solid var(--border); }
   .track-card:last-child { border-bottom: none; }
-  .track-header { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 0; cursor: pointer; list-style: none; }
+  .track-header { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 0; cursor: pointer; list-style: none; gap: 0.5rem; }
   .track-header::-webkit-details-marker { display: none; }
   .track-header.playing { color: var(--accent); }
+  .track-header .title { flex: 1; }
+  .quick-play { padding: 0.3rem 0.6rem; font-size: 0.8rem; background: transparent; border: 1px solid var(--border); }
+
   .mixer-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.5rem 0; }
   .mixer-row label { width: 70px; color: var(--text-muted); font-size: 0.85rem; flex-shrink: 0; }
   .mixer-row input[type="range"] { flex: 1; }
   .mixer-row .vol-value { width: 32px; text-align: right; font-size: 0.8rem; color: var(--text-muted); }
   .stem-filename { font-size: 0.75rem; color: var(--text-muted); margin: -0.3rem 0 0.4rem 76px; word-break: break-all; }
-  .player-panel { margin-bottom: 1.5rem; }
-  .player-panel .now-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; margin-bottom: 0.5rem; }
-  .player-panel .controls { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.6rem; }
+  .loading-note { font-size: 0.8rem; color: var(--text-muted); }
+
+  .floating-player {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg-elevated); border-top: 1px solid var(--border);
+    padding: 0.8rem 1.2rem; display: none; flex-direction: column; gap: 0.5rem;
+    z-index: 50;
+  }
+  .floating-player .now-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.15rem; }
+  .floating-player .controls { display: flex; gap: 0.5rem; align-items: center; }
+  .floating-player .controls button.active { border-color: var(--accent); color: var(--accent); }
   .progress-row { display: flex; align-items: center; gap: 0.6rem; }
   .progress-row input[type="range"] { flex: 1; }
-  .progress-row .time { font-size: 0.8rem; color: var(--text-muted); width: 40px; text-align: center; }
-  .loading-note { font-size: 0.8rem; color: var(--text-muted); }
+  .progress-row .time { font-size: 0.75rem; color: var(--text-muted); width: 36px; text-align: center; }
+  .container { padding-bottom: 7rem; }
 </style>
 </head>
 <body>
 
 <div class="container">
-  <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
-  <h1>Spelaren</h1>
+  <div class="top-nav">
+    <a href="/medlem/spelare.html" class="top-nav-link active">Spellistor</a>
+    <a href="/medlem/repertoar.html" class="top-nav-link">Repertoar</a>
+    <a href="/medlem/skapa-spellista.html" class="top-nav-link">Skapa spellista</a>
+  </div>
 
-  <div class="card player-panel">
-    <div class="now-title" id="nowPlayingTitle">Ingen låt vald</div>
-    <div class="controls">
-      <button id="prevBtn" type="button">&larr;</button>
-      <button id="playPauseBtn" type="button">Spela</button>
-      <button id="nextBtn" type="button">&rarr;</button>
-    </div>
-    <div class="progress-row">
-      <span class="time" id="timeElapsed">0:00</span>
-      <input type="range" id="progressSlider" min="0" max="100" value="0" step="0.1">
-      <span class="time" id="timeTotal">0:00</span>
+  <div id="listView">
+    <h1>Mina spellistor</h1>
+    <div class="card">
+      <div id="playlistsSection"><p class="text-muted">Laddar...</p></div>
     </div>
   </div>
 
-  <div class="card">
-    <h3>Min spellista</h3>
-    <div id="playlistSection"><p class="text-muted">Laddar...</p></div>
+  <div id="detailView" style="display: none;">
+    <a href="/medlem/spelare.html" class="back-btn">&larr; Tillbaka till spellistor</a>
+    <div class="header-row">
+      <h1 id="playlistTitle">Spellista</h1>
+      <button type="button" id="playAllBtn">Spela listan</button>
+    </div>
+    <div class="card">
+      <div id="tracksSection"><p class="text-muted">Laddar...</p></div>
+    </div>
+  </div>
+</div>
+
+<div class="floating-player" id="floatingPlayer">
+  <div class="now-title" id="nowPlayingTitle">–</div>
+  <div class="controls">
+    <button id="prevBtn" type="button">&larr;</button>
+    <button id="playPauseBtn" type="button">Spela</button>
+    <button id="nextBtn" type="button">&rarr;</button>
+    <button id="repeatBtn" type="button">Repeat</button>
+  </div>
+  <div class="progress-row">
+    <span class="time" id="timeElapsed">0:00</span>
+    <input type="range" id="progressSlider" min="0" max="100" value="0" step="0.1">
+    <span class="time" id="timeTotal">0:00</span>
   </div>
 </div>
 
@@ -60,10 +93,15 @@ const stemFields = { Backtrack: 'stem_backtrack_path', Sopran: 'stem_sopran_path
 const volColumns = { Backtrack: 'vol_backtrack', Sopran: 'vol_sopran', Alt: 'vol_alt', Tenor: 'vol_tenor', Bas: 'vol_bas' };
 const priorityOrder = ['Backtrack', 'Sopran', 'Alt', 'Tenor', 'Bas'];
 
-let playlist = [];
+const params = new URLSearchParams(window.location.search);
+const playlistId = params.get('playlist');
+
+let tracks = [];
 let currentIndex = -1;
 let isPlaying = false;
+let isRepeat = false;
 let currentMemberId = null;
+let playlistName = '';
 
 let audioCtx = null;
 let gainNodes = {};
@@ -102,48 +140,75 @@ function ensureAudioContext() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
 }
 
-async function loadPlaylist() {
+async function loadPlaylistsList() {
   const { data, error } = await supabaseClient
-    .from('member_playlists')
-    .select('id, song_id, vol_backtrack, vol_sopran, vol_alt, vol_tenor, vol_bas, songs(*)')
+    .from('playlists')
+    .select('id, name')
     .eq('member_id', currentMemberId)
     .order('created_at');
 
-  const el = document.getElementById('playlistSection');
+  const el = document.getElementById('playlistsSection');
 
-  if (error) {
-    el.innerHTML = `<p class="error">Kunde inte hämta spellistan: ${error.message}</p>`;
-    return;
-  }
+  if (error) { el.innerHTML = `<p class="error">${error.message}</p>`; return; }
 
   if (!data.length) {
-    el.innerHTML = `<p class="text-muted">Din spellista är tom. Lägg till låtar från repertoaren.</p>`;
-    playlist = [];
-    renderPlayerPanel();
+    el.innerHTML = `<p class="text-muted">Du har inga spellistor än. <a href="/medlem/skapa-spellista.html">Skapa en</a> eller lägg till låtar från <a href="/medlem/repertoar.html">Repertoaren</a>.</p>`;
     return;
   }
 
-  playlist = data.map(row => ({
-    playlistId: row.id,
+  el.innerHTML = data.map(p => `
+    <div class="playlist-card">
+      <a href="/medlem/spelare.html?playlist=${p.id}">${p.name}</a>
+    </div>
+  `).join('');
+}
+
+async function loadPlaylistDetail() {
+  const { data: playlist, error: plError } = await supabaseClient
+    .from('playlists').select('id, name').eq('id', playlistId).single();
+
+  if (plError || !playlist) {
+    document.getElementById('playlistTitle').textContent = 'Kunde inte hitta spellistan';
+    return;
+  }
+  playlistName = playlist.name;
+  document.getElementById('playlistTitle').textContent = playlist.name;
+
+  const { data, error } = await supabaseClient
+    .from('playlist_songs')
+    .select('id, song_id, vol_backtrack, vol_sopran, vol_alt, vol_tenor, vol_bas, songs(*)')
+    .eq('playlist_id', playlistId)
+    .order('created_at');
+
+  const el = document.getElementById('tracksSection');
+
+  if (error) { el.innerHTML = `<p class="error">${error.message}</p>`; return; }
+
+  if (!data.length) {
+    el.innerHTML = `<p class="text-muted">Inga låtar i den här spellistan än. Lägg till från <a href="/medlem/repertoar.html">Repertoaren</a>.</p>`;
+    tracks = [];
+    return;
+  }
+
+  tracks = data.map(row => ({
+    playlistSongId: row.id,
     song: row.songs,
     volumes: { Backtrack: row.vol_backtrack, Sopran: row.vol_sopran, Alt: row.vol_alt, Tenor: row.vol_tenor, Bas: row.vol_bas },
     signedUrls: null,
     buffers: null,
   }));
 
-  if (currentIndex === -1) currentIndex = 0;
-
-  renderPlaylist();
-  renderPlayerPanel();
+  renderTracks();
 }
 
-function renderPlaylist() {
-  const el = document.getElementById('playlistSection');
-  el.innerHTML = playlist.map((item, i) => `
+function renderTracks() {
+  const el = document.getElementById('tracksSection');
+  el.innerHTML = tracks.map((item, i) => `
     <div class="track-card">
-      <details ${i === currentIndex ? 'open' : ''}>
+      <details>
         <summary class="track-header ${i === currentIndex ? 'playing' : ''}">
-          <span>${item.song.title}</span>
+          <span class="title">${item.song.title}</span>
+          <button type="button" class="quick-play" data-index="${i}">&#9658; Spela</button>
         </summary>
         <div style="padding: 0.3rem 0 1rem 0;">
           ${priorityOrder.map(label => {
@@ -161,13 +226,21 @@ function renderPlaylist() {
           }).join('')}
           <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
             <button type="button" class="playTrackBtn" data-index="${i}">Spela denna låt</button>
-            <button type="button" class="btn-danger removeTrackBtn" data-id="${item.playlistId}">Ta bort</button>
+            <button type="button" class="btn-danger removeTrackBtn" data-id="${item.playlistSongId}">Ta bort</button>
             <span class="loading-note" data-index="${i}"></span>
           </div>
         </div>
       </details>
     </div>
   `).join('');
+
+  document.querySelectorAll('.quick-play').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      playAt(parseInt(e.target.dataset.index), 0);
+    });
+  });
 
   document.querySelectorAll('.playTrackBtn').forEach(btn => {
     btn.addEventListener('click', (e) => playAt(parseInt(e.target.dataset.index), 0));
@@ -176,8 +249,8 @@ function renderPlaylist() {
   document.querySelectorAll('.removeTrackBtn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const id = e.target.dataset.id;
-      await supabaseClient.from('member_playlists').delete().eq('id', id);
-      loadPlaylist();
+      await supabaseClient.from('playlist_songs').delete().eq('id', id);
+      loadPlaylistDetail();
     });
   });
 
@@ -186,7 +259,7 @@ function renderPlaylist() {
       const i = parseInt(e.target.dataset.index);
       const label = e.target.dataset.label;
       const value = parseInt(e.target.value);
-      playlist[i].volumes[label] = value;
+      tracks[i].volumes[label] = value;
       e.target.nextElementSibling.textContent = value;
       if (i === currentIndex && gainNodes[label]) {
         gainNodes[label].gain.value = value / 100;
@@ -195,28 +268,16 @@ function renderPlaylist() {
     slider.addEventListener('change', async (e) => {
       const i = parseInt(e.target.dataset.index);
       const label = e.target.dataset.label;
-      const item = playlist[i];
-      await supabaseClient.from('member_playlists')
+      const item = tracks[i];
+      await supabaseClient.from('playlist_songs')
         .update({ [volColumns[label]]: item.volumes[label] })
-        .eq('id', item.playlistId);
+        .eq('id', item.playlistSongId);
     });
   });
 }
 
-function renderPlayerPanel() {
-  const title = document.getElementById('nowPlayingTitle');
-  if (currentIndex < 0 || !playlist[currentIndex]) {
-    title.textContent = playlist.length ? 'Välj en låt' : 'Din spellista är tom';
-    document.getElementById('playPauseBtn').disabled = true;
-    return;
-  }
-  document.getElementById('playPauseBtn').disabled = false;
-  title.textContent = playlist[currentIndex].song.title;
-  document.getElementById('playPauseBtn').textContent = isPlaying ? 'Pausa' : 'Spela';
-}
-
 async function ensureSignedUrls(index) {
-  const item = playlist[index];
+  const item = tracks[index];
   if (item.signedUrls) return item.signedUrls;
   const urls = {};
   for (const label of priorityOrder) {
@@ -230,7 +291,7 @@ async function ensureSignedUrls(index) {
 }
 
 async function ensureBuffers(index) {
-  const item = playlist[index];
+  const item = tracks[index];
   if (item.buffers) return item.buffers;
 
   const note = document.querySelector(`.loading-note[data-index="${index}"]`);
@@ -265,11 +326,11 @@ function stopSources() {
 }
 
 async function playAt(index, offsetSeconds) {
-  if (index < 0 || index >= playlist.length) {
+  if (index < 0 || index >= tracks.length) {
     stopSources();
     isPlaying = false;
     stopProgressTimer();
-    renderPlayerPanel();
+    renderFloatingPlayer();
     return;
   }
 
@@ -278,14 +339,14 @@ async function playAt(index, offsetSeconds) {
   stopSources();
 
   currentIndex = index;
-  const item = playlist[index];
+  const item = tracks[index];
 
   const buffers = await ensureBuffers(index);
 
   referenceLabel = priorityOrder.find(l => buffers[l]) || null;
   if (!referenceLabel) {
     alert('Inga stämfiler uppladdade för den här låten.');
-    renderPlaylist();
+    renderTracks();
     return;
   }
   currentDuration = buffers[referenceLabel].duration;
@@ -306,15 +367,18 @@ async function playAt(index, offsetSeconds) {
 
   manualStop = false;
   activeSources[referenceLabel].onended = () => {
-    if (!manualStop) playAt(currentIndex + 1, 0);
+    if (manualStop) return;
+    if (isRepeat) playAt(currentIndex, 0);
+    else playAt(currentIndex + 1, 0);
   };
 
   playbackStartTime = startAt;
   playbackOffset = offsetSeconds;
   isPlaying = true;
   startProgressTimer();
-  renderPlayerPanel();
-  renderPlaylist();
+  renderFloatingPlayer();
+  renderTracks();
+  updateMediaSession(item.song.title);
 }
 
 function pauseAll() {
@@ -325,7 +389,8 @@ function pauseAll() {
   playbackOffset = elapsed;
   isPlaying = false;
   stopProgressTimer();
-  renderPlayerPanel();
+  renderFloatingPlayer();
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 }
 
 function resumeAll() {
@@ -342,10 +407,32 @@ function startProgressTimer() {
     document.getElementById('timeElapsed').textContent = formatTime(elapsed);
   }, 250);
 }
-
 function stopProgressTimer() {
   if (progressTimer) clearInterval(progressTimer);
   progressTimer = null;
+}
+
+function renderFloatingPlayer() {
+  const bar = document.getElementById('floatingPlayer');
+  if (currentIndex < 0 || !tracks[currentIndex]) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  document.getElementById('nowPlayingTitle').textContent = tracks[currentIndex].song.title;
+  document.getElementById('playPauseBtn').textContent = isPlaying ? 'Pausa' : 'Spela';
+  document.getElementById('repeatBtn').className = isRepeat ? 'active' : '';
+}
+
+function updateMediaSession(title) {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: title,
+    artist: 'Heavy Voices',
+    album: playlistName,
+  });
+  navigator.mediaSession.playbackState = 'playing';
+  navigator.mediaSession.setActionHandler('play', resumeAll);
+  navigator.mediaSession.setActionHandler('pause', pauseAll);
+  navigator.mediaSession.setActionHandler('previoustrack', () => playAt(currentIndex - 1, 0));
+  navigator.mediaSession.setActionHandler('nexttrack', () => playAt(currentIndex + 1, 0));
 }
 
 document.getElementById('playPauseBtn').addEventListener('click', () => {
@@ -354,6 +441,10 @@ document.getElementById('playPauseBtn').addEventListener('click', () => {
 });
 document.getElementById('prevBtn').addEventListener('click', () => playAt(currentIndex - 1, 0));
 document.getElementById('nextBtn').addEventListener('click', () => playAt(currentIndex + 1, 0));
+document.getElementById('repeatBtn').addEventListener('click', (e) => {
+  isRepeat = !isRepeat;
+  e.target.className = isRepeat ? 'active' : '';
+});
 
 const progressSlider = document.getElementById('progressSlider');
 progressSlider.addEventListener('input', (e) => {
@@ -366,11 +457,21 @@ progressSlider.addEventListener('change', (e) => {
   playAt(currentIndex, parseFloat(e.target.value));
 });
 
+document.getElementById('playAllBtn').addEventListener('click', () => playAt(0, 0));
+
 (async () => {
   const member = await requireAuth();
-  if (member) {
-    currentMemberId = member.id;
-    loadPlaylist();
+  if (!member) return;
+  currentMemberId = member.id;
+
+  if (playlistId) {
+    document.getElementById('listView').style.display = 'none';
+    document.getElementById('detailView').style.display = 'block';
+    await loadPlaylistDetail();
+  } else {
+    document.getElementById('listView').style.display = 'block';
+    document.getElementById('detailView').style.display = 'none';
+    await loadPlaylistsList();
   }
 })();
 </script>

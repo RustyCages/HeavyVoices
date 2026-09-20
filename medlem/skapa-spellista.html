@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skapa spellista — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="container">
+  <div class="top-nav">
+    <a href="/medlem/spelare.html" class="top-nav-link">Spellistor</a>
+    <a href="/medlem/repertoar.html" class="top-nav-link">Repertoar</a>
+    <a href="/medlem/skapa-spellista.html" class="top-nav-link active">Skapa spellista</a>
+  </div>
+
+  <h1>Skapa spellista</h1>
+
+  <div class="card" style="max-width: 400px;">
+    <form id="createForm">
+      <input type="text" id="plName" placeholder="Namn på spellistan" required>
+      <button type="submit">Skapa</button>
+      <p class="error" id="createError"></p>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+let currentMemberId = null;
+
+document.getElementById('createForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('plName').value.trim();
+  const errorEl = document.getElementById('createError');
+  errorEl.textContent = '';
+
+  const { data, error } = await supabaseClient
+    .from('playlists').insert({ member_id: currentMemberId, name }).select().single();
+
+  if (error) { errorEl.textContent = error.message; return; }
+
+  window.location.href = `/medlem/spelare.html?playlist=${data.id}`;
+});
+
+(async () => {
+  const member = await requireAuth();
+  if (member) currentMemberId = member.id;
+})();
+</script>
+
+</body>
+</html>

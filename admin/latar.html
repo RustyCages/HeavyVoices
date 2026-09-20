@@ -211,7 +211,8 @@ async function loadSongs() {
       if (statusEl) { statusEl.textContent = `Vald: ${file.name} — laddar upp...`; statusEl.className = 'fileStatus status-missing'; }
 
       const ext = file.name.split('.').pop();
-      const path = `${id}/${kind}.${ext}`;
+      const safeName = file.name.replace(/[^a-zA-Z0-9.\-]/g, '_');
+      const path = `${id}/${kind}__${safeName}`;
 
       const { error: uploadError } = await supabaseClient.storage
         .from(bucket)

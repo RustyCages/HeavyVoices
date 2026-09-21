@@ -37,7 +37,7 @@
 (async () => {
   const member = await requireAuth();
   if (member) {
-    document.getElementById('welcome').textContent = `Inloggad som ${member.name}`;
+    document.getElementById('welcome').textContent = `Välkommen ${member.name}`;
   }
 })();
 

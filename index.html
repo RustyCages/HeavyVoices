@@ -19,7 +19,7 @@
       font-family: Arial, sans-serif;
     }
 
-    /* Gemensam stil för videobakgrunder */
+    /* Videobakgrund som täcker hela skärmen */
     .bg-video {
       position: fixed;
       top: 50%;
@@ -33,22 +33,21 @@
       object-fit: cover;
     }
 
-    /* Som standard (Dator): Visa desktop-video, dölj mobil-video */
+    /* Responsiv växling mellan dator och mobil (valfritt) */
     #video-desktop { display: block; }
     #video-mobile  { display: none; }
 
-    /* Om skärmen är smalare än 768px (Mobil): Visa mobil-video, dölj desktop-video */
     @media (max-width: 768px) {
       #video-desktop { display: none; }
       #video-mobile  { display: block; }
     }
 
-    /* Logga in-knapp */
+    /* Logga in-knapp uppe till höger */
     .header {
       position: fixed;
       top: 20px;
       right: 20px;
-      z-index: 2;
+      z-index: 3;
     }
 
     .login-btn {
@@ -61,26 +60,58 @@
       border-radius: 4px;
       text-decoration: none;
       display: inline-block;
+      transition: all 0.3s ease;
+    }
+
+    .login-btn:hover {
+      background-color: #ffffff;
+      color: #000000;
+    }
+
+    /* Centrerar logotypen mitt på skärmen */
+    .logo-container {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .logo {
+      max-width: 800px;
+      width: 85%;
+      height: auto;
+      display: block;
+      filter: drop-shadow(0px 4px 15px rgba(0, 0, 0, 0.8)); /* Ger skugga mot videon */
     }
   </style>
 </head>
 <body>
 
-  <!-- Video för Dator / Stora skärmar -->
+  <!-- Videobakgrund (Dator) -->
   <video autoplay loop muted playsinline id="video-desktop" class="bg-video">
-    <source src="heavyvoices-desktop.webm" type="video/webm">
     <source src="heavyvoices-desktop.mp4" type="video/mp4">
   </video>
 
-  <!-- Video för Mobil / Små skärmar -->
+  <!-- Videobakgrund (Mobil) -->
   <video autoplay loop muted playsinline id="video-mobile" class="bg-video">
-    <source src="heavyvoices-mobile.webm" type="video/webm">
     <source src="heavyvoices-mobile.mp4" type="video/mp4">
   </video>
 
+  <!-- Logga in-knapp -->
   <header class="header">
     <a href="https://heavyvoices.se/logga-in.html" class="login-btn">Logga in</a>
   </header>
+
+  <!-- Centrerad bild mitt på sidan -->
+  <div class="logo-container">
+    <img src="heavyvoices-logo.jpg" alt="Heavy Voices" class="logo">
+  </div>
 
 </body>
 </html>

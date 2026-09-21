@@ -36,15 +36,8 @@
 <script>
 (async () => {
   const member = await requireAuth();
-  if (!member) return;
-  currentMemberId = member.id;
-  await refreshPlaylists();
-  const wantsRepertoire = new URLSearchParams(window.location.search).get('tab') === 'repertoire';
-  if (wantsRepertoire) {
-    showTab('repertoire');
-    loadRepertoireIfNeeded();
-  } else {
-    loadPlaylistsListView();
+  if (member) {
+    document.getElementById('welcome').textContent = `Inloggad som ${member.name}`;
   }
 })();
 

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalender — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .event-item { display: flex; align-items: flex-start; padding: 0.9rem 0; border-bottom: 1px solid var(--border); gap: 1rem; }
+  .event-item:last-child { border-bottom: none; }
+  .event-item.past { opacity: 0.5; }
+  .event-date { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; min-width: 95px; }
+  .event-type-rep { color: #60a5fa; }
+  .event-type-konsert { color: var(--accent); }
+  .event-type-ovrigt { color: var(--text-muted); }
+  .event-meta { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
+  <h1>Kalender</h1>
+
+  <div class="card">
+    <div id="eventsList"><p class="text-muted">Laddar...</p></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+const typeLabels = { rep: 'Repetition', konsert: 'Konsert', ovrigt: 'Övrigt' };
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+async function loadEvents() {
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const { data: events, error } = await supabaseClient
+    .from('events').select('*').order('event_date').order('event_time');
+
+  const el = document.getElementById('eventsList');
+  if (error) { el.innerHTML = `<p class="error">${error.message}</p>`; return; }
+  if (!events.length) { el.innerHTML = `<p class="text-muted">Inga händelser inlagda än.</p>`; return; }
+
+  el.innerHTML = events.map(ev => `
+    <div class="event-item ${ev.event_date < todayStr ? 'past' : ''}">
+      <div class="event-date">${formatDate(ev.event_date)}${ev.event_time ? ' ' + ev.event_time.slice(0,5) : ''}</div>
+      <div>
+        <strong class="event-type-${ev.event_type}">${typeLabels[ev.event_type]}</strong> — ${ev.title}
+        ${ev.location ? `<div class="event-meta">${ev.location}</div>` : ''}
+        ${ev.notes ? `<div class="event-meta">${ev.notes}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+(async () => {
+  const member = await requireAuth();
+  if (member) loadEvents();
+})();
+</script>
+
+</body>
+</html>

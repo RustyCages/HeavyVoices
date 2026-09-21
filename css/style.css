@@ -13,7 +13,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: 'Roboto Condensed', 'DM Sans', system-ui, sans-serif;
   line-height: 1.5;
 }
 

@@ -19,7 +19,7 @@
       font-family: Arial, sans-serif;
     }
 
-    /* Videobakgrund som täcker hela skärmen */
+    /* Videobakgrund */
     .bg-video {
       position: fixed;
       top: 50%;
@@ -33,7 +33,6 @@
       object-fit: cover;
     }
 
-    /* Responsiv växling mellan dator och mobil (valfritt) */
     #video-desktop { display: block; }
     #video-mobile  { display: none; }
 
@@ -42,7 +41,7 @@
       #video-mobile  { display: block; }
     }
 
-    /* Logga in-knapp uppe till höger */
+    /* Logga in-knapp */
     .header {
       position: fixed;
       top: 20px;
@@ -68,26 +67,74 @@
       color: #000000;
     }
 
-    /* Centrerar logotypen mitt på skärmen */
-    .logo-container {
+    /* Huvudbehållare centrerad mitt på skärmen */
+    .main-content {
       position: fixed;
-      top: 25%;
+      top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       z-index: 2;
+      width: 90%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    /* Logotypen */
+    .logo {
+      max-width: 700px; /* Ändra storlek på loggan här */
       width: 100%;
+      height: auto;
+      display: block;
+      filter: drop-shadow(0px 4px 15px rgba(0, 0, 0, 0.8));
+      margin-bottom: 30px; /* Avstånd ner till citatet */
+    }
+
+    /* Ramlös textruta för citat */
+    .quote-box {
+      width: 100%;
+      min-height: 90px;
+      position: relative;
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 20px;
+      padding: 10px;
     }
 
-    .logo {
-      max-width: 1000px;
-      width: 85%;
-      height: auto;
-      display: block;
-      filter: drop-shadow(0px 4px 15px rgba(0, 0, 0, 0.8)); /* Ger skugga mot videon */
+    .quote {
+      position: absolute;
+      font-style: italic;
+      font-size: 1.25rem;
+      line-height: 1.5;
+      color: #ffffff;
+      text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.9), 0px 0px 5px rgba(0, 0, 0, 0.9);
+      opacity: 0;
+      transition: opacity 1.2s ease-in-out;
+      width: 100%;
+    }
+
+    .quote.active {
+      opacity: 1;
+    }
+
+    .author {
+      font-style: normal;
+      font-weight: bold;
+      color: #e5b352; /* Guldfärgad ton på artistnamnen */
+      display: inline-block;
+      margin-left: 6px;
+    }
+
+    /* Mindre textstorlek på mobiler */
+    @media (max-width: 600px) {
+      .quote {
+        font-size: 1.05rem;
+      }
+      .logo {
+        margin-bottom: 15px;
+      }
     }
   </style>
 </head>
@@ -108,10 +155,38 @@
     <a href="https://heavyvoices.se/logga-in.html" class="login-btn">Logga in</a>
   </header>
 
-  <!-- Centrerad bild mitt på sidan -->
-  <div class="logo-container">
-    <img src="heavyvoices-logo.png" alt="Heavy Voices" class="logo">
+  <!-- Centrerat innehåll: Logga + Citat -->
+  <div class="main-content">
+    <img src="heavy voices ur megafon-transparent.jpg" alt="Heavy Voices" class="logo">
+
+    <!-- Ramlös textruta med roterande citat -->
+    <div class="quote-box">
+      <div class="quote active">
+        "If heavy metal bands ruled the world, we'd be a lot better off" <span class="author">- Bruce Dickinson</span>
+      </div>
+      <div class="quote">
+        "Heavy metal is always going to be there. At its core, it's all about a primitive connection we all need to keep in our lives" <span class="author">— Rob Halford</span>
+      </div>
+      <div class="quote">
+        "The misunderstanding out there is that we are a 'hard rock' band or a 'heavy metal' band. We've only ever been a rock n' roll band" <span class="author">- Angus Young</span>
+      </div>
+      <div class="quote">
+        "Yeah!" <span class="author">- James Hetfield</span>
+      </div>
+    </div>
   </div>
+
+  <!-- Skript som tonar och växlar citat automatiskt -->
+  <script>
+    const quotes = document.querySelectorAll('.quote');
+    let currentQuote = 0;
+
+    setInterval(() => {
+      quotes[currentQuote].classList.remove('active');
+      currentQuote = (currentQuote + 1) % quotes.length;
+      quotes[currentQuote].classList.add('active');
+    }, 6000); // Byter citat var 6:e sekund
+  </script>
 
 </body>
 </html>

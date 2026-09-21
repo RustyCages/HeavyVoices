@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Heavy Voices</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      font-family: 'Arial', sans-serif;
+      overflow: hidden;
+      color: #ffffff;
+    }
+
+    /* Videobakgrund */
+    #bg-video {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      min-width: 100%;
+      min-height: 100%;
+      width: auto;
+      height: auto;
+      z-index: -2;
+      object-fit: cover;
+    }
+
+    /* Mörkt overlay för läsbarhet */
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: -1;
+    }
+
+    /* Huvudcontainer */
+    .container {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* Top-bar med Logga in-knapp */
+    .header {
+      width: 100%;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .login-btn {
+      background-color: transparent;
+      border: 2px solid #ffffff;
+      color: #ffffff;
+      padding: 0.6rem 1.5rem;
+      font-size: 1rem;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+    }
+
+    .login-btn:hover {
+      background-color: #ffffff;
+      color: #000000;
+    }
+
+    /* Logotyp */
+    .logo-container {
+      margin-top: 2rem;
+    }
+
+    .logo {
+      max-width: 800px;
+      width: 90%;
+      height: auto;
+      filter: drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.8));
+    }
+
+    /* Citat-sektion */
+    .quote-container {
+      max-width: 850px;
+      margin-bottom: 4rem;
+      min-height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .quote {
+      font-size: 1.4rem;
+      font-style: italic;
+      line-height: 1.6;
+      text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9);
+      opacity: 0;
+      transition: opacity 1s ease-in-out;
+      position: absolute;
+    }
+
+    .quote.active {
+      opacity: 1;
+    }
+
+    .quote-author {
+      display: block;
+      margin-top: 0.5rem;
+      font-weight: bold;
+      font-style: normal;
+      color: #e5b352; /* Hårdrocks-guld/gul ton */
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loopande bakgrundsvideo -->
+  <video autoplay loop muted playsinline id="bg-video">
+    <source src="bakgrundsvideo.mp4" type="video/mp4">
+    Din webbläsare stöder inte videotaggen.
+  </video>
+
+  <!-- Mörk överläggsyta -->
+  <div class="overlay"></div>
+
+  <!-- Innehåll -->
+  <div class="container">
+    <header class="header">
+      <a href="https://heavyvoices.se/logga-in.html" class="login-btn">Logga in</a>
+    </header>
+
+    <main class="logo-container">
+      <img src="heavy-voices-logo.png" alt="Heavy Voices" class="logo">
+    </main>
+
+    <!-- Roterande citat från presentationen -->
+    <footer class="quote-container">
+      <div class="quote active">
+        "If heavy metal bands ruled the world, we'd be a lot better off"
+        <span class="quote-author">— Bruce Dickinson</span>
+      </div>
+      <div class="quote">
+        "Heavy metal is always going to be there. At its core, it's all about a primitive connection we all need to keep in our lives"
+        <span class="quote-author">— Rob Halford</span>
+      </div>
+      <div class="quote">
+        "The misunderstanding out there is that we are a 'hard rock' band or a 'heavy metal' band. We've only ever been a rock n' roll band"
+        <span class="quote-author">— Angus Young</span>
+      </div>
+      <div class="quote">
+        "Yeah!"
+        <span class="quote-author">— James Hetfield</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Skript för att växla mellan citaten snyggt -->
+  <script>
+    const quotes = document.querySelectorAll('.quote');
+    let currentQuote = 0;
+
+    setInterval(() => {
+      quotes[currentQuote].classList.remove('active');
+      currentQuote = (currentQuote + 1) % quotes.length;
+      quotes[currentQuote].classList.add('active');
+    }, 6000); // Växlar citat var 6:e sekund
+  </script>
+
+</body>
+</html>

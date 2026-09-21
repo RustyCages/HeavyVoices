@@ -19,8 +19,8 @@
       font-family: Arial, sans-serif;
     }
 
-    /* Videobakgrund som täcker 100% av skärmen */
-    #bg-video {
+    /* Gemensam stil för videobakgrunder */
+    .bg-video {
       position: fixed;
       top: 50%;
       left: 50%;
@@ -30,10 +30,20 @@
       height: auto;
       z-index: 1;
       transform: translate(-50%, -50%);
-      object-fit: cover; /* Ser till att videon täcker hela ytan utan svarta kanter */
+      object-fit: cover;
     }
 
-    /* Top-bar för Logga in-knappen ovanpå videon */
+    /* Som standard (Dator): Visa desktop-video, dölj mobil-video */
+    #video-desktop { display: block; }
+    #video-mobile  { display: none; }
+
+    /* Om skärmen är smalare än 768px (Mobil): Visa mobil-video, dölj desktop-video */
+    @media (max-width: 768px) {
+      #video-desktop { display: none; }
+      #video-mobile  { display: block; }
+    }
+
+    /* Logga in-knapp */
     .header {
       position: fixed;
       top: 20px;
@@ -50,26 +60,24 @@
       font-weight: bold;
       border-radius: 4px;
       text-decoration: none;
-      cursor: pointer;
-      transition: all 0.3s ease;
       display: inline-block;
-    }
-
-    .login-btn:hover {
-      background-color: #ffffff;
-      color: #000000;
     }
   </style>
 </head>
 <body>
 
-  <!-- MP4-videobakgrund -->
-  <video autoplay loop muted playsinline id="bg-video">
-    <source src="heavyvoices.mp4" type="video/mp4">
-    Din webbläsare stöder inte videotaggen.
+  <!-- Video för Dator / Stora skärmar -->
+  <video autoplay loop muted playsinline id="video-desktop" class="bg-video">
+    <source src="heavyvoices-desktop.webm" type="video/webm">
+    <source src="heavyvoices-desktop.mp4" type="video/mp4">
   </video>
 
-  <!-- Logga in-knapp -->
+  <!-- Video för Mobil / Små skärmar -->
+  <video autoplay loop muted playsinline id="video-mobile" class="bg-video">
+    <source src="heavyvoices-mobile.webm" type="video/webm">
+    <source src="heavyvoices-mobile.mp4" type="video/mp4">
+  </video>
+
   <header class="header">
     <a href="https://heavyvoices.se/logga-in.html" class="login-btn">Logga in</a>
   </header>

@@ -7,9 +7,14 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
 <style>
-  .playlist-card { display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 0; border-bottom: 1px solid var(--border); }
-  .playlist-card:last-child { border-bottom: none; }
-  .playlist-card a { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 0.03em; cursor: pointer; }
+  .playlist-card-wrap { border-bottom: 1px solid var(--border); }
+  .playlist-card-wrap:last-child { border-bottom: none; }
+  .playlist-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; cursor: pointer; list-style: none; }
+  .playlist-header::-webkit-details-marker { display: none; }
+  .playlist-header .title { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.03em; }
+  .playlist-header .arrow { transition: transform 0.15s; color: var(--text-muted); font-size: 1.1rem; }
+  details[open] .playlist-header .arrow { transform: rotate(180deg); }
+  .playlist-body { padding: 0 0 1.2rem 0; }
   .header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
  
   .track-card { border-bottom: 1px solid var(--border); }
@@ -77,25 +82,9 @@
  
   <!-- ===== VY: SPELLISTOR ===== -->
   <div id="view-playlists">
-    <div id="playlistsListSub">
-      <h1>Mina spellistor</h1>
-      <div class="card">
-        <div id="playlistsSection"><p class="text-muted">Laddar...</p></div>
-      </div>
-    </div>
- 
-    <div id="playlistDetailSub" style="display: none;">
-      <button type="button" class="back-btn" id="backToListBtn">&larr; Tillbaka till spellistor</button>
-      <div class="header-row">
-        <h1 id="playlistTitle">Spellista</h1>
-        <div style="display: flex; gap: 0.5rem;">
-          <button type="button" id="playAllBtn">Spela listan</button>
-          <button type="button" id="deletePlaylistBtn" class="btn-danger">Radera spellista</button>
-        </div>
-      </div>
-      <div class="card">
-        <div id="tracksSection"><p class="text-muted">Laddar...</p></div>
-      </div>
+    <h1>Mina spellistor</h1>
+    <div class="card">
+      <div id="playlistsSection"><p class="text-muted">Laddar...</p></div>
     </div>
   </div>
  
@@ -142,10 +131,9 @@ const volColumns = { Backtrack: 'vol_backtrack', Sopran: 'vol_sopran', Alt: 'vol
 const priorityOrder = ['Backtrack', 'Sopran', 'Alt', 'Tenor', 'Bas'];
  
 let currentMemberId = null;
-let playlists = [];       // { id, name }
-let currentPlaylistId = null;
-let currentPlaylistName = '';
-let tracks = [];          // aktuell spellistas låtar
+let playlists = [];              // { id, name }
+let allTracksByPlaylist = {};    // playlistId -> array av låtar (lazy-laddas när kortet fälls ut)
+let currentPlaylistId = null;    // vilken spellista som är "laddad" för uppspelning just nu
 let currentIndex = -1;
 let isPlaying = false;
 let isRepeat = false;
@@ -186,7 +174,7 @@ function ensureAudioContext() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
 }
  
-// ---------- Flikväxling (inget sidbyte - ljudet fortsätter) ----------
+// ---------- Flikväxling ----------
 function showTab(tab) {
   document.getElementById('tabBtnPlaylists').classList.toggle('active', tab === 'playlists');
   document.getElementById('tabBtnRepertoire').classList.toggle('active', tab === 'repertoire');
@@ -199,20 +187,7 @@ document.getElementById('tabBtnRepertoire').addEventListener('click', () => {
   loadRepertoireIfNeeded();
 });
  
-function showPlaylistsListSub() {
-  document.getElementById('playlistsListSub').style.display = 'block';
-  document.getElementById('playlistDetailSub').style.display = 'none';
-  loadPlaylistsListView();
-}
-function showPlaylistDetailSub(id) {
-  currentPlaylistId = id;
-  document.getElementById('playlistsListSub').style.display = 'none';
-  document.getElementById('playlistDetailSub').style.display = 'block';
-  loadPlaylistDetail();
-}
-document.getElementById('backToListBtn').addEventListener('click', showPlaylistsListSub);
- 
-// ---------- Spellistor: hämtning ----------
+// ---------- Spellistor (utfällbara kort) ----------
 async function refreshPlaylists() {
   const { data } = await supabaseClient
     .from('playlists').select('id, name').eq('member_id', currentMemberId).order('created_at');
@@ -229,51 +204,72 @@ async function loadPlaylistsListView() {
   }
  
   el.innerHTML = playlists.map(p => `
-    <div class="playlist-card">
-      <a data-id="${p.id}" class="openPlaylistLink">${p.name}</a>
-      <button type="button" class="btn-danger deletePlaylistCardBtn" data-id="${p.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Radera</button>
+    <div class="playlist-card-wrap">
+      <details class="playlist-details" data-id="${p.id}">
+        <summary class="playlist-header">
+          <span class="title">${p.name}</span>
+          <span class="arrow">&#9660;</span>
+        </summary>
+        <div class="playlist-body">
+          <div class="header-row" style="margin-bottom: 0.5rem;">
+            <div></div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button type="button" class="playAllPlBtn" data-id="${p.id}">Spela listan</button>
+              <button type="button" class="btn-danger deletePlBtn" data-id="${p.id}">Radera spellista</button>
+            </div>
+          </div>
+          <div class="tracksSection" data-playlist="${p.id}"><p class="text-muted">Laddar...</p></div>
+        </div>
+      </details>
     </div>
   `).join('');
  
-  document.querySelectorAll('.openPlaylistLink').forEach(a => {
-    a.addEventListener('click', (e) => showPlaylistDetailSub(e.target.dataset.id));
+  document.querySelectorAll('.playlist-details').forEach(det => {
+    det.addEventListener('toggle', () => {
+      if (det.open && !allTracksByPlaylist[det.dataset.id]) {
+        loadPlaylistTracks(det.dataset.id);
+      }
+    });
   });
-  document.querySelectorAll('.deletePlaylistCardBtn').forEach(btn => {
+  document.querySelectorAll('.playAllPlBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.id;
+      if (!allTracksByPlaylist[id]) await loadPlaylistTracks(id);
+      playAt(id, 0, 0);
+    });
+  });
+  document.querySelectorAll('.deletePlBtn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       if (!confirm('Radera spellistan permanent?')) return;
-      await supabaseClient.from('playlists').delete().eq('id', e.target.dataset.id);
+      const id = e.target.dataset.id;
+      await supabaseClient.from('playlists').delete().eq('id', id);
+      delete allTracksByPlaylist[id];
+      if (currentPlaylistId === id) {
+        stopSources(); currentPlaylistId = null; currentIndex = -1; isPlaying = false;
+        stopProgressTimer(); renderFloatingPlayer();
+      }
       loadPlaylistsListView();
     });
   });
 }
  
-async function loadPlaylistDetail() {
-  const { data: playlist, error: plError } = await supabaseClient
-    .from('playlists').select('id, name').eq('id', currentPlaylistId).single();
- 
-  if (plError || !playlist) {
-    document.getElementById('playlistTitle').textContent = 'Kunde inte hitta spellistan';
-    return;
-  }
-  currentPlaylistName = playlist.name;
-  document.getElementById('playlistTitle').textContent = playlist.name;
- 
+async function loadPlaylistTracks(playlistId) {
+  const container = document.querySelector(`.tracksSection[data-playlist="${playlistId}"]`);
   const { data, error } = await supabaseClient
     .from('playlist_songs')
     .select('id, song_id, vol_backtrack, vol_sopran, vol_alt, vol_tenor, vol_bas, songs(*)')
-    .eq('playlist_id', currentPlaylistId)
+    .eq('playlist_id', playlistId)
     .order('created_at');
  
-  const el = document.getElementById('tracksSection');
-  if (error) { el.innerHTML = `<p class="error">${error.message}</p>`; return; }
+  if (error) { container.innerHTML = `<p class="error">${error.message}</p>`; return; }
  
   if (!data.length) {
-    el.innerHTML = `<p class="text-muted">Inga låtar i den här spellistan än. Lägg till från fliken Repertoar.</p>`;
-    tracks = [];
+    allTracksByPlaylist[playlistId] = [];
+    container.innerHTML = `<p class="text-muted">Inga låtar i den här spellistan än. Lägg till från fliken Repertoar.</p>`;
     return;
   }
  
-  tracks = data.map(row => ({
+  allTracksByPlaylist[playlistId] = data.map(row => ({
     playlistSongId: row.id,
     song: row.songs,
     volumes: { Backtrack: row.vol_backtrack, Sopran: row.vol_sopran, Alt: row.vol_alt, Tenor: row.vol_tenor, Bas: row.vol_bas },
@@ -282,15 +278,23 @@ async function loadPlaylistDetail() {
     buffers: null,
   }));
  
-  renderTracks();
+  renderTracksForPlaylist(playlistId);
 }
  
-function renderTracks() {
-  const el = document.getElementById('tracksSection');
-  el.innerHTML = tracks.map((item, i) => `
+function renderTracksForPlaylist(playlistId) {
+  const list = allTracksByPlaylist[playlistId];
+  const container = document.querySelector(`.tracksSection[data-playlist="${playlistId}"]`);
+  if (!container) return;
+ 
+  if (!list.length) {
+    container.innerHTML = `<p class="text-muted">Inga låtar i den här spellistan än.</p>`;
+    return;
+  }
+ 
+  container.innerHTML = list.map((item, i) => `
     <div class="track-card">
       <details>
-        <summary class="track-header ${i === currentIndex ? 'playing' : ''}">
+        <summary class="track-header ${playlistId === currentPlaylistId && i === currentIndex ? 'playing' : ''}">
           <span class="title">${item.song.title}</span>
           <button type="button" class="quick-play" data-index="${i}">&#9658; Spela</button>
           <span class="arrow">&#9660;</span>
@@ -320,49 +324,49 @@ function renderTracks() {
     </div>
   `).join('');
  
-  document.querySelectorAll('.quick-play').forEach(btn => {
+  container.querySelectorAll('.quick-play').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
-      playAt(parseInt(e.target.dataset.index), 0);
+      playAt(playlistId, parseInt(e.target.dataset.index), 0);
     });
   });
-  document.querySelectorAll('.playTrackBtn').forEach(btn => {
-    btn.addEventListener('click', (e) => playAt(parseInt(e.target.dataset.index), 0));
+  container.querySelectorAll('.playTrackBtn').forEach(btn => {
+    btn.addEventListener('click', (e) => playAt(playlistId, parseInt(e.target.dataset.index), 0));
   });
-  document.querySelectorAll('.removeTrackBtn').forEach(btn => {
+  container.querySelectorAll('.removeTrackBtn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       await supabaseClient.from('playlist_songs').delete().eq('id', e.target.dataset.id);
-      loadPlaylistDetail();
+      await loadPlaylistTracks(playlistId);
     });
   });
-  document.querySelectorAll('.volSlider').forEach(slider => {
+  container.querySelectorAll('.volSlider').forEach(slider => {
     slider.addEventListener('input', (e) => {
       const i = parseInt(e.target.dataset.index);
       const label = e.target.dataset.label;
       const value = parseInt(e.target.value);
-      tracks[i].volumes[label] = value;
+      list[i].volumes[label] = value;
       e.target.nextElementSibling.textContent = value;
-      if (i === currentIndex && gainNodes[label] && !tracks[i].muted[label]) {
+      if (playlistId === currentPlaylistId && i === currentIndex && gainNodes[label] && !list[i].muted[label]) {
         gainNodes[label].gain.value = value / 100;
       }
     });
     slider.addEventListener('change', async (e) => {
       const i = parseInt(e.target.dataset.index);
       const label = e.target.dataset.label;
-      const item = tracks[i];
+      const item = list[i];
       await supabaseClient.from('playlist_songs')
         .update({ [volColumns[label]]: item.volumes[label] })
         .eq('id', item.playlistSongId);
     });
   });
-  document.querySelectorAll('.muteBtn').forEach(btn => {
+  container.querySelectorAll('.muteBtn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const i = parseInt(e.target.dataset.index);
       const label = e.target.dataset.label;
-      const item = tracks[i];
+      const item = list[i];
       item.muted[label] = !item.muted[label];
       e.target.classList.toggle('active', item.muted[label]);
-      if (i === currentIndex && gainNodes[label]) {
+      if (playlistId === currentPlaylistId && i === currentIndex && gainNodes[label]) {
         gainNodes[label].gain.value = item.muted[label] ? 0 : (item.volumes[label] || 0) / 100;
       }
     });
@@ -370,8 +374,8 @@ function renderTracks() {
 }
  
 // ---------- Uppspelning (Web Audio API) ----------
-async function ensureSignedUrls(index) {
-  const item = tracks[index];
+async function ensureSignedUrls(playlistId, index) {
+  const item = allTracksByPlaylist[playlistId][index];
   if (item.signedUrls) return item.signedUrls;
   const urls = {};
   for (const label of priorityOrder) {
@@ -383,12 +387,12 @@ async function ensureSignedUrls(index) {
   item.signedUrls = urls;
   return urls;
 }
-async function ensureBuffers(index) {
-  const item = tracks[index];
+async function ensureBuffers(playlistId, index) {
+  const item = allTracksByPlaylist[playlistId][index];
   if (item.buffers) return item.buffers;
-  const note = document.querySelector(`.loading-note[data-index="${index}"]`);
+  const note = document.querySelector(`.tracksSection[data-playlist="${playlistId}"] .loading-note[data-index="${index}"]`);
   if (note) note.textContent = 'Laddar ljud...';
-  const urls = await ensureSignedUrls(index);
+  const urls = await ensureSignedUrls(playlistId, index);
   const buffers = {};
   await Promise.all(priorityOrder.map(async (label) => {
     if (!urls[label]) { buffers[label] = null; return; }
@@ -410,8 +414,10 @@ function stopSources() {
   }
   activeSources = {};
 }
-async function playAt(index, offsetSeconds) {
-  if (index < 0 || index >= tracks.length) {
+ 
+async function playAt(playlistId, index, offsetSeconds) {
+  const list = allTracksByPlaylist[playlistId];
+  if (!list || index < 0 || index >= list.length) {
     stopSources(); isPlaying = false; stopProgressTimer(); renderFloatingPlayer();
     return;
   }
@@ -419,12 +425,14 @@ async function playAt(index, offsetSeconds) {
   manualStop = true;
   stopSources();
  
+  const prevPlaylistId = currentPlaylistId;
+  currentPlaylistId = playlistId;
   currentIndex = index;
-  const item = tracks[index];
-  const buffers = await ensureBuffers(index);
+  const item = list[index];
  
+  const buffers = await ensureBuffers(playlistId, index);
   referenceLabel = priorityOrder.find(l => buffers[l]) || null;
-  if (!referenceLabel) { alert('Inga stämfiler uppladdade för den här låten.'); renderTracks(); return; }
+  if (!referenceLabel) { alert('Inga stämfiler uppladdade för den här låten.'); renderTracksForPlaylist(playlistId); return; }
  
   currentDuration = buffers[referenceLabel].duration;
   document.getElementById('progressSlider').max = currentDuration;
@@ -444,8 +452,8 @@ async function playAt(index, offsetSeconds) {
   manualStop = false;
   activeSources[referenceLabel].onended = () => {
     if (manualStop) return;
-    if (isRepeat) playAt(currentIndex, 0);
-    else playAt(currentIndex + 1, 0);
+    if (isRepeat) playAt(currentPlaylistId, currentIndex, 0);
+    else playAt(currentPlaylistId, currentIndex + 1, 0);
   };
  
   playbackStartTime = startAt;
@@ -453,11 +461,15 @@ async function playAt(index, offsetSeconds) {
   isPlaying = true;
   startProgressTimer();
   renderFloatingPlayer();
-  renderTracks();
+  renderTracksForPlaylist(playlistId);
+  if (prevPlaylistId && prevPlaylistId !== playlistId && allTracksByPlaylist[prevPlaylistId]) {
+    renderTracksForPlaylist(prevPlaylistId);
+  }
   updateMediaSession(item.song.title);
 }
+ 
 function pauseAll() {
-  if (currentIndex < 0) return;
+  if (currentIndex < 0 || !currentPlaylistId) return;
   manualStop = true;
   const elapsed = Math.max(0, audioCtx.currentTime - playbackStartTime + playbackOffset);
   stopSources();
@@ -467,7 +479,7 @@ function pauseAll() {
   renderFloatingPlayer();
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 }
-function resumeAll() { if (currentIndex >= 0) playAt(currentIndex, playbackOffset); }
+function resumeAll() { if (currentIndex >= 0 && currentPlaylistId) playAt(currentPlaylistId, currentIndex, playbackOffset); }
  
 function startProgressTimer() {
   stopProgressTimer();
@@ -482,37 +494,32 @@ function stopProgressTimer() { if (progressTimer) clearInterval(progressTimer); 
  
 function renderFloatingPlayer() {
   const bar = document.getElementById('floatingPlayer');
-  if (currentIndex < 0 || !tracks[currentIndex]) { bar.style.display = 'none'; return; }
+  const item = (currentPlaylistId && allTracksByPlaylist[currentPlaylistId]) ? allTracksByPlaylist[currentPlaylistId][currentIndex] : null;
+  if (!item) { bar.style.display = 'none'; return; }
   bar.style.display = 'flex';
-  document.getElementById('nowPlayingTitle').textContent = tracks[currentIndex].song.title;
+  document.getElementById('nowPlayingTitle').textContent = item.song.title;
   document.getElementById('playPauseBtn').textContent = isPlaying ? 'Pausa' : 'Spela';
   document.getElementById('repeatBtn').className = isRepeat ? 'active' : '';
 }
 function updateMediaSession(title) {
   if (!('mediaSession' in navigator)) return;
-  navigator.mediaSession.metadata = new MediaMetadata({ title, artist: 'Heavy Voices', album: currentPlaylistName });
+  const plName = playlists.find(p => p.id === currentPlaylistId)?.name || '';
+  navigator.mediaSession.metadata = new MediaMetadata({ title, artist: 'Heavy Voices', album: plName });
   navigator.mediaSession.playbackState = 'playing';
   navigator.mediaSession.setActionHandler('play', resumeAll);
   navigator.mediaSession.setActionHandler('pause', pauseAll);
-  navigator.mediaSession.setActionHandler('previoustrack', () => playAt(currentIndex - 1, 0));
-  navigator.mediaSession.setActionHandler('nexttrack', () => playAt(currentIndex + 1, 0));
+  navigator.mediaSession.setActionHandler('previoustrack', () => playAt(currentPlaylistId, currentIndex - 1, 0));
+  navigator.mediaSession.setActionHandler('nexttrack', () => playAt(currentPlaylistId, currentIndex + 1, 0));
 }
  
 document.getElementById('playPauseBtn').addEventListener('click', () => { if (currentIndex >= 0) (isPlaying ? pauseAll() : resumeAll()); });
-document.getElementById('prevBtn').addEventListener('click', () => playAt(currentIndex - 1, 0));
-document.getElementById('nextBtn').addEventListener('click', () => playAt(currentIndex + 1, 0));
+document.getElementById('prevBtn').addEventListener('click', () => playAt(currentPlaylistId, currentIndex - 1, 0));
+document.getElementById('nextBtn').addEventListener('click', () => playAt(currentPlaylistId, currentIndex + 1, 0));
 document.getElementById('repeatBtn').addEventListener('click', (e) => { isRepeat = !isRepeat; e.target.className = isRepeat ? 'active' : ''; });
  
 const progressSlider = document.getElementById('progressSlider');
 progressSlider.addEventListener('input', (e) => { isSeeking = true; document.getElementById('timeElapsed').textContent = formatTime(parseFloat(e.target.value)); });
-progressSlider.addEventListener('change', (e) => { isSeeking = false; if (currentIndex >= 0) playAt(currentIndex, parseFloat(e.target.value)); });
- 
-document.getElementById('playAllBtn').addEventListener('click', () => playAt(0, 0));
-document.getElementById('deletePlaylistBtn').addEventListener('click', async () => {
-  if (!confirm('Radera hela spellistan permanent?')) return;
-  await supabaseClient.from('playlists').delete().eq('id', currentPlaylistId);
-  showPlaylistsListSub();
-});
+progressSlider.addEventListener('change', (e) => { isSeeking = false; if (currentIndex >= 0 && currentPlaylistId) playAt(currentPlaylistId, currentIndex, parseFloat(e.target.value)); });
  
 // ---------- Repertoar ----------
 const stemDefs = [
@@ -681,6 +688,7 @@ async function addToPlaylist(songId, selectAll) {
     if (error) { errorEl.textContent = error.message; return; }
   }
   successEl.textContent = 'Tillagd i spellistan.';
+  delete allTracksByPlaylist[playlistId]; // tvinga omladdning nästa gång den fälls ut
 }
  
 document.getElementById('quickCreateForm').addEventListener('submit', async (e) => {
@@ -707,9 +715,16 @@ document.getElementById('quickCreateForm').addEventListener('submit', async (e) 
   if (!member) return;
   currentMemberId = member.id;
   await refreshPlaylists();
-  loadPlaylistsListView();
+  const wantsRepertoire = new URLSearchParams(window.location.search).get('tab') === 'repertoire';
+  if (wantsRepertoire) {
+    showTab('repertoire');
+    loadRepertoireIfNeeded();
+  } else {
+    loadPlaylistsListView();
+  }
 })();
 </script>
  
 </body>
 </html>
+ 

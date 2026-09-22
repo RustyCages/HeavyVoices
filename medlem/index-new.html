@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medlem — Heavy Voices</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<!-- Tailwind CSS for modern responsive layout utility -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Lucide Icons for clean music and navigation vector graphics -->
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['DM Sans', 'sans-serif'],
+          heading: ['Roboto Condensed', 'sans-serif'],
+        },
+        colors: {
+          accent: '#E5A968',
+          accentHover: '#f0be86',
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  :root {
+    --bg-dark: #121418;
+    --card-bg: linear-gradient(145deg, rgba(30, 34, 43, 0.9), rgba(22, 25, 32, 0.95));
+    --accent-gold: #E5A968;
+    --border-subtle: rgba(255, 255, 255, 0.08);
+  }
+
+  body {
+    background-color: var(--bg-dark);
+    background-image: radial-gradient(circle at 50% 0%, #1d222e 0%, #121418 75%);
+    color: #f3f4f6;
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Roboto Condensed', sans-serif;
+  }
+
+  /* Glassmorphic card design with subtle hover elevation */
+  .modern-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .modern-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(229, 169, 104, 0.35);
+    box-shadow: 0 14px 35px -10px rgba(0, 0, 0, 0.7), 0 0 20px rgba(229, 169, 104, 0.12);
+  }
+
+  .modern-card:active {
+    transform: translateY(-1px);
+  }
+
+  /* Button styles */
+  .btn-gold {
+    background-color: var(--accent-gold);
+    color: #111317;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  .btn-gold:hover {
+    background-color: #f0be86;
+    box-shadow: 0 0 12px rgba(229, 169, 104, 0.3);
+  }
+
+  .btn-outline {
+    background: rgba(255, 255, 255, 0.06);
+    color: #d1d5db;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    transition: all 0.2s ease;
+  }
+
+  .btn-outline:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+  }
+</style>
+</head>
+<body class="flex flex-col min-h-screen justify-between p-4 sm:p-6 md:p-8">
+
+  <div class="max-w-xl mx-auto w-full flex-grow flex flex-col justify-center py-6">
+
+    <!-- Header Section -->
+    <header class="mb-6">
+      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-1 uppercase">
+        Mitt konto
+      </h1>
+      <p id="welcome" class="text-sm sm:text-base text-gray-400 font-medium">
+        Laddar...
+      </p>
+    </header>
+
+    <!-- Navigation Grid: 2 columns layout on mobile and desktop -->
+    <div class="nav-grid grid grid-cols-2 gap-3 sm:gap-4 my-4">
+      
+      <!-- Repertoar Card -->
+      <a href="/medlem/spelare.html?tab=repertoire" class="card nav-card modern-card rounded-2xl p-4 sm:p-6 flex flex-col items-center justify-center text-center group cursor-pointer">
+        <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#E5A968]/10 text-[#E5A968] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+          <i data-lucide="music-4" class="w-6 h-6 sm:w-7 sm:h-7"></i>
+        </div>
+        <h3 class="text-base sm:text-lg font-bold text-gray-100 group-hover:text-[#E5A968] transition-colors m-0">
+          Repertoar
+        </h3>
+      </a>
+
+      <!-- Spelaren Card -->
+      <a href="/medlem/spelare.html" class="card nav-card modern-card rounded-2xl p-4 sm:p-6 flex flex-col items-center justify-center text-center group cursor-pointer">
+        <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#E5A968]/10 text-[#E5A968] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+          <i data-lucide="play-circle" class="w-6 h-6 sm:w-7 sm:h-7"></i>
+        </div>
+        <h3 class="text-base sm:text-lg font-bold text-gray-100 group-hover:text-[#E5A968] transition-colors m-0">
+          Spelaren
+        </h3>
+      </a>
+
+      <!-- Kalender Card -->
+      <a href="/medlem/kalender.html" class="card nav-card modern-card rounded-2xl p-4 sm:p-6 flex flex-col items-center justify-center text-center group cursor-pointer">
+        <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#E5A968]/10 text-[#E5A968] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+          <i data-lucide="calendar" class="w-6 h-6 sm:w-7 sm:h-7"></i>
+        </div>
+        <h3 class="text-base sm:text-lg font-bold text-gray-100 group-hover:text-[#E5A968] transition-colors m-0">
+          Kalender
+        </h3>
+      </a>
+
+      <!-- Information Card -->
+      <a href="/medlem/info.html" class="card nav-card modern-card rounded-2xl p-4 sm:p-6 flex flex-col items-center justify-center text-center group cursor-pointer">
+        <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#E5A968]/10 text-[#E5A968] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+          <i data-lucide="info" class="w-6 h-6 sm:w-7 sm:h-7"></i>
+        </div>
+        <h3 class="text-base sm:text-lg font-bold text-gray-100 group-hover:text-[#E5A968] transition-colors m-0">
+          Information
+        </h3>
+      </a>
+
+    </div>
+
+    <!-- Action Buttons Row at the Bottom -->
+    <div class="flex items-center gap-2.5 pt-4">
+      <a href="/konto.html">
+        <button type="button" class="btn-gold px-3.5 py-1.5 text-xs sm:text-sm rounded-lg transition-all focus:outline-none">
+          Mitt konto
+        </button>
+      </a>
+      <button id="logoutBtn" type="button" class="btn-outline px-3.5 py-1.5 text-xs sm:text-sm rounded-lg focus:outline-none">
+        Logga ut
+      </button>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-config.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    // Initialize Lucide vector icons
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+
+    // Safe execution logic for requireAuth with preview fallback
+    (async () => {
+      try {
+        if (typeof requireAuth === 'function') {
+          const member = await requireAuth();
+          if (member && member.name) {
+            document.getElementById('welcome').textContent = `Välkommen ${member.name}`;
+          }
+        } else {
+          // Graceful fallback when running in standalone preview or offline mode
+          console.warn('requireAuth function not found (preview environment). Setting default welcome text.');
+          document.getElementById('welcome').textContent = 'Välkommen Test';
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        document.getElementById('welcome').textContent = 'Välkommen';
+      }
+    })();
+
+    // Logout button listener with safety fallback
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        if (typeof signOut === 'function') {
+          signOut();
+        } else {
+          console.log('Loggar ut (Demo/Förhandsvisning)...');
+          document.getElementById('welcome').textContent = 'Utloggad';
+        }
+      });
+    }
+  </script>
+
+</body>
+</html>

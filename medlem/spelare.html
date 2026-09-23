@@ -45,9 +45,9 @@
   }
 
   .mixer { margin:0.5rem 0 1.25rem; padding:1.1rem; background:rgba(255,255,255,0.03); border-radius:0.6rem; }
-  .mixer-row { display:flex; align-items:center; gap:0.75rem; margin-bottom:0.85rem; }
+  .mixer-row { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; }
   .mixer-row:last-child { margin-bottom:0; }
-  .mixer-row .label { min-width:110px; font-weight:600; font-size:0.85rem; }
+  .mixer-row .label { min-width:70px; flex-shrink:0; font-weight:600; font-size:0.85rem; }
   .mixer-row .fname { color:var(--text-muted); font-size:0.75rem; min-width:0; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .mixer-row .muteBtn { font-size:0.7rem; padding:0.3rem 0.6rem; flex-shrink:0; }
   .mixer-row .muteBtn.muted { background:#ef4444; color:#fff; }
@@ -78,7 +78,24 @@
     width:24px; height:24px; border-radius:50%;
     background:var(--accent); border:2px solid #111317; cursor:pointer;
   }
+   .mixer-row input[type=range]::-moz-range-thumb {
+    width:24px; height:24px; border-radius:50%;
+    background:var(--accent); border:2px solid #111317; cursor:pointer;
+    @media (max-width: 600px) {
+    .track-row { flex-wrap:wrap; row-gap:0.4rem; }
+    .track-title { flex:1 1 100%; order:1; }
+    .track-play-btn { order:0; }
+    .mixerToggleBtn { order:2; white-space:nowrap; font-size:0.7rem; padding:0.35rem 0.6rem; }
+    .removeTrackBtn { order:3; }
 
+    .mixer { padding:0.85rem; }
+    .mixer-row { flex-wrap:wrap; row-gap:0.5rem; }
+    .mixer-row .label { flex:0 0 auto; order:1; }
+    .mixer-row input[type=range] { order:2; flex:1 1 100%; width:100%; }
+    .mixer-row .muteBtn { order:3; }
+  }
+  
+  .stem-check-row { margin-bottom:0.6rem; }
   .stem-check-row { margin-bottom:0.6rem; }
   .stem-check-row label { display:flex; align-items:center; gap:0.6rem; cursor:pointer; margin:0; width:auto; }
   .stem-check-row input[type=checkbox] { width:auto; flex-shrink:0; margin:0; }
@@ -459,7 +476,6 @@ function renderTracksForPlaylist(pl, items, containerEl) {
         <span class="label">${escapeHtml(def.label)}</span>
         <input type="range" min="0" max="100" value="${item.volumes[def.key]}" class="volSlider" data-key="${def.key}">
         <button class="btn-outline muteBtn" data-key="${def.key}">Mute</button>
-        <span class="fname">${escapeHtml(stemFilename(def.path))}</span>
       `;
       mrow.querySelector('.volSlider').addEventListener('input', (e) => {
         const val = parseInt(e.target.value, 10);

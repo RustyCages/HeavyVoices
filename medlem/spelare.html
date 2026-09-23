@@ -714,7 +714,11 @@ async function ensureAudioCtx() {
   }
 }
 
-function disconnectCurrentGainNodes() {
+// Stops/disconnects the currently-playing source + gain nodes WITHOUT throwing away
+// the already-decoded audio buffers. Use this for anything that reschedules the SAME
+// track (scrubbing, pause) — re-decoding on every scrub would also work but is slow
+// and was actually the cause of a real bug (see below).
+function stopCurrentSources() {
   Object.values(currentSources).forEach(src => {
     try { src.onended = null; src.stop(); } catch (e) {}
     try { src.disconnect(); } catch (e) {}
@@ -724,6 +728,12 @@ function disconnectCurrentGainNodes() {
   });
   currentSources = {};
   gainNodesCurrent = {};
+}
+
+// Full teardown before loading a DIFFERENT track — also drops the decoded buffers,
+// since they belong to the track we're leaving.
+function disconnectCurrentGainNodes() {
+  stopCurrentSources();
   currentBuffers = {};
 }
 
@@ -884,10 +894,7 @@ function handleTrackEnded() {
 function pauseAll() {
   if (!isPlaying) return;
   const elapsed = playStartOffset + (audioCtx.currentTime - playStartCtxTime);
-  Object.values(currentSources).forEach(src => {
-    try { src.onended = null; src.stop(); } catch (e) {}
-  });
-  currentSources = {};
+  stopCurrentSources();
   isPlaying = false;
   setPlayPauseIcon(false);
   clearInterval(progressTimer);
@@ -939,7 +946,11 @@ scrubberEl.addEventListener('change', () => {
   const val = parseFloat(scrubberEl.value);
   if (!currentPlaylist) return;
   const item = currentPlaylist.items[currentIndex];
-  disconnectCurrentGainNodes();
+  if (!item || !Object.keys(currentBuffers).length) return; // nothing decoded yet to scrub within
+  // Reuses the already-decoded buffers for this track — must NOT clear currentBuffers here,
+  // only stop the old source nodes, otherwise schedulePlaybackFrom finds no buffers and
+  // silently plays nothing (this was the cause of the "scrubbing goes silent" bug).
+  stopCurrentSources();
   clearInterval(progressTimer);
   isPlaying = false;
   pausedOffset = val;

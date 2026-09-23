@@ -359,7 +359,14 @@ async function loadPlaylistTracks(pl, containerEl) {
   const items = rows.map(row => {
     const song = songsById[row.song_id];
     const extraVolumesRaw = row.extra_volumes || {};
-    const stemDefs = getStemDefs(song);
+    // Only include a stem if it was actually picked when the song was added to this
+    // playlist (its volume column/entry is set) — NOT every stem the song happens to
+    // have. Previously this used getStemDefs(song) unfiltered, so unchecking a stem
+    // in Repertoar had no effect: every available stem was included anyway.
+    const stemDefs = getStemDefs(song).filter(def => {
+      if (def.type === 'fixed') return row[def.volColumn] !== null && row[def.volColumn] !== undefined;
+      return extraVolumesRaw[def.key] !== undefined && extraVolumesRaw[def.key] !== null;
+    });
     const volumes = {};
     stemDefs.forEach(def => {
       if (def.type === 'fixed') {
@@ -615,13 +622,18 @@ async function loadDocsForSong(s, container) {
 }
 
 async function addToPlaylist(song, stemDefs, checkedKeys, playlistId) {
-  const selectedDefs = stemDefs.filter(d => checkedKeys.includes(d.key));
   const insertRow = { playlist_id: playlistId, song_id: song.id };
   const extraVolumes = {};
-  selectedDefs.forEach(def => {
+  // Walk EVERY stem the song has (not just the checked ones) so unchecked fixed
+  // columns are explicitly written as null. The vol_* columns have a DB default of
+  // 100 from the original fixed-5-stem design, so simply omitting a column from the
+  // insert let that default sneak the stem back in — which was the bug: unchecking
+  // a stem in Repertoar appeared to do nothing.
+  stemDefs.forEach(def => {
+    const isChecked = checkedKeys.includes(def.key);
     if (def.type === 'fixed') {
-      insertRow[def.volColumn] = 100;
-    } else {
+      insertRow[def.volColumn] = isChecked ? 100 : null;
+    } else if (isChecked) {
       extraVolumes[def.key] = 100;
     }
   });

@@ -96,20 +96,20 @@
   <h1>Spelare</h1>
 
   <div class="tabs">
-    <button class="tab-btn active" id="tabSpellistorBtn">Spellistor</button>
-    <button class="tab-btn" id="tabRepertoarBtn">Repertoar</button>
+    <button class="tab-btn active" id="tabRepertoarBtn">Repertoar</button>
+    <button class="tab-btn" id="tabSpellistorBtn">Spellistor</button>
   </div>
 
-  <div class="tab-panel active" id="tabSpellistor">
+  <div class="tab-panel active" id="tabRepertoar">
     <div class="quick-create">
       <input type="text" id="newPlaylistName" placeholder="Namn på ny spellista">
       <button class="btn-gold" id="createPlaylistBtn">Skapa ny spellista</button>
     </div>
-    <div id="playlistList">Laddar...</div>
+    <div id="repertoarList">Laddar...</div>
   </div>
 
-  <div class="tab-panel" id="tabRepertoar">
-    <div id="repertoarList">Laddar...</div>
+  <div class="tab-panel" id="tabSpellistor">
+    <div id="playlistList">Laddar...</div>
   </div>
 </div>
 
@@ -287,13 +287,8 @@ function renderPlaylistList() {
     playListBtn.addEventListener('click', async () => {
       if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
 
-      // This playlist is already the active one: toggle play/pause instead of restarting
-      if (activePlaylistId === pl.id && currentPlaylist) {
-        if (isPlaying) { pauseAll(); }
-        else { resumeAll(); }
-        return;
-      }
-
+      // Always (re)starts the playlist from track 1. Pausing/resuming a track in
+      // progress is handled by each track's own play button + the floating player.
       if (!details.open) details.open = true;
       const tc = body.querySelector('.tracksContainer');
       if (!loaded) { loaded = true; await loadPlaylistTracks(pl, tc); }
@@ -307,9 +302,23 @@ function renderPlaylistList() {
       const { error } = await supabaseClient.from('playlists').delete().eq('id', pl.id);
       if (error) { toast('Fel: ' + error.message); return; }
       playlistsCache = playlistsCache.filter(x => x.id !== pl.id);
+      delete playlistPlayBtns[pl.id];
       renderPlaylistList();
+      refreshPlaylistSelects();
       toast('Spellista raderad');
     });
+  });
+}
+
+// Keep every "lägg till i spellista"-dropdown in Repertoar in sync with playlistsCache
+// (a playlist created or deleted elsewhere no longer leaves stale options behind)
+function refreshPlaylistSelects() {
+  const optionsHtml = playlistsCache.map(pl => `<option value="${pl.id}">${escapeHtml(pl.name)}</option>`).join('')
+    || '<option value="">Ingen spellista ännu</option>';
+  document.querySelectorAll('.targetPlaylistSelect').forEach(sel => {
+    const prevValue = sel.value;
+    sel.innerHTML = optionsHtml;
+    if (playlistsCache.some(pl => pl.id === prevValue)) sel.value = prevValue;
   });
 }
 
@@ -322,6 +331,7 @@ document.getElementById('createPlaylistBtn').addEventListener('click', async () 
   input.value = '';
   playlistsCache.push(data);
   renderPlaylistList();
+  refreshPlaylistSelects();
   toast('Spellista skapad');
 });
 
@@ -655,16 +665,12 @@ function setControlsDisabled(disabled) {
 }
 
 function updateAllPlayButtons() {
-  Object.entries(playlistPlayBtns).forEach(([plId, btn]) => {
+  // "Spela listan" always means (re)start from track 1 — it never flips into a
+  // pause/resume toggle just because some track happens to be playing. Per-track
+  // control lives on each track's own play/pause icon and the floating player.
+  Object.values(playlistPlayBtns).forEach(btn => {
     if (!btn) return;
-    if (plId === activePlaylistId) {
-      if (isLoadingTrack) { btn.textContent = '⏳ Laddar...'; btn.disabled = true; return; }
-      btn.disabled = false;
-      btn.textContent = isPlaying ? '⏸ Pausa' : '▶ Fortsätt spela';
-    } else {
-      btn.disabled = isLoadingTrack;
-      btn.textContent = '▶ Spela listan';
-    }
+    btn.disabled = isLoadingTrack;
   });
   updateTrackPlayIcons();
 }
@@ -697,9 +703,15 @@ function updateTrackPlayIcons() {
   });
 }
 
-function ensureAudioCtx() {
+async function ensureAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (audioCtx.state === 'suspended') {
+    // Mobile browsers aggressively suspend the AudioContext (e.g. after switching
+    // tabs/panels). If we don't wait for resume() before scheduling, source.start()
+    // can be scheduled against a context that isn't actually running yet, producing
+    // silent playback even though every JS variable looks "playing". Always await it.
+    try { await audioCtx.resume(); } catch (e) { /* ignored — we'll surface failures via decode/play errors */ }
+  }
 }
 
 function disconnectCurrentGainNodes() {
@@ -726,10 +738,13 @@ async function fetchAndDecode(bucket, path) {
   const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 3600);
   if (error) throw error;
   const resp = await fetch(data.signedUrl);
+  if (!resp.ok) throw new Error(`Kunde inte hämta ljudfil (HTTP ${resp.status})`);
   const arrBuf = await resp.arrayBuffer();
-  ensureAudioCtx();
+  await ensureAudioCtx();
   return await audioCtx.decodeAudioData(arrBuf);
 }
+
+let playRequestId = 0; // bumped on every playTrackAt call; lets a stale in-flight load bail out instead of clobbering a newer one
 
 function startPlaylist(pl, items, index) {
   if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
@@ -744,11 +759,11 @@ async function playTrackAt(index, offsetSeconds) {
   const items = currentPlaylist.items;
   if (index < 0 || index >= items.length) return;
 
+  const myRequestId = ++playRequestId;
   isLoadingTrack = true;
   setControlsDisabled(true);
   updateAllPlayButtons();
 
-  ensureAudioCtx();
   disconnectCurrentGainNodes();
   clearInterval(progressTimer);
   isPlaying = false;
@@ -765,34 +780,51 @@ async function playTrackAt(index, offsetSeconds) {
   markTrackRowLoading(item.rowId, true);
 
   try {
+    await ensureAudioCtx();
+
     // Decode all stems in parallel
     const bufferEntries = await Promise.all(item.stemDefs.map(async def => {
       const buf = await fetchAndDecode(STEMS_BUCKET, def.path);
       return [def.key, buf];
     }));
+
+    // A newer playTrackAt call has started while we were loading — discard this
+    // stale result instead of overwriting/(re)connecting nodes for a track that's
+    // no longer the one the user wants. This is what could otherwise cause a
+    // "click, then click the next one" sequence to end in silence.
+    if (myRequestId !== playRequestId) return;
+
     currentBuffers = {};
     bufferEntries.forEach(([k, b]) => { currentBuffers[k] = b; });
-  } catch (e) {
-    toast('Kunde inte ladda ljudfiler: ' + (e.message || e));
+
+    trackDuration = Math.max(0, ...Object.values(currentBuffers).map(b => b.duration));
+    document.getElementById('scrubber').max = trackDuration || 1;
+    document.getElementById('durTime').textContent = fmtTime(trackDuration);
     document.getElementById('playerTitle').textContent = item.song.title;
     markTrackRowLoading(item.rowId, false);
+
     isLoadingTrack = false;
     setControlsDisabled(false);
-    updateAllPlayButtons();
-    return;
+
+    // Belt-and-braces: some browsers re-suspend the context between the click and
+    // here if the tab was backgrounded mid-decode. Make sure it's really running
+    // right before we schedule the sources.
+    await ensureAudioCtx();
+    if (myRequestId !== playRequestId) return;
+
+    schedulePlaybackFrom(item, offsetSeconds || 0);
+    updateMediaSession(item);
+  } catch (e) {
+    console.error('playTrackAt failed:', e);
+    toast('Kunde inte spela låten: ' + (e.message || e));
+    document.getElementById('playerTitle').textContent = item.song.title;
+    markTrackRowLoading(item.rowId, false);
+    if (myRequestId === playRequestId) {
+      isLoadingTrack = false;
+      setControlsDisabled(false);
+      updateAllPlayButtons();
+    }
   }
-
-  trackDuration = Math.max(0, ...Object.values(currentBuffers).map(b => b.duration));
-  document.getElementById('scrubber').max = trackDuration || 1;
-  document.getElementById('durTime').textContent = fmtTime(trackDuration);
-  document.getElementById('playerTitle').textContent = item.song.title;
-  markTrackRowLoading(item.rowId, false);
-
-  isLoadingTrack = false;
-  setControlsDisabled(false);
-
-  schedulePlaybackFrom(item, offsetSeconds || 0);
-  updateMediaSession(item);
 }
 
 function markTrackRowLoading(rowId, loading) {
@@ -865,10 +897,12 @@ function pauseAll() {
 
 let pausedOffset = 0;
 
-function resumeAll() {
+async function resumeAll() {
   if (isPlaying || isLoadingTrack || !currentPlaylist) return;
   const item = currentPlaylist.items[currentIndex];
   if (!item) return;
+  await ensureAudioCtx();
+  if (isPlaying || !currentPlaylist) return; // state may have changed while awaiting resume
   schedulePlaybackFrom(item, pausedOffset);
 }
 

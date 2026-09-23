@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medlem — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h1>Mitt konto</h1>
+      <p id="welcome" class="text-muted">Laddar...</p>
+    </div>
+    <span id="roleBadge" class="badge"></span>
+  </div>
+
+  <div class="card" style="margin-top: 1.5rem;">
+    <ul class="nav-list">
+      <li><a href="/medlem/spelare.html?tab=repertoire" class="nav-item">
+        <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></span>
+        <span class="nav-item-text">
+          <h3>Repertoar</h3>
+          <p>Låtar, stämfiler &amp; övningsmaterial</p>
+        </span>
+      </a></li>
+      <li><a href="/medlem/spelare.html" class="nav-item">
+        <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg></span>
+        <span class="nav-item-text">
+          <h3>Spelaren</h3>
+          <p>Inbyggd ljud- &amp; stämspelare</p>
+        </span>
+      </a></li>
+      <li><a href="/medlem/kalender.html" class="nav-item">
+        <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
+        <span class="nav-item-text">
+          <h3>Kalender</h3>
+          <p>Repetitioner &amp; framträdanden</p>
+        </span>
+      </a></li>
+      <li><a href="/medlem/info.html" class="nav-item">
+        <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+        <span class="nav-item-text">
+          <h3>Information</h3>
+          <p>Körinfo, klädsel &amp; kontakter</p>
+        </span>
+      </a></li>
+    </ul>
+  </div>
+
+  <div class="page-footer">
+    <div class="page-footer-actions">
+      <a href="/konto.html"><button type="button" class="btn-outline">Mitt konto</button></a>
+      <button id="logoutBtn" class="btn-outline">Logga ut</button>
+    </div>
+    <span class="text-muted">Heavy Voices</span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+(async () => {
+  const member = await requireAuth();
+  if (member) {
+    document.getElementById('welcome').textContent = `Välkommen ${member.name}`;
+    document.getElementById('roleBadge').textContent = member.role;
+  }
+})();
+
+document.getElementById('logoutBtn').addEventListener('click', signOut);
+</script>
+
+</body>
+</html>

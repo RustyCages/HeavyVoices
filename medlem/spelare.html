@@ -87,10 +87,10 @@
     .removeTrackBtn { order:3; }
 
     .mixer { padding:0.85rem; }
-    .mixer-row { flex-wrap:wrap; row-gap:0.5rem; }
-    .mixer-row .label { flex:0 0 auto; order:1; }
-    .mixer-row input[type=range] { order:2; flex:1 1 100%; width:100%; }
-    .mixer-row .muteBtn { order:3; }
+    .mixer-row { flex-wrap:nowrap; gap:0.4rem; }
+    .mixer-row .label { flex:0 0 46px; width:46px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.7rem; order:1; }
+    .mixer-row input[type=range] { order:2; flex:1 1 auto; width:auto; min-width:0; }
+    .mixer-row .muteBtn { order:3; flex:0 0 auto; font-size:0.65rem; padding:0.3rem 0.5rem; }
   }
 
   .stem-check-row { margin-bottom:0.6rem; }

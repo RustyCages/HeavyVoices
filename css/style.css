@@ -1,0 +1,264 @@
+/* ==========================================================================
+Heavy Voices — Central Stilmall (style.css)
+Inkluderar Koncept 4 (Micro-List) för en modern, kompakt känsla
+========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Roboto+Condensed:wght@400;700&display=swap');
+
+/* --- CSS Variabler --- */
+:root {
+--bg: #121418;
+--bg-gradient: radial-gradient(circle at 50% 0%, #1d222e 0%, #121418 75%);
+--bg-elevated: linear-gradient(145deg, rgba(25, 28, 36, 0.95), rgba(18, 20, 26, 0.98));
+--text: #f3f4f6;
+--text-muted: #9ca3af;
+--accent: #E5A968;
+--accent-hover: #f0be86;
+--border: rgba(255, 255, 255, 0.08);
+--border-hover: rgba(229, 169, 104, 0.35);
+--card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+--card-shadow-hover: 0 14px 35px -10px rgba(0, 0, 0, 0.7), 0 0 15px rgba(229, 169, 104, 0.15);
+}
+
+{
+box-sizing: border-box;
+}
+
+/* --- Grundläggande Layout & Typografi --- */
+body {
+margin: 0;
+padding: 0;
+background-color: var(--bg);
+background-image: var(--bg-gradient);
+background-attachment: fixed;
+color: var(--text);
+font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+line-height: 1.5;
+min-height: 100vh;
+}
+
+h1, h2, h3, h4, .font-heading {
+font-family: 'Roboto Condensed', sans-serif;
+letter-spacing: -0.01em;
+color: #ffffff;
+}
+
+h1 {
+font-size: 1.75rem;
+margin-top: 0;
+margin-bottom: 0.25rem;
+text-transform: uppercase;
+}
+
+a {
+color: var(--accent);
+text-decoration: none;
+transition: all 0.2s ease;
+}
+
+a:hover {
+color: var(--accent-hover);
+}
+
+.container {
+max-width: 520px; /* Kompakt centrerad bredd som passar perfekt på både mobil och dator */
+margin: 0 auto;
+padding: 2rem 1.25rem;
+min-height: 100vh;
+display: flex;
+flex-direction: column;
+justify-content: center;
+}
+
+/* ==========================================================================
+MICRO-LIST DESIGN (Koncept 4 Integration)
+Omvandlar alla .nav-grid och .card till rena listrader
+========================================================================== */
+
+/* Behållare för listan */
+.nav-grid {
+display: flex !important;
+flex-direction: column !important;
+background: var(--bg-elevated);
+border: 1px solid var(--border);
+border-radius: 1rem;
+box-shadow: var(--card-shadow);
+padding: 0.35rem;
+margin-top: 1.25rem;
+margin-bottom: 1.5rem;
+overflow: hidden;
+}
+
+/* Enskilda rader/kort inuti listan */
+.card, .nav-card {
+display: flex !important;
+align-items: center;
+justify-content: space-between;
+padding: 0.85rem 1rem !important;
+background: transparent !important;
+border: none !important;
+border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+border-radius: 0.65rem !important;
+text-align: left !important;
+color: var(--text) !important;
+transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+cursor: pointer;
+box-shadow: none !important;
+}
+
+/* Sista raden saknar underlinje */
+.nav-grid > *:last-child,
+.nav-grid > a:last-child .card,
+.nav-grid > a:last-child {
+border-bottom: none !important;
+}
+
+.card h3, .nav-card h3 {
+font-size: 0.95rem;
+font-weight: 600;
+margin: 0 !important;
+color: #f3f4f6;
+transition: color 0.2s ease;
+}
+
+/* Hover-effekt för listrader */
+.card:hover, .nav-card:hover {
+background-color: rgba(255, 255, 255, 0.04) !important;
+transform: none !important;
+}
+
+.card:hover h3, .nav-card:hover h3 {
+color: var(--accent);
+}
+
+/* Automatisk pil (›) till höger på korten */
+.card::after, .nav-card::after {
+content: "›";
+font-size: 1.35rem;
+line-height: 1;
+color: var(--text-muted);
+font-family: monospace;
+transition: transform 0.2s ease, color 0.2s ease;
+margin-left: 0.5rem;
+}
+
+.card:hover::after, .nav-card:hover::after {
+color: var(--accent);
+transform: translateX(4px);
+}
+
+/* Cirkel/ikonbehållare om ikoner används */
+.card-icon-box {
+width: 2.25rem;
+height: 2.25rem;
+border-radius: 0.5rem;
+background-color: rgba(229, 169, 104, 0.1);
+color: var(--accent);
+display: flex;
+align-items: center;
+justify-content: center;
+transition: transform 0.2s ease;
+margin-right: 0.75rem;
+shrink: 0;
+}
+
+.card:hover .card-icon-box {
+transform: scale(1.08);
+}
+
+/* --- Formulärelement & Knappar --- */
+input, select, textarea {
+font-family: inherit;
+font-size: 0.9rem;
+padding: 0.6rem 0.85rem;
+border-radius: 0.6rem;
+border: 1px solid var(--border);
+background: rgba(18, 20, 24, 0.8);
+color: var(--text);
+width: 100%;
+margin-bottom: 0.75rem;
+outline: none;
+transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+border-color: var(--accent);
+box-shadow: 0 0 0 3px rgba(229, 169, 104, 0.15);
+}
+
+button, .btn {
+font-family: inherit;
+font-size: 0.8rem;
+font-weight: 600;
+padding: 0.4rem 0.85rem;
+border-radius: 0.5rem;
+border: 1px solid var(--border);
+background: var(--accent);
+color: #111317;
+cursor: pointer;
+transition: all 0.2s ease;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+gap: 0.4rem;
+}
+
+button:hover, .btn:hover {
+background: var(--accent-hover);
+box-shadow: 0 0 10px rgba(229, 169, 104, 0.25);
+}
+
+/* Knappvarianter & transparenta knappar (som "Mitt konto" / "Logga ut") */
+.btn-gold, button.btn-gold {
+background-color: var(--accent);
+color: #111317;
+border: none;
+}
+
+button[style*="transparent"], .btn-outline, button.btn-outline {
+background: rgba(255, 255, 255, 0.05) !important;
+color: #d1d5db !important;
+border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+button[style*="transparent"]:hover, .btn-outline:hover, button.btn-outline:hover {
+background: rgba(255, 255, 255, 0.1) !important;
+color: #ffffff !important;
+}
+
+.back-btn {
+display: inline-flex;
+align-items: center;
+gap: 0.4rem;
+padding: 0.35rem 0.8rem;
+margin-bottom: 1rem;
+border: 1px solid var(--border);
+border-radius: 0.5rem;
+color: var(--text);
+text-decoration: none;
+font-size: 0.8rem;
+background: rgba(255, 255, 255, 0.04);
+transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+border-color: var(--accent);
+color: var(--accent);
+background: rgba(229, 169, 104, 0.08);
+}
+
+/* --- Hjälpklasser & Textstilar --- */
+.text-muted, .text-subtle {
+color: var(--text-muted);
+font-size: 0.85rem;
+}
+
+.text-gold {
+color: var(--accent);
+}
+
+.error {
+color: #ef4444;
+font-size: 0.85rem;
+margin-top: 0.25rem;
+}

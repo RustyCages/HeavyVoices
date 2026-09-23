@@ -259,12 +259,9 @@ function renderPlaylistList() {
 
     const body = document.createElement('div');
     body.style.marginTop = '1rem';
-        body.innerHTML = `
+    body.innerHTML = `
       <div class="row-between" style="margin-bottom:0.75rem;">
-        <div style="display:flex; gap:0.5rem;">
-          <button class="btn-gold playListBtn">▶ Spela listan</button>
-          <button class="btn-outline restartListBtn" title="Starta om från början">↺</button>
-        </div>
+        <button class="btn-gold playListBtn">▶ Spela listan</button>
         <button class="danger deleteListBtn">Radera spellista</button>
       </div>
       <div class="tracksContainer text-muted">Laddar låtar...</div>
@@ -283,24 +280,11 @@ function renderPlaylistList() {
       }
     });
 
-        playListBtn.addEventListener('click', async () => {
+    playListBtn.addEventListener('click', async () => {
       if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
 
-      // Already the active playlist: toggle pause/resume instead of restarting
-      if (activePlaylistId === pl.id && currentPlaylist) {
-        if (isPlaying) pauseAll(); else resumeAll();
-        return;
-      }
-
-      if (!details.open) details.open = true;
-      const tc = body.querySelector('.tracksContainer');
-      if (!loaded) { loaded = true; await loadPlaylistTracks(pl, tc); }
-      const items = playlistTracksCache[pl.id];
-      if (items && items.length) startPlaylist(pl, items, 0);
-    });
-
-    body.querySelector('.restartListBtn').addEventListener('click', async () => {
-      if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
+      // Always (re)starts the playlist from track 1. Pausing/resuming a track in
+      // progress is handled by each track's own play button + the floating player.
       if (!details.open) details.open = true;
       const tc = body.querySelector('.tracksContainer');
       if (!loaded) { loaded = true; await loadPlaylistTracks(pl, tc); }
@@ -376,7 +360,7 @@ async function loadPlaylistTracks(pl, containerEl) {
     // have. Previously this used getStemDefs(song) unfiltered, so unchecking a stem
     // in Repertoar had no effect: every available stem was included anyway.
     const stemDefs = getStemDefs(song).filter(def => {
-       if (def.type === 'fixed') return row[def.volColumn] !== null && row[def.volColumn] !== undefined && row[def.volColumn] >= 0;
+      if (def.type === 'fixed') return row[def.volColumn] !== null && row[def.volColumn] !== undefined;
       return extraVolumesRaw[def.key] !== undefined && extraVolumesRaw[def.key] !== null;
     });
     const volumes = {};
@@ -643,7 +627,7 @@ async function addToPlaylist(song, stemDefs, checkedKeys, playlistId) {
   stemDefs.forEach(def => {
     const isChecked = checkedKeys.includes(def.key);
     if (def.type === 'fixed') {
-           insertRow[def.volColumn] = isChecked ? 100 : -1; // -1 = "not included" sentinel (columns are NOT NULL)
+      insertRow[def.volColumn] = isChecked ? 100 : null;
     } else if (isChecked) {
       extraVolumes[def.key] = 100;
     }
@@ -688,16 +672,12 @@ function setControlsDisabled(disabled) {
 }
 
 function updateAllPlayButtons() {
-  Object.entries(playlistPlayBtns).forEach(([plId, btn]) => {
+  // "Spela listan" always means (re)start from track 1 — it never flips into a
+  // pause/resume toggle just because some track happens to be playing. Per-track
+  // control lives on each track's own play/pause icon and the floating player.
+  Object.values(playlistPlayBtns).forEach(btn => {
     if (!btn) return;
-    if (plId === activePlaylistId && currentPlaylist) {
-      if (isLoadingTrack) { btn.textContent = '⏳ Laddar...'; btn.disabled = true; return; }
-      btn.disabled = false;
-      btn.textContent = isPlaying ? '⏸ Pausa' : '▶ Fortsätt';
-    } else {
-      btn.disabled = isLoadingTrack;
-      btn.textContent = '▶ Spela listan';
-    }
+    btn.disabled = isLoadingTrack;
   });
   updateTrackPlayIcons();
 }

@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spelare – Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  body { padding-bottom: 7rem; }
+  .tabs { display:flex; gap:0.75rem; margin-bottom:1.5rem; }
+  .tab-btn { background:rgba(255,255,255,0.06); color:#d1d5db; border:1px solid rgba(255,255,255,0.12); }
+  .tab-btn.active { background:var(--accent); color:#111317; }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+
+  details.list-card, details.song-card { margin-bottom:1rem; }
+  details.list-card summary, details.song-card summary { list-style:none; cursor:pointer; }
+  details.list-card summary::-webkit-details-marker, details.song-card summary::-webkit-details-marker { display:none; }
+  .row-between { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+
+  .track-row { display:flex; align-items:center; gap:0.75rem; padding:0.5rem 0; border-bottom:1px solid var(--border); }
+  .track-row:last-child { border-bottom:none; }
+  .track-title { flex:1; cursor:pointer; }
+  .track-title:hover { color:var(--accent); }
+
+  .mixer { margin-top:0.5rem; padding:0.75rem; background:rgba(255,255,255,0.03); border-radius:0.6rem; }
+  .mixer-row { display:flex; align-items:center; gap:0.6rem; margin-bottom:0.5rem; }
+  .mixer-row .label { min-width:110px; font-weight:600; font-size:0.85rem; }
+  .mixer-row input[type=range] { flex:1; margin-bottom:0; }
+  .mixer-row .fname { color:var(--text-muted); font-size:0.75rem; min-width:100px; text-align:right; }
+  .mixer-row .muteBtn { font-size:0.7rem; padding:0.3rem 0.6rem; }
+  .mixer-row .muteBtn.muted { background:#ef4444; color:#fff; }
+
+  .stem-check-row { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem; }
+  .doc-links { display:flex; flex-wrap:wrap; gap:0.5rem; margin:0.5rem 0; }
+  .doc-links a { font-size:0.8rem; padding:0.3rem 0.7rem; border:1px solid var(--border); border-radius:0.4rem; }
+  .lyrics-preview { white-space:pre-wrap; max-height:150px; overflow-y:auto; background:rgba(0,0,0,0.2); padding:0.75rem; border-radius:0.5rem; font-size:0.85rem; margin:0.5rem 0; }
+
+  .quick-create { display:flex; gap:0.6rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+  .quick-create input { width:auto; flex:1; margin-bottom:0; min-width:180px; }
+
+  .danger { background:#ef4444; color:#fff; }
+  .danger:hover { background:#dc2626; }
+
+  /* Floating player bar */
+  #playerBar {
+    position:fixed; bottom:0; left:0; right:0;
+    background: var(--bg-elevated);
+    border-top:1px solid var(--border);
+    padding:0.75rem 1.25rem;
+    display:flex; flex-direction:column; gap:0.4rem;
+    z-index:100;
+    backdrop-filter: blur(10px);
+  }
+  #playerBar.hidden { display:none; }
+  #playerTitle { font-weight:700; text-align:center; font-family:'Roboto Condensed', sans-serif; }
+  #playerControls { display:flex; align-items:center; justify-content:center; gap:1rem; }
+  #playerControls button { font-size:1.1rem; padding:0.5rem 0.9rem; border-radius:50%; }
+  #playerScrubberRow { display:flex; align-items:center; gap:0.6rem; }
+  #playerScrubberRow input[type=range] { flex:1; margin-bottom:0; }
+  #playerScrubberRow span { font-size:0.75rem; color:var(--text-muted); min-width:38px; text-align:center; }
+  #repeatBtn.active { color:var(--accent); box-shadow:0 0 8px rgba(229,169,104,0.4); }
+
+  #toast { position:fixed; bottom:8rem; right:1.5rem; background:var(--accent); color:#111317; padding:0.7rem 1.2rem; border-radius:0.6rem; font-weight:600; box-shadow:var(--card-shadow); z-index:999; display:none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
+  <h1>Spelare</h1>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabSpellistorBtn">Spellistor</button>
+    <button class="tab-btn" id="tabRepertoarBtn">Repertoar</button>
+  </div>
+
+  <div class="tab-panel active" id="tabSpellistor">
+    <div class="quick-create">
+      <input type="text" id="newPlaylistName" placeholder="Namn på ny spellista">
+      <button class="btn-gold" id="createPlaylistBtn">Skapa ny spellista</button>
+    </div>
+    <div id="playlistList">Laddar...</div>
+  </div>
+
+  <div class="tab-panel" id="tabRepertoar">
+    <div id="repertoarList">Laddar...</div>
+  </div>
+</div>
+
+<div id="playerBar" class="hidden">
+  <div id="playerTitle">–</div>
+  <div id="playerScrubberRow">
+    <span id="curTime">0:00</span>
+    <input type="range" id="scrubber" min="0" max="100" value="0" step="0.1">
+    <span id="durTime">0:00</span>
+  </div>
+  <div id="playerControls">
+    <button class="btn-outline" id="repeatBtn" title="Upprepa">🔁</button>
+    <button class="btn-outline" id="prevBtn" title="Föregående">⏮</button>
+    <button class="btn-gold" id="playPauseBtn" title="Spela/Pausa">▶</button>
+    <button class="btn-outline" id="nextBtn" title="Nästa">⏭</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+const NOTER_BUCKET = 'heavy-voices-noter';
+const STEMS_BUCKET = 'heavy-voices-stems';
+
+const FIXED_STEMS = [
+  { key: 'backtrack', pathCol: 'stem_backtrack_path', volColumn: 'vol_backtrack', label: 'Backtrack' },
+  { key: 'sopran',    pathCol: 'stem_sopran_path',    volColumn: 'vol_sopran',    label: 'Sopran' },
+  { key: 'alt',       pathCol: 'stem_alt_path',       volColumn: 'vol_alt',       label: 'Alt' },
+  { key: 'tenor',     pathCol: 'stem_tenor_path',     volColumn: 'vol_tenor',     label: 'Tenor' },
+  { key: 'bas',       pathCol: 'stem_bas_path',       volColumn: 'vol_bas',       label: 'Bas' }
+];
+
+const STAMTEXT_FIELDS = [
+  { key: 'sopran', col: 'lyrics_sopran_path', label: 'Sopran text' },
+  { key: 'alt',    col: 'lyrics_alt_path',    label: 'Alt text' },
+  { key: 'tenor',  col: 'lyrics_tenor_path',  label: 'Tenor text' },
+  { key: 'bas',    col: 'lyrics_bas_path',    label: 'Bas text' }
+];
+
+const DOC_FIELDS = [
+  { col: 'sheet_music_path', label: 'Noter (PDF)' },
+  { col: 'lyrics_pdf_path',  label: 'Sångtext (PDF)' }
+];
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2500);
+}
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function stemFilename(path) {
+  if (!path) return '';
+  const base = path.split('/').pop();
+  const parts = base.split('__');
+  if (parts.length < 2) return decodeURIComponent(base);
+  return decodeURIComponent(parts.slice(1).join('__'));
+}
+
+function fmtTime(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+// Merge fixed + extra stems present on a song into one generic list
+function getStemDefs(song) {
+  const defs = [];
+  FIXED_STEMS.forEach(f => {
+    if (song[f.pathCol]) {
+      defs.push({ key: f.key, type: 'fixed', label: f.label, path: song[f.pathCol], volColumn: f.volColumn });
+    }
+  });
+  (song.extra_stems || []).forEach(ex => {
+    defs.push({ key: ex.id, type: 'extra', label: ex.label, path: ex.path, volColumn: null });
+  });
+  return defs;
+}
+
+let currentMember = null;
+
+// =========================================================
+// Tabs
+// =========================================================
+document.getElementById('tabSpellistorBtn').addEventListener('click', () => switchTab('spellistor'));
+document.getElementById('tabRepertoarBtn').addEventListener('click', () => switchTab('repertoar'));
+
+function switchTab(name) {
+  document.getElementById('tabSpellistorBtn').classList.toggle('active', name === 'spellistor');
+  document.getElementById('tabRepertoarBtn').classList.toggle('active', name === 'repertoar');
+  document.getElementById('tabSpellistor').classList.toggle('active', name === 'spellistor');
+  document.getElementById('tabRepertoar').classList.toggle('active', name === 'repertoar');
+}
+
+// =========================================================
+// Init
+// =========================================================
+async function init() {
+  const member = await requireAuth();
+  if (!member) return;
+  currentMember = member;
+
+  await loadPlaylists();
+  await loadRepertoar();
+}
+init();
+
+// =========================================================
+// Spellistor
+// =========================================================
+let playlistsCache = [];
+
+async function loadPlaylists() {
+  const { data, error } = await supabaseClient
+    .from('playlists')
+    .select('*')
+    .eq('member_id', currentMember.id)
+    .order('name', { ascending: true });
+  if (error) {
+    document.getElementById('playlistList').textContent = 'Kunde inte ladda spellistor: ' + error.message;
+    return;
+  }
+  playlistsCache = data || [];
+  renderPlaylistList();
+}
+
+function renderPlaylistList() {
+  const container = document.getElementById('playlistList');
+  if (!playlistsCache.length) {
+    container.innerHTML = '<p class="text-muted">Inga spellistor ännu.</p>';
+    return;
+  }
+  container.innerHTML = '';
+  playlistsCache.forEach(pl => {
+    const details = document.createElement('details');
+    details.className = 'list-card card modern-card';
+    details.dataset.playlistId = pl.id;
+
+    const summary = document.createElement('summary');
+    summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(pl.name)}</h3><span class="text-muted">Visa ▾</span></div>`;
+    details.appendChild(summary);
+
+    const body = document.createElement('div');
+    body.style.marginTop = '1rem';
+    body.innerHTML = `
+      <div class="row-between" style="margin-bottom:0.75rem;">
+        <button class="btn-gold playListBtn">▶ Spela listan</button>
+        <button class="danger deleteListBtn">Radera spellista</button>
+      </div>
+      <div class="tracksContainer text-muted">Laddar låtar...</div>
+    `;
+    details.appendChild(body);
+    container.appendChild(details);
+
+    let loaded = false;
+    details.addEventListener('toggle', () => {
+      if (details.open && !loaded) {
+        loaded = true;
+        loadPlaylistTracks(pl, body.querySelector('.tracksContainer'));
+      }
+    });
+
+    body.querySelector('.playListBtn').addEventListener('click', async () => {
+      if (!details.open) details.open = true;
+      const tc = body.querySelector('.tracksContainer');
+      if (!loaded) { loaded = true; await loadPlaylistTracks(pl, tc); }
+      const items = playlistTracksCache[pl.id];
+      if (items && items.length) startPlaylist(pl, items, 0);
+    });
+
+    body.querySelector('.deleteListBtn').addEventListener('click', async () => {
+      if (!confirm(`Radera spellistan "${pl.name}"?`)) return;
+      await supabaseClient.from('playlist_songs').delete().eq('playlist_id', pl.id);
+      const { error } = await supabaseClient.from('playlists').delete().eq('id', pl.id);
+      if (error) { toast('Fel: ' + error.message); return; }
+      playlistsCache = playlistsCache.filter(x => x.id !== pl.id);
+      renderPlaylistList();
+      toast('Spellista raderad');
+    });
+  });
+}
+
+document.getElementById('createPlaylistBtn').addEventListener('click', async () => {
+  const input = document.getElementById('newPlaylistName');
+  const name = input.value.trim();
+  if (!name) { toast('Ange ett namn'); return; }
+  const { data, error } = await supabaseClient.from('playlists').insert({ member_id: currentMember.id, name }).select().single();
+  if (error) { toast('Fel: ' + error.message); return; }
+  input.value = '';
+  playlistsCache.push(data);
+  renderPlaylistList();
+  toast('Spellista skapad');
+});
+
+// playlistTracksCache[playlistId] = [{ rowId, song, stemDefs, volumes, extraVolumesRaw, muted:Set }]
+const playlistTracksCache = {};
+
+async function loadPlaylistTracks(pl, containerEl) {
+  const { data: rows, error } = await supabaseClient
+    .from('playlist_songs')
+    .select('*')
+    .eq('playlist_id', pl.id)
+    .order('id', { ascending: true });
+
+  if (error) { containerEl.textContent = 'Fel: ' + error.message; return; }
+  if (!rows.length) { containerEl.innerHTML = '<p class="text-muted">Inga låtar i denna spellista ännu. Lägg till från Repertoar.</p>'; return; }
+
+  const songIds = rows.map(r => r.song_id);
+  const { data: songs, error: songsErr } = await supabaseClient.from('songs').select('*').in('id', songIds);
+  if (songsErr) { containerEl.textContent = 'Fel: ' + songsErr.message; return; }
+  const songsById = {};
+  songs.forEach(s => { songsById[s.id] = s; });
+
+  const items = rows.map(row => {
+    const song = songsById[row.song_id];
+    const extraVolumesRaw = row.extra_volumes || {};
+    const stemDefs = getStemDefs(song);
+    const volumes = {};
+    stemDefs.forEach(def => {
+      if (def.type === 'fixed') {
+        const v = row[def.volColumn];
+        volumes[def.key] = (v === null || v === undefined) ? 100 : v;
+      } else {
+        const v = extraVolumesRaw[def.key];
+        volumes[def.key] = (v === undefined || v === null) ? 100 : v;
+      }
+    });
+    return {
+      rowId: row.id,
+      playlistId: pl.id,
+      song,
+      stemDefs,
+      volumes,
+      extraVolumesRaw,
+      muted: new Set()
+    };
+  });
+
+  playlistTracksCache[pl.id] = items;
+  renderTracksForPlaylist(pl, items, containerEl);
+}
+
+function renderTracksForPlaylist(pl, items, containerEl) {
+  containerEl.innerHTML = '';
+  items.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'track-row';
+    row.innerHTML = `
+      <span class="track-title">${escapeHtml(item.song.title)}</span>
+      <button class="btn-outline mixerToggleBtn" style="font-size:0.75rem;">Mixer</button>
+      <button class="btn-outline removeTrackBtn" style="font-size:0.75rem;">Ta bort</button>
+    `;
+    row.querySelector('.track-title').addEventListener('click', () => startPlaylist(pl, items, idx));
+
+    const mixer = document.createElement('div');
+    mixer.className = 'mixer';
+    mixer.style.display = 'none';
+    item.stemDefs.forEach(def => {
+      const mrow = document.createElement('div');
+      mrow.className = 'mixer-row';
+      mrow.innerHTML = `
+        <span class="label">${escapeHtml(def.label)}</span>
+        <input type="range" min="0" max="100" value="${item.volumes[def.key]}" class="volSlider" data-key="${def.key}">
+        <button class="btn-outline muteBtn" data-key="${def.key}">Mute</button>
+        <span class="fname">${escapeHtml(stemFilename(def.path))}</span>
+      `;
+      mrow.querySelector('.volSlider').addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        item.volumes[def.key] = val;
+        applyGainForKey(item, def.key, val);
+        scheduleVolumeSave(item);
+      });
+      mrow.querySelector('.muteBtn').addEventListener('click', (e) => {
+        const k = def.key;
+        if (item.muted.has(k)) { item.muted.delete(k); e.target.classList.remove('muted'); }
+        else { item.muted.add(k); e.target.classList.add('muted'); }
+        applyGainForKey(item, k, item.volumes[k]);
+      });
+      mixer.appendChild(mrow);
+    });
+
+    row.querySelector('.mixerToggleBtn').addEventListener('click', () => {
+      mixer.style.display = mixer.style.display === 'none' ? 'block' : 'none';
+    });
+
+    row.querySelector('.removeTrackBtn').addEventListener('click', async () => {
+      if (!confirm(`Ta bort "${item.song.title}" från spellistan?`)) return;
+      const { error } = await supabaseClient.from('playlist_songs').delete().eq('id', item.rowId);
+      if (error) { toast('Fel: ' + error.message); return; }
+      const newItems = items.filter(x => x.rowId !== item.rowId);
+      playlistTracksCache[pl.id] = newItems;
+      renderTracksForPlaylist(pl, newItems, containerEl);
+      toast('Borttagen');
+    });
+
+    containerEl.appendChild(row);
+    containerEl.appendChild(mixer);
+  });
+}
+
+let volumeSaveTimers = {};
+function scheduleVolumeSave(item) {
+  clearTimeout(volumeSaveTimers[item.rowId]);
+  volumeSaveTimers[item.rowId] = setTimeout(() => saveVolumes(item), 600);
+}
+
+async function saveVolumes(item) {
+  const update = {};
+  const extraVolumes = {};
+  item.stemDefs.forEach(def => {
+    if (def.type === 'fixed') {
+      update[def.volColumn] = item.volumes[def.key];
+    } else {
+      extraVolumes[def.key] = item.volumes[def.key];
+    }
+  });
+  update.extra_volumes = extraVolumes;
+  await supabaseClient.from('playlist_songs').update(update).eq('id', item.rowId);
+}
+
+// =========================================================
+// Repertoar
+// =========================================================
+let repertoarCache = [];
+
+async function loadRepertoar() {
+  const { data, error } = await supabaseClient.from('songs').select('*').order('title', { ascending: true });
+  if (error) { document.getElementById('repertoarList').textContent = 'Fel: ' + error.message; return; }
+  repertoarCache = data || [];
+  renderRepertoar();
+}
+
+function renderRepertoar() {
+  const container = document.getElementById('repertoarList');
+  if (!repertoarCache.length) { container.innerHTML = '<p class="text-muted">Inga låtar ännu.</p>'; return; }
+  container.innerHTML = '';
+  repertoarCache.forEach(s => {
+    container.appendChild(renderSongCard(s));
+  });
+}
+
+function renderSongCard(s) {
+  const details = document.createElement('details');
+  details.className = 'song-card card modern-card';
+
+  const summary = document.createElement('summary');
+  summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}</h3><span class="text-muted">Visa ▾</span></div>`;
+  details.appendChild(summary);
+
+  const body = document.createElement('div');
+  body.style.marginTop = '1rem';
+
+  // Docs (PDF) + stamtext + extra_lyrics links
+  const docLinks = document.createElement('div');
+  docLinks.className = 'doc-links';
+  body.appendChild(docLinks);
+  loadDocsForSong(s, docLinks);
+
+  // Lyrics preview
+  if (s.lyrics_plain) {
+    const pre = document.createElement('div');
+    pre.className = 'lyrics-preview';
+    pre.textContent = s.lyrics_plain;
+    body.appendChild(pre);
+  }
+
+  // Stem checkboxes (fixed + extra) for adding to a playlist
+  const stemDefs = getStemDefs(s);
+  const stemsWrap = document.createElement('div');
+  stemsWrap.innerHTML = '<h4 style="margin-bottom:0.5rem;">Välj stämmor att lägga till</h4>';
+  const checksWrap = document.createElement('div');
+  stemDefs.forEach(def => {
+    const row = document.createElement('div');
+    row.className = 'stem-check-row';
+    row.innerHTML = `<label><input type="checkbox" class="stemCheck" value="${def.key}" checked> ${escapeHtml(def.label)}</label>`;
+    checksWrap.appendChild(row);
+  });
+  if (!stemDefs.length) {
+    checksWrap.innerHTML = '<p class="text-muted">Inga stämfiler uppladdade för denna låt ännu.</p>';
+  }
+  stemsWrap.appendChild(checksWrap);
+  body.appendChild(stemsWrap);
+
+  // Add to playlist controls
+  const addWrap = document.createElement('div');
+  addWrap.className = 'add-row';
+  addWrap.style.marginTop = '0.75rem';
+  let plOptions = playlistsCache.map(pl => `<option value="${pl.id}">${escapeHtml(pl.name)}</option>`).join('');
+  addWrap.innerHTML = `
+    <select class="targetPlaylistSelect">${plOptions || '<option value="">Ingen spellista ännu</option>'}</select>
+    <button class="btn-gold addToPlaylistBtn">Lägg till i spellista</button>
+  `;
+  body.appendChild(addWrap);
+
+  addWrap.querySelector('.addToPlaylistBtn').addEventListener('click', async () => {
+    const playlistId = addWrap.querySelector('.targetPlaylistSelect').value;
+    if (!playlistId) { toast('Skapa en spellista först'); return; }
+    const checked = Array.from(checksWrap.querySelectorAll('.stemCheck:checked')).map(c => c.value);
+    if (!checked.length) { toast('Välj minst en stämma'); return; }
+    await addToPlaylist(s, stemDefs, checked, playlistId);
+  });
+
+  details.appendChild(body);
+  return details;
+}
+
+async function loadDocsForSong(s, container) {
+  container.innerHTML = '';
+  for (const f of DOC_FIELDS) {
+    if (!s[f.col]) continue;
+    const a = document.createElement('a');
+    a.href = '#';
+    a.textContent = f.label;
+    a.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(s[f.col], 3600);
+      if (error) { toast('Fel: ' + error.message); return; }
+      window.open(data.signedUrl, '_blank');
+    });
+    container.appendChild(a);
+  }
+  for (const f of STAMTEXT_FIELDS) {
+    if (!s[f.col]) continue;
+    const a = document.createElement('a');
+    a.href = '#';
+    a.textContent = f.label;
+    a.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(s[f.col], 3600);
+      if (error) { toast('Fel: ' + error.message); return; }
+      window.open(data.signedUrl, '_blank');
+    });
+    container.appendChild(a);
+  }
+  (s.extra_lyrics || []).forEach(ex => {
+    const a = document.createElement('a');
+    a.href = '#';
+    a.textContent = ex.label;
+    a.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(ex.path, 3600);
+      if (error) { toast('Fel: ' + error.message); return; }
+      window.open(data.signedUrl, '_blank');
+    });
+    container.appendChild(a);
+  });
+}
+
+async function addToPlaylist(song, stemDefs, checkedKeys, playlistId) {
+  const selectedDefs = stemDefs.filter(d => checkedKeys.includes(d.key));
+  const insertRow = { playlist_id: playlistId, song_id: song.id };
+  const extraVolumes = {};
+  selectedDefs.forEach(def => {
+    if (def.type === 'fixed') {
+      insertRow[def.volColumn] = 100;
+    } else {
+      extraVolumes[def.key] = 100;
+    }
+  });
+  insertRow.extra_volumes = extraVolumes;
+
+  const { error } = await supabaseClient.from('playlist_songs').insert(insertRow);
+  if (error) { toast('Fel: ' + error.message); return; }
+  toast('Tillagd i spellistan');
+  // invalidate cache for that playlist so it reloads next time it's opened
+  delete playlistTracksCache[playlistId];
+  const details = document.querySelector(`details.list-card[data-playlist-id="${playlistId}"]`);
+  if (details && details.open) {
+    const tc = details.querySelector('.tracksContainer');
+    const pl = playlistsCache.find(p => p.id === playlistId);
+    if (pl && tc) loadPlaylistTracks(pl, tc);
+  }
+}
+
+// =========================================================
+// Web Audio playback engine (sample-accurate multi-stem sync)
+// =========================================================
+let audioCtx = null;
+let currentPlaylist = null;   // { pl, items }
+let currentIndex = -1;
+let currentBuffers = {};      // key -> AudioBuffer
+let currentSources = {};      // key -> AudioBufferSourceNode
+let gainNodesCurrent = {};    // key -> GainNode
+let isPlaying = false;
+let playStartCtxTime = 0;     // audioCtx.currentTime when playback of current offset started
+let playStartOffset = 0;      // offset into the track (seconds) at playStartCtxTime
+let trackDuration = 0;
+let repeatOne = false;
+let progressTimer = null;
+
+function ensureAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function disconnectCurrentGainNodes() {
+  Object.values(currentSources).forEach(src => {
+    try { src.onended = null; src.stop(); } catch (e) {}
+    try { src.disconnect(); } catch (e) {}
+  });
+  Object.values(gainNodesCurrent).forEach(g => {
+    try { g.disconnect(); } catch (e) {}
+  });
+  currentSources = {};
+  gainNodesCurrent = {};
+  currentBuffers = {};
+}
+
+function applyGainForKey(item, key, val) {
+  const g = gainNodesCurrent[key];
+  if (!g) return;
+  const muted = item.muted.has(key);
+  g.gain.value = muted ? 0 : (val / 100);
+}
+
+async function fetchAndDecode(bucket, path) {
+  const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 3600);
+  if (error) throw error;
+  const resp = await fetch(data.signedUrl);
+  const arrBuf = await resp.arrayBuffer();
+  ensureAudioCtx();
+  return await audioCtx.decodeAudioData(arrBuf);
+}
+
+function startPlaylist(pl, items, index) {
+  currentPlaylist = { pl, items };
+  playTrackAt(index, 0);
+}
+
+async function playTrackAt(index, offsetSeconds) {
+  if (!currentPlaylist) return;
+  const items = currentPlaylist.items;
+  if (index < 0 || index >= items.length) return;
+
+  ensureAudioCtx();
+  disconnectCurrentGainNodes();
+  clearInterval(progressTimer);
+
+  currentIndex = index;
+  const item = items[index];
+
+  document.getElementById('playerBar').classList.remove('hidden');
+  document.getElementById('playerTitle').textContent = item.song.title;
+  document.getElementById('scrubber').value = 0;
+  document.getElementById('curTime').textContent = '0:00';
+  document.getElementById('durTime').textContent = '0:00';
+  setPlayPauseIcon(false);
+
+  try {
+    // Decode all stems in parallel
+    const bufferEntries = await Promise.all(item.stemDefs.map(async def => {
+      const buf = await fetchAndDecode(STEMS_BUCKET, def.path);
+      return [def.key, buf];
+    }));
+    currentBuffers = {};
+    bufferEntries.forEach(([k, b]) => { currentBuffers[k] = b; });
+  } catch (e) {
+    toast('Kunde inte ladda ljudfiler: ' + (e.message || e));
+    return;
+  }
+
+  trackDuration = Math.max(0, ...Object.values(currentBuffers).map(b => b.duration));
+  document.getElementById('scrubber').max = trackDuration || 1;
+  document.getElementById('durTime').textContent = fmtTime(trackDuration);
+
+  schedulePlaybackFrom(item, offsetSeconds || 0);
+  updateMediaSession(item);
+}
+
+function schedulePlaybackFrom(item, offset) {
+  const startAt = audioCtx.currentTime + 0.15;
+  playStartCtxTime = startAt;
+  playStartOffset = offset;
+
+  item.stemDefs.forEach(def => {
+    const buffer = currentBuffers[def.key];
+    if (!buffer) return;
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    const gain = audioCtx.createGain();
+    const muted = item.muted.has(def.key);
+    gain.gain.value = muted ? 0 : ((item.volumes[def.key] ?? 100) / 100);
+    source.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start(startAt, offset);
+    currentSources[def.key] = source;
+    gainNodesCurrent[def.key] = gain;
+  });
+
+  const firstKey = item.stemDefs[0] && item.stemDefs[0].key;
+  if (firstKey && currentSources[firstKey]) {
+    currentSources[firstKey].onended = () => {
+      if (isPlaying) handleTrackEnded();
+    };
+  }
+
+  isPlaying = true;
+  setPlayPauseIcon(true);
+  startProgressTimer();
+}
+
+function handleTrackEnded() {
+  if (repeatOne) {
+    playTrackAt(currentIndex, 0);
+    return;
+  }
+  if (currentPlaylist && currentIndex < currentPlaylist.items.length - 1) {
+    playTrackAt(currentIndex + 1, 0);
+  } else {
+    isPlaying = false;
+    setPlayPauseIcon(false);
+    clearInterval(progressTimer);
+  }
+}
+
+function pauseAll() {
+  if (!isPlaying) return;
+  const elapsed = playStartOffset + (audioCtx.currentTime - playStartCtxTime);
+  Object.values(currentSources).forEach(src => {
+    try { src.onended = null; src.stop(); } catch (e) {}
+  });
+  currentSources = {};
+  isPlaying = false;
+  setPlayPauseIcon(false);
+  clearInterval(progressTimer);
+  pausedOffset = Math.max(0, elapsed);
+}
+
+let pausedOffset = 0;
+
+function resumeAll() {
+  if (isPlaying || !currentPlaylist) return;
+  const item = currentPlaylist.items[currentIndex];
+  if (!item) return;
+  schedulePlaybackFrom(item, pausedOffset);
+}
+
+document.getElementById('playPauseBtn').addEventListener('click', () => {
+  if (!currentPlaylist) return;
+  if (isPlaying) pauseAll();
+  else resumeAll();
+});
+
+document.getElementById('prevBtn').addEventListener('click', () => {
+  if (!currentPlaylist) return;
+  const newIdx = Math.max(0, currentIndex - 1);
+  playTrackAt(newIdx, 0);
+});
+
+document.getElementById('nextBtn').addEventListener('click', () => {
+  if (!currentPlaylist) return;
+  const newIdx = Math.min(currentPlaylist.items.length - 1, currentIndex + 1);
+  playTrackAt(newIdx, 0);
+});
+
+document.getElementById('repeatBtn').addEventListener('click', (e) => {
+  repeatOne = !repeatOne;
+  e.currentTarget.classList.toggle('active', repeatOne);
+});
+
+const scrubberEl = document.getElementById('scrubber');
+let scrubbing = false;
+scrubberEl.addEventListener('mousedown', () => { scrubbing = true; });
+scrubberEl.addEventListener('touchstart', () => { scrubbing = true; });
+scrubberEl.addEventListener('change', () => {
+  scrubbing = false;
+  const val = parseFloat(scrubberEl.value);
+  if (!currentPlaylist) return;
+  const item = currentPlaylist.items[currentIndex];
+  disconnectCurrentGainNodes();
+  clearInterval(progressTimer);
+  isPlaying = false;
+  pausedOffset = val;
+  schedulePlaybackFrom(item, val);
+});
+
+function startProgressTimer() {
+  clearInterval(progressTimer);
+  progressTimer = setInterval(() => {
+    if (!isPlaying || scrubbing) return;
+    const elapsed = playStartOffset + (audioCtx.currentTime - playStartCtxTime);
+    document.getElementById('curTime').textContent = fmtTime(elapsed);
+    scrubberEl.value = Math.min(elapsed, trackDuration);
+    if (navigator.mediaSession && navigator.mediaSession.setPositionState) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: trackDuration || 0,
+          playbackRate: 1,
+          position: Math.min(elapsed, trackDuration || 0)
+        });
+      } catch (e) {}
+    }
+  }, 250);
+}
+
+function setPlayPauseIcon(playing) {
+  document.getElementById('playPauseBtn').textContent = playing ? '⏸' : '▶';
+}
+
+function updateMediaSession(item) {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: item.song.title,
+    artist: 'Heavy Voices',
+    album: currentPlaylist.pl.name
+  });
+  navigator.mediaSession.setActionHandler('play', () => resumeAll());
+  navigator.mediaSession.setActionHandler('pause', () => pauseAll());
+  navigator.mediaSession.setActionHandler('previoustrack', () => {
+    const newIdx = Math.max(0, currentIndex - 1);
+    playTrackAt(newIdx, 0);
+  });
+  navigator.mediaSession.setActionHandler('nexttrack', () => {
+    const newIdx = Math.min(currentPlaylist.items.length - 1, currentIndex + 1);
+    playTrackAt(newIdx, 0);
+  });
+}
+</script>
+</body>
+</html>

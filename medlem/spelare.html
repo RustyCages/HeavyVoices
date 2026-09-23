@@ -37,15 +37,47 @@
   .track-play-btn.playing-icon { background:var(--accent); color:#111317; border-color:var(--accent); }
   .track-play-btn.loading-icon { cursor:wait; }
 
+  /* Round icon-only buttons (trash cans etc.) — same footprint as track-play-btn so
+     rows stay compact and every tap target is still a comfortable ~2.2rem circle. */
+  .icon-btn {
+    flex-shrink:0; width:2.2rem; height:2.2rem; min-width:2.2rem;
+    border-radius:50%; padding:0; font-size:1rem; line-height:1;
+  }
+
   .mixer { margin:0.5rem 0 1.25rem; padding:1.1rem; background:rgba(255,255,255,0.03); border-radius:0.6rem; }
   .mixer-row { display:flex; align-items:center; gap:0.75rem; margin-bottom:0.85rem; }
   .mixer-row:last-child { margin-bottom:0; }
   .mixer-row .label { min-width:110px; font-weight:600; font-size:0.85rem; }
-  .mixer-row input[type=range] { flex:1; margin-bottom:0; }
-  .mixer-row .fname { color:var(--text-muted); font-size:0.75rem; min-width:100px; text-align:right; }
-  .mixer-row .muteBtn { font-size:0.7rem; padding:0.3rem 0.6rem; }
+  .mixer-row .fname { color:var(--text-muted); font-size:0.75rem; min-width:0; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mixer-row .muteBtn { font-size:0.7rem; padding:0.3rem 0.6rem; flex-shrink:0; }
   .mixer-row .muteBtn.muted { background:#ef4444; color:#fff; }
   .mixerToggleBtn.open { background:var(--accent); color:#111317; }
+
+    /* Volume slider — the bare browser-default range input is only a few px tall and
+     nearly impossible to grab on a touchscreen. Give it a visible track plus a large
+     (24px) thumb, and a tall invisible hit area around it so a slightly-off tap still
+     lands on the thumb. */
+  .mixer-row input[type=range] {
+    flex:1; margin-bottom:0; min-width:0;
+    -webkit-appearance:none; appearance:none;
+    height:2.4rem; background:transparent; cursor:pointer;
+  }
+  .mixer-row input[type=range]::-webkit-slider-runnable-track {
+    height:6px; border-radius:3px; background:rgba(255,255,255,0.18);
+  }
+  .mixer-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; appearance:none;
+    width:24px; height:24px; border-radius:50%;
+    background:var(--accent); border:2px solid #111317;
+    margin-top:-9px; cursor:pointer;
+  }
+  .mixer-row input[type=range]::-moz-range-track {
+    height:6px; border-radius:3px; background:rgba(255,255,255,0.18);
+  }
+  .mixer-row input[type=range]::-moz-range-thumb {
+    width:24px; height:24px; border-radius:50%;
+    background:var(--accent); border:2px solid #111317; cursor:pointer;
+  }
 
   .stem-check-row { margin-bottom:0.6rem; }
   .stem-check-row label { display:flex; align-items:center; gap:0.6rem; cursor:pointer; margin:0; width:auto; }
@@ -262,7 +294,7 @@ function renderPlaylistList() {
     body.innerHTML = `
       <div class="row-between" style="margin-bottom:0.75rem;">
         <button class="btn-gold playListBtn">▶ Spela listan</button>
-        <button class="danger deleteListBtn">Radera spellista</button>
+         <button class="danger deleteListBtn icon-btn" title="Radera spellista">🗑️</button>
       </div>
       <div class="tracksContainer text-muted">Laddar låtar...</div>
     `;
@@ -398,7 +430,7 @@ function renderTracksForPlaylist(pl, items, containerEl) {
       <button class="track-play-btn" data-playlist-id="${pl.id}" data-row-id="${item.rowId}" title="Spela">▶</button>
       <span class="track-title">${escapeHtml(item.song.title)}</span>
       <button class="btn-outline mixerToggleBtn" style="font-size:0.75rem;">Mixer ▾</button>
-      <button class="btn-outline removeTrackBtn" style="font-size:0.75rem;">Ta bort</button>
+           <button class="btn-outline removeTrackBtn icon-btn" title="Ta bort från spellistan">🗑️</button>
     `;
 
     const handleTrackActivate = () => {

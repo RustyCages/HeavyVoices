@@ -1,0 +1,194 @@
+/* ==========================================================================
+Heavy Voices — Central Stilmall (style.css)
+========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Roboto+Condensed:wght@400;700&display=swap');
+
+/* --- CSS Variabler --- */
+:root {
+--bg: #121418;
+--bg-gradient: radial-gradient(circle at 50% 0%, #1d222e 0%, #121418 75%);
+--bg-elevated: linear-gradient(145deg, rgba(30, 34, 43, 0.9), rgba(22, 25, 32, 0.95));
+--text: #f3f4f6;
+--text-muted: #9ca3af;
+--accent: #E5A968;
+--accent-hover: #f0be86;
+--border: rgba(255, 255, 255, 0.08);
+--border-hover: rgba(229, 169, 104, 0.35);
+--card-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+--card-shadow-hover: 0 14px 35px -10px rgba(0, 0, 0, 0.7), 0 0 20px rgba(229, 169, 104, 0.12);
+}
+
+{
+box-sizing: border-box;
+}
+
+/* --- Grundläggande Layout & Typografi --- */
+body {
+margin: 0;
+padding: 0;
+background-color: var(--bg);
+background-image: var(--bg-gradient);
+background-attachment: fixed;
+color: var(--text);
+font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+line-height: 1.5;
+min-height: 100vh;
+}
+
+h1, h2, h3, h4, .font-heading {
+font-family: 'Roboto Condensed', sans-serif;
+letter-spacing: -0.01em;
+color: #ffffff;
+}
+
+a {
+color: var(--accent);
+text-decoration: none;
+transition: color 0.2s ease;
+}
+
+a:hover {
+color: var(--accent-hover);
+}
+
+.container {
+max-width: 960px;
+margin: 0 auto;
+padding: 2rem 1.25rem;
+}
+
+/* --- Kort / Navigationskort (Glassmorphism) --- */
+.card, .modern-card {
+background: var(--bg-elevated);
+border: 1px solid var(--border);
+border-radius: 1rem;
+padding: 1.5rem;
+box-shadow: var(--card-shadow);
+transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+color: inherit;
+}
+
+.card:hover, .modern-card:hover {
+transform: translateY(-3px);
+border-color: var(--border-hover);
+box-shadow: var(--card-shadow-hover);
+}
+
+.card:active, .modern-card:active {
+transform: translateY(-1px);
+}
+
+/* Cirkel/ikonbehållare inuti kort */
+.card-icon-box {
+width: 3.25rem;
+height: 3.25rem;
+border-radius: 0.85rem;
+background-color: rgba(229, 169, 104, 0.1);
+color: var(--accent);
+display: flex;
+align-items: center;
+justify-content: center;
+transition: transform 0.2s ease;
+}
+
+.card:hover .card-icon-box,
+.modern-card:hover .card-icon-box {
+transform: scale(1.1);
+}
+
+/* --- Formulärelement & Knappar --- */
+input, select, textarea {
+font-family: inherit;
+font-size: 0.95rem;
+padding: 0.65rem 0.9rem;
+border-radius: 0.6rem;
+border: 1px solid var(--border);
+background: rgba(18, 20, 24, 0.8);
+color: var(--text);
+width: 100%;
+margin-bottom: 0.85rem;
+outline: none;
+transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+border-color: var(--accent);
+box-shadow: 0 0 0 3px rgba(229, 169, 104, 0.15);
+}
+
+button, .btn {
+font-family: inherit;
+font-size: 0.875rem;
+font-weight: 600;
+padding: 0.45rem 1rem;
+border-radius: 0.5rem;
+border: none;
+background: var(--accent);
+color: #111317;
+cursor: pointer;
+transition: all 0.2s ease;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+gap: 0.4rem;
+}
+
+button:hover, .btn:hover {
+background: var(--accent-hover);
+box-shadow: 0 0 12px rgba(229, 169, 104, 0.3);
+transform: translateY(-1px);
+}
+
+/* Knappvarianter */
+.btn-gold, button.btn-gold {
+background-color: var(--accent);
+color: #111317;
+}
+
+.btn-outline, button.btn-outline {
+background: rgba(255, 255, 255, 0.06);
+color: #d1d5db;
+border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.btn-outline:hover, button.btn-outline:hover {
+background: rgba(255, 255, 255, 0.12);
+color: #ffffff;
+}
+
+.back-btn {
+display: inline-flex;
+align-items: center;
+gap: 0.4rem;
+padding: 0.45rem 1rem;
+margin-bottom: 1.25rem;
+border: 1px solid var(--border);
+border-radius: 0.5rem;
+color: var(--text);
+text-decoration: none;
+font-size: 0.875rem;
+background: rgba(255, 255, 255, 0.04);
+transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+border-color: var(--accent);
+color: var(--accent);
+background: rgba(229, 169, 104, 0.08);
+}
+
+/* --- Hjälpklasser & Textstilar --- */
+.text-muted, .text-subtle {
+color: var(--text-muted);
+}
+
+.text-gold {
+color: var(--accent);
+}
+
+.error {
+color: #ef4444;
+font-size: 0.875rem;
+margin-top: 0.25rem;
+}

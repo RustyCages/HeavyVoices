@@ -1,264 +1,1005 @@
-/* ==========================================================================
-Heavy Voices — Central Stilmall (style.css)
-Inkluderar Koncept 4 (Micro-List) för en modern, kompakt känsla
-========================================================================== */
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spelare – Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  body { padding-bottom: 7.5rem; }
+  .tabs { display:flex; gap:0.75rem; margin-bottom:1.75rem; }
+  .tab-btn { background:rgba(255,255,255,0.06); color:#d1d5db; border:1px solid rgba(255,255,255,0.12); padding:0.6rem 1.2rem; }
+  .tab-btn.active { background:var(--accent); color:#111317; }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Roboto+Condensed:wght@400;700&display=swap');
+  details.list-card, details.song-card { margin-bottom:1.25rem; padding:1.5rem; }
+  details.list-card summary, details.song-card summary { list-style:none; cursor:pointer; }
+  details.list-card summary::-webkit-details-marker, details.song-card summary::-webkit-details-marker { display:none; }
+  details.list-card[open] summary, details.song-card[open] summary { margin-bottom:0.5rem; }
+  .row-between { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
 
-/* --- CSS Variabler --- */
-:root {
---bg: #121418;
---bg-gradient: radial-gradient(circle at 50% 0%, #1d222e 0%, #121418 75%);
---bg-elevated: linear-gradient(145deg, rgba(25, 28, 36, 0.95), rgba(18, 20, 26, 0.98));
---text: #f3f4f6;
---text-muted: #9ca3af;
---accent: #E5A968;
---accent-hover: #f0be86;
---border: rgba(255, 255, 255, 0.08);
---border-hover: rgba(229, 169, 104, 0.35);
---card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
---card-shadow-hover: 0 14px 35px -10px rgba(0, 0, 0, 0.7), 0 0 15px rgba(229, 169, 104, 0.15);
+  .track-row { display:flex; align-items:center; gap:0.85rem; padding:0.6rem 0.5rem; border-bottom:1px solid var(--border); border-radius:0.5rem; transition:background 0.15s ease; }
+  .track-row:last-child { border-bottom:none; }
+  .track-row:hover { background:rgba(255,255,255,0.03); }
+  .track-row.playing { background:rgba(229,169,104,0.07); }
+  .track-title { flex:1; cursor:pointer; font-size:1.02rem; }
+  .track-title:hover { color:var(--accent); }
+  .track-title.loading { color:var(--text-muted); cursor:wait; }
+  .track-loading-note { font-size:0.75rem; color:var(--accent); }
+
+  .track-play-btn {
+    flex-shrink:0; width:2.2rem; height:2.2rem; min-width:2.2rem;
+    border-radius:50%; padding:0; font-size:0.9rem; line-height:1;
+    background:transparent; border:1px solid var(--border); color:var(--text);
+    opacity:0; transition:opacity 0.15s ease, background 0.15s ease;
+  }
+  .track-row:hover .track-play-btn,
+  .track-play-btn.playing-icon,
+  .track-play-btn.loading-icon { opacity:1; }
+  .track-play-btn.playing-icon { background:var(--accent); color:#111317; border-color:var(--accent); }
+  .track-play-btn.loading-icon { cursor:wait; }
+
+  .mixer { margin:0.5rem 0 1.25rem; padding:1.1rem; background:rgba(255,255,255,0.03); border-radius:0.6rem; }
+  .mixer-row { display:flex; align-items:center; gap:0.75rem; margin-bottom:0.85rem; }
+  .mixer-row:last-child { margin-bottom:0; }
+  .mixer-row .label { min-width:110px; font-weight:600; font-size:0.85rem; }
+  .mixer-row input[type=range] { flex:1; margin-bottom:0; }
+  .mixer-row .fname { color:var(--text-muted); font-size:0.75rem; min-width:100px; text-align:right; }
+  .mixer-row .muteBtn { font-size:0.7rem; padding:0.3rem 0.6rem; }
+  .mixer-row .muteBtn.muted { background:#ef4444; color:#fff; }
+  .mixerToggleBtn.open { background:var(--accent); color:#111317; }
+
+  .stem-check-row { margin-bottom:0.6rem; }
+  .stem-check-row label { display:flex; align-items:center; gap:0.6rem; cursor:pointer; margin:0; width:auto; }
+  .stem-check-row input[type=checkbox] { width:auto; flex-shrink:0; margin:0; }
+  .doc-links { display:flex; flex-wrap:wrap; gap:0.6rem; margin:0.75rem 0; }
+  .doc-links a { font-size:0.8rem; padding:0.4rem 0.8rem; border:1px solid var(--border); border-radius:0.4rem; }
+  .lyrics-preview { white-space:pre-wrap; max-height:150px; overflow-y:auto; background:rgba(0,0,0,0.2); padding:0.9rem; border-radius:0.5rem; font-size:0.85rem; margin:0.75rem 0; line-height:1.6; }
+
+  .quick-create { display:flex; gap:0.6rem; margin-bottom:1.75rem; flex-wrap:wrap; }
+  .quick-create input { width:auto; flex:1; margin-bottom:0; min-width:180px; }
+
+  h4 { margin:1rem 0 0.6rem; }
+
+  .danger { background:#ef4444; color:#fff; }
+  .danger:hover { background:#dc2626; }
+
+  /* Floating player bar */
+  #playerBar {
+    position:fixed; bottom:0; left:0; right:0;
+    background: var(--bg-elevated);
+    border-top:1px solid var(--border);
+    padding:0.75rem 1.25rem;
+    display:flex; flex-direction:column; gap:0.4rem;
+    z-index:100;
+    backdrop-filter: blur(10px);
+  }
+  #playerBar.hidden { display:none; }
+  #playerTitle { font-weight:700; text-align:center; font-family:'Roboto Condensed', sans-serif; }
+  #playerTitle .loading-tag { color:var(--accent); font-weight:500; font-size:0.8rem; margin-left:0.5rem; }
+  #playerControls { display:flex; align-items:center; justify-content:center; gap:1rem; }
+  #playerControls button { font-size:1.1rem; padding:0.5rem 0.9rem; border-radius:50%; }
+  #playerControls button:disabled { opacity:0.4; cursor:wait; }
+  #playerScrubberRow { display:flex; align-items:center; gap:0.6rem; }
+  #playerScrubberRow input[type=range] { flex:1; margin-bottom:0; }
+  #playerScrubberRow span { font-size:0.75rem; color:var(--text-muted); min-width:38px; text-align:center; }
+  #repeatBtn.active { color:var(--accent); box-shadow:0 0 8px rgba(229,169,104,0.4); }
+
+  #toast { position:fixed; bottom:8rem; right:1.5rem; background:var(--accent); color:#111317; padding:0.7rem 1.2rem; border-radius:0.6rem; font-weight:600; box-shadow:var(--card-shadow); z-index:999; display:none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
+  <h1>Spelare</h1>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabRepertoarBtn">Repertoar</button>
+    <button class="tab-btn" id="tabSpellistorBtn">Spellistor</button>
+  </div>
+
+  <div class="tab-panel active" id="tabRepertoar">
+    <div class="quick-create">
+      <input type="text" id="newPlaylistName" placeholder="Namn på ny spellista">
+      <button class="btn-gold" id="createPlaylistBtn">Skapa ny spellista</button>
+    </div>
+    <div id="repertoarList">Laddar...</div>
+  </div>
+
+  <div class="tab-panel" id="tabSpellistor">
+    <div id="playlistList">Laddar...</div>
+  </div>
+</div>
+
+<div id="playerBar" class="hidden">
+  <div id="playerTitle">–</div>
+  <div id="playerScrubberRow">
+    <span id="curTime">0:00</span>
+    <input type="range" id="scrubber" min="0" max="100" value="0" step="0.1">
+    <span id="durTime">0:00</span>
+  </div>
+  <div id="playerControls">
+    <button class="btn-outline" id="repeatBtn" title="Upprepa">🔁</button>
+    <button class="btn-outline" id="prevBtn" title="Föregående">⏮</button>
+    <button class="btn-gold" id="playPauseBtn" title="Spela/Pausa">▶</button>
+    <button class="btn-outline" id="nextBtn" title="Nästa">⏭</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+const NOTER_BUCKET = 'heavy-voices-noter';
+const STEMS_BUCKET = 'heavy-voices-stems';
+
+const FIXED_STEMS = [
+  { key: 'backtrack', pathCol: 'stem_backtrack_path', volColumn: 'vol_backtrack', label: 'Backtrack' },
+  { key: 'sopran',    pathCol: 'stem_sopran_path',    volColumn: 'vol_sopran',    label: 'Sopran' },
+  { key: 'alt',       pathCol: 'stem_alt_path',       volColumn: 'vol_alt',       label: 'Alt' },
+  { key: 'tenor',     pathCol: 'stem_tenor_path',     volColumn: 'vol_tenor',     label: 'Tenor' },
+  { key: 'bas',       pathCol: 'stem_bas_path',       volColumn: 'vol_bas',       label: 'Bas' }
+];
+
+const STAMTEXT_FIELDS = [
+  { key: 'sopran', col: 'lyrics_sopran_path', label: 'Sopran text' },
+  { key: 'alt',    col: 'lyrics_alt_path',    label: 'Alt text' },
+  { key: 'tenor',  col: 'lyrics_tenor_path',  label: 'Tenor text' },
+  { key: 'bas',    col: 'lyrics_bas_path',    label: 'Bas text' }
+];
+
+const DOC_FIELDS = [
+  { col: 'sheet_music_path', label: 'Noter (PDF)' },
+  { col: 'lyrics_pdf_path',  label: 'Sångtext (PDF)' }
+];
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2500);
 }
 
-{
-box-sizing: border-box;
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-/* --- Grundläggande Layout & Typografi --- */
-body {
-margin: 0;
-padding: 0;
-background-color: var(--bg);
-background-image: var(--bg-gradient);
-background-attachment: fixed;
-color: var(--text);
-font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
-line-height: 1.5;
-min-height: 100vh;
+function stemFilename(path) {
+  if (!path) return '';
+  const base = path.split('/').pop();
+  const parts = base.split('__');
+  if (parts.length < 2) return decodeURIComponent(base);
+  return decodeURIComponent(parts.slice(1).join('__'));
 }
 
-h1, h2, h3, h4, .font-heading {
-font-family: 'Roboto Condensed', sans-serif;
-letter-spacing: -0.01em;
-color: #ffffff;
+function fmtTime(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return m + ':' + String(s).padStart(2, '0');
 }
 
-h1 {
-font-size: 1.75rem;
-margin-top: 0;
-margin-bottom: 0.25rem;
-text-transform: uppercase;
+// Merge fixed + extra stems present on a song into one generic list
+function getStemDefs(song) {
+  const defs = [];
+  FIXED_STEMS.forEach(f => {
+    if (song[f.pathCol]) {
+      defs.push({ key: f.key, type: 'fixed', label: f.label, path: song[f.pathCol], volColumn: f.volColumn });
+    }
+  });
+  (song.extra_stems || []).forEach(ex => {
+    defs.push({ key: ex.id, type: 'extra', label: ex.label, path: ex.path, volColumn: null });
+  });
+  return defs;
 }
 
-a {
-color: var(--accent);
-text-decoration: none;
-transition: all 0.2s ease;
+let currentMember = null;
+
+// =========================================================
+// Tabs
+// =========================================================
+document.getElementById('tabSpellistorBtn').addEventListener('click', () => switchTab('spellistor'));
+document.getElementById('tabRepertoarBtn').addEventListener('click', () => switchTab('repertoar'));
+
+function switchTab(name) {
+  document.getElementById('tabSpellistorBtn').classList.toggle('active', name === 'spellistor');
+  document.getElementById('tabRepertoarBtn').classList.toggle('active', name === 'repertoar');
+  document.getElementById('tabSpellistor').classList.toggle('active', name === 'spellistor');
+  document.getElementById('tabRepertoar').classList.toggle('active', name === 'repertoar');
 }
 
-a:hover {
-color: var(--accent-hover);
+// =========================================================
+// Init
+// =========================================================
+async function init() {
+  const member = await requireAuth();
+  if (!member) return;
+  currentMember = member;
+
+  await loadPlaylists();
+  await loadRepertoar();
+}
+init();
+
+// =========================================================
+// Spellistor
+// =========================================================
+let playlistsCache = [];
+
+async function loadPlaylists() {
+  const { data, error } = await supabaseClient
+    .from('playlists')
+    .select('*')
+    .eq('member_id', currentMember.id)
+    .order('name', { ascending: true });
+  if (error) {
+    document.getElementById('playlistList').textContent = 'Kunde inte ladda spellistor: ' + error.message;
+    return;
+  }
+  playlistsCache = data || [];
+  renderPlaylistList();
 }
 
-.container {
-max-width: 520px; /* Kompakt centrerad bredd som passar perfekt på både mobil och dator */
-margin: 0 auto;
-padding: 2rem 1.25rem;
-min-height: 100vh;
-display: flex;
-flex-direction: column;
-justify-content: center;
+function renderPlaylistList() {
+  const container = document.getElementById('playlistList');
+  if (!playlistsCache.length) {
+    container.innerHTML = '<p class="text-muted">Inga spellistor ännu.</p>';
+    return;
+  }
+  container.innerHTML = '';
+  playlistsCache.forEach(pl => {
+    const details = document.createElement('details');
+    details.className = 'list-card card modern-card';
+    details.dataset.playlistId = pl.id;
+
+    const summary = document.createElement('summary');
+    summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(pl.name)}</h3><span class="text-muted">Visa ▾</span></div>`;
+    details.appendChild(summary);
+
+    const body = document.createElement('div');
+    body.style.marginTop = '1rem';
+    body.innerHTML = `
+      <div class="row-between" style="margin-bottom:0.75rem;">
+        <button class="btn-gold playListBtn">▶ Spela listan</button>
+        <button class="danger deleteListBtn">Radera spellista</button>
+      </div>
+      <div class="tracksContainer text-muted">Laddar låtar...</div>
+    `;
+    details.appendChild(body);
+    container.appendChild(details);
+
+    const playListBtn = body.querySelector('.playListBtn');
+    playlistPlayBtns[pl.id] = playListBtn;
+
+    let loaded = false;
+    details.addEventListener('toggle', () => {
+      if (details.open && !loaded) {
+        loaded = true;
+        loadPlaylistTracks(pl, body.querySelector('.tracksContainer'));
+      }
+    });
+
+    playListBtn.addEventListener('click', async () => {
+      if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
+
+      // Always (re)starts the playlist from track 1. Pausing/resuming a track in
+      // progress is handled by each track's own play button + the floating player.
+      if (!details.open) details.open = true;
+      const tc = body.querySelector('.tracksContainer');
+      if (!loaded) { loaded = true; await loadPlaylistTracks(pl, tc); }
+      const items = playlistTracksCache[pl.id];
+      if (items && items.length) startPlaylist(pl, items, 0);
+    });
+
+    body.querySelector('.deleteListBtn').addEventListener('click', async () => {
+      if (!confirm(`Radera spellistan "${pl.name}"?`)) return;
+      await supabaseClient.from('playlist_songs').delete().eq('playlist_id', pl.id);
+      const { error } = await supabaseClient.from('playlists').delete().eq('id', pl.id);
+      if (error) { toast('Fel: ' + error.message); return; }
+      playlistsCache = playlistsCache.filter(x => x.id !== pl.id);
+      delete playlistPlayBtns[pl.id];
+      renderPlaylistList();
+      refreshPlaylistSelects();
+      toast('Spellista raderad');
+    });
+  });
 }
 
-/* ==========================================================================
-MICRO-LIST DESIGN (Koncept 4 Integration)
-Omvandlar alla .nav-grid och .card till rena listrader
-========================================================================== */
-
-/* Behållare för listan */
-.nav-grid {
-display: flex !important;
-flex-direction: column !important;
-background: var(--bg-elevated);
-border: 1px solid var(--border);
-border-radius: 1rem;
-box-shadow: var(--card-shadow);
-padding: 0.35rem;
-margin-top: 1.25rem;
-margin-bottom: 1.5rem;
-overflow: hidden;
+// Keep every "lägg till i spellista"-dropdown in Repertoar in sync with playlistsCache
+// (a playlist created or deleted elsewhere no longer leaves stale options behind)
+function refreshPlaylistSelects() {
+  const optionsHtml = playlistsCache.map(pl => `<option value="${pl.id}">${escapeHtml(pl.name)}</option>`).join('')
+    || '<option value="">Ingen spellista ännu</option>';
+  document.querySelectorAll('.targetPlaylistSelect').forEach(sel => {
+    const prevValue = sel.value;
+    sel.innerHTML = optionsHtml;
+    if (playlistsCache.some(pl => pl.id === prevValue)) sel.value = prevValue;
+  });
 }
 
-/* Enskilda rader/kort inuti listan */
-.card, .nav-card {
-display: flex !important;
-align-items: center;
-justify-content: space-between;
-padding: 0.85rem 1rem !important;
-background: transparent !important;
-border: none !important;
-border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-border-radius: 0.65rem !important;
-text-align: left !important;
-color: var(--text) !important;
-transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-cursor: pointer;
-box-shadow: none !important;
+document.getElementById('createPlaylistBtn').addEventListener('click', async () => {
+  const input = document.getElementById('newPlaylistName');
+  const name = input.value.trim();
+  if (!name) { toast('Ange ett namn'); return; }
+  const { data, error } = await supabaseClient.from('playlists').insert({ member_id: currentMember.id, name }).select().single();
+  if (error) { toast('Fel: ' + error.message); return; }
+  input.value = '';
+  playlistsCache.push(data);
+  renderPlaylistList();
+  refreshPlaylistSelects();
+  toast('Spellista skapad');
+});
+
+// playlistTracksCache[playlistId] = [{ rowId, song, stemDefs, volumes, extraVolumesRaw, muted:Set }]
+const playlistTracksCache = {};
+// playlistPlayBtns[playlistId] = the "Spela listan" button element for that playlist card
+const playlistPlayBtns = {};
+
+async function loadPlaylistTracks(pl, containerEl) {
+  const { data: rows, error } = await supabaseClient
+    .from('playlist_songs')
+    .select('*')
+    .eq('playlist_id', pl.id)
+    .order('id', { ascending: true });
+
+  if (error) { containerEl.textContent = 'Fel: ' + error.message; return; }
+  if (!rows.length) { containerEl.innerHTML = '<p class="text-muted">Inga låtar i denna spellista ännu. Lägg till från Repertoar.</p>'; return; }
+
+  const songIds = rows.map(r => r.song_id);
+  const { data: songs, error: songsErr } = await supabaseClient.from('songs').select('*').in('id', songIds);
+  if (songsErr) { containerEl.textContent = 'Fel: ' + songsErr.message; return; }
+  const songsById = {};
+  songs.forEach(s => { songsById[s.id] = s; });
+
+  const items = rows.map(row => {
+    const song = songsById[row.song_id];
+    const extraVolumesRaw = row.extra_volumes || {};
+    const stemDefs = getStemDefs(song);
+    const volumes = {};
+    stemDefs.forEach(def => {
+      if (def.type === 'fixed') {
+        const v = row[def.volColumn];
+        volumes[def.key] = (v === null || v === undefined) ? 100 : v;
+      } else {
+        const v = extraVolumesRaw[def.key];
+        volumes[def.key] = (v === undefined || v === null) ? 100 : v;
+      }
+    });
+    return {
+      rowId: row.id,
+      playlistId: pl.id,
+      song,
+      stemDefs,
+      volumes,
+      extraVolumesRaw,
+      muted: new Set()
+    };
+  });
+
+  playlistTracksCache[pl.id] = items;
+  renderTracksForPlaylist(pl, items, containerEl);
 }
 
-/* Sista raden saknar underlinje */
-.nav-grid > *:last-child,
-.nav-grid > a:last-child .card,
-.nav-grid > a:last-child {
-border-bottom: none !important;
+function renderTracksForPlaylist(pl, items, containerEl) {
+  containerEl.innerHTML = '';
+  items.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'track-row';
+    row.dataset.rowId = item.rowId;
+    row.innerHTML = `
+      <button class="track-play-btn" data-playlist-id="${pl.id}" data-row-id="${item.rowId}" title="Spela">▶</button>
+      <span class="track-title">${escapeHtml(item.song.title)}</span>
+      <button class="btn-outline mixerToggleBtn" style="font-size:0.75rem;">Mixer ▾</button>
+      <button class="btn-outline removeTrackBtn" style="font-size:0.75rem;">Ta bort</button>
+    `;
+
+    const handleTrackActivate = () => {
+      if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
+      const activeItem = (currentPlaylist && activePlaylistId === pl.id) ? currentPlaylist.items[currentIndex] : null;
+      const isThisTrackActive = activeItem && activeItem.rowId === item.rowId;
+      if (isThisTrackActive) {
+        if (isPlaying) pauseAll(); else resumeAll();
+      } else {
+        startPlaylist(pl, items, idx);
+      }
+    };
+
+    row.querySelector('.track-play-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleTrackActivate();
+    });
+    row.querySelector('.track-title').addEventListener('click', handleTrackActivate);
+
+    const mixer = document.createElement('div');
+    mixer.className = 'mixer';
+    mixer.style.display = 'none';
+    item.stemDefs.forEach(def => {
+      const mrow = document.createElement('div');
+      mrow.className = 'mixer-row';
+      mrow.innerHTML = `
+        <span class="label">${escapeHtml(def.label)}</span>
+        <input type="range" min="0" max="100" value="${item.volumes[def.key]}" class="volSlider" data-key="${def.key}">
+        <button class="btn-outline muteBtn" data-key="${def.key}">Mute</button>
+        <span class="fname">${escapeHtml(stemFilename(def.path))}</span>
+      `;
+      mrow.querySelector('.volSlider').addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        item.volumes[def.key] = val;
+        applyGainForKey(item, def.key, val);
+        scheduleVolumeSave(item);
+      });
+      mrow.querySelector('.muteBtn').addEventListener('click', (e) => {
+        const k = def.key;
+        if (item.muted.has(k)) { item.muted.delete(k); e.target.classList.remove('muted'); }
+        else { item.muted.add(k); e.target.classList.add('muted'); }
+        applyGainForKey(item, k, item.volumes[k]);
+      });
+      mixer.appendChild(mrow);
+    });
+
+    const mixerToggleBtn = row.querySelector('.mixerToggleBtn');
+    mixerToggleBtn.addEventListener('click', () => {
+      const willOpen = mixer.style.display === 'none';
+      mixer.style.display = willOpen ? 'block' : 'none';
+      mixerToggleBtn.textContent = willOpen ? 'Mixer ▴ (stäng)' : 'Mixer ▾';
+      mixerToggleBtn.classList.toggle('open', willOpen);
+    });
+
+    row.querySelector('.removeTrackBtn').addEventListener('click', async () => {
+      if (!confirm(`Ta bort "${item.song.title}" från spellistan?`)) return;
+      const { error } = await supabaseClient.from('playlist_songs').delete().eq('id', item.rowId);
+      if (error) { toast('Fel: ' + error.message); return; }
+      const newItems = items.filter(x => x.rowId !== item.rowId);
+      playlistTracksCache[pl.id] = newItems;
+      renderTracksForPlaylist(pl, newItems, containerEl);
+      toast('Borttagen');
+    });
+
+    containerEl.appendChild(row);
+    containerEl.appendChild(mixer);
+  });
+  updateTrackPlayIcons();
 }
 
-.card h3, .nav-card h3 {
-font-size: 0.95rem;
-font-weight: 600;
-margin: 0 !important;
-color: #f3f4f6;
-transition: color 0.2s ease;
+let volumeSaveTimers = {};
+function scheduleVolumeSave(item) {
+  clearTimeout(volumeSaveTimers[item.rowId]);
+  volumeSaveTimers[item.rowId] = setTimeout(() => saveVolumes(item), 600);
 }
 
-/* Hover-effekt för listrader */
-.card:hover, .nav-card:hover {
-background-color: rgba(255, 255, 255, 0.04) !important;
-transform: none !important;
+async function saveVolumes(item) {
+  const update = {};
+  const extraVolumes = {};
+  item.stemDefs.forEach(def => {
+    if (def.type === 'fixed') {
+      update[def.volColumn] = item.volumes[def.key];
+    } else {
+      extraVolumes[def.key] = item.volumes[def.key];
+    }
+  });
+  update.extra_volumes = extraVolumes;
+  await supabaseClient.from('playlist_songs').update(update).eq('id', item.rowId);
 }
 
-.card:hover h3, .nav-card:hover h3 {
-color: var(--accent);
+// =========================================================
+// Repertoar
+// =========================================================
+let repertoarCache = [];
+
+async function loadRepertoar() {
+  const { data, error } = await supabaseClient.from('songs').select('*').order('title', { ascending: true });
+  if (error) { document.getElementById('repertoarList').textContent = 'Fel: ' + error.message; return; }
+  repertoarCache = data || [];
+  renderRepertoar();
 }
 
-/* Automatisk pil (›) till höger på korten */
-.card::after, .nav-card::after {
-content: "›";
-font-size: 1.35rem;
-line-height: 1;
-color: var(--text-muted);
-font-family: monospace;
-transition: transform 0.2s ease, color 0.2s ease;
-margin-left: 0.5rem;
+function renderRepertoar() {
+  const container = document.getElementById('repertoarList');
+  if (!repertoarCache.length) { container.innerHTML = '<p class="text-muted">Inga låtar ännu.</p>'; return; }
+  container.innerHTML = '';
+  repertoarCache.forEach(s => {
+    container.appendChild(renderSongCard(s));
+  });
 }
 
-.card:hover::after, .nav-card:hover::after {
-color: var(--accent);
-transform: translateX(4px);
+function renderSongCard(s) {
+  const details = document.createElement('details');
+  details.className = 'song-card card modern-card';
+
+  const summary = document.createElement('summary');
+  summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}</h3><span class="text-muted">Visa ▾</span></div>`;
+  details.appendChild(summary);
+
+  const body = document.createElement('div');
+  body.style.marginTop = '1rem';
+
+  // Docs (PDF) + stamtext + extra_lyrics links
+  const docLinks = document.createElement('div');
+  docLinks.className = 'doc-links';
+  body.appendChild(docLinks);
+  loadDocsForSong(s, docLinks);
+
+  // Lyrics preview
+  if (s.lyrics_plain) {
+    const pre = document.createElement('div');
+    pre.className = 'lyrics-preview';
+    pre.textContent = s.lyrics_plain;
+    body.appendChild(pre);
+  }
+
+  // Stem checkboxes (fixed + extra) for adding to a playlist
+  const stemDefs = getStemDefs(s);
+  const stemsWrap = document.createElement('div');
+  stemsWrap.innerHTML = '<h4 style="margin-bottom:0.5rem;">Välj stämmor att lägga till</h4>';
+  const checksWrap = document.createElement('div');
+  stemDefs.forEach(def => {
+    const row = document.createElement('div');
+    row.className = 'stem-check-row';
+    row.innerHTML = `<label><input type="checkbox" class="stemCheck" value="${def.key}" checked> ${escapeHtml(def.label)}</label>`;
+    checksWrap.appendChild(row);
+  });
+  if (!stemDefs.length) {
+    checksWrap.innerHTML = '<p class="text-muted">Inga stämfiler uppladdade för denna låt ännu.</p>';
+  }
+  stemsWrap.appendChild(checksWrap);
+  body.appendChild(stemsWrap);
+
+  // Add to playlist controls
+  const addWrap = document.createElement('div');
+  addWrap.className = 'add-row';
+  addWrap.style.marginTop = '0.75rem';
+  let plOptions = playlistsCache.map(pl => `<option value="${pl.id}">${escapeHtml(pl.name)}</option>`).join('');
+  addWrap.innerHTML = `
+    <select class="targetPlaylistSelect">${plOptions || '<option value="">Ingen spellista ännu</option>'}</select>
+    <button class="btn-gold addToPlaylistBtn">Lägg till i spellista</button>
+  `;
+  body.appendChild(addWrap);
+
+  addWrap.querySelector('.addToPlaylistBtn').addEventListener('click', async () => {
+    const playlistId = addWrap.querySelector('.targetPlaylistSelect').value;
+    if (!playlistId) { toast('Skapa en spellista först'); return; }
+    const checked = Array.from(checksWrap.querySelectorAll('.stemCheck:checked')).map(c => c.value);
+    if (!checked.length) { toast('Välj minst en stämma'); return; }
+    await addToPlaylist(s, stemDefs, checked, playlistId);
+  });
+
+  details.appendChild(body);
+  return details;
 }
 
-/* Cirkel/ikonbehållare om ikoner används */
-.card-icon-box {
-width: 2.25rem;
-height: 2.25rem;
-border-radius: 0.5rem;
-background-color: rgba(229, 169, 104, 0.1);
-color: var(--accent);
-display: flex;
-align-items: center;
-justify-content: center;
-transition: transform 0.2s ease;
-margin-right: 0.75rem;
-shrink: 0;
+async function loadDocsForSong(s, container) {
+  container.innerHTML = '';
+  for (const f of DOC_FIELDS) {
+    if (!s[f.col]) continue;
+    const a = document.createElement('a');
+    a.href = '#';
+    a.textContent = f.label;
+    a.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(s[f.col], 3600);
+      if (error) { toast('Fel: ' + error.message); return; }
+      window.open(data.signedUrl, '_blank');
+    });
+    container.appendChild(a);
+  }
+  for (const f of STAMTEXT_FIELDS) {
+    if (!s[f.col]) continue;
+    const a = document.createElement('a');
+    a.href = '#';
+    a.textContent = f.label;
+    a.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(s[f.col], 3600);
+      if (error) { toast('Fel: ' + error.message); return; }
+      window.open(data.signedUrl, '_blank');
+    });
+    container.appendChild(a);
+  }
+  (s.extra_lyrics || []).forEach(ex => {
+    const a = document.createElement('a');
+    a.href = '#';
+    a.textContent = ex.label;
+    a.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(ex.path, 3600);
+      if (error) { toast('Fel: ' + error.message); return; }
+      window.open(data.signedUrl, '_blank');
+    });
+    container.appendChild(a);
+  });
 }
 
-.card:hover .card-icon-box {
-transform: scale(1.08);
+async function addToPlaylist(song, stemDefs, checkedKeys, playlistId) {
+  const selectedDefs = stemDefs.filter(d => checkedKeys.includes(d.key));
+  const insertRow = { playlist_id: playlistId, song_id: song.id };
+  const extraVolumes = {};
+  selectedDefs.forEach(def => {
+    if (def.type === 'fixed') {
+      insertRow[def.volColumn] = 100;
+    } else {
+      extraVolumes[def.key] = 100;
+    }
+  });
+  insertRow.extra_volumes = extraVolumes;
+
+  const { error } = await supabaseClient.from('playlist_songs').insert(insertRow);
+  if (error) { toast('Fel: ' + error.message); return; }
+  toast('Tillagd i spellistan');
+  // invalidate cache for that playlist so it reloads next time it's opened
+  delete playlistTracksCache[playlistId];
+  const details = document.querySelector(`details.list-card[data-playlist-id="${playlistId}"]`);
+  if (details && details.open) {
+    const tc = details.querySelector('.tracksContainer');
+    const pl = playlistsCache.find(p => p.id === playlistId);
+    if (pl && tc) loadPlaylistTracks(pl, tc);
+  }
 }
 
-/* --- Formulärelement & Knappar --- */
-input, select, textarea {
-font-family: inherit;
-font-size: 0.9rem;
-padding: 0.6rem 0.85rem;
-border-radius: 0.6rem;
-border: 1px solid var(--border);
-background: rgba(18, 20, 24, 0.8);
-color: var(--text);
-width: 100%;
-margin-bottom: 0.75rem;
-outline: none;
-transition: border-color 0.2s ease, box-shadow 0.2s ease;
+// =========================================================
+// Web Audio playback engine (sample-accurate multi-stem sync)
+// =========================================================
+let audioCtx = null;
+let currentPlaylist = null;   // { pl, items }
+let activePlaylistId = null;  // id of the playlist currentPlaylist belongs to (kept even across pause)
+let currentIndex = -1;
+let currentBuffers = {};      // key -> AudioBuffer
+let currentSources = {};      // key -> AudioBufferSourceNode
+let gainNodesCurrent = {};    // key -> GainNode
+let isPlaying = false;
+let isLoadingTrack = false;   // true while stems are being fetched/decoded — guards against overlapping playback
+let playStartCtxTime = 0;     // audioCtx.currentTime when playback of current offset started
+let playStartOffset = 0;      // offset into the track (seconds) at playStartCtxTime
+let trackDuration = 0;
+let repeatOne = false;
+let progressTimer = null;
+
+function setControlsDisabled(disabled) {
+  document.getElementById('prevBtn').disabled = disabled;
+  document.getElementById('nextBtn').disabled = disabled;
+  document.getElementById('playPauseBtn').disabled = disabled;
 }
 
-input:focus, select:focus, textarea:focus {
-border-color: var(--accent);
-box-shadow: 0 0 0 3px rgba(229, 169, 104, 0.15);
+function updateAllPlayButtons() {
+  // "Spela listan" always means (re)start from track 1 — it never flips into a
+  // pause/resume toggle just because some track happens to be playing. Per-track
+  // control lives on each track's own play/pause icon and the floating player.
+  Object.values(playlistPlayBtns).forEach(btn => {
+    if (!btn) return;
+    btn.disabled = isLoadingTrack;
+  });
+  updateTrackPlayIcons();
 }
 
-button, .btn {
-font-family: inherit;
-font-size: 0.8rem;
-font-weight: 600;
-padding: 0.4rem 0.85rem;
-border-radius: 0.5rem;
-border: 1px solid var(--border);
-background: var(--accent);
-color: #111317;
-cursor: pointer;
-transition: all 0.2s ease;
-display: inline-flex;
-align-items: center;
-justify-content: center;
-gap: 0.4rem;
+function updateTrackPlayIcons() {
+  document.querySelectorAll('.track-play-btn').forEach(btn => {
+    const plId = btn.dataset.playlistId;
+    const rowId = btn.dataset.rowId;
+    const row = btn.closest('.track-row');
+    const activeItem = (currentPlaylist && activePlaylistId === plId) ? currentPlaylist.items[currentIndex] : null;
+    const isThisTrack = activeItem && String(activeItem.rowId) === String(rowId);
+
+    btn.classList.remove('playing-icon', 'loading-icon');
+    if (row) row.classList.remove('playing');
+
+    if (isThisTrack && isLoadingTrack) {
+      btn.textContent = '⏳';
+      btn.classList.add('loading-icon');
+      if (row) row.classList.add('playing');
+    } else if (isThisTrack && isPlaying) {
+      btn.textContent = '⏸';
+      btn.classList.add('playing-icon');
+      if (row) row.classList.add('playing');
+    } else if (isThisTrack) {
+      btn.textContent = '▶';
+      if (row) row.classList.add('playing');
+    } else {
+      btn.textContent = '▶';
+    }
+  });
 }
 
-button:hover, .btn:hover {
-background: var(--accent-hover);
-box-shadow: 0 0 10px rgba(229, 169, 104, 0.25);
+async function ensureAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') {
+    // Mobile browsers aggressively suspend the AudioContext (e.g. after switching
+    // tabs/panels). If we don't wait for resume() before scheduling, source.start()
+    // can be scheduled against a context that isn't actually running yet, producing
+    // silent playback even though every JS variable looks "playing". Always await it.
+    try { await audioCtx.resume(); } catch (e) { /* ignored — we'll surface failures via decode/play errors */ }
+  }
 }
 
-/* Knappvarianter & transparenta knappar (som "Mitt konto" / "Logga ut") */
-.btn-gold, button.btn-gold {
-background-color: var(--accent);
-color: #111317;
-border: none;
+// Stops/disconnects the currently-playing source + gain nodes WITHOUT throwing away
+// the already-decoded audio buffers. Use this for anything that reschedules the SAME
+// track (scrubbing, pause) — re-decoding on every scrub would also work but is slow
+// and was actually the cause of a real bug (see below).
+function stopCurrentSources() {
+  Object.values(currentSources).forEach(src => {
+    try { src.onended = null; src.stop(); } catch (e) {}
+    try { src.disconnect(); } catch (e) {}
+  });
+  Object.values(gainNodesCurrent).forEach(g => {
+    try { g.disconnect(); } catch (e) {}
+  });
+  currentSources = {};
+  gainNodesCurrent = {};
 }
 
-button[style*="transparent"], .btn-outline, button.btn-outline {
-background: rgba(255, 255, 255, 0.05) !important;
-color: #d1d5db !important;
-border: 1px solid rgba(255, 255, 255, 0.1) !important;
+// Full teardown before loading a DIFFERENT track — also drops the decoded buffers,
+// since they belong to the track we're leaving.
+function disconnectCurrentGainNodes() {
+  stopCurrentSources();
+  currentBuffers = {};
 }
 
-button[style*="transparent"]:hover, .btn-outline:hover, button.btn-outline:hover {
-background: rgba(255, 255, 255, 0.1) !important;
-color: #ffffff !important;
+function applyGainForKey(item, key, val) {
+  const g = gainNodesCurrent[key];
+  if (!g) return;
+  const muted = item.muted.has(key);
+  g.gain.value = muted ? 0 : (val / 100);
 }
 
-.back-btn {
-display: inline-flex;
-align-items: center;
-gap: 0.4rem;
-padding: 0.35rem 0.8rem;
-margin-bottom: 1rem;
-border: 1px solid var(--border);
-border-radius: 0.5rem;
-color: var(--text);
-text-decoration: none;
-font-size: 0.8rem;
-background: rgba(255, 255, 255, 0.04);
-transition: all 0.2s ease;
+async function fetchAndDecode(bucket, path) {
+  const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 3600);
+  if (error) throw error;
+  const resp = await fetch(data.signedUrl);
+  if (!resp.ok) throw new Error(`Kunde inte hämta ljudfil (HTTP ${resp.status})`);
+  const arrBuf = await resp.arrayBuffer();
+  await ensureAudioCtx();
+  return await audioCtx.decodeAudioData(arrBuf);
 }
 
-.back-btn:hover {
-border-color: var(--accent);
-color: var(--accent);
-background: rgba(229, 169, 104, 0.08);
+let playRequestId = 0; // bumped on every playTrackAt call; lets a stale in-flight load bail out instead of clobbering a newer one
+
+function startPlaylist(pl, items, index) {
+  if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
+  currentPlaylist = { pl, items };
+  activePlaylistId = pl.id;
+  playTrackAt(index, 0);
 }
 
-/* --- Hjälpklasser & Textstilar --- */
-.text-muted, .text-subtle {
-color: var(--text-muted);
-font-size: 0.85rem;
+async function playTrackAt(index, offsetSeconds) {
+  if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
+  if (!currentPlaylist) return;
+  const items = currentPlaylist.items;
+  if (index < 0 || index >= items.length) return;
+
+  const myRequestId = ++playRequestId;
+  isLoadingTrack = true;
+  setControlsDisabled(true);
+  updateAllPlayButtons();
+
+  disconnectCurrentGainNodes();
+  clearInterval(progressTimer);
+  isPlaying = false;
+
+  currentIndex = index;
+  const item = items[index];
+
+  document.getElementById('playerBar').classList.remove('hidden');
+  document.getElementById('playerTitle').innerHTML = `${escapeHtml(item.song.title)} <span class="loading-tag">laddar...</span>`;
+  document.getElementById('scrubber').value = 0;
+  document.getElementById('curTime').textContent = '0:00';
+  document.getElementById('durTime').textContent = '0:00';
+  setPlayPauseIcon(false);
+  markTrackRowLoading(item.rowId, true);
+
+  try {
+    await ensureAudioCtx();
+
+    // Decode all stems in parallel
+    const bufferEntries = await Promise.all(item.stemDefs.map(async def => {
+      const buf = await fetchAndDecode(STEMS_BUCKET, def.path);
+      return [def.key, buf];
+    }));
+
+    // A newer playTrackAt call has started while we were loading — discard this
+    // stale result instead of overwriting/(re)connecting nodes for a track that's
+    // no longer the one the user wants. This is what could otherwise cause a
+    // "click, then click the next one" sequence to end in silence.
+    if (myRequestId !== playRequestId) return;
+
+    currentBuffers = {};
+    bufferEntries.forEach(([k, b]) => { currentBuffers[k] = b; });
+
+    trackDuration = Math.max(0, ...Object.values(currentBuffers).map(b => b.duration));
+    document.getElementById('scrubber').max = trackDuration || 1;
+    document.getElementById('durTime').textContent = fmtTime(trackDuration);
+    document.getElementById('playerTitle').textContent = item.song.title;
+    markTrackRowLoading(item.rowId, false);
+
+    isLoadingTrack = false;
+    setControlsDisabled(false);
+
+    // Belt-and-braces: some browsers re-suspend the context between the click and
+    // here if the tab was backgrounded mid-decode. Make sure it's really running
+    // right before we schedule the sources.
+    await ensureAudioCtx();
+    if (myRequestId !== playRequestId) return;
+
+    schedulePlaybackFrom(item, offsetSeconds || 0);
+    updateMediaSession(item);
+  } catch (e) {
+    console.error('playTrackAt failed:', e);
+    toast('Kunde inte spela låten: ' + (e.message || e));
+    document.getElementById('playerTitle').textContent = item.song.title;
+    markTrackRowLoading(item.rowId, false);
+    if (myRequestId === playRequestId) {
+      isLoadingTrack = false;
+      setControlsDisabled(false);
+      updateAllPlayButtons();
+    }
+  }
 }
 
-.text-gold {
-color: var(--accent);
+function markTrackRowLoading(rowId, loading) {
+  document.querySelectorAll(`.track-row[data-row-id="${rowId}"] .track-title`).forEach(el => {
+    el.classList.toggle('loading', loading);
+  });
 }
 
-.error {
-color: #ef4444;
-font-size: 0.85rem;
-margin-top: 0.25rem;
+function schedulePlaybackFrom(item, offset) {
+  const startAt = audioCtx.currentTime + 0.15;
+  playStartCtxTime = startAt;
+  playStartOffset = offset;
+
+  item.stemDefs.forEach(def => {
+    const buffer = currentBuffers[def.key];
+    if (!buffer) return;
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    const gain = audioCtx.createGain();
+    const muted = item.muted.has(def.key);
+    gain.gain.value = muted ? 0 : ((item.volumes[def.key] ?? 100) / 100);
+    source.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start(startAt, offset);
+    currentSources[def.key] = source;
+    gainNodesCurrent[def.key] = gain;
+  });
+
+  const firstKey = item.stemDefs[0] && item.stemDefs[0].key;
+  if (firstKey && currentSources[firstKey]) {
+    currentSources[firstKey].onended = () => {
+      if (isPlaying) handleTrackEnded();
+    };
+  }
+
+  isPlaying = true;
+  setPlayPauseIcon(true);
+  startProgressTimer();
+  updateAllPlayButtons();
 }
+
+function handleTrackEnded() {
+  if (repeatOne) {
+    playTrackAt(currentIndex, 0);
+    return;
+  }
+  if (currentPlaylist && currentIndex < currentPlaylist.items.length - 1) {
+    playTrackAt(currentIndex + 1, 0);
+  } else {
+    isPlaying = false;
+    setPlayPauseIcon(false);
+    clearInterval(progressTimer);
+    updateAllPlayButtons();
+  }
+}
+
+function pauseAll() {
+  if (!isPlaying) return;
+  const elapsed = playStartOffset + (audioCtx.currentTime - playStartCtxTime);
+  stopCurrentSources();
+  isPlaying = false;
+  setPlayPauseIcon(false);
+  clearInterval(progressTimer);
+  pausedOffset = Math.max(0, elapsed);
+  updateAllPlayButtons();
+}
+
+let pausedOffset = 0;
+
+async function resumeAll() {
+  if (isPlaying || isLoadingTrack || !currentPlaylist) return;
+  const item = currentPlaylist.items[currentIndex];
+  if (!item) return;
+  await ensureAudioCtx();
+  if (isPlaying || !currentPlaylist) return; // state may have changed while awaiting resume
+  schedulePlaybackFrom(item, pausedOffset);
+}
+
+document.getElementById('playPauseBtn').addEventListener('click', () => {
+  if (!currentPlaylist || isLoadingTrack) return;
+  if (isPlaying) pauseAll();
+  else resumeAll();
+});
+
+document.getElementById('prevBtn').addEventListener('click', () => {
+  if (!currentPlaylist || isLoadingTrack) return;
+  const newIdx = Math.max(0, currentIndex - 1);
+  playTrackAt(newIdx, 0);
+});
+
+document.getElementById('nextBtn').addEventListener('click', () => {
+  if (!currentPlaylist || isLoadingTrack) return;
+  const newIdx = Math.min(currentPlaylist.items.length - 1, currentIndex + 1);
+  playTrackAt(newIdx, 0);
+});
+
+document.getElementById('repeatBtn').addEventListener('click', (e) => {
+  repeatOne = !repeatOne;
+  e.currentTarget.classList.toggle('active', repeatOne);
+});
+
+const scrubberEl = document.getElementById('scrubber');
+let scrubbing = false;
+scrubberEl.addEventListener('mousedown', () => { scrubbing = true; });
+scrubberEl.addEventListener('touchstart', () => { scrubbing = true; });
+scrubberEl.addEventListener('change', () => {
+  scrubbing = false;
+  if (isLoadingTrack) return;
+  const val = parseFloat(scrubberEl.value);
+  if (!currentPlaylist) return;
+  const item = currentPlaylist.items[currentIndex];
+  if (!item || !Object.keys(currentBuffers).length) return; // nothing decoded yet to scrub within
+  // Reuses the already-decoded buffers for this track — must NOT clear currentBuffers here,
+  // only stop the old source nodes, otherwise schedulePlaybackFrom finds no buffers and
+  // silently plays nothing (this was the cause of the "scrubbing goes silent" bug).
+  stopCurrentSources();
+  clearInterval(progressTimer);
+  isPlaying = false;
+  pausedOffset = val;
+  schedulePlaybackFrom(item, val);
+});
+
+function startProgressTimer() {
+  clearInterval(progressTimer);
+  progressTimer = setInterval(() => {
+    if (!isPlaying || scrubbing) return;
+    const elapsed = playStartOffset + (audioCtx.currentTime - playStartCtxTime);
+    document.getElementById('curTime').textContent = fmtTime(elapsed);
+    scrubberEl.value = Math.min(elapsed, trackDuration);
+    if (navigator.mediaSession && navigator.mediaSession.setPositionState) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: trackDuration || 0,
+          playbackRate: 1,
+          position: Math.min(elapsed, trackDuration || 0)
+        });
+      } catch (e) {}
+    }
+  }, 250);
+}
+
+function setPlayPauseIcon(playing) {
+  document.getElementById('playPauseBtn').textContent = playing ? '⏸' : '▶';
+}
+
+function updateMediaSession(item) {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: item.song.title,
+    artist: 'Heavy Voices',
+    album: currentPlaylist.pl.name
+  });
+  navigator.mediaSession.setActionHandler('play', () => { if (!isLoadingTrack) resumeAll(); });
+  navigator.mediaSession.setActionHandler('pause', () => { if (!isLoadingTrack) pauseAll(); });
+  navigator.mediaSession.setActionHandler('previoustrack', () => {
+    if (isLoadingTrack) return;
+    const newIdx = Math.max(0, currentIndex - 1);
+    playTrackAt(newIdx, 0);
+  });
+  navigator.mediaSession.setActionHandler('nexttrack', () => {
+    if (isLoadingTrack) return;
+    const newIdx = Math.min(currentPlaylist.items.length - 1, currentIndex + 1);
+    playTrackAt(newIdx, 0);
+  });
+}
+</script>
+</body>
+</html>

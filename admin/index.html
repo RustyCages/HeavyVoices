@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h1>Admin</h1>
+      <p id="welcome" class="text-muted">Laddar...</p>
+    </div>
+    <span id="roleBadge" class="badge"></span>
+  </div>
+
+  <div class="card" style="margin-top: 1.5rem;">
+    <ul class="nav-list">
+      <li><a href="/admin/latar.html" class="nav-item">
+        <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></span>
+        <span class="nav-item-text">
+          <h3>Låtar &amp; texter</h3>
+          <p>Hantera repertoar, stämfiler &amp; sångtexter</p>
+        </span>
+      </a></li>
+      <li><a href="/admin/medlemmar.html" class="nav-item">
+        <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
+        <span class="nav-item-text">
+          <h3>Medlemmar</h3>
+          <p>Hantera medlemmar &amp; roller</p>
+        </span>
+      </a></li>
+    </ul>
+  </div>
+
+  <div class="page-footer">
+    <div class="page-footer-actions">
+      <button id="logoutBtn" class="btn-outline">Logga ut</button>
+    </div>
+    <span class="text-muted">Heavy Voices</span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+(async () => {
+  const member = await requireAuth('admin');
+  if (member) {
+    document.getElementById('welcome').textContent = `Inloggad som ${member.name}`;
+    document.getElementById('roleBadge').textContent = member.role;
+  }
+})();
+
+document.getElementById('logoutBtn').addEventListener('click', signOut);
+</script>
+
+</body>
+</html>

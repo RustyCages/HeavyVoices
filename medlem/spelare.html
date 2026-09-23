@@ -364,7 +364,7 @@ async function loadPlaylistTracks(pl, containerEl) {
     // have. Previously this used getStemDefs(song) unfiltered, so unchecking a stem
     // in Repertoar had no effect: every available stem was included anyway.
     const stemDefs = getStemDefs(song).filter(def => {
-      if (def.type === 'fixed') return row[def.volColumn] !== null && row[def.volColumn] !== undefined;
+      if (def.type === 'fixed') return row[def.volColumn] !== null && row[def.volColumn] !== undefined && row[def.volColumn] >= 0;
       return extraVolumesRaw[def.key] !== undefined && extraVolumesRaw[def.key] !== null;
     });
     const volumes = {};
@@ -632,7 +632,7 @@ async function addToPlaylist(song, stemDefs, checkedKeys, playlistId) {
   stemDefs.forEach(def => {
     const isChecked = checkedKeys.includes(def.key);
     if (def.type === 'fixed') {
-      insertRow[def.volColumn] = isChecked ? 100 : null;
+           insertRow[def.volColumn] = isChecked ? 100 : -1; // -1 = "not included" sentinel (columns are NOT NULL)
     } else if (isChecked) {
       extraVolumes[def.key] = 100;
     }

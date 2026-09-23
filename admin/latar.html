@@ -4,17 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Låtar — Heavy Voices Admin</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
 <style>
   .back-link { display: inline-block; margin-bottom: 1rem; color: var(--text-muted); }
   .success { color: #4ade80; font-size: 0.9rem; }
   .song-item { border-bottom: 1px solid var(--border); padding: 1rem 0; }
   .song-item:last-child { border-bottom: none; }
-  .song-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.03em; }
-  .field-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.4rem 0; font-size: 0.9rem; }
+  .song-title { font-family: 'Roboto Condensed', sans-serif; font-size: 1.3rem; }
+  .field-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.4rem 0; font-size: 0.9rem; flex-wrap: wrap; }
   .field-row label { width: 100px; color: var(--text-muted); flex-shrink: 0; }
-  .field-row input[type="file"] { flex: 1; font-size: 0.85rem; }
+  .field-row input[type="file"] { flex: 1; min-width: 160px; font-size: 0.85rem; }
   .status-ok { color: #4ade80; font-size: 0.8rem; }
   .status-missing { color: var(--text-muted); font-size: 0.8rem; }
   .open-link { font-size: 0.8rem; white-space: nowrap; }
@@ -26,14 +26,26 @@
   .btn-danger { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
   details > summary { cursor: pointer; margin-top: 0.6rem; color: var(--text-muted); font-size: 0.85rem; }
   h4.section-heading { margin: 1.2rem 0 0.3rem 0; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+ 
+  .stem-row {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    padding: 0.5rem 0; border-bottom: 1px solid var(--border);
+  }
+  .stem-row:last-of-type { border-bottom: none; }
+  .stem-label { width: 90px; flex-shrink: 0; font-weight: 600; }
+  .stem-filename { flex: 1; min-width: 140px; font-size: 0.8rem; color: var(--text-muted); word-break: break-all; }
+  .stem-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .stem-add-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.6rem; flex-wrap: wrap; }
+  select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.6rem; }
+  audio.stem-preview { width: 100%; margin-top: 0.4rem; display: none; }
 </style>
 </head>
 <body>
-
+ 
 <div class="container">
   <a href="/admin/" class="back-btn">&larr; Tillbaka till admin</a>
   <h1>Låtar</h1>
-
+ 
   <div class="card">
     <h3>Lägg till ny låt</h3>
     <form id="addSongForm">
@@ -42,13 +54,13 @@
       <p class="error" id="addError"></p>
     </form>
   </div>
-
+ 
   <div class="card" style="margin-top: 1.5rem;">
     <h3>Repertoar</h3>
     <div id="songList"><p class="text-muted">Laddar...</p></div>
   </div>
 </div>
-
+ 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 <script src="/js/supabase-config.js"></script>
@@ -71,7 +83,16 @@ const STEM_FIELDS = [
   { kind: 'stem_tenor_path', label: 'Tenor' },
   { kind: 'stem_bas_path', label: 'Bas' },
 ];
-
+ 
+let songs = []; // hålls i minnet så stämändringar kan göras utan att stänga panelen
+ 
+function stemFilename(path) {
+  if (!path) return '';
+  const base = path.split('/').pop();
+  const parts = base.split('__');
+  return parts.length > 1 ? decodeURIComponent(parts.slice(1).join('__')) : base;
+}
+ 
 function docRow(s, field, bucket) {
   const has = !!s[field.kind];
   return `
@@ -82,42 +103,126 @@ function docRow(s, field, bucket) {
       <a class="open-link" data-id="${s.id}" data-kind="${field.kind}" data-bucket="${bucket}" href="#" target="_blank" style="display: ${has ? 'inline' : 'none'};">Öppna</a>
     </div>`;
 }
-
-function stemRow(s, field) {
-  const has = !!s[field.kind];
+ 
+function renderStemsArea(s) {
+  const uploaded = STEM_FIELDS.filter(f => s[f.kind]);
+  const available = STEM_FIELDS.filter(f => !s[f.kind]);
+ 
+  const rows = uploaded.map(f => `
+    <div class="stem-row">
+      <span class="stem-label">${f.label}</span>
+      <span class="stem-filename">${stemFilename(s[f.kind])}</span>
+      <div class="stem-actions">
+        <button type="button" class="btn-small playStemBtn" data-id="${s.id}" data-kind="${f.kind}" style="background: transparent; border: 1px solid var(--border);">&#9658; Spela</button>
+        <button type="button" class="btn-small btn-danger removeStemBtn" data-id="${s.id}" data-kind="${f.kind}">Ta bort</button>
+      </div>
+    </div>
+  `).join('');
+ 
+  const addRow = available.length ? `
+    <div class="stem-add-row">
+      <select class="stemAddSelect" data-id="${s.id}">
+        ${available.map(f => `<option value="${f.kind}">${f.label}</option>`).join('')}
+      </select>
+      <input type="file" accept="audio/*" class="stemAddFile" data-id="${s.id}">
+      <span class="loading-note" data-stemadd="${s.id}" style="font-size: 0.8rem; color: var(--text-muted);"></span>
+    </div>
+  ` : `<p class="text-muted" style="font-size: 0.85rem; margin-top: 0.5rem;">Alla stämmor uppladdade.</p>`;
+ 
   return `
-    <div class="field-row">
-      <label>${field.label}</label>
-      <input type="file" accept="audio/*" class="fileInput" data-id="${s.id}" data-kind="${field.kind}" data-bucket="heavy-voices-stems">
-      <span class="fileStatus ${has ? 'status-ok' : 'status-missing'}" data-id="${s.id}" data-kind="${field.kind}">${has ? '✓ uppladdad' : 'saknas'}</span>
-    </div>`;
+    ${uploaded.length ? rows : '<p class="text-muted" style="font-size: 0.85rem;">Inga stämfiler uppladdade än.</p>'}
+    ${addRow}
+    <audio class="stem-preview" id="preview-${s.id}" controls></audio>
+  `;
 }
-
+ 
+function wireStemsArea(s) {
+  const area = document.getElementById(`stemsArea-${s.id}`);
+ 
+  area.querySelectorAll('.playStemBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const kind = e.target.dataset.kind;
+      const path = s[kind];
+      const audioEl = document.getElementById(`preview-${s.id}`);
+      btn.textContent = 'Laddar...';
+      const { data: signed } = await supabaseClient.storage.from('heavy-voices-stems').createSignedUrl(path, 3600);
+      btn.textContent = '▶ Spela';
+      if (signed) {
+        audioEl.src = signed.signedUrl;
+        audioEl.style.display = 'block';
+        audioEl.play();
+      }
+    });
+  });
+ 
+  area.querySelectorAll('.removeStemBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const kind = e.target.dataset.kind;
+      if (!confirm('Ta bort stämfilen?')) return;
+      const path = s[kind];
+      if (path) await supabaseClient.storage.from('heavy-voices-stems').remove([path]);
+      await supabaseClient.from('songs').update({ [kind]: null }).eq('id', s.id);
+      s[kind] = null;
+      area.innerHTML = renderStemsArea(s);
+      wireStemsArea(s);
+    });
+  });
+ 
+  const select = area.querySelector('.stemAddSelect');
+  const fileInput = area.querySelector('.stemAddFile');
+  if (fileInput) {
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const kind = select.value;
+      const note = area.querySelector(`.loading-note[data-stemadd="${s.id}"]`);
+      note.textContent = `Laddar upp ${file.name}...`;
+ 
+      const safeName = file.name.replace(/[^a-zA-Z0-9.\-]/g, '_');
+      const path = `${s.id}/${kind}__${safeName}`;
+ 
+      const { error: uploadError } = await supabaseClient.storage
+        .from('heavy-voices-stems').upload(path, file, { upsert: true });
+ 
+      if (uploadError) { note.textContent = 'Fel: ' + uploadError.message; return; }
+ 
+      const { error: updateError } = await supabaseClient.from('songs').update({ [kind]: path }).eq('id', s.id);
+      if (updateError) { note.textContent = 'Fel: ' + updateError.message; return; }
+ 
+      s[kind] = path;
+      area.innerHTML = renderStemsArea(s);
+      wireStemsArea(s);
+    });
+  }
+}
+ 
 async function loadSongs() {
-  const { data: songs, error } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from('songs')
     .select('*')
     .order('title');
-
+ 
   const listEl = document.getElementById('songList');
-
+ 
   if (error) {
     listEl.innerHTML = `<p class="error">Kunde inte hämta låtar: ${error.message}</p>`;
     return;
   }
-
+ 
+  songs = data || [];
+ 
   if (!songs.length) {
     listEl.innerHTML = `<p class="text-muted">Inga låtar än.</p>`;
     return;
   }
-
+ 
   listEl.innerHTML = songs.map(s => `
     <div class="song-item">
       <div class="song-title">${s.title}</div>
-
+ 
       <details>
         <summary>Redigera text och filer</summary>
-
+ 
         <div style="margin-top: 0.75rem;">
           <h4 class="section-heading">Sångtext (redigerbar)</h4>
           <textarea data-id="${s.id}" class="lyricsField" placeholder="Sångtext">${s.lyrics_plain || ''}</textarea>
@@ -127,16 +232,16 @@ async function loadSongs() {
             <span class="docxStatus" data-id="${s.id}"></span>
           </div>
           <button type="button" class="saveLyricsBtn btn-small" data-id="${s.id}">Spara text</button>
-
+ 
           <h4 class="section-heading">Noter &amp; sångtext som fil</h4>
           ${DOC_FIELDS.map(f => docRow(s, f, 'heavy-voices-noter')).join('')}
-
+ 
           <h4 class="section-heading">Stämtexter (per stämma, visas bara - redigeras ej här)</h4>
           ${STAMTEXT_FIELDS.map(f => docRow(s, f, 'heavy-voices-noter')).join('')}
-
+ 
           <h4 class="section-heading">Stämfiler (ljud)</h4>
-          ${STEM_FIELDS.map(f => stemRow(s, f)).join('')}
-
+          <div id="stemsArea-${s.id}">${renderStemsArea(s)}</div>
+ 
           <button type="button" class="btn-danger btn-small deleteSongBtn" data-id="${s.id}" style="margin-top: 0.75rem;">Ta bort låt</button>
           <button type="button" class="btn-small closeDetailsBtn" data-id="${s.id}" style="margin-top: 0.75rem; margin-left: 0.5rem; background: transparent; border: 1px solid var(--border);">OK / Stäng</button>
           <p class="error uploadError" data-id="${s.id}"></p>
@@ -144,7 +249,9 @@ async function loadSongs() {
       </details>
     </div>
   `).join('');
-
+ 
+  songs.forEach(s => wireStemsArea(s));
+ 
   for (const s of songs) {
     for (const field of [...DOC_FIELDS, ...STAMTEXT_FIELDS]) {
       const path = s[field.kind];
@@ -158,7 +265,7 @@ async function loadSongs() {
       }
     }
   }
-
+ 
   document.querySelectorAll('.saveLyricsBtn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const id = e.target.dataset.id;
@@ -169,7 +276,7 @@ async function loadSongs() {
       setTimeout(() => btn.textContent = 'Spara text', 1500);
     });
   });
-
+ 
   document.querySelectorAll('.docxInput').forEach(input => {
     input.addEventListener('change', async (e) => {
       const file = e.target.files[0];
@@ -190,13 +297,13 @@ async function loadSongs() {
       }
     });
   });
-
+ 
   document.querySelectorAll('.closeDetailsBtn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.target.closest('details').removeAttribute('open');
     });
   });
-
+ 
   document.querySelectorAll('.fileInput').forEach(input => {
     input.addEventListener('change', async (e) => {
       const file = e.target.files[0];
@@ -209,40 +316,39 @@ async function loadSongs() {
       const linkEl = document.querySelector(`.open-link[data-id="${id}"][data-kind="${kind}"]`);
       errEl.textContent = '';
       if (statusEl) { statusEl.textContent = `Vald: ${file.name} — laddar upp...`; statusEl.className = 'fileStatus status-missing'; }
-
+ 
       const ext = file.name.split('.').pop();
-      const safeName = file.name.replace(/[^a-zA-Z0-9.\-]/g, '_');
-      const path = `${id}/${kind}__${safeName}`;
-
+      const path = `${id}/${kind}__${file.name.replace(/[^a-zA-Z0-9.\-]/g, '_')}`;
+ 
       const { error: uploadError } = await supabaseClient.storage
         .from(bucket)
         .upload(path, file, { upsert: true });
-
+ 
       if (uploadError) {
         errEl.textContent = 'Uppladdning misslyckades: ' + uploadError.message;
         if (statusEl) { statusEl.textContent = 'saknas'; statusEl.className = 'fileStatus status-missing'; }
         return;
       }
-
+ 
       const { error: updateError } = await supabaseClient
         .from('songs')
         .update({ [kind]: path })
         .eq('id', id);
-
+ 
       if (updateError) {
         errEl.textContent = 'Kunde inte spara filväg: ' + updateError.message;
         return;
       }
-
+ 
       if (statusEl) { statusEl.textContent = `✓ uppladdad (${file.name})`; statusEl.className = 'fileStatus status-ok'; }
-
+ 
       if (linkEl) {
         const { data: signed } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 3600);
         if (signed) { linkEl.href = signed.signedUrl; linkEl.style.display = 'inline'; }
       }
     });
   });
-
+ 
   document.querySelectorAll('.deleteSongBtn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const id = e.target.dataset.id;
@@ -253,13 +359,13 @@ async function loadSongs() {
     });
   });
 }
-
+ 
 document.getElementById('addSongForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const title = document.getElementById('newTitle').value;
   const errorEl = document.getElementById('addError');
   errorEl.textContent = '';
-
+ 
   const { error } = await supabaseClient.from('songs').insert({ title });
   if (error) {
     errorEl.textContent = error.message;
@@ -268,12 +374,12 @@ document.getElementById('addSongForm').addEventListener('submit', async (e) => {
   document.getElementById('addSongForm').reset();
   loadSongs();
 });
-
+ 
 (async () => {
   const member = await requireAuth('admin');
   if (member) loadSongs();
 })();
 </script>
-
+ 
 </body>
 </html>

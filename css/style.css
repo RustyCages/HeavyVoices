@@ -97,6 +97,24 @@ transition: transform 0.2s ease;
 transform: scale(1.1);
 }
 
+/* --- Sidhuvud (logga överst på varje sida) --- */
+.site-header {
+display: flex;
+align-items: center;
+padding: 0.85rem 1.25rem;
+border-bottom: 1px solid var(--border);
+}
+.site-header .site-logo {
+font-family: 'Roboto Condensed', sans-serif;
+font-size: 1.05rem;
+font-weight: 700;
+letter-spacing: 0.02em;
+color: var(--text);
+text-decoration: none;
+}
+.site-header .site-logo:hover {
+color: var(--accent);
+}
 /* --- Sidhuvud med statusmärke (t.ex. "MEDLEM"/"ADMIN") --- */
 .page-header {
 display: flex;

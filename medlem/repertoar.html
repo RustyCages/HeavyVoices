@@ -596,6 +596,23 @@ function renderSongCard(s) {
   stemsWrap.appendChild(checksWrap);
   body.appendChild(stemsWrap);
 
+    // Spela valda stämmor direkt, utan att lägga till i en spellista
+  const previewRow = document.createElement('div');
+  previewRow.className = 'row-between';
+  previewRow.style.marginTop = '0.75rem';
+  previewRow.innerHTML = `<button class="track-play-btn" data-playlist-id="preview" data-row-id="preview-${s.id}" title="Spela">▶</button> <span class="text-muted" style="font-size:0.8rem;">Spela ikryssade stämmor</span>`;
+  previewRow.style.display = 'flex';
+  previewRow.style.alignItems = 'center';
+  previewRow.style.gap = '0.6rem';
+  body.appendChild(previewRow);
+
+  previewRow.querySelector('.track-play-btn').addEventListener('click', () => {
+    const checked = Array.from(checksWrap.querySelectorAll('.stemCheck:checked')).map(c => c.value);
+    const selectedDefs = stemDefs.filter(def => checked.includes(def.key));
+    if (!selectedDefs.length) { toast('Välj minst en stämma att spela'); return; }
+    playSongPreview(s, selectedDefs);
+  });
+
   // Add to playlist controls
   const addWrap = document.createElement('div');
   addWrap.className = 'add-row';
@@ -815,6 +832,30 @@ function startPlaylist(pl, items, index) {
   playTrackAt(index, 0);
 }
 
+function playSongPreview(song, stemDefs) {
+  if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
+  const activeItem = (currentPlaylist && activePlaylistId === 'preview') ? currentPlaylist.items[currentIndex] : null;
+  if (activeItem && activeItem.rowId === 'preview-' + song.id) {
+    if (isPlaying) pauseAll(); else resumeAll();
+    return;
+  }
+  const volumes = {};
+  stemDefs.forEach(def => { volumes[def.key] = 100; });
+  const item = {
+    rowId: 'preview-' + song.id,
+    playlistId: 'preview',
+    song,
+    stemDefs,
+    volumes,
+    extraVolumesRaw: {},
+    muted: new Set(),
+    isPreview: true
+  };
+  currentPlaylist = { pl: { id: 'preview', name: song.title }, items: [item] };
+  activePlaylistId = 'preview';
+  playTrackAt(0, 0);
+}
+  
 async function playTrackAt(index, offsetSeconds) {
   if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
   if (!currentPlaylist) return;

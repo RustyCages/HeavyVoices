@@ -122,7 +122,7 @@
   #playerTitle { font-weight:700; text-align:center; font-family:'Roboto Condensed', sans-serif; }
   #playerTitle .loading-tag { color:var(--accent); font-weight:500; font-size:0.8rem; margin-left:0.5rem; }
   #playerControls { display:flex; align-items:center; justify-content:center; gap:1rem; }
-  #playerControls button { font-size:1.1rem; padding:0.5rem 0.9rem; border-radius:50%; }
+  #playerControls button { font-size:1.1rem; width:2.6rem; height:2.6rem; padding:0; border-radius:50%; display:flex; align-items:center; justify-content:center; }
   #playerControls button:disabled { opacity:0.4; cursor:wait; }
   #playerScrubberRow { display:flex; align-items:center; gap:0.6rem; }
   #playerScrubberRow input[type=range] { flex:1; margin-bottom:0; }
@@ -163,7 +163,7 @@
     <span id="durTime">0:00</span>
   </div>
   <div id="playerControls">
-    <button class="btn-outline" id="repeatBtn" title="Upprepa">🔁</button>
+    <button class="btn-outline" id="repeatBtn" title="Upprepa"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg></button>
     <button class="btn-outline" id="prevBtn" title="Föregående">⏮</button>
     <button class="btn-gold" id="playPauseBtn" title="Spela/Pausa">▶</button>
     <button class="btn-outline" id="nextBtn" title="Nästa">⏭</button>

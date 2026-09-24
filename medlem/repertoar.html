@@ -611,8 +611,8 @@ function renderSongCard(s) {
   addWrap.style.alignItems = 'center';
   let plOptions = playlistsCache.map(pl => `<option value="${pl.id}">${escapeHtml(pl.name)}</option>`).join('');
   addWrap.innerHTML = `
-    <select class="targetPlaylistSelect" style="width:auto; flex:1; margin-bottom:0;">${plOptions || '<option value="">Ingen spellista ännu</option>'}</select>
     <button class="btn-gold addToPlaylistBtn">Lägg till i spellista</button>
+    <select class="targetPlaylistSelect" style="width:auto; flex:1; margin-bottom:0;">${plOptions || '<option value="">Ingen spellista ännu</option>'}</select>
   `;
   body.appendChild(addWrap);
 

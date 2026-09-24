@@ -93,7 +93,7 @@
     .mixer-row .muteBtn { order:3; flex:0 0 auto; font-size:0.65rem; padding:0.3rem 0.5rem; }
   }
 
-  .stem-check-row { margin-bottom:0.6rem; }
+  .stem-check-row { margin-bottom:0.6rem; display:flex; align-items:center; gap:0.6rem; }
   .stem-check-row label { display:flex; align-items:center; gap:0.6rem; cursor:pointer; margin:0; width:auto; }
   .stem-check-row input[type=checkbox] { width:auto; flex-shrink:0; margin:0; }
   .doc-links { display:flex; flex-wrap:wrap; gap:0.6rem; margin:0.75rem 0; }
@@ -585,10 +585,16 @@ function renderSongCard(s) {
   stemsWrap.innerHTML = '<h4 style="margin-bottom:0.5rem;">Välj stämmor att lägga till</h4>';
   const checksWrap = document.createElement('div');
   stemDefs.forEach(def => {
-    const row = document.createElement('div');
-    row.className = 'stem-check-row';
-    row.innerHTML = `<label><input type="checkbox" class="stemCheck" value="${def.key}" checked> ${escapeHtml(def.label)}</label>`;
+  const row = document.createElement('div');
+  row.className = 'stem-check-row';
+  row.innerHTML = `
+    <button class="track-play-btn" data-playlist-id="preview" data-row-id="preview-${s.id}-${def.key}" title="Förhandslyssna ${escapeHtml(def.label)}">▶</button>
+    <label><input type="checkbox" class="stemCheck" value="${def.key}" checked> ${escapeHtml(def.label)}</label>
+    `;
     checksWrap.appendChild(row);
+    row.querySelector('.track-play-btn').addEventListener('click', () => {
+    playSongPreview(s, [def], `preview-${s.id}-${def.key}`);
+    });
   });
   if (!stemDefs.length) {
     checksWrap.innerHTML = '<p class="text-muted">Inga stämfiler uppladdade för denna låt ännu.</p>';
@@ -831,18 +837,18 @@ function startPlaylist(pl, items, index) {
   activePlaylistId = pl.id;
   playTrackAt(index, 0);
 }
-
-function playSongPreview(song, stemDefs) {
+function playSongPreview(song, stemDefs, previewId) {
+  previewId = previewId || ('preview-' + song.id);
   if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
   const activeItem = (currentPlaylist && activePlaylistId === 'preview') ? currentPlaylist.items[currentIndex] : null;
-  if (activeItem && activeItem.rowId === 'preview-' + song.id) {
+  if (activeItem && activeItem.rowId === previewId) {
     if (isPlaying) pauseAll(); else resumeAll();
     return;
   }
   const volumes = {};
   stemDefs.forEach(def => { volumes[def.key] = 100; });
   const item = {
-    rowId: 'preview-' + song.id,
+    rowId: previewId,
     playlistId: 'preview',
     song,
     stemDefs,

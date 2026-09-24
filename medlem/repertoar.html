@@ -602,23 +602,6 @@ function renderSongCard(s) {
   stemsWrap.appendChild(checksWrap);
   body.appendChild(stemsWrap);
 
-    // Spela valda stämmor direkt, utan att lägga till i en spellista
-  const previewRow = document.createElement('div');
-  previewRow.className = 'row-between';
-  previewRow.style.marginTop = '0.75rem';
-  previewRow.innerHTML = `<button class="track-play-btn" data-playlist-id="preview" data-row-id="preview-${s.id}" title="Spela">▶</button> <span class="text-muted" style="font-size:0.8rem;">Spela ikryssade stämmor</span>`;
-  previewRow.style.display = 'flex';
-  previewRow.style.alignItems = 'center';
-  previewRow.style.gap = '0.6rem';
-  body.appendChild(previewRow);
-
-  previewRow.querySelector('.track-play-btn').addEventListener('click', () => {
-    const checked = Array.from(checksWrap.querySelectorAll('.stemCheck:checked')).map(c => c.value);
-    const selectedDefs = stemDefs.filter(def => checked.includes(def.key));
-    if (!selectedDefs.length) { toast('Välj minst en stämma att spela'); return; }
-    playSongPreview(s, selectedDefs);
-  });
-
   // Add to playlist controls
   const addWrap = document.createElement('div');
   addWrap.className = 'add-row';

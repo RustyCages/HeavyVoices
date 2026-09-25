@@ -72,7 +72,7 @@
 <script>
 const DOC_FIELDS = [
   { kind: 'sheet_music_path', label: 'Noter (PDF)', accept: 'application/pdf' },
-  { kind: 'lyrics_pdf_path', label: 'Sångtext (PDF)', accept: '.pdf,application/pdf' },
+  { kind: 'lyrics_pdf_path', label: 'Sångtext (docx, pdf, txt)', accept: '.pdf,.docx,.txt' },
 ];
 const STAMTEXT_FIELDS = [
   { kind: 'lyrics_sopran_path', label: 'Sopran' },
@@ -157,11 +157,15 @@ function wireDocField(s, field, bucket, containerSelector) {
       s[field.kind] = null;
       rerenderDocsAndStamtext(s);
     });
-  }
   const openLink = container.querySelector(`.open-link[data-id="${s.id}"][data-kind="${field.kind}"]`);
   if (openLink && s[field.kind]) {
     supabaseClient.storage.from(bucket).createSignedUrl(s[field.kind], 3600).then(({ data: signed }) => {
-      if (signed) { openLink.href = signed.signedUrl; openLink.style.display = 'inline'; }
+      if (!signed) return;
+      const isDocx = s[field.kind].toLowerCase().endsWith('.docx');
+      openLink.href = isDocx
+        ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(signed.signedUrl)}`
+        : signed.signedUrl;
+      openLink.style.display = 'inline';
     });
   }
 }
@@ -229,15 +233,20 @@ function wireLyricsArea(s) {
   const area = document.getElementById(`stamtextArea-${s.id}`);
   if (!area) return;
 
-  area.querySelectorAll('.openLyricBtn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      const path = btn.dataset.fixed ? s[btn.dataset.fixed] : (s.extra_lyrics.find(x => x.id === btn.dataset.extra) || {}).path;
-      if (!path) return;
-      const { data: signed } = await supabaseClient.storage.from('heavy-voices-noter').createSignedUrl(path, 3600);
-      if (signed) window.open(signed.signedUrl, '_blank');
-    });
+area.querySelectorAll('.openLyricBtn').forEach(btn => {
+  btn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    const path = btn.dataset.fixed ? s[btn.dataset.fixed] : (s.extra_lyrics.find(x => x.id === btn.dataset.extra) || {}).path;
+    if (!path) return;
+    const { data: signed } = await supabaseClient.storage.from('heavy-voices-noter').createSignedUrl(path, 3600);
+    if (!signed) return;
+    const isDocx = path.toLowerCase().endsWith('.docx');
+    const url = isDocx
+      ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(signed.signedUrl)}`
+      : signed.signedUrl;
+    window.open(url, '_blank');
   });
+});
 
   area.querySelectorAll('.removeLyricBtn').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -473,6 +482,7 @@ async function loadSongs() {
           <span class="docxStatus" data-id="${s.id}"></span>
         </div>
           <button type="button" class="saveLyricsBtn btn-small" data-id="${s.id}">Spara text</button>
+          <button type="button" class="btn-small btn-danger clearLyricsBtn" data-id="${s.id}">Ta bort sångtext</button>
 
           <h4 class="section-heading">Noter &amp; sångtext som fil</h4>
           <div id="docsArea-${s.id}">${DOC_FIELDS.map(f => docRow(s, f, 'heavy-voices-noter')).join('')}</div>
@@ -508,6 +518,16 @@ async function loadSongs() {
     });
   });
 
+  document.querySelectorAll('.clearLyricsBtn').forEach(btn => {
+  btn.addEventListener('click', async (e) => {
+    const id = e.target.dataset.id;
+    if (!confirm('Ta bort sångtexten?')) return;
+    const { error } = await supabaseClient.from('songs').update({ lyrics_plain: null }).eq('id', id);
+    if (error) { alert('Kunde inte ta bort: ' + error.message); return; }
+    document.querySelector(`.lyricsField[data-id="${id}"]`).value = '';
+  });
+});
+  
   document.querySelectorAll('.docxInput').forEach(input => {
   input.addEventListener('change', async (e) => {
     const file = e.target.files[0];

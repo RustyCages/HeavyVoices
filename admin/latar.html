@@ -157,6 +157,7 @@ function wireDocField(s, field, bucket, containerSelector) {
       s[field.kind] = null;
       rerenderDocsAndStamtext(s);
     });
+  }
   const openLink = container.querySelector(`.open-link[data-id="${s.id}"][data-kind="${field.kind}"]`);
   if (openLink && s[field.kind]) {
     supabaseClient.storage.from(bucket).createSignedUrl(s[field.kind], 3600).then(({ data: signed }) => {

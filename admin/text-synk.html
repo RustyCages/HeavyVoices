@@ -135,7 +135,7 @@
           </div>
           <div class="row-flex">
             <button type="button" class="btn-outline btn-small" id="undoBtn" title="Backsteg">&#8617; Ångra</button>
-            <button type="button" class="btn-outline" id="gapBtn" disabled title="Enter — infoga en tom rad här (när det inte sjungs något)">&#9834; Tom rad</button>
+            <button type="button" class="btn-outline" id="gapBtn" disabled title="Enter — lägg in en paus (tom rad) under texten">&#9834; Paus</button>
             <button type="button" id="tapBtn" disabled>TAP</button>
           </div>
         </div>
@@ -153,7 +153,6 @@
         <span id="progressInfo" class="muted"></span>
         <div class="row-flex">
           <button type="button" class="btn-outline btn-small" id="editLinesBtn">&#9998; Redigera rader</button>
-          <button type="button" class="btn-outline btn-small" id="addPauseBtn" title="Infoga en tom rad (paus/instrumentalt) före markerad rad">+ Paus</button>
           <button type="button" class="btn-outline btn-small" id="rebuildBtn">&#8635; Börja om från sångtext</button>
         </div>
       </div>
@@ -165,7 +164,7 @@
           <li><kbd>Backsteg</kbd> ångrar senaste tryck. <kbd>P</kbd> spelar/pausar. <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> hoppar 3 s.</li>
           <li>Klicka på en rad för att flytta markören dit. Klicka på tiden för att skriva in den manuellt (t.ex. <code>1:23.45</code>).</li>
           <li><strong>&#9654;</strong> spelar från strax före raden, <strong>&minus;/+</strong> justerar 0,1 s, <strong>&#8856;</strong> hoppar över raden (t.ex. rubriker som "Refräng").</li>
-          <li><strong>Tom rad:</strong> tryck <kbd>Enter</kbd> (eller &#9834; Tom rad) när sången tar slut, t.ex. inför ett instrumentalt parti. Då infogas en tom rad med den tiden och markören står kvar på nästa textrad — i spelaren släcks texten tills nästa rad börjar.</li>
+          <li><strong>Paus:</strong> tryck <kbd>Enter</kbd> (eller &#9834; Paus) när sången tar slut, t.ex. inför ett instrumentalt parti. Under uppspelning läggs pausen in med den tiden direkt under raden som just sjöngs, och markören står kvar på nästa textrad. När ljudet är pausat läggs pausen in under den markerade raden (tajma den sen med TAP). I spelaren släcks texten tills nästa rad börjar.</li>
           <li><strong>&#9834;+</strong> på en rad infogar en tom rad efter den i efterhand (tajma den sen genom att klicka på den och trycka TAP, eller skriv in tiden).</li>
           <li>Sänk tempot till 75 % om det går fort — tiderna blir ändå rätt.</li>
         </ul>
@@ -352,7 +351,7 @@ function updateProgress() {
   const done = needed.filter(r => r.time != null).length;
   $('progressInfo').textContent = `${done} av ${needed.length} rader tajmade`;
   $('tapBtn').disabled = !audio.src || cursor >= rows.length;
-  $('gapBtn').disabled = !audio.src;
+  $('gapBtn').disabled = !song || !rows.length;
   $('tapBtn').textContent = cursor >= rows.length ? 'Klart ✓' : 'TAP';
 }
 
@@ -441,18 +440,28 @@ function tap() {
   playingIdx = -2;
   setCursor(nextCursorFrom(cursor));
 }
-// Tom rad "nu": infogas före markerad rad, markören står kvar på samma textrad
+// Paus (tom rad) under texten.
+// Under uppspelning: tajmad paus direkt under raden som just sjöngs (= före markören), markören står kvar.
+// Pausat ljud: otajmad paus under den markerade raden, markören flyttas till pausen.
 function tapGap() {
-  if (!audio.src) return;
-  if (audio.paused) { play(); return; }
-  const at = Math.min(cursor, rows.length);
-  // Ligger markören på slut-raden (tom) behövs ingen ny — tajma den i stället
-  if (at < rows.length && isPause(rows[at])) { tap(); return; }
-  rows.splice(at, 0, { text: '', time: tapTime(), skip: false });
-  undoStack.push({ type: 'insert', i: at });
+  if (!song || !rows.length) return;
+  if (audio.src && !audio.paused) {
+    const at = Math.min(cursor, rows.length);
+    // Ligger markören på en paus-rad (t.ex. slut) behövs ingen ny — tajma den i stället
+    if (at < rows.length && isPause(rows[at])) { tap(); return; }
+    rows.splice(at, 0, { text: '', time: tapTime(), skip: false });
+    undoStack.push({ type: 'insert', i: at, cursor });
+    setDirty(true);
+    renderLines();
+    setCursor(at + 1);
+    return;
+  }
+  const at = cursor >= rows.length ? rows.length : cursor + 1;
+  rows.splice(at, 0, { text: '', time: null, skip: false });
+  undoStack.push({ type: 'insert', i: at, cursor });
   setDirty(true);
   renderLines();
-  setCursor(at + 1);
+  setCursor(at);
 }
 const undoStack = [];
 function undo() {
@@ -462,7 +471,7 @@ function undo() {
     rows.splice(u.i, 1);
     setDirty(true);
     renderLines();
-    setCursor(u.i);
+    setCursor(u.cursor != null ? u.cursor : u.i);
     return;
   }
   rows[u.i].time = u.prev ? u.prev.time : null;
@@ -494,7 +503,6 @@ async function loadTrack(path) {
   audio.pause();
   $('trackStatus').textContent = 'Laddar ljud...';
   $('tapBtn').disabled = true;
-  $('gapBtn').disabled = true;
   const { data: signed, error } = await supabaseClient.storage.from(STEM_BUCKET).createSignedUrl(path, 3600);
   if (token !== trackToken) return;
   if (error || !signed) { $('trackStatus').textContent = 'Kunde inte hämta ljudfilen'; return; }
@@ -674,12 +682,6 @@ function wireEvents() {
   $('editLinesBtn').addEventListener('click', openEdit);
   $('cancelEditBtn').addEventListener('click', closeEdit);
   $('applyEditBtn').addEventListener('click', applyEdit);
-  $('addPauseBtn').addEventListener('click', () => {
-    const at = Math.min(cursor, rows.length);
-    rows.splice(at, 0, { text: '', time: null, skip: false });
-    undoStack.length = 0; setDirty(true);
-    renderLines(); setCursor(at);
-  });
   $('rebuildBtn').addEventListener('click', () => {
     if (!song.lyrics_plain) { toast('Låten har ingen sångtext — lägg till den i rutan Sångtext ovan'); $('textCard').open = true; return; }
     if (rows.some(r => r.time != null) && !confirm('Börja om från sångtexten? Alla tider i editorn nollställs (det sparade påverkas inte förrän du sparar).')) return;

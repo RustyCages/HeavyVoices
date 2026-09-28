@@ -7,14 +7,28 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
 <style>
-  .event-item { display: flex; align-items: flex-start; padding: 0.9rem 0; border-bottom: 1px solid var(--border); gap: 1rem; }
-  .event-item:last-child { border-bottom: none; }
-  .event-item.past { opacity: 0.5; }
-  .event-date { font-family: 'Roboto Condensed', sans-serif; font-size: 1.2rem; min-width: 95px; }
-  .event-type-rep { color: #60a5fa; }
-  .event-type-konsert { color: var(--accent); }
-  .event-type-ovrigt { color: var(--text-muted); }
-  .event-meta { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
+  .tabs { display:flex; gap:0.75rem; margin-bottom:1.75rem; flex-wrap:wrap; }
+  .tab-btn { background:rgba(255,255,255,0.06); color:#d1d5db; border:1px solid rgba(255,255,255,0.12); padding:0.6rem 1.2rem; }
+  .tab-btn.active { background:var(--accent); color:#111317; }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+
+  details.event-card { margin-bottom:1.1rem; padding:1.25rem 1.5rem; }
+  details.event-card summary { list-style:none; cursor:pointer; }
+  details.event-card summary::-webkit-details-marker { display:none; }
+  details.event-card[open] summary { margin-bottom:0.9rem; }
+  details.event-card.past { opacity:0.5; }
+
+  .row-between { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+  .event-summary-main { display:flex; align-items:baseline; gap:0.9rem; flex-wrap:wrap; }
+  .event-date { font-family:'Roboto Condensed', sans-serif; font-size:1.15rem; min-width:95px; }
+  .event-title { font-weight:700; }
+  .event-type-rep { color:#60a5fa; }
+  .event-type-konsert { color:var(--accent); }
+  .event-type-ovrigt { color:var(--text-muted); }
+
+  .event-body-row { padding:0.3rem 0; }
+  .event-body-label { font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.15rem; }
 </style>
 </head>
 <body>
@@ -23,8 +37,20 @@
   <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
   <h1>Kalender</h1>
 
-  <div class="card">
-    <div id="eventsList"><p class="text-muted">Laddar...</p></div>
+  <div class="tabs">
+    <button class="tab-btn active" id="tabRepBtn">Reptider</button>
+    <button class="tab-btn" id="tabKonsertBtn">Konserter</button>
+    <button class="tab-btn" id="tabOvrigtBtn">Övrigt</button>
+  </div>
+
+  <div class="tab-panel active" id="tabRep">
+    <div id="listRep"><p class="text-muted">Laddar...</p></div>
+  </div>
+  <div class="tab-panel" id="tabKonsert">
+    <div id="listKonsert"><p class="text-muted">Laddar...</p></div>
+  </div>
+  <div class="tab-panel" id="tabOvrigt">
+    <div id="listOvrigt"><p class="text-muted">Laddar...</p></div>
   </div>
 </div>
 
@@ -33,32 +59,111 @@
 <script src="/js/auth.js"></script>
 <script>
 const typeLabels = { rep: 'Repetition', konsert: 'Konsert', ovrigt: 'Övrigt' };
+const emptyLabels = {
+  rep: 'Inga repetitioner inlagda än.',
+  konsert: 'Inga konserter inlagda än.',
+  ovrigt: 'Inget övrigt inlagt än.'
+};
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 function formatDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-async function loadEvents() {
-  const todayStr = new Date().toISOString().slice(0, 10);
+// =========================================================
+// Tabs
+// =========================================================
+document.getElementById('tabRepBtn').addEventListener('click', () => switchTab('rep'));
+document.getElementById('tabKonsertBtn').addEventListener('click', () => switchTab('konsert'));
+document.getElementById('tabOvrigtBtn').addEventListener('click', () => switchTab('ovrigt'));
 
+function switchTab(name) {
+  document.getElementById('tabRepBtn').classList.toggle('active', name === 'rep');
+  document.getElementById('tabKonsertBtn').classList.toggle('active', name === 'konsert');
+  document.getElementById('tabOvrigtBtn').classList.toggle('active', name === 'ovrigt');
+  document.getElementById('tabRep').classList.toggle('active', name === 'rep');
+  document.getElementById('tabKonsert').classList.toggle('active', name === 'konsert');
+  document.getElementById('tabOvrigt').classList.toggle('active', name === 'ovrigt');
+}
+
+// =========================================================
+// Events
+// =========================================================
+function renderEventCard(ev, isPast) {
+  const details = document.createElement('details');
+  details.className = 'event-card card modern-card' + (isPast ? ' past' : '');
+
+  const summary = document.createElement('summary');
+  summary.innerHTML = `
+    <div class="row-between">
+      <div class="event-summary-main">
+        <span class="event-date">${formatDate(ev.event_date)}${ev.event_time ? ' ' + ev.event_time.slice(0,5) : ''}</span>
+        <span class="event-title event-type-${ev.event_type}">${escapeHtml(ev.title)}</span>
+      </div>
+      <span class="text-muted">Visa ▾</span>
+    </div>
+  `;
+  details.appendChild(summary);
+
+  const body = document.createElement('div');
+  if (!ev.location && !ev.notes) {
+    body.innerHTML = '<p class="text-muted">Inga fler detaljer.</p>';
+  } else {
+    if (ev.location) {
+      body.innerHTML += `
+        <div class="event-body-row">
+          <div class="event-body-label">Plats</div>
+          <div>${escapeHtml(ev.location)}</div>
+        </div>`;
+    }
+    if (ev.notes) {
+      body.innerHTML += `
+        <div class="event-body-row">
+          <div class="event-body-label">Anteckningar</div>
+          <div>${escapeHtml(ev.notes)}</div>
+        </div>`;
+    }
+  }
+  details.appendChild(body);
+  return details;
+}
+
+function renderGroup(containerEl, events, type) {
+  containerEl.innerHTML = '';
+  if (!events.length) {
+    containerEl.innerHTML = `<p class="text-muted">${emptyLabels[type]}</p>`;
+    return;
+  }
+  const todayStr = new Date().toISOString().slice(0, 10);
+  events.forEach(ev => {
+    containerEl.appendChild(renderEventCard(ev, ev.event_date < todayStr));
+  });
+}
+
+async function loadEvents() {
   const { data: events, error } = await supabaseClient
     .from('events').select('*').order('event_date').order('event_time');
 
-  const el = document.getElementById('eventsList');
-  if (error) { el.innerHTML = `<p class="error">${error.message}</p>`; return; }
-  if (!events.length) { el.innerHTML = `<p class="text-muted">Inga händelser inlagda än.</p>`; return; }
+  if (error) {
+    ['listRep', 'listKonsert', 'listOvrigt'].forEach(id => {
+      document.getElementById(id).innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
+    });
+    return;
+  }
 
-  el.innerHTML = events.map(ev => `
-    <div class="event-item ${ev.event_date < todayStr ? 'past' : ''}">
-      <div class="event-date">${formatDate(ev.event_date)}${ev.event_time ? ' ' + ev.event_time.slice(0,5) : ''}</div>
-      <div>
-        <strong class="event-type-${ev.event_type}">${typeLabels[ev.event_type]}</strong> — ${ev.title}
-        ${ev.location ? `<div class="event-meta">${ev.location}</div>` : ''}
-        ${ev.notes ? `<div class="event-meta">${ev.notes}</div>` : ''}
-      </div>
-    </div>
-  `).join('');
+  const byType = { rep: [], konsert: [], ovrigt: [] };
+  (events || []).forEach(ev => {
+    (byType[ev.event_type] || byType.ovrigt).push(ev);
+  });
+
+  renderGroup(document.getElementById('listRep'), byType.rep, 'rep');
+  renderGroup(document.getElementById('listKonsert'), byType.konsert, 'konsert');
+  renderGroup(document.getElementById('listOvrigt'), byType.ovrigt, 'ovrigt');
 }
 
 (async () => {

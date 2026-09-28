@@ -133,11 +133,27 @@
   @media (max-width: 420px) { #playerControls { gap:0.45rem; } }
 
   /* Karaoke (synkad text) ovanför spelarkontrollerna */
-  #karaoke { text-align:center; padding:0.2rem 0.5rem 0.5rem; border-bottom:1px solid var(--border); margin-bottom:0.2rem; }
+  /* Rullande textremsa: alla rader ligger i .k-reel som flyttas med transform så att aktuell rad hamnar i mitten */
+  #karaoke {
+    position:relative; height:6.4rem; overflow:hidden; text-align:center;
+    border-bottom:1px solid var(--border); margin-bottom:0.2rem;
+    -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 28%, #000 72%, transparent 100%);
+            mask-image:linear-gradient(to bottom, transparent 0, #000 28%, #000 72%, transparent 100%);
+  }
   #karaoke.hidden { display:none; }
-  #karaoke div { line-height:1.35; min-height:1.35em; transition:opacity 0.2s ease, color 0.2s ease; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #karaoke .k-prev, #karaoke .k-next { color:var(--text-muted); font-size:0.85rem; opacity:0.55; }
-  #karaoke .k-cur { color:var(--accent); font-size:1.25rem; font-weight:700; font-family:'Roboto Condensed', sans-serif; white-space:normal; }
+  .k-reel { position:absolute; left:0; right:0; top:0; transition:transform 0.55s cubic-bezier(0.22, 1, 0.36, 1); will-change:transform; }
+  .k-line {
+    padding:0.18rem 0.75rem; line-height:1.3;
+    font-family:'Roboto Condensed', sans-serif; font-weight:700; font-size:1.3rem;
+    color:var(--text); opacity:0.35; transform:scale(0.78); transform-origin:center;
+    transition:transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease, color 0.45s ease, text-shadow 0.45s ease;
+  }
+  .k-line.k-pause { font-size:1rem; opacity:0.25; }
+  .k-line.k-intro { min-height:1.3em; }
+  .k-line.k-active { color:var(--accent); opacity:1; transform:scale(1); text-shadow:0 0 18px rgba(229,169,104,0.35); }
+  .k-line.k-past { opacity:0.2; }
+  #karaoke.no-anim .k-reel, #karaoke.no-anim .k-line { transition:none; }
+  @media (prefers-reduced-motion: reduce) { .k-reel, .k-line { transition:none; } }
 
   #toast { position:fixed; bottom:8rem; right:1.5rem; background:var(--accent); color:#111317; padding:0.7rem 1.2rem; border-radius:0.6rem; font-weight:600; box-shadow:var(--card-shadow); z-index:999; display:none; }
 </style>
@@ -169,11 +185,7 @@
 </div>
 
 <div id="playerBar" class="hidden">
-  <div id="karaoke" class="hidden">
-    <div class="k-prev"></div>
-    <div class="k-cur"></div>
-    <div class="k-next"></div>
-  </div>
+  <div id="karaoke" class="hidden"><div class="k-reel"></div></div>
   <div id="playerTitle">–</div>
   <div id="playerScrubberRow">
     <span id="curTime">0:00</span>
@@ -1147,30 +1159,47 @@ function setPlayerSong(song) {
   const btn = document.getElementById('karaokeBtn');
   btn.disabled = !hasSync;
   btn.title = hasSync ? 'Visa/dölj synkad text' : 'Ingen synkad text för den här låten';
+  buildKaraokeReel();
   document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
   document.getElementById('lyricsDocBtn').classList.toggle('hidden', !(song && song.lyrics_pdf_path));
   renderKaraoke(true);
 }
 
+function buildKaraokeReel() {
+  const reel = document.querySelector('#karaoke .k-reel');
+  // Första elementet är en tom "intro"-rad så att första textraden väntar under mitten innan den börjar
+  reel.innerHTML = '<div class="k-line k-intro"></div>' + karaokeLines.map(l =>
+    l.text ? `<div class="k-line">${escapeHtml(l.text)}</div>` : '<div class="k-line k-pause">♪</div>'
+  ).join('');
+}
+
 function renderKaraoke(force) {
   if (!karaokeOn || !karaokeLines.length) return;
+  const box = document.getElementById('karaoke');
+  if (box.classList.contains('hidden')) return;
   const t = currentElapsed();
   let idx = -1;
   for (let i = 0; i < karaokeLines.length; i++) {
     if (karaokeLines[i].time <= t) idx = i; else break;
   }
   if (idx === karaokeIdx && !force) return;
+
+  // Stora hopp (ny låt, scrubbing, visa igen) = flytta direkt utan animation
+  const jump = force || karaokeIdx < -1 || Math.abs(idx - karaokeIdx) > 2;
   karaokeIdx = idx;
-  const box = document.getElementById('karaoke');
-  const cur = idx >= 0 ? karaokeLines[idx] : null;
-  // föregående/nästa = närmaste rader med text (tomma rader = paus)
-  let prev = null, next = null;
-  for (let i = idx - 1; i >= 0; i--) { if (karaokeLines[i].text) { prev = karaokeLines[i]; break; } }
-  for (let i = idx + 1; i < karaokeLines.length; i++) { if (karaokeLines[i].text) { next = karaokeLines[i]; break; } }
-  const inPause = !cur || !cur.text;
-  box.querySelector('.k-prev').textContent = inPause ? '' : (prev ? prev.text : '');
-  box.querySelector('.k-cur').textContent = cur && cur.text ? cur.text : (idx >= 0 ? '♪' : '');
-  box.querySelector('.k-next').textContent = next ? next.text : '';
+
+  const reel = box.querySelector('.k-reel');
+  const els = reel.children;
+  const activeEl = els[idx + 1];
+  if (!activeEl) return;
+  for (let i = 0; i < els.length; i++) {
+    els[i].classList.toggle('k-active', i === idx + 1 && idx >= 0);
+    els[i].classList.toggle('k-past', i < idx + 1);
+  }
+  const y = box.clientHeight / 2 - (activeEl.offsetTop + activeEl.offsetHeight / 2);
+  if (jump) box.classList.add('no-anim');
+  reel.style.transform = `translateY(${y}px)`;
+  if (jump) { void reel.offsetHeight; box.classList.remove('no-anim'); }
 }
 
 (function karaokeLoop() {
@@ -1185,6 +1214,7 @@ document.getElementById('karaokeBtn').addEventListener('click', (e) => {
   e.currentTarget.classList.toggle('active', karaokeOn);
   const hasSync = karaokeLines.some(l => l.text);
   document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
+  karaokeIdx = -2;
   renderKaraoke(true);
 });
 
@@ -1200,6 +1230,10 @@ document.getElementById('lyricsDocBtn').addEventListener('click', async () => {
     : data.signedUrl;
   if (win) win.location.href = url; else window.location.href = url;
 });
+
+if (window.ResizeObserver) {
+  new ResizeObserver(() => renderKaraoke(true)).observe(document.getElementById('karaoke'));
+}
 
 // Håll sidans nederkant fri från den (nu högre) spelarlisten
 if (window.ResizeObserver) {

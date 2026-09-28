@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Animerad guide till Heavy Voices medlemsportal: registrering, repertoar, stämövning, kalender och admin.">
+<link rel="icon" href="/heavyvoices-logo.png">
+<title>Heavy Voices Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Roboto+Condensed:wght@400;700&display=swap">
+<style>
+/* Layout: telefon-demo till vänster (överst på mobil), stegtext + kontroller + steglista till höger. Samma mörka guld-tema som heavyvoices.se. */
+:root {
+  --bg: #121418;
+  --bg-2: #1d222e;
+  --surface: #1a1e27;
+  --surface-2: #232937;
+  --line: rgba(255,255,255,0.08);
+  --text: #f3f4f6;
+  --muted: #9ca3af;
+  --accent: #E5A968;
+  --accent-ink: #111317;
+  --ok: #7fc99a;
+  --warn: #e7c46a;
+  --f-head: 'Roboto Condensed', 'Arial Narrow', sans-serif;
+  --f-body: 'DM Sans', system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  background-image: radial-gradient(circle at 50% 0%, var(--bg-2) 0%, var(--bg) 70%);
+  color: var(--text);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-inline: 16px;
+  padding-block: 20px 40px;
+  min-height: 100%;
+}
+.wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px; }
+.brand small { font-family: var(--f-head); text-transform: uppercase; letter-spacing: .14em; color: var(--accent); font-size: 12px; }
+.brand h1 { font-family: var(--f-head); font-weight: 700; font-size: clamp(28px, 6vw, 42px); line-height: 1.05; margin: 2px 0 0; text-wrap: balance; letter-spacing: -0.01em; }
+.brand p { color: var(--muted); margin: 6px 0 0; max-width: 52ch; }
+
+.track { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
+.track button { font: 700 14px var(--f-head); letter-spacing: .06em; text-transform: uppercase; border: 0; background: transparent; color: var(--muted); padding: 8px 18px; border-radius: 999px; cursor: pointer; }
+.track button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+button:focus-visible, .step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.stage { display: grid; grid-template-columns: 300px 1fr; gap: 32px; align-items: start; }
+@media (max-width: 760px) { .stage { grid-template-columns: 1fr; gap: 18px; } }
+
+/* ---------- Telefonen ---------- */
+.phone-col { display: flex; justify-content: center; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+@media (max-width: 760px) { .phone-col { position: static; } }
+.phone {
+  width: 272px; max-width: 100%; border-radius: 38px; padding: 10px;
+  background: linear-gradient(160deg, #2b303b, #0d0f13);
+  box-shadow: 0 30px 60px -20px rgba(0,0,0,.8), inset 0 0 0 1px rgba(255,255,255,.07);
+}
+.screen {
+  position: relative; height: 520px; border-radius: 29px; overflow: hidden;
+  background: var(--bg); background-image: radial-gradient(circle at 50% 0%, #1d222e 0%, #121418 75%);
+  font-size: 12px;
+}
+.sbar { display: flex; justify-content: space-between; padding: 8px 18px 2px; font: 600 11px var(--f-body); color: var(--text); }
+.url { margin: 4px 10px 0; background: rgba(255,255,255,.06); border-radius: 8px; padding: 5px 9px; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.url b { color: var(--text); font-weight: 500; }
+.view { position: absolute; inset: 58px 0 0 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; overflow: hidden; animation: viewIn .45s ease both; }
+@keyframes viewIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+.appbar { display: flex; align-items: center; justify-content: space-between; }
+.appbar .logo { font: 700 13px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.appbar .who { font-size: 10.5px; color: var(--muted); }
+.s-h { font: 700 20px var(--f-head); margin: 2px 0 0; }
+.s-p { color: var(--muted); font-size: 11.5px; margin: 0; }
+
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.field .in { min-height: 30px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.04); padding: 6px 9px; font-size: 12px; transition: border-color .2s; }
+.field .in.focus { border-color: var(--accent); }
+.field .in.ph { color: #6b7280; }
+
+.btn { display: inline-flex; justify-content: center; align-items: center; gap: 6px; border-radius: 9px; padding: 8px 12px; background: var(--accent); color: var(--accent-ink); font: 700 12px var(--f-head); letter-spacing: .05em; text-transform: uppercase; transition: transform .15s, filter .2s; }
+.btn.ghost { background: rgba(255,255,255,.07); color: var(--text); }
+.btn.sm { padding: 5px 9px; font-size: 10.5px; }
+.btn.pressed { transform: scale(.94); filter: brightness(1.15); }
+
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tile { border-radius: 12px; border: 1px solid var(--line); background: linear-gradient(145deg, rgba(30,34,43,.9), rgba(22,25,32,.95)); padding: 12px 10px; display: flex; flex-direction: column; gap: 4px; transition: border-color .25s, box-shadow .25s, transform .15s; }
+.tile .ic { width: 26px; height: 26px; border-radius: 8px; background: rgba(229,169,104,.14); display: grid; place-items: center; }
+.tile .ic svg { width: 15px; height: 15px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tile b { font: 700 13px var(--f-head); }
+.tile span { font-size: 10px; color: var(--muted); line-height: 1.3; }
+.tile.hot, .row.hot, .card.hot { border-color: rgba(229,169,104,.55); box-shadow: 0 0 18px rgba(229,169,104,.18); }
+
+.row { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; background: rgba(255,255,255,.03); transition: border-color .25s, background .25s, opacity .3s; }
+.row .t { flex: 1; min-width: 0; }
+.row .t b { display: block; font-weight: 500; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .t small { color: var(--muted); font-size: 10px; }
+.play { width: 26px; height: 26px; border-radius: 50%; background: rgba(229,169,104,.16); color: var(--accent); display: grid; place-items: center; font-size: 10px; flex: none; }
+.pill { font-size: 9.5px; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,.07); color: var(--muted); white-space: nowrap; transition: background .3s, color .3s; }
+.pill.wait { background: rgba(231,196,104,.15); color: var(--warn); }
+.pill.ok { background: rgba(127,201,154,.15); color: var(--ok); }
+.chk { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--muted); flex: none; display: grid; place-items: center; font-size: 10px; color: var(--accent-ink); transition: background .2s, border-color .2s; }
+.chk.on { background: var(--accent); border-color: var(--accent); }
+.chk.on::after { content: "✓"; }
+
+.tabs { display: flex; gap: 5px; }
+.tabs span { flex: 1; text-align: center; font-size: 10.5px; padding: 6px 4px; border-radius: 999px; background: rgba(255,255,255,.06); color: #d1d5db; transition: background .25s, color .25s; }
+.tabs span.on { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
+.card { border: 1px solid var(--line); border-radius: 11px; padding: 8px 10px; background: rgba(255,255,255,.03); transition: border-color .25s, box-shadow .25s; }
+.card .top { display: flex; justify-content: space-between; gap: 6px; }
+.card .top b { font-size: 12px; font-weight: 500; }
+.card .top em { font-style: normal; color: var(--accent); font-size: 10.5px; white-space: nowrap; }
+.card .more { max-height: 0; overflow: hidden; color: var(--muted); font-size: 10.5px; transition: max-height .45s ease, margin .45s; }
+.card.open .more { max-height: 80px; margin-top: 5px; }
+.card.past { opacity: .45; }
+
+.player { margin-top: auto; border-radius: 14px; border: 1px solid rgba(229,169,104,.3); background: #1b1f28; padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; }
+.player .pt { display: flex; justify-content: space-between; font-size: 11px; }
+.player .pt b { font-weight: 500; }
+.bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.1); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 7s linear; }
+.ctrls { display: flex; justify-content: center; gap: 14px; align-items: center; font-size: 13px; color: var(--muted); }
+.ctrls .pp { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-size: 11px; }
+.ctrls .ico { padding: 2px 5px; border-radius: 6px; transition: background .2s; }
+.ctrls .ico.on { background: rgba(229,169,104,.2); }
+
+.mix { display: flex; flex-direction: column; gap: 6px; }
+.mixrow { display: grid; grid-template-columns: 58px 1fr 30px; align-items: center; gap: 7px; font-size: 10.5px; }
+.mixrow .tr { height: 6px; border-radius: 6px; background: rgba(255,255,255,.1); position: relative; }
+.mixrow .tr i { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: var(--accent); width: 70%; transition: width .9s ease; }
+.mixrow .tr i::after { content: ""; position: absolute; right: -6px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.mixrow.mine span:first-child { color: var(--accent); font-weight: 700; }
+.mixrow small { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+.lyr { border-radius: 12px; background: rgba(0,0,0,.25); border: 1px solid var(--line); padding: 10px; display: flex; flex-direction: column; gap: 6px; text-align: center; }
+.lyr p { margin: 0; font-size: 12.5px; color: #6b7280; transition: color .35s, transform .35s; }
+.lyr p.on { color: var(--text); font-weight: 700; transform: scale(1.06); }
+.lyr p.done { color: var(--muted); }
+.lyr.plain { text-align: left; }
+.lyr.plain p { color: var(--text); font-size: 11.5px; }
+
+.sync { display: flex; flex-direction: column; gap: 4px; }
+.sline { display: grid; grid-template-columns: 50px 1fr; gap: 8px; font-size: 11px; padding: 5px 7px; border-radius: 7px; transition: background .25s; }
+.sline code { font-family: ui-monospace, Menlo, monospace; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.sline.cur { background: rgba(229,169,104,.14); }
+.sline.set code { color: var(--accent); }
+.tapbtn { align-self: center; width: 76px; height: 76px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font: 700 17px var(--f-head); letter-spacing: .08em; box-shadow: 0 0 0 6px rgba(229,169,104,.15); transition: transform .12s; }
+.tapbtn.pressed { transform: scale(.9); }
+.clock { text-align: center; font: 700 15px var(--f-head); font-variant-numeric: tabular-nums; }
+
+.up { display: grid; grid-template-columns: 58px 1fr 16px; align-items: center; gap: 7px; font-size: 10.5px; }
+.up .bar i { transition: width 1s ease; }
+.up .okm { color: var(--ok); opacity: 0; transition: opacity .3s; }
+.up.done .okm { opacity: 1; }
+
+.center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; }
+.hour { width: 58px; height: 58px; border-radius: 50%; border: 2px solid var(--accent); display: grid; place-items: center; color: var(--accent); font-size: 24px; animation: spin 3s ease-in-out infinite; }
+@keyframes spin { 0%, 40% { transform: rotate(0); } 60%, 100% { transform: rotate(180deg); } }
+
+.off { opacity: 0; transform: translateY(8px); pointer-events: none; max-height: 0; overflow: hidden; margin: 0; padding-block: 0; border-width: 0; }
+.shown { opacity: 1; transform: none; transition: opacity .4s, transform .4s; }
+
+.toast { position: absolute; left: 12px; right: 12px; bottom: 14px; border-radius: 11px; padding: 9px 11px; background: #2a2f3b; border: 1px solid rgba(127,201,154,.35); font-size: 11px; display: flex; gap: 8px; align-items: center; transform: translateY(80px); opacity: 0; transition: transform .45s cubic-bezier(.2,.9,.3,1.2), opacity .3s; z-index: 5; }
+.toast.in { transform: none; opacity: 1; }
+.toast .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+.notif { position: absolute; left: 8px; right: 8px; top: 6px; border-radius: 14px; padding: 9px 11px; background: rgba(40,44,55,.97); font-size: 10.5px; transform: translateY(-110px); transition: transform .5s cubic-bezier(.2,.9,.3,1.1); z-index: 6; box-shadow: 0 10px 25px rgba(0,0,0,.5); }
+.notif.in { transform: none; }
+.notif small { color: var(--muted); display: block; }
+
+.finger { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; background: rgba(255,255,255,.28); border: 2px solid rgba(255,255,255,.85); box-shadow: 0 4px 12px rgba(0,0,0,.45); z-index: 9; left: 50%; top: 110%; transition: left .7s cubic-bezier(.4,0,.2,1), top .7s cubic-bezier(.4,0,.2,1), transform .15s, opacity .3s; pointer-events: none; }
+.finger.down { transform: scale(.75); }
+.ripple { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid var(--accent); z-index: 8; animation: rip .6s ease-out forwards; pointer-events: none; }
+@keyframes rip { to { transform: scale(4); opacity: 0; } }
+
+/* ---------- Text & kontroller ---------- */
+.side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.now { display: flex; flex-direction: column; gap: 8px; }
+.now .count { font: 700 12px var(--f-head); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-variant-numeric: tabular-nums; }
+.now h2 { font: 700 clamp(24px, 4.2vw, 32px)/1.1 var(--f-head); margin: 0; text-wrap: balance; }
+.now p { margin: 0; color: #cfd3da; max-width: 58ch; }
+.path { align-self: flex-start; font: 12px ui-monospace, Menlo, monospace; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; overflow-wrap: anywhere; }
+.tips { margin: 2px 0 0; padding-left: 18px; color: #cfd3da; display: flex; flex-direction: column; gap: 4px; max-width: 58ch; }
+.tips li::marker { color: var(--accent); }
+
+.controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cbtn { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 10px; padding: 9px 14px; font: 700 13px var(--f-head); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+.cbtn.main { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 104px; }
+.cbtn:disabled { opacity: .35; cursor: default; }
+.prog { flex: 1; min-width: 120px; height: 4px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.prog i { display: block; height: 100%; width: 0; background: var(--accent); }
+
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--line); padding-top: 12px; }
+.step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: baseline; padding: 8px 10px; border-radius: 9px; cursor: pointer; color: var(--muted); }
+.step:hover { background: rgba(255,255,255,.03); }
+.step .n { font: 700 13px var(--f-head); font-variant-numeric: tabular-nums; }
+.step b { font-weight: 500; color: var(--text); }
+.step small { display: block; font-size: 12.5px; }
+.step[aria-current="true"] { background: var(--surface); }
+.step[aria-current="true"] .n { color: var(--accent); }
+.step.seen .n { color: var(--accent); opacity: .6; }
+
+.hdr-right { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.music { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 8px 14px; font: 700 13px var(--f-head); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.music[aria-pressed="true"] { color: var(--accent); border-color: rgba(229,169,104,.5); }
+.eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
+.eq i { width: 3px; height: 4px; background: currentColor; border-radius: 1px; }
+.music[aria-pressed="true"] .eq i { animation: eq .5s ease-in-out infinite alternate; }
+.music[aria-pressed="true"] .eq i:nth-child(2) { animation-delay: .17s; }
+.music[aria-pressed="true"] .eq i:nth-child(3) { animation-delay: .33s; }
+@keyframes eq { from { height: 3px; } to { height: 12px; } }
+.cta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+a.cbtn { text-decoration: none; display: inline-flex; align-items: center; }
+footer p { margin: 0; }
+footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <small>heavyvoices.se · guide</small>
+      <h1>Så funkar Heavy Voices</h1>
+      <p>Följ med steg för steg: från registrering till att öva din stämma, och vad admin gör bakom kulisserna.</p>
+    </div>
+    <div class="hdr-right">
+    <div class="track" role="group" aria-label="Välj guide">
+      <button id="tMember" aria-pressed="true">Medlem</button>
+      <button id="tAdmin" aria-pressed="false">Admin</button>
+    </div>
+    <button class="music" id="musicBtn" aria-pressed="false" title="Bakgrundsmusik"><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span><span id="musicLbl">Musik av</span></button>
+    </div>
+  </header>
+
+  <div class="stage">
+    <div class="phone-col">
+      <div class="phone" aria-hidden="true">
+        <div class="screen" id="screen">
+          <div class="sbar"><span>19:30</span><span>●●● 5G</span></div>
+          <div class="url" id="url">heavyvoices.se</div>
+          <div id="viewHost"></div>
+          <div class="finger" id="finger"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="now" aria-live="polite">
+        <div class="count" id="count">Steg 1 av 10</div>
+        <h2 id="title"></h2>
+        <code class="path" id="path"></code>
+        <p id="desc"></p>
+        <ul class="tips" id="tips"></ul>
+      </div>
+      <div class="controls">
+        <button class="cbtn" id="prev">Förra</button>
+        <button class="cbtn main" id="playBtn">Pausa</button>
+        <button class="cbtn" id="next">Nästa</button>
+        <div class="prog" aria-hidden="true"><i id="progFill"></i></div>
+      </div>
+      <ol class="steps" id="steps"></ol>
+    </div>
+  </div>
+
+  <footer>
+    <div class="cta"><a class="cbtn main" href="/logga-in.html">Logga in</a><a class="cbtn" href="/registrera.html">Registrera dig</a><a class="cbtn" href="/">Till startsidan</a></div>
+    <p>Låtar, namn och datum i demon är exempel. Sökvägarna under varje rubrik är de riktiga sidorna på heavyvoices.se. Musiken är genererad direkt i webbläsaren.</p>
+  </footer>
+</div>
+
+<script>
+const IC = {
+  music: '<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+  cal: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+  info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+  user: '<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  users: '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  folder: '<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'
+};
+const bar = (who) => `<div class="appbar"><span class="logo">Heavy Voices</span><span class="who">${who||''}</span></div>`;
+const tile = (id, ic, name, sub) => `<div class="tile" id="${id}"><div class="ic">${IC[ic]}</div><b>${name}</b><span>${sub}</span></div>`;
+const toast = (txt) => `<div class="toast" id="toast"><span class="dot"></span>${txt}</div>`;
+const lyrics = ['Vi tänder ljusen, scenen är vår', 'varje röst en tråd i samma väv', 'när basen bär och tenoren slår', 'blir vi ett enda andetag'];
+
+const MEMBER = [
+ { t: 'Registrera dig', path: '/registrera.html', url: 'heavyvoices.se/<b>registrera.html</b>',
+   d: 'Nya medlemmar skapar sitt konto själva. Fyll i namn, e-post, vilken stämma du sjunger och ett lösenord.',
+   tips: ['Välj rätt stämma, den styr vilka övningsfiler som lyfts fram för dig.', 'Kontot är inte aktivt direkt. Det väntar på att en admin godkänner det.'],
+   html: `${bar()}<h3 class="s-h">Registrera dig</h3>
+     <div class="field"><label>Namn</label><div class="in ph" id="f1">Ditt namn</div></div>
+     <div class="field"><label>E-post</label><div class="in ph" id="f2">namn@exempel.se</div></div>
+     <div class="field"><label>Stämma</label><div class="in ph" id="f3">Välj stämma ▾</div></div>
+     <div class="field"><label>Lösenord</label><div class="in ph" id="f4">Minst 8 tecken</div></div>
+     <div class="btn" id="b1">Registrera</div>${toast('Konto skapat. Väntar på godkännande.')}`,
+   act: [['type','#f1','Anna Berg'],['type','#f2','anna.berg@exempel.se'],['tap','#f3'],['text','#f3','Alt'],['type','#f4','••••••••••'],['tap','#b1'],['add','#toast','in'],['wait',1400]] },
+
+ { t: 'Vänta på godkännande', path: '/vantar.html', url: 'heavyvoices.se/<b>vantar.html</b>',
+   d: 'Tills en admin har godkänt dig hamnar du på väntesidan, även om du försöker logga in. När du är godkänd kommer ett mejl.',
+   tips: ['Mejlet kommer från no-reply@heavyvoices.se. Titta i skräpposten om det dröjer.'],
+   html: `${bar()}<div class="center"><div class="hour">⌛</div><h3 class="s-h">Väntar på godkännande</h3><p class="s-p">En admin går igenom din ansökan. Du får ett mejl när ditt konto är aktiverat.</p></div>
+     <div class="notif" id="nt"><small>E-post · no-reply@heavyvoices.se</small><b>Välkommen till Heavy Voices!</b> Ditt konto är godkänt, nu kan du logga in.</div>`,
+   act: [['wait',1800],['add','#nt','in'],['wait',2200]] },
+
+ { t: 'Logga in', path: '/logga-in.html', url: 'heavyvoices.se/<b>logga-in.html</b>',
+   d: 'Logga in med din e-post och ditt lösenord. Du kommer direkt till medlemssidan.',
+   tips: ['Glömt lösenordet? Be en admin skicka en ny inbjudan, eller byt lösenord under Mitt konto när du är inne.'],
+   html: `${bar()}<h3 class="s-h">Logga in</h3>
+     <div class="field"><label>E-post</label><div class="in ph" id="f1">namn@exempel.se</div></div>
+     <div class="field"><label>Lösenord</label><div class="in ph" id="f2">Lösenord</div></div>
+     <div class="btn" id="b1">Logga in</div><p class="s-p" style="text-align:center">Ny i kören? <span style="color:var(--accent)">Registrera dig</span></p>`,
+   act: [['type','#f1','anna.berg@exempel.se'],['type','#f2','••••••••••'],['tap','#b1'],['text','#b1','Loggar in…'],['wait',900]] },
+
+ { t: 'Medlemssidan', path: '/medlem/', url: 'heavyvoices.se/<b>medlem/</b>',
+   d: 'Startsidan för medlemmar. Härifrån når du allt: repertoaren med övningsfiler, kalendern, information från styrelsen och ditt konto.',
+   tips: ['Spara sidan som bokmärke eller lägg den på hemskärmen, så är du ett tryck från repertoaren.'],
+   html: `${bar('Anna · Alt')}<h3 class="s-h">Hej Anna!</h3><p class="s-p">Vad vill du göra idag?</p>
+     <div class="tiles">${tile('k1','music','Repertoar','Öva låtar och stämmor')}${tile('k2','cal','Kalender','Rep och konserter')}${tile('k3','info','Information','Nyheter och filer')}${tile('k4','user','Mitt konto','Lösenord')}</div>
+     <div class="btn ghost" style="margin-top:auto">Logga ut</div>`,
+   act: [['wait',500],['hot','#k2'],['wait',500],['hot','#k3'],['wait',500],['hot','#k4'],['wait',500],['tap','#k1'],['hot','#k1'],['wait',900]] },
+
+ { t: 'Öva med stämfiler', path: '/medlem/repertoar.html', url: 'heavyvoices.se/medlem/<b>repertoar.html</b>',
+   d: 'Tryck på en låt för att spela den. Varje låt har separata spår för sopran, alt, tenor, bas och komp, och du blandar själv hur mycket du hör av varje.',
+   tips: ['Dra upp din egen stämma och sänk de andra när du lär dig din del.', 'Vänd på det när du kan den: sänk din stämma och sjung själv mot resten av kören.'],
+   html: `${bar('Anna · Alt')}<h3 class="s-h">Repertoar</h3>
+     <div class="row" id="r1"><span class="play">▶</span><div class="t"><b>Stormens öga</b><small>4:12 · 5 spår</small></div></div>
+     <div class="row"><span class="play">▶</span><div class="t"><b>Nattens eko</b><small>3:48 · 5 spår</small></div></div>
+     <div class="mix off" id="mix">
+       <div class="mixrow"><span>Sopran</span><div class="tr"><i id="m1"></i></div><small id="v1">70</small></div>
+       <div class="mixrow mine"><span>Alt</span><div class="tr"><i id="m2"></i></div><small id="v2">70</small></div>
+       <div class="mixrow"><span>Tenor</span><div class="tr"><i id="m3"></i></div><small id="v3">70</small></div>
+       <div class="mixrow"><span>Bas</span><div class="tr"><i id="m4"></i></div><small id="v4">70</small></div>
+       <div class="mixrow"><span>Komp</span><div class="tr"><i id="m5"></i></div><small id="v5">70</small></div>
+     </div>
+     <div class="player off" id="pl"><div class="pt"><b>Stormens öga</b><span>0:48</span></div><div class="bar"><i id="pb"></i></div>
+       <div class="ctrls"><span>⏮</span><span class="pp">❚❚</span><span>⏭</span><span class="ico">🎤</span><span class="ico">📄</span></div></div>`,
+   act: [['tap','#r1'],['hot','#r1'],['show','#pl'],['style','#pb',{width:'55%'}],['wait',500],['show','#mix'],['wait',700],
+         ['style','#m1',{width:'20%'}],['text','#v1','20'],['style','#m3',{width:'20%'}],['text','#v3','20'],['style','#m4',{width:'20%'}],['text','#v4','20'],['wait',500],
+         ['tap','#m2'],['style','#m2',{width:'100%'}],['text','#v2','100'],['wait',1600]] },
+
+ { t: 'Text och karaoke', path: '/medlem/repertoar.html', url: 'heavyvoices.se/medlem/<b>repertoar.html</b>',
+   d: 'I spelaren finns två textknappar. Dokumentikonen visar hela sångtexten. Mikrofonen visar karaoke: raden som sjungs just nu lyser upp i takt med musiken.',
+   tips: ['Karaoke finns på låtar där en admin har synkat texten.', 'Knappen uppe till höger förstorar texten och fäller ut spelaren till helskärm.'],
+   html: `${bar('Anna · Alt')}<h3 class="s-h">Stormens öga</h3>
+     <div class="lyr plain off" id="lp">${lyrics.map(l=>`<p>${l}</p>`).join('')}</div>
+     <div class="lyr off" id="lk">${lyrics.map((l,i)=>`<p id="k${i}">${l}</p>`).join('')}</div>
+     <div class="player" id="pl"><div class="pt"><b>Stormens öga</b><span>1:05</span></div><div class="bar"><i id="pb" style="width:25%"></i></div>
+       <div class="ctrls"><span>⏮</span><span class="pp">❚❚</span><span>⏭</span><span class="ico" id="mic">🎤</span><span class="ico" id="doc">📄</span></div></div>`,
+   act: [['tap','#doc'],['add','#doc','on'],['show','#lp'],['wait',1500],['tap','#mic'],['rm','#doc','on'],['hide','#lp'],['add','#mic','on'],['show','#lk'],['style','#pb',{width:'70%'}],
+         ['add','#k0','on'],['wait',1100],['swap','#k0','#k1'],['wait',1100],['swap','#k1','#k2'],['wait',1100],['swap','#k2','#k3'],['wait',1200]] },
+
+ { t: 'Egna spellistor', path: '/medlem/skapa-spellista.html', url: 'heavyvoices.se/medlem/<b>skapa-spellista.html</b>',
+   d: 'Samla de låtar du vill öva på inför en viss konsert i en egen spellista. Listan sparar även din stämmix per låt, och spelas i ordning med ett tryck.',
+   tips: ['Spellistorna är personliga. Ingen annan i kören ser dem.'],
+   html: `${bar('Anna · Alt')}<h3 class="s-h">Skapa spellista</h3>
+     <div class="field"><label>Namn</label><div class="in ph" id="f1">T.ex. Inför vårkonserten</div></div>
+     <div class="row"><span class="chk" id="c1"></span><div class="t"><b>Stormens öga</b></div></div>
+     <div class="row"><span class="chk" id="c2"></span><div class="t"><b>Nattens eko</b></div></div>
+     <div class="row"><span class="chk" id="c3"></span><div class="t"><b>Järn och sammet</b></div></div>
+     <div class="btn" id="b1">Skapa</div>
+     <div class="card off" id="done"><div class="top"><b>Inför vårkonserten</b><em>2 låtar</em></div><div class="btn sm" style="margin-top:6px">▶ Spela listan</div></div>`,
+   act: [['type','#f1','Inför vårkonserten'],['tap','#c1'],['add','#c1','on'],['tap','#c3'],['add','#c3','on'],['tap','#b1'],['show','#done'],['wait',1500]] },
+
+ { t: 'Kalendern', path: '/medlem/kalender.html', url: 'heavyvoices.se/medlem/<b>kalender.html</b>',
+   d: 'Allt som händer i kören, uppdelat på tre flikar: reptider, konserter och övrigt. Tryck på en händelse för att se detaljerna.',
+   tips: ['Händelser som redan har passerat visas gråtonade, så du ser direkt vad som är nästa.'],
+   html: `${bar('Anna · Alt')}<h3 class="s-h">Kalender</h3>
+     <div class="tabs"><span class="on" id="t1">Reptider</span><span id="t2">Konserter</span><span id="t3">Övrigt</span></div>
+     <div id="g1" style="display:flex;flex-direction:column;gap:7px">
+       <div class="card past"><div class="top"><b>Rep</b><em>tis 22 sep</em></div></div>
+       <div class="card"><div class="top"><b>Rep</b><em>tis 29 sep</em></div></div>
+       <div class="card"><div class="top"><b>Stämrep alt + sopran</b><em>tor 1 okt</em></div></div></div>
+     <div id="g2" class="off" style="flex-direction:column;gap:7px">
+       <div class="card" id="c1"><div class="top"><b>Vårkonsert</b><em>lör 14 nov</em></div><div class="more">Samling 17:00 · Konsert 19:00<br>Klädsel: svart med guld-detalj</div></div>
+       <div class="card"><div class="top"><b>Julgig</b><em>fre 11 dec</em></div></div></div>`,
+   act: [['wait',700],['tap','#t2'],['rm','#t1','on'],['add','#t2','on'],['hide','#g1'],['show','#g2','flex'],['wait',500],['tap','#c1'],['add','#c1','open'],['hot','#c1'],['wait',1800]] },
+
+ { t: 'Information och filer', path: '/medlem/info.html', url: 'heavyvoices.se/medlem/<b>info.html</b>',
+   d: 'Här lägger styrelsen ut nyheter och praktisk information. Under Filer finns dokument sorterade i mappar, till exempel noter och scheman.',
+   tips: ['Du kan öppna och ladda ner filerna. Bara admin kan lägga till nya.'],
+   html: `${bar('Anna · Alt')}<h3 class="s-h">Information</h3>
+     <div class="card"><div class="top"><b>Ny rep-lokal från oktober</b><em>24 sep</em></div><div class="more" style="max-height:80px;margin-top:5px">Vi flyttar till stora salen på plan 2. Samma tid som vanligt.</div></div>
+     <h3 class="s-h" style="font-size:16px;margin-top:4px">Filer</h3>
+     <div class="row" id="d1"><span class="play" style="border-radius:7px">${IC.folder.replace('<svg','<svg style="width:13px;height:13px;stroke:var(--accent);fill:none;stroke-width:2"')}</span><div class="t"><b>Noter</b><small>6 filer</small></div></div>
+     <div class="row off" id="d2"><span class="pill">PDF</span><div class="t"><b>Stormens öga – alt.pdf</b></div></div>
+     <div class="row off" id="d3"><span class="pill">PDF</span><div class="t"><b>Nattens eko – alt.pdf</b></div></div>
+     <div class="row" id="d4"><span class="play" style="border-radius:7px">${IC.folder.replace('<svg','<svg style="width:13px;height:13px;stroke:var(--accent);fill:none;stroke-width:2"')}</span><div class="t"><b>Konsertinfo</b><small>2 filer</small></div></div>`,
+   act: [['wait',700],['tap','#d1'],['hot','#d1'],['show','#d2','flex'],['show','#d3','flex'],['wait',400],['tap','#d2'],['hot','#d2'],['wait',1500]] },
+
+ { t: 'Mitt konto', path: '/konto.html', url: 'heavyvoices.se/<b>konto.html</b>',
+   d: 'Byt lösenord när du vill. Skriv det nya två gånger och spara.',
+   tips: ['Fick du en inbjudan via mejl sätter du ditt första lösenord på en egen sida via länken i mejlet.'],
+   html: `${bar('Anna · Alt')}<h3 class="s-h">Mitt konto</h3><p class="s-p">anna.berg@exempel.se · Alt</p>
+     <div class="field"><label>Nytt lösenord</label><div class="in ph" id="f1">Minst 8 tecken</div></div>
+     <div class="field"><label>Upprepa lösenord</label><div class="in ph" id="f2">Samma igen</div></div>
+     <div class="btn" id="b1">Spara nytt lösenord</div>${toast('Lösenordet är uppdaterat.')}`,
+   act: [['type','#f1','••••••••••••'],['type','#f2','••••••••••••'],['tap','#b1'],['add','#toast','in'],['wait',1600]] },
+];
+
+const ADMIN = [
+ { t: 'Adminsidan', path: '/admin/', url: 'heavyvoices.se/<b>admin/</b>',
+   d: 'Admin har en egen startsida med verktyg för att sköta kören. Som admin kommer du också åt allt i medlemsvyn.',
+   tips: ['Bara konton med rollen admin kommer in hit. Andra skickas vidare till medlemssidan.'],
+   html: `${bar('Niklas · Admin')}<h3 class="s-h">Admin</h3>
+     <div class="tiles">${tile('k1','users','Medlemmar','Godkänn, bjud in, roller')}${tile('k2','music','Låtar','Stämfiler och text')}${tile('k3','cal','Kalender','Rep och konserter')}${tile('k4','info','Information','Nyheter till kören')}</div>
+     ${tile('k5','folder','Filer','Dela och organisera dokument i mappar')}`,
+   act: [['wait',500],['hot','#k2'],['wait',400],['hot','#k3'],['wait',400],['hot','#k4'],['wait',400],['hot','#k5'],['wait',400],['tap','#k1'],['hot','#k1'],['wait',900]] },
+
+ { t: 'Godkänn och bjud in', path: '/admin/medlemmar.html', url: 'heavyvoices.se/admin/<b>medlemmar.html</b>',
+   d: 'Nya registreringar dyker upp som väntande. Godkänn dem med ett tryck. Du kan också bjuda in någon direkt via mejl, ändra roll eller ta bort ett konto.',
+   tips: ['Den som godkänns får ett mejl från no-reply@heavyvoices.se.', 'Att ta bort en medlem raderar även inloggningen helt.'],
+   html: `${bar('Niklas · Admin')}<h3 class="s-h">Medlemmar</h3>
+     <div class="row" id="r1"><div class="t"><b>Anna Berg</b><small>Alt · anna.berg@exempel.se</small></div><span class="pill wait" id="p1">Väntar</span></div>
+     <div class="btn sm" id="ok1" style="align-self:flex-end;margin-top:-4px">Godkänn</div>
+     <div class="row"><div class="t"><b>Johan Ek</b><small>Bas</small></div><span class="pill ok">Medlem</span></div>
+     <div class="row"><div class="t"><b>Sara Lind</b><small>Sopran</small></div><span class="pill ok">Admin</span></div>
+     <div class="field" style="margin-top:4px"><label>Bjud in via e-post</label><div class="in ph" id="f1">namn@exempel.se</div></div>
+     <div class="btn" id="b1">Skicka inbjudan</div>${toast('Inbjudan skickad till erik.sund@exempel.se')}`,
+   act: [['hot','#r1'],['wait',500],['tap','#ok1'],['text','#p1','Medlem'],['swapcls','#p1','wait','ok'],['hide','#ok1'],['wait',600],['type','#f1','erik.sund@exempel.se'],['tap','#b1'],['add','#toast','in'],['wait',1600]] },
+
+ { t: 'Lägg till låtar', path: '/admin/latar.html', url: 'heavyvoices.se/admin/<b>latar.html</b>',
+   d: 'Skapa en låt och ladda upp ett ljudspår per stämma plus komp. Lägg till sångtexten genom att klistra in den eller läsa in en fil, och bifoga noter som PDF.',
+   tips: ['Text från Word (.docx) och .txt behåller radbrytningarna. Från PDF hamnar varje sida på en rad, så kontrollera texten efteråt.'],
+   html: `${bar('Niklas · Admin')}<h3 class="s-h">Låtar</h3>
+     <div class="field"><label>Lägg till ny låt</label><div class="in ph" id="f1">Titel</div></div>
+     <div class="btn" id="b1">Lägg till</div>
+     <p class="s-p" style="margin-top:4px">Stämfiler (ljud)</p>
+     ${['Sopran','Alt','Tenor','Bas','Komp'].map((s,i)=>`<div class="up" id="u${i}"><span>${s}</span><div class="bar"><i></i></div><span class="okm">✓</span></div>`).join('')}
+     <div class="row off" id="tx"><span class="pill">DOCX</span><div class="t"><b>Sångtext inläst</b><small>32 rader</small></div></div>
+     <div class="row off" id="nt"><span class="pill">PDF</span><div class="t"><b>Noter bifogade</b></div></div>`,
+   act: [['type','#f1','Järn och sammet'],['tap','#b1'],['wait',300],
+         ['up','#u0'],['up','#u1'],['up','#u2'],['up','#u3'],['up','#u4'],['wait',500],['show','#tx','flex'],['wait',400],['show','#nt','flex'],['wait',1400]] },
+
+ { t: 'Synka texten', path: '/admin/text-synk.html', url: 'heavyvoices.se/admin/<b>text-synk.html</b>',
+   d: 'Så skapas karaoke-texten. Spela låten och tryck TAP (eller mellanslag) i samma ögonblick som den markerade raden börjar sjungas. Spara, så syns texten rullande i medlemmarnas spelare.',
+   tips: ['Sänk tempot till 75 % om det går fort. Tiderna blir ändå rätt.', 'Tryck på en tid för att justera den för hand, t.ex. 1:23.45.', 'Synken kan exporteras och importeras som .lrc-fil.'],
+   html: `${bar('Niklas · Admin')}<h3 class="s-h">Textsynk</h3>
+     <div class="tabs"><span>50 %</span><span class="on" id="tp">75 %</span><span>100 %</span></div>
+     <div class="clock" id="clk">0:00.00</div>
+     <div class="sync">${lyrics.map((l,i)=>`<div class="sline${i===0?' cur':''}" id="s${i}"><code id="c${i}">–:–</code><span>${l}</span></div>`).join('')}</div>
+     <div class="tapbtn" id="tap">TAP</div>
+     <div class="btn ghost" id="sv" style="margin-top:auto">Spara synk</div>${toast('Synken är sparad. Karaoke är på.')}`,
+   act: [['clock','#clk'],['wait',700],
+         ['tap','#tap'],['text','#c0','0:12.40'],['synk',0],['wait',500],
+         ['tap','#tap'],['text','#c1','0:16.85'],['synk',1],['wait',500],
+         ['tap','#tap'],['text','#c2','0:21.10'],['synk',2],['wait',500],
+         ['tap','#tap'],['text','#c3','0:25.62'],['synk',3],['wait',400],
+         ['tap','#sv'],['add','#toast','in'],['wait',1600]] },
+
+ { t: 'Kalender', path: '/admin/kalender.html', url: 'heavyvoices.se/admin/<b>kalender.html</b>',
+   d: 'Lägg in rep, konserter och annat. Välj typ så hamnar händelsen under rätt flik för medlemmarna.',
+   tips: ['Skriv samlingstid, plats och klädsel i beskrivningen. Det är det medlemmarna ser när de fäller ut kortet.'],
+   html: `${bar('Niklas · Admin')}<h3 class="s-h">Kalender</h3>
+     <div class="tabs"><span id="y1">Reptid</span><span id="y2">Konsert</span><span id="y3">Övrigt</span></div>
+     <div class="field"><label>Titel</label><div class="in ph" id="f1">Titel</div></div>
+     <div class="field"><label>Datum och tid</label><div class="in ph" id="f2">ÅÅÅÅ-MM-DD 00:00</div></div>
+     <div class="field"><label>Beskrivning</label><div class="in ph" id="f3">Plats, samling, klädsel</div></div>
+     <div class="btn" id="b1">Spara händelse</div>
+     <div class="card off" id="done"><div class="top"><b>Julgig</b><em>fre 11 dec</em></div></div>`,
+   act: [['tap','#y2'],['add','#y2','on'],['type','#f1','Julgig'],['type','#f2','2026-12-11 19:00'],['type','#f3','Samling 17:30'],['tap','#b1'],['show','#done'],['hot','#done'],['wait',1500]] },
+
+ { t: 'Information och filer', path: '/admin/info.html · /admin/filer.html', url: 'heavyvoices.se/admin/<b>filer.html</b>',
+   d: 'Skriv nyheter som visas på medlemmarnas informationssida. I filutforskaren skapar du mappar och laddar upp dokument som alla medlemmar kan öppna.',
+   tips: ['Bara admin kan skapa mappar och ladda upp. Medlemmar kan läsa och ladda ner.'],
+   html: `${bar('Niklas · Admin')}<h3 class="s-h">Filer</h3>
+     <div style="display:flex;gap:6px"><div class="btn sm" id="nf">+ Ny mapp</div><div class="btn sm ghost" id="ul">Ladda upp</div></div>
+     <div class="row"><span class="pill">Mapp</span><div class="t"><b>Konsertinfo</b></div></div>
+     <div class="row off" id="n1"><span class="pill">Mapp</span><div class="t"><b id="nn">Ny mapp</b></div></div>
+     <div class="row off" id="n2"><span class="pill">PDF</span><div class="t"><b>Stormens öga – alt.pdf</b><small>Noter</small></div></div>
+     <div class="up" id="u0" style="grid-template-columns:1fr 16px"><div class="bar"><i></i></div><span class="okm">✓</span></div>
+     ${toast('1 fil uppladdad till Noter')}`,
+   act: [['tap','#nf'],['show','#n1','flex'],['wait',300],['text','#nn','Noter'],['hot','#n1'],['wait',500],['tap','#ul'],['up','#u0'],['show','#n2','flex'],['add','#toast','in'],['wait',1600]] },
+];
+
+const $ = (s, r=document) => r.querySelector(s);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let track = MEMBER, idx = 0, playing = !reduce, run = 0, seen = new Set();
+const host = $('#viewHost'), finger = $('#finger'), screen = $('#screen');
+
+const sleep = (ms) => new Promise(r => setTimeout(r, reduce ? Math.min(ms, 60) : ms));
+
+function moveFinger(el) {
+  const s = screen.getBoundingClientRect(), r = el.getBoundingClientRect();
+  finger.style.left = (r.left - s.left + r.width/2) + 'px';
+  finger.style.top = (r.top - s.top + r.height/2) + 'px';
+  return { x: r.left - s.left + r.width/2, y: r.top - s.top + r.height/2 };
+}
+
+async function doAct(a, id) {
+  const q = (s) => host.querySelector(s);
+  const [k, s, v, w] = a;
+  if (id !== run) throw 0;
+  switch (k) {
+    case 'wait': await sleep(s); break;
+    case 'tap': {
+      const el = q(s); if (!el) break;
+      const p = moveFinger(el); await sleep(750);
+      finger.classList.add('down'); el.classList.add('pressed');
+      const rp = document.createElement('div'); rp.className = 'ripple'; rp.style.left = p.x+'px'; rp.style.top = p.y+'px'; screen.appendChild(rp);
+      setTimeout(() => rp.remove(), 700);
+      await sleep(180); finger.classList.remove('down'); el.classList.remove('pressed'); await sleep(200); break;
+    }
+    case 'type': {
+      const el = q(s); moveFinger(el); await sleep(650);
+      el.classList.add('focus'); el.classList.remove('ph'); el.textContent = '';
+      for (const ch of v) { if (id !== run) throw 0; el.textContent += ch; await sleep(38); }
+      await sleep(250); el.classList.remove('focus'); break;
+    }
+    case 'text': { const el = q(s); el.textContent = v; el.classList.remove('ph'); await sleep(250); break; }
+    case 'add': q(s).classList.add(v); await sleep(350); break;
+    case 'rm': q(s).classList.remove(v); break;
+    case 'swapcls': q(s).classList.replace(v, w); await sleep(300); break;
+    case 'hot': host.querySelectorAll('.hot').forEach(e => e.classList.remove('hot')); q(s).classList.add('hot'); await sleep(200); break;
+    case 'show': { const el = q(s); el.classList.remove('off'); el.classList.add('shown'); if (v) el.style.display = v; await sleep(350); break; }
+    case 'hide': { const el = q(s); el.classList.add('off'); el.style.display = ''; break; }
+    case 'style': Object.assign(q(s).style, v); await sleep(200); break;
+    case 'swap': q(s).classList.remove('on'); q(s).classList.add('done'); q(v).classList.add('on'); break;
+    case 'up': { const el = q(s); el.querySelector('i').style.width = '100%'; await sleep(650); el.classList.add('done'); break; }
+    case 'synk': {
+      const i = s; q('#s'+i).classList.remove('cur'); q('#s'+i).classList.add('set');
+      const nx = q('#s'+(i+1)); if (nx) nx.classList.add('cur'); break;
+    }
+    case 'clock': {
+      const el = q(s); const t0 = performance.now(), my = id;
+      (function tick() { if (my !== run || !el.isConnected) return;
+        const t = (performance.now()-t0)/1000*0.75 + 10.2; const m = Math.floor(t/60), sec = (t%60).toFixed(2).padStart(5,'0');
+        el.textContent = `${m}:${sec}`; requestAnimationFrame(tick); })();
+      break;
+    }
+  }
+}
+
+function render() {
+  const step = track[idx]; const id = ++run;
+  $('#count').textContent = `Steg ${idx+1} av ${track.length}`;
+  $('#title').textContent = step.t;
+  $('#path').textContent = step.path;
+  $('#desc').textContent = step.d;
+  $('#tips').innerHTML = step.tips.map(t => `<li>${t}</li>`).join('');
+  $('#url').innerHTML = step.url;
+  host.innerHTML = `<div class="view">${step.html}</div>`;
+  finger.style.opacity = reduce ? '0' : '1';
+  finger.style.left = '50%'; finger.style.top = '110%';
+  $('#prev').disabled = idx === 0;
+  $('#next').disabled = idx === track.length-1 && !playing;
+  seen.add(idx);
+  document.querySelectorAll('.step').forEach((li, i) => { li.setAttribute('aria-current', i===idx); li.classList.toggle('seen', seen.has(i)); });
+  const fill = $('#progFill'); fill.style.transition = 'none'; fill.style.width = (idx/track.length*100)+'%';
+  requestAnimationFrame(() => { fill.style.transition = 'width .4s'; fill.style.width = ((idx+1)/track.length*100)+'%'; });
+  animate(step, id);
+}
+
+async function animate(step, id) {
+  try {
+    await sleep(500);
+    for (const a of step.act) await doAct(a, id);
+    finger.style.top = '110%';
+    await sleep(900);
+    if (id === run && playing) {
+      if (idx < track.length-1) { idx++; render(); }
+      else { playing = false; updatePlay(); }
+    }
+  } catch (e) { /* avbruten */ }
+}
+
+function buildList() {
+  $('#steps').innerHTML = track.map((s, i) => `<li class="step" tabindex="0" data-i="${i}"><span class="n">${String(i+1).padStart(2,'0')}</span><span><b>${s.t}</b><small>${s.path}</small></span></li>`).join('');
+  document.querySelectorAll('.step').forEach(li => {
+    const go = () => { idx = +li.dataset.i; render(); };
+    li.onclick = go; li.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+  });
+}
+function updatePlay() { $('#playBtn').textContent = playing ? 'Pausa' : (idx === track.length-1 ? 'Spela igen' : 'Spela'); }
+function setTrack(t) {
+  track = t; idx = 0; seen = new Set();
+  $('#tMember').setAttribute('aria-pressed', t === MEMBER); $('#tAdmin').setAttribute('aria-pressed', t === ADMIN);
+  try { localStorage.setItem('hv-guide-track', t === ADMIN ? 'admin' : 'member'); } catch (e) {}
+  buildList(); render(); updatePlay();
+}
+
+$('#tMember').onclick = () => setTrack(MEMBER);
+$('#tAdmin').onclick = () => setTrack(ADMIN);
+$('#prev').onclick = () => { if (idx > 0) { idx--; render(); } };
+$('#next').onclick = () => { if (idx < track.length-1) { idx++; render(); } };
+$('#playBtn').onclick = () => {
+  if (!playing && idx === track.length-1) idx = 0;
+  playing = !playing; updatePlay(); if (playing) render();
+};
+
+
+/* ---------- Bakgrundsmusik: egenkomponerad rockloop, syntad med Web Audio ---------- */
+const Music = (() => {
+  let ctx, master, dist, timer, on = false, next = 0, step = 0;
+  const BPM = 138, S16 = 60 / BPM / 4;
+  // 4 takter, åttondelar: grundton (MIDI) per åttondel, null = paus
+  const E=40, G=43, A=45, C=36+12, D=38+12, B=47;
+  const riff = [
+    E,E,null,E, E,E,G,A,   E,E,null,E, E,E,A,G,
+    C,C,null,C, C,C,D,C,   D,D,null,D, B,B,A,G
+  ];
+  const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+  function curve(k) { const n = 2048, c = new Float32Array(n); for (let i = 0; i < n; i++) { const x = i*2/n - 1; c[i] = (1+k)*x/(1+k*Math.abs(x)); } return c; }
+  let noiseBuf;
+  function init() {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain(); master.gain.value = 0;
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4;
+    master.connect(comp).connect(ctx.destination);
+    // Gitarrkedja: distorsion -> "kabinett"-filter
+    dist = ctx.createWaveShaper(); dist.curve = curve(60); dist.oversample = '4x';
+    const cab = ctx.createBiquadFilter(); cab.type = 'lowpass'; cab.frequency.value = 3200; cab.Q.value = .8;
+    const mid = ctx.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 900; mid.gain.value = -5;
+    const g = ctx.createGain(); g.gain.value = .23;
+    dist.connect(mid).connect(cab).connect(g).connect(master);
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
+  }
+  function env(g, t, a, peak, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + dec); }
+  function chord(root, t, len, mute) {
+    const g = ctx.createGain(); env(g, t, .004, mute ? .5 : .8, len);
+    g.connect(dist);
+    [0, 7, 12].forEach((iv, i) => { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz(root + 12 + iv); o.detune.value = i ? 4 : -4; o.connect(g); o.start(t); o.stop(t + len + .02); });
+  }
+  function bass(root, t, len) {
+    const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = 'square'; o.frequency.value = hz(root); f.type = 'lowpass'; f.frequency.value = 520;
+    env(g, t, .005, .32, len); o.connect(f).connect(g).connect(master); o.start(t); o.stop(t + len + .02);
+  }
+  function kick(t) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(42, t + .12);
+    env(g, t, .002, 1, .28); o.connect(g).connect(master); o.start(t); o.stop(t + .3);
+  }
+  function noise(t, type, freq, vol, dec) {
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = noiseBuf; f.type = type; f.frequency.value = freq; env(g, t, .001, vol, dec);
+    s.connect(f).connect(g).connect(master); s.start(t, Math.random()*.5); s.stop(t + dec + .02);
+  }
+  function snare(t) {
+    noise(t, 'bandpass', 1800, .55, .18);
+    const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 190; env(g, t, .002, .3, .09);
+    o.connect(g).connect(master); o.start(t); o.stop(t + .1);
+  }
+  function schedule() {
+    while (next < ctx.currentTime + .15) {
+      const s16 = step % 64, bar16 = s16 % 16, loop = Math.floor(step / 64);
+      if (s16 % 2 === 0) {
+        const r = riff[s16 / 2];
+        const accent = bar16 === 0 || bar16 === 6 || bar16 === 12;
+        if (r !== null) { chord(r, next, accent ? S16*1.9 : S16*1.2, !accent); bass(r - 12, next, S16*1.7); }
+        noise(next, 'highpass', 7500, bar16 % 4 === 0 ? .16 : .09, .05);
+      }
+      if (bar16 === 0 || bar16 === 10 || (bar16 === 7 && s16 >= 48)) kick(next);
+      if (bar16 === 4 || bar16 === 12) snare(next);
+      if (s16 >= 60 && loop % 2 === 1) snare(next); // trumvirvel var annan varv
+      if (s16 === 0 && loop % 2 === 0) noise(next, 'highpass', 5000, .22, .9); // cymbal
+      next += S16; step++;
+    }
+  }
+  function start() {
+    if (!ctx) init();
+    ctx.resume();
+    on = true; next = ctx.currentTime + .08; step = 0;
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
+    master.gain.linearRampToValueAtTime(.42, ctx.currentTime + 1.2);
+    clearInterval(timer); timer = setInterval(schedule, 25); schedule();
+  }
+  function stop() {
+    if (!ctx) return; on = false;
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
+    master.gain.linearRampToValueAtTime(0, ctx.currentTime + .5);
+    setTimeout(() => { if (!on) { clearInterval(timer); ctx.suspend(); } }, 600);
+  }
+  return { toggle() { on ? stop() : start(); return on; }, pause() { if (on) { stop(); return true; } return false; }, start, get on() { return on; } };
+})();
+let resumeMusic = false;
+function setMusicUI() { $('#musicBtn').setAttribute('aria-pressed', Music.on); $('#musicLbl').textContent = Music.on ? 'Musik på' : 'Musik av'; }
+$('#musicBtn').onclick = () => { try { Music.toggle(); } catch (e) {} setMusicUI(); try { localStorage.setItem('hv-guide-music', Music.on ? '1' : '0'); } catch (e) {} };
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { resumeMusic = Music.pause(); setMusicUI(); }
+  else if (resumeMusic) { resumeMusic = false; Music.start(); setMusicUI(); }
+});
+
+let start = MEMBER;
+try { if (localStorage.getItem('hv-guide-track') === 'admin') start = ADMIN; } catch (e) {}
+setTrack(start);
+</script>
+
+</body>
+</html>

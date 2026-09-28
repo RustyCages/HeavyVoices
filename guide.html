@@ -276,7 +276,7 @@ footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--lin
 
   <footer>
     <div class="cta"><a class="cbtn main" href="/logga-in.html">Logga in</a><a class="cbtn" href="/registrera.html">Registrera dig</a><a class="cbtn" href="/">Till startsidan</a></div>
-    <p>Låtar, namn och datum i demon är exempel. Sökvägarna under varje rubrik är de riktiga sidorna på heavyvoices.se. Musiken är genererad direkt i webbläsaren.</p>
+    <p>Låtar, namn och datum i demon är exempel. Sökvägarna under varje rubrik är de riktiga sidorna på heavyvoices.se. Musiken är skriven för guiden och spelad med samplade instrument ur ljudbanken FluidR3 GM (MIT-licens).</p>
   </footer>
 </div>
 
@@ -599,99 +599,50 @@ $('#playBtn').onclick = () => {
 };
 
 
-/* ---------- Bakgrundsmusik: egenkomponerad rockloop, syntad med Web Audio ---------- */
+/* ---------- Bakgrundsmusik: egenkomponerad rockloop, inspelad med samplade riktiga instrument ---------- */
 const Music = (() => {
-  let ctx, master, dist, timer, on = false, next = 0, step = 0;
-  const BPM = 138, S16 = 60 / BPM / 4;
-  // 4 takter, åttondelar: grundton (MIDI) per åttondel, null = paus
-  const E=40, G=43, A=45, C=36+12, D=38+12, B=47;
-  const riff = [
-    E,E,null,E, E,E,G,A,   E,E,null,E, E,E,A,G,
-    C,C,null,C, C,C,D,C,   D,D,null,D, B,B,A,G
-  ];
-  const hz = m => 440 * Math.pow(2, (m - 69) / 12);
-  function curve(k) { const n = 2048, c = new Float32Array(n); for (let i = 0; i < n; i++) { const x = i*2/n - 1; c[i] = (1+k)*x/(1+k*Math.abs(x)); } return c; }
-  let noiseBuf;
-  function init() {
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
-    master = ctx.createGain(); master.gain.value = 0;
-    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4;
-    master.connect(comp).connect(ctx.destination);
-    // Gitarrkedja: distorsion -> "kabinett"-filter
-    dist = ctx.createWaveShaper(); dist.curve = curve(60); dist.oversample = '4x';
-    const cab = ctx.createBiquadFilter(); cab.type = 'lowpass'; cab.frequency.value = 3200; cab.Q.value = .8;
-    const mid = ctx.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 900; mid.gain.value = -5;
-    const g = ctx.createGain(); g.gain.value = .23;
-    dist.connect(mid).connect(cab).connect(g).connect(master);
-    noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
-  }
-  function env(g, t, a, peak, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + dec); }
-  function chord(root, t, len, mute) {
-    const g = ctx.createGain(); env(g, t, .004, mute ? .5 : .8, len);
-    g.connect(dist);
-    [0, 7, 12].forEach((iv, i) => { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz(root + 12 + iv); o.detune.value = i ? 4 : -4; o.connect(g); o.start(t); o.stop(t + len + .02); });
-  }
-  function bass(root, t, len) {
-    const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-    o.type = 'square'; o.frequency.value = hz(root); f.type = 'lowpass'; f.frequency.value = 520;
-    env(g, t, .005, .32, len); o.connect(f).connect(g).connect(master); o.start(t); o.stop(t + len + .02);
-  }
-  function kick(t) {
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(42, t + .12);
-    env(g, t, .002, 1, .28); o.connect(g).connect(master); o.start(t); o.stop(t + .3);
-  }
-  function noise(t, type, freq, vol, dec) {
-    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-    s.buffer = noiseBuf; f.type = type; f.frequency.value = freq; env(g, t, .001, vol, dec);
-    s.connect(f).connect(g).connect(master); s.start(t, Math.random()*.5); s.stop(t + dec + .02);
-  }
-  function snare(t) {
-    noise(t, 'bandpass', 1800, .55, .18);
-    const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 190; env(g, t, .002, .3, .09);
-    o.connect(g).connect(master); o.start(t); o.stop(t + .1);
-  }
-  function schedule() {
-    while (next < ctx.currentTime + .15) {
-      const s16 = step % 64, bar16 = s16 % 16, loop = Math.floor(step / 64);
-      if (s16 % 2 === 0) {
-        const r = riff[s16 / 2];
-        const accent = bar16 === 0 || bar16 === 6 || bar16 === 12;
-        if (r !== null) { chord(r, next, accent ? S16*1.9 : S16*1.2, !accent); bass(r - 12, next, S16*1.7); }
-        noise(next, 'highpass', 7500, bar16 % 4 === 0 ? .16 : .09, .05);
-      }
-      if (bar16 === 0 || bar16 === 10 || (bar16 === 7 && s16 >= 48)) kick(next);
-      if (bar16 === 4 || bar16 === 12) snare(next);
-      if (s16 >= 60 && loop % 2 === 1) snare(next); // trumvirvel var annan varv
-      if (s16 === 0 && loop % 2 === 0) noise(next, 'highpass', 5000, .22, .9); // cymbal
-      next += S16; step++;
+  const SRC = 'guide-rock.mp3', LOOP_END = 96 * 60 / 138; // 24 takter i 138 BPM
+  let ctx, gain, buf, src, on = false, loading = null;
+  async function load() {
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    if (!gain) { gain = ctx.createGain(); gain.gain.value = 0; gain.connect(ctx.destination); }
+    if (!buf) {
+      loading = loading || fetch(SRC).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+        .then(ab => new Promise((ok, bad) => ctx.decodeAudioData(ab, ok, bad)));
+      buf = await loading;
     }
   }
-  function start() {
-    if (!ctx) init();
-    ctx.resume();
-    on = true; next = ctx.currentTime + .08; step = 0;
-    master.gain.cancelScheduledValues(ctx.currentTime);
-    master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
-    master.gain.linearRampToValueAtTime(.42, ctx.currentTime + 1.2);
-    clearInterval(timer); timer = setInterval(schedule, 25); schedule();
+  async function start() {
+    on = true; setMusicUI('Laddar…');
+    try { await load(); } catch (e) { on = false; setMusicUI('Musik saknas'); return; }
+    if (!on) return;
+    await ctx.resume();
+    if (!src) {
+      src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+      src.loopStart = 0; src.loopEnd = Math.min(LOOP_END, buf.duration);
+      src.connect(gain); src.start();
+    }
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(.8, ctx.currentTime + 1.2);
+    setMusicUI();
   }
   function stop() {
-    if (!ctx) return; on = false;
-    master.gain.cancelScheduledValues(ctx.currentTime);
-    master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
-    master.gain.linearRampToValueAtTime(0, ctx.currentTime + .5);
-    setTimeout(() => { if (!on) { clearInterval(timer); ctx.suspend(); } }, 600);
+    on = false; setMusicUI();
+    if (!ctx || !gain) return;
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + .6);
+    setTimeout(() => { if (!on) ctx.suspend(); }, 700);
   }
-  return { toggle() { on ? stop() : start(); return on; }, pause() { if (on) { stop(); return true; } return false; }, start, get on() { return on; } };
+  return { toggle() { on ? stop() : start(); }, pause() { if (on) { stop(); return true; } return false; }, start, get on() { return on; } };
 })();
 let resumeMusic = false;
-function setMusicUI() { $('#musicBtn').setAttribute('aria-pressed', Music.on); $('#musicLbl').textContent = Music.on ? 'Musik på' : 'Musik av'; }
-$('#musicBtn').onclick = () => { try { Music.toggle(); } catch (e) {} setMusicUI(); try { localStorage.setItem('hv-guide-music', Music.on ? '1' : '0'); } catch (e) {} };
+function setMusicUI(msg) { $('#musicBtn').setAttribute('aria-pressed', Music.on); $('#musicLbl').textContent = msg || (Music.on ? 'Musik på' : 'Musik av'); }
+$('#musicBtn').onclick = () => { Music.toggle(); };
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { resumeMusic = Music.pause(); setMusicUI(); }
-  else if (resumeMusic) { resumeMusic = false; Music.start(); setMusicUI(); }
+  if (document.hidden) { resumeMusic = Music.pause(); }
+  else if (resumeMusic) { resumeMusic = false; Music.start(); }
 });
 
 let start = MEMBER;

@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Textsynk — Heavy Voices Admin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .card.static:hover { transform: none; border-color: var(--border); box-shadow: var(--card-shadow); }
+  .card.static:active { transform: none; }
+  .row-flex { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  .row-flex > * { margin-bottom: 0; }
+  .row-flex select, .row-flex input { width: auto; }
+  .muted { color: var(--text-muted); font-size: 0.85rem; }
+  .btn-small { padding: 0.35rem 0.8rem; font-size: 0.85rem; }
+  .btn-danger { background: transparent; color: #ef4444; border: 1px solid rgba(239,68,68,0.5); }
+  .btn-danger:hover { background: rgba(239,68,68,0.1); box-shadow: none; }
+  kbd { background: rgba(255,255,255,0.08); border: 1px solid var(--border); border-radius: 4px; padding: 0 0.35rem; font-size: 0.8rem; font-family: inherit; }
+
+  /* Transport */
+  .transport { position: sticky; top: 0; z-index: 20; margin-bottom: 1rem; }
+  .transport .card { background: #171a21; }
+  #scrubber { width: 100%; margin: 0.6rem 0; padding: 0; accent-color: var(--accent); }
+  .time-readout { font-variant-numeric: tabular-nums; font-family: 'Roboto Condensed', sans-serif; font-size: 1.1rem; min-width: 9.5rem; }
+  #tapBtn { font-size: 1.1rem; padding: 0.8rem 1.6rem; min-width: 9rem; }
+  #tapBtn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* Karaoke-förhandsvisning */
+  .preview { text-align: center; padding: 0.8rem 0.5rem 0.2rem; min-height: 5.8rem; }
+  .preview div { transition: all 0.2s ease; line-height: 1.35; min-height: 1.35em; }
+  .preview .p-prev, .preview .p-next { color: var(--text-muted); font-size: 0.95rem; opacity: 0.6; }
+  .preview .p-cur { color: var(--accent); font-size: 1.35rem; font-weight: 700; font-family: 'Roboto Condensed', sans-serif; }
+
+  /* Radlista */
+  .lines { list-style: none; padding: 0; margin: 0; }
+  .line {
+    display: grid; grid-template-columns: 6.2rem 1fr auto; gap: 0.6rem; align-items: center;
+    padding: 0.45rem 0.6rem; border-radius: 0.5rem; border: 1px solid transparent; cursor: pointer;
+  }
+  .line + .line { margin-top: 2px; }
+  .line:hover { background: rgba(255,255,255,0.03); }
+  .line .t {
+    width: 100%; margin: 0; padding: 0.25rem 0.4rem; font-size: 0.85rem;
+    font-variant-numeric: tabular-nums; text-align: center;
+  }
+  .line .t.empty { color: var(--text-muted); }
+  .line .txt { word-break: break-word; }
+  .line .acts { display: flex; gap: 0.25rem; opacity: 0.55; }
+  .line:hover .acts, .line.cursor .acts { opacity: 1; }
+  .line .acts button { padding: 0.2rem 0.45rem; font-size: 0.75rem; background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); }
+  .line .acts button:hover { border-color: var(--accent); box-shadow: none; transform: none; }
+  .line.cursor { border-color: var(--accent); background: rgba(229,169,104,0.08); }
+  .line.playing .txt { color: var(--accent); font-weight: 700; }
+  .line.skip .txt { color: var(--text-muted); font-style: italic; text-decoration: line-through; opacity: 0.6; }
+  .line.pause .txt { color: var(--text-muted); font-style: italic; }
+  .line.order-warn .t { border-color: #ef4444; }
+
+  .status-bar { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+  #editArea { min-height: 320px; font-size: 0.9rem; line-height: 1.5; }
+  .help summary { cursor: pointer; color: var(--text-muted); font-size: 0.85rem; }
+  .help ul { margin: 0.5rem 0 0 1.1rem; padding: 0; font-size: 0.85rem; color: var(--text-muted); }
+  .dirty-dot { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--accent); margin-right: 0.35rem; vertical-align: middle; }
+  #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 999; display: none; }
+
+  @media (max-width: 560px) {
+    .line { grid-template-columns: 5.2rem 1fr; }
+    .line .acts { grid-column: 1 / -1; justify-content: flex-end; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header"><span class="site-logo">Heavy Voices</span></header>
+<div class="container">
+  <a href="/admin/latar.html" class="back-btn" id="backLink">&larr; Tillbaka till låtar</a>
+  <h1 id="songTitle" style="margin-bottom: 0.2rem;">Textsynk</h1>
+  <p class="muted" style="margin-top: 0;">Tajma sångtexten rad för rad mot ljudet — resultatet används som karaoke-text i spelaren.</p>
+
+  <p class="error" id="loadError"></p>
+
+  <div id="editor" style="display: none;">
+
+    <!-- Transport + förhandsvisning (sticky) -->
+    <div class="transport">
+      <div class="card static">
+        <div class="row-flex">
+          <label class="muted" for="trackSelect">Spår</label>
+          <select id="trackSelect"></select>
+          <label class="muted" for="rateSelect">Tempo</label>
+          <select id="rateSelect">
+            <option value="0.5">50 %</option>
+            <option value="0.75">75 %</option>
+            <option value="1" selected>100 %</option>
+          </select>
+          <label class="muted" for="offsetInput" title="Dras av från varje tryck för att kompensera reaktionstid">Reaktion (s)</label>
+          <input type="number" id="offsetInput" step="0.05" min="0" max="1" value="0.20" style="width: 5rem;">
+          <span class="muted" id="trackStatus"></span>
+        </div>
+
+        <input type="range" id="scrubber" min="0" max="0" step="0.01" value="0">
+
+        <div class="row-flex" style="justify-content: space-between;">
+          <div class="row-flex">
+            <button type="button" class="btn-outline btn-small" id="backBtn" title="Pil vänster">&#8634; 3 s</button>
+            <button type="button" id="playBtn" class="btn-small" style="min-width: 5.5rem;">&#9654; Spela</button>
+            <button type="button" class="btn-outline btn-small" id="fwdBtn" title="Pil höger">3 s &#8635;</button>
+            <span class="time-readout" id="timeReadout">0:00.00 / 0:00</span>
+          </div>
+          <div class="row-flex">
+            <button type="button" class="btn-outline btn-small" id="undoBtn" title="Backsteg">&#8617; Ångra</button>
+            <button type="button" id="tapBtn" disabled>TAP</button>
+          </div>
+        </div>
+
+        <div class="preview" id="preview">
+          <div class="p-prev"></div>
+          <div class="p-cur"></div>
+          <div class="p-next"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card static">
+      <div class="status-bar">
+        <span id="progressInfo" class="muted"></span>
+        <div class="row-flex">
+          <button type="button" class="btn-outline btn-small" id="editLinesBtn">&#9998; Redigera rader</button>
+          <button type="button" class="btn-outline btn-small" id="addPauseBtn" title="Infoga en tom rad (paus/instrumentalt) före markerad rad">+ Paus</button>
+          <button type="button" class="btn-outline btn-small" id="rebuildBtn">&#8635; Börja om från sångtext</button>
+        </div>
+      </div>
+
+      <details class="help" style="margin-bottom: 0.75rem;">
+        <summary>Så funkar det / kortkommandon</summary>
+        <ul>
+          <li>Tryck <kbd>Mellanslag</kbd> (eller TAP) i samma ögonblick som den markerade raden börjar sjungas. Är ljudet pausat startar första trycket bara uppspelningen.</li>
+          <li><kbd>Backsteg</kbd> ångrar senaste tryck. <kbd>P</kbd> spelar/pausar. <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> hoppar 3 s.</li>
+          <li>Klicka på en rad för att flytta markören dit. Klicka på tiden för att skriva in den manuellt (t.ex. <code>1:23.45</code>).</li>
+          <li><strong>&#9654;</strong> spelar från strax före raden, <strong>&minus;/+</strong> justerar 0,1 s, <strong>&#8856;</strong> hoppar över raden (t.ex. rubriker som "Refräng").</li>
+          <li>Paus-rader (&#9834;) blir tomma rader i spelaren — bra för instrumentala partier och slutet av låten.</li>
+          <li>Sänk tempot till 75 % om det går fort — tiderna blir ändå rätt.</li>
+        </ul>
+      </details>
+
+      <ol class="lines" id="lineList"></ol>
+
+      <div id="editPanel" style="display: none;">
+        <p class="muted">En rad per textrad. Tom rad = paus-rad. Tider behålls för rader som har samma text som förut.</p>
+        <textarea id="editArea"></textarea>
+        <div class="row-flex">
+          <button type="button" class="btn-small" id="applyEditBtn">Använd</button>
+          <button type="button" class="btn-outline btn-small" id="cancelEditBtn">Avbryt</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card static" style="margin-top: 1rem;">
+      <div class="row-flex" style="justify-content: space-between;">
+        <div class="row-flex">
+          <button type="button" id="saveBtn"><span id="dirtyDot"></span>Spara synk</button>
+          <button type="button" class="btn-outline btn-small" id="exportBtn">Exportera .lrc</button>
+          <label class="btn btn-outline btn-small" style="margin: 0;">
+            Importera .lrc
+            <input type="file" id="importInput" accept=".lrc,.txt" style="display: none;">
+          </label>
+        </div>
+        <button type="button" class="btn-danger btn-small" id="clearBtn">Ta bort synk</button>
+      </div>
+      <p class="muted" id="saveInfo" style="margin: 0.6rem 0 0;"></p>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<audio id="audio" preload="auto"></audio>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+const STEM_BUCKET = 'heavy-voices-stems';
+const STEM_FIELDS = [
+  { kind: 'stem_backtrack_path', label: 'Backtrack' },
+  { kind: 'stem_sopran_path', label: 'Sopran' },
+  { kind: 'stem_alt_path', label: 'Alt' },
+  { kind: 'stem_tenor_path', label: 'Tenor' },
+  { kind: 'stem_bas_path', label: 'Bas' },
+];
+// Rader som ser ut som sektionsrubriker hoppas över som standard
+const HEADER_RE = /^[\[(]?\s*(vers|verse|refräng|ref|chorus|brygga|bridge|stick|intro|outro|pre-?chorus|förrefräng|mellanspel|solo|slut|coda|alla|tutti|sopran|alt|tenor|bas)\b[^a-zåäö]*[\])]?\s*:?\s*$/i;
+
+const audio = document.getElementById('audio');
+const $ = id => document.getElementById(id);
+
+let song = null;
+let rows = [];        // { text, time: number|null, skip: bool }
+let cursor = 0;       // index för nästa rad att tajma
+let dirty = false;
+let playingIdx = -1;
+let currentBlobUrl = null;
+let isScrubbing = false;
+
+// ---------- Hjälpfunktioner ----------
+function fmt(t, withCs = true) {
+  if (t == null || isNaN(t)) return '';
+  const m = Math.floor(t / 60);
+  const s = t - m * 60;
+  return withCs ? `${m}:${s.toFixed(2).padStart(5, '0')}` : `${m}:${String(Math.floor(s)).padStart(2, '0')}`;
+}
+function fmtLrc(t) {
+  const cs = Math.round(t * 100);
+  const m = Math.floor(cs / 6000);
+  const s = Math.floor((cs % 6000) / 100);
+  const c = cs % 100;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(c).padStart(2, '0')}`;
+}
+function parseTime(str) {
+  str = (str || '').trim().replace(',', '.');
+  if (!str) return null;
+  const m = str.match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/);
+  if (!m) return NaN;
+  return (m[1] ? parseInt(m[1], 10) * 60 : 0) + parseFloat(m[2]);
+}
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg; el.style.display = 'block';
+  clearTimeout(toast._t); toast._t = setTimeout(() => el.style.display = 'none', 2200);
+}
+function setDirty(v) {
+  dirty = v;
+  $('dirtyDot').className = v ? 'dirty-dot' : '';
+}
+function isPause(r) { return r.text.trim() === ''; }
+
+// ---------- LRC ----------
+function parseLrc(lrc) {
+  const out = [];
+  (lrc || '').split(/\r?\n/).forEach(line => {
+    const tags = [];
+    let rest = line;
+    let m;
+    while ((m = rest.match(/^\s*\[(\d+):(\d+(?:[.:]\d+)?)\]/))) {
+      tags.push(parseInt(m[1], 10) * 60 + parseFloat(m[2].replace(':', '.')));
+      rest = rest.slice(m[0].length);
+    }
+    if (!tags.length) return; // metadata ([ti:], [ar:] ...) eller skräp
+    const text = rest.replace(/<\d+:\d+(?:\.\d+)?>/g, '').trim(); // strippa ev. ord-tider
+    tags.forEach(t => out.push({ text, time: t, skip: false }));
+  });
+  out.sort((a, b) => a.time - b.time);
+  return out;
+}
+function buildLrc() {
+  const timed = rows.filter(r => !r.skip && r.time != null).slice().sort((a, b) => a.time - b.time);
+  const head = [`[ti:${song.title}]`, `[by:Heavy Voices textsynk]`];
+  return head.concat(timed.map(r => `[${fmtLrc(r.time)}]${r.text}`)).join('\n');
+}
+
+function rowsFromPlain(plain) {
+  const out = [];
+  let lastWasBlank = true;
+  (plain || '').split(/\r?\n/).forEach(raw => {
+    const text = raw.trim();
+    if (!text) {
+      if (!lastWasBlank) out.push({ text: '', time: null, skip: true }); // paus-rad mellan stycken, valfri
+      lastWasBlank = true;
+      return;
+    }
+    lastWasBlank = false;
+    out.push({ text, time: null, skip: HEADER_RE.test(text) });
+  });
+  while (out.length && isPause(out[out.length - 1])) out.pop();
+  if (out.length) out.push({ text: '', time: null, skip: false }); // slutmarkör
+  return out;
+}
+
+// ---------- Rendering ----------
+function renderLines() {
+  const list = $('lineList');
+  list.innerHTML = rows.map((r, i) => {
+    const cls = ['line'];
+    if (i === cursor) cls.push('cursor');
+    if (r.skip) cls.push('skip');
+    if (isPause(r)) cls.push('pause');
+    const label = isPause(r) ? (i === rows.length - 1 ? '♪ slut' : '♪ paus') : esc(r.text);
+    return `<li class="${cls.join(' ')}" data-i="${i}">
+      <input class="t ${r.time == null ? 'empty' : ''}" data-i="${i}" value="${r.time == null ? '' : fmt(r.time)}" placeholder="--:--">
+      <span class="txt">${label}</span>
+      <span class="acts">
+        <button type="button" data-act="play" data-i="${i}" title="Spela från raden">&#9654;</button>
+        <button type="button" data-act="minus" data-i="${i}" title="-0,1 s">&minus;</button>
+        <button type="button" data-act="plus" data-i="${i}" title="+0,1 s">+</button>
+        <button type="button" data-act="skip" data-i="${i}" title="${r.skip ? 'Ta med raden' : 'Hoppa över raden'}">${r.skip ? '&#8634;' : '&#8856;'}</button>
+        ${isPause(r) ? `<button type="button" data-act="del" data-i="${i}" title="Ta bort paus-rad">&times;</button>` : ''}
+      </span>
+    </li>`;
+  }).join('');
+  markOrderWarnings();
+  updateProgress();
+  playingIdx = -2; // tvinga omritning av highlight
+  updatePlaying();
+}
+
+function markOrderWarnings() {
+  let last = -1;
+  rows.forEach((r, i) => {
+    const li = $('lineList').children[i];
+    if (!li) return;
+    const bad = !r.skip && r.time != null && r.time < last;
+    li.classList.toggle('order-warn', bad);
+    if (!r.skip && r.time != null) last = Math.max(last, r.time);
+  });
+}
+
+function updateProgress() {
+  const needed = rows.filter(r => !r.skip);
+  const done = needed.filter(r => r.time != null).length;
+  $('progressInfo').textContent = `${done} av ${needed.length} rader tajmade`;
+  $('tapBtn').disabled = !audio.src || cursor >= rows.length;
+  $('tapBtn').textContent = cursor >= rows.length ? 'Klart ✓' : 'TAP';
+}
+
+function setCursor(i, scroll = true) {
+  cursor = Math.max(0, Math.min(i, rows.length));
+  const list = $('lineList');
+  list.querySelectorAll('.line.cursor').forEach(el => el.classList.remove('cursor'));
+  const li = list.children[cursor];
+  if (li) {
+    li.classList.add('cursor');
+    if (scroll) li.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  updateProgress();
+}
+
+// Vilken rad "sjungs" vid tid t (samma logik som spelaren kommer använda)
+function activeIndexAt(t) {
+  let best = -1, bestTime = -Infinity;
+  rows.forEach((r, i) => {
+    if (r.skip || r.time == null) return;
+    if (r.time <= t && r.time >= bestTime) { best = i; bestTime = r.time; }
+  });
+  return best;
+}
+function neighbour(idx, dir) {
+  const timed = rows.map((r, i) => ({ r, i })).filter(x => !x.r.skip && x.r.time != null).sort((a, b) => a.r.time - b.r.time);
+  const pos = timed.findIndex(x => x.i === idx);
+  if (idx === -1) return dir > 0 && timed.length ? timed[0].r : null;
+  const n = timed[pos + dir];
+  return n ? n.r : null;
+}
+
+function updatePlaying() {
+  const idx = activeIndexAt(audio.currentTime || 0);
+  if (idx === playingIdx) return;
+  playingIdx = idx;
+  const list = $('lineList');
+  list.querySelectorAll('.line.playing').forEach(el => el.classList.remove('playing'));
+  const li = list.children[idx];
+  if (li) li.classList.add('playing');
+
+  const cur = idx >= 0 ? rows[idx] : null;
+  const prev = idx >= 0 ? neighbour(idx, -1) : null;
+  const next = neighbour(idx, 1);
+  $('preview').querySelector('.p-prev').textContent = prev ? prev.text : '';
+  $('preview').querySelector('.p-cur').textContent = cur ? (cur.text || '♪') : '';
+  $('preview').querySelector('.p-next').textContent = next ? next.text : '';
+
+  // När allt är tajmat: följ uppspelningen i listan
+  if (li && !audio.paused && cursor >= rows.length) li.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+function tick() {
+  if (!isScrubbing) $('scrubber').value = audio.currentTime || 0;
+  $('timeReadout').textContent = `${fmt(audio.currentTime || 0)} / ${fmt(audio.duration || 0, false)}`;
+  updatePlaying();
+  requestAnimationFrame(tick);
+}
+
+// ---------- Tap / ångra ----------
+function nextCursorFrom(i) {
+  let j = i + 1;
+  while (j < rows.length && rows[j].skip) j++;
+  return j;
+}
+function tap() {
+  if (!audio.src) return;
+  if (audio.paused) { play(); return; } // första trycket startar bara ljudet
+  if (cursor >= rows.length) return;
+  const offset = parseFloat($('offsetInput').value) || 0;
+  const t = Math.max(0, audio.currentTime - offset);
+  const r = rows[cursor];
+  r.time = t; r.skip = false;
+  const li = $('lineList').children[cursor];
+  if (li) {
+    li.classList.remove('skip');
+    const inp = li.querySelector('.t'); inp.value = fmt(t); inp.classList.remove('empty');
+  }
+  undoStack.push(cursor);
+  setDirty(true);
+  markOrderWarnings();
+  playingIdx = -2;
+  setCursor(nextCursorFrom(cursor));
+}
+const undoStack = [];
+function undo() {
+  const i = undoStack.pop();
+  if (i == null) { toast('Inget att ångra'); return; }
+  rows[i].time = null;
+  const li = $('lineList').children[i];
+  if (li) { const inp = li.querySelector('.t'); inp.value = ''; inp.classList.add('empty'); }
+  setDirty(true);
+  markOrderWarnings();
+  playingIdx = -2;
+  setCursor(i);
+}
+
+// ---------- Ljud ----------
+function play() { audio.play().catch(err => toast('Kunde inte spela: ' + err.message)); }
+function togglePlay() { audio.paused ? play() : audio.pause(); }
+function seek(t) { audio.currentTime = Math.max(0, Math.min(t, audio.duration || t)); playingIdx = -2; }
+
+audio.addEventListener('play', () => { $('playBtn').innerHTML = '&#10074;&#10074; Paus'; updateProgress(); });
+audio.addEventListener('pause', () => { $('playBtn').innerHTML = '&#9654; Spela'; });
+audio.addEventListener('loadedmetadata', () => { $('scrubber').max = audio.duration || 0; });
+
+function trackOptions() {
+  const opts = STEM_FIELDS.filter(f => song[f.kind]).map(f => ({ label: f.label, path: song[f.kind] }));
+  (song.extra_stems || []).forEach(ex => opts.push({ label: ex.label, path: ex.path }));
+  return opts;
+}
+
+async function loadTrack(path) {
+  const wasTime = audio.currentTime || 0;
+  audio.pause();
+  $('trackStatus').textContent = 'Laddar ljud...';
+  $('tapBtn').disabled = true;
+  const { data: signed, error } = await supabaseClient.storage.from(STEM_BUCKET).createSignedUrl(path, 3600);
+  if (error || !signed) { $('trackStatus').textContent = 'Kunde inte hämta ljudfilen'; return; }
+  try {
+    // Laddas ner helt som blob → exakt och snabb seek
+    const res = await fetch(signed.signedUrl);
+    const blob = await res.blob();
+    if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+    currentBlobUrl = URL.createObjectURL(blob);
+    audio.src = currentBlobUrl;
+    audio.playbackRate = parseFloat($('rateSelect').value);
+    audio.preservesPitch = true;
+    await new Promise(res => audio.addEventListener('loadedmetadata', res, { once: true }));
+    if (wasTime) seek(wasTime);
+    $('trackStatus').textContent = '';
+    updateProgress();
+  } catch (err) {
+    $('trackStatus').textContent = 'Fel vid laddning: ' + err.message;
+  }
+}
+
+// ---------- Redigera rader ----------
+function openEdit() {
+  $('lineList').style.display = 'none';
+  $('editPanel').style.display = 'block';
+  $('editArea').value = rows.map(r => r.text).join('\n');
+  $('editArea').focus();
+}
+function closeEdit() {
+  $('lineList').style.display = '';
+  $('editPanel').style.display = 'none';
+}
+function applyEdit() {
+  const lines = $('editArea').value.split(/\r?\n/).map(l => l.trim());
+  // Behåll tider: matcha i ordning mot gamla rader med samma text
+  const old = rows.slice();
+  let searchFrom = 0;
+  const next = lines.map(text => {
+    for (let k = searchFrom; k < old.length; k++) {
+      if (old[k].text === text) { searchFrom = k + 1; return { ...old[k] }; }
+    }
+    return { text, time: null, skip: text ? HEADER_RE.test(text) : true };
+  });
+  while (next.length && isPause(next[next.length - 1]) && next[next.length - 1].time == null) next.pop();
+  if (next.length && !isPause(next[next.length - 1])) next.push({ text: '', time: null, skip: false }); // slutmarkör
+  rows = next;
+  undoStack.length = 0;
+  closeEdit();
+  setDirty(true);
+  renderLines();
+  setCursor(firstUntimed(), false);
+}
+function firstUntimed() {
+  const i = rows.findIndex(r => !r.skip && r.time == null);
+  return i === -1 ? rows.length : i;
+}
+
+// ---------- Spara / ladda ----------
+async function save() {
+  const needed = rows.filter(r => !r.skip && !isPause(r));
+  const missing = needed.filter(r => r.time == null).length;
+  if (!rows.some(r => !r.skip && r.time != null)) { toast('Inga tajmade rader att spara'); return; }
+  if (missing && !confirm(`${missing} textrad(er) saknar tid och kommer inte med. Spara ändå?`)) return;
+  if ($('lineList').querySelector('.order-warn') && !confirm('Några tider ligger i fel ordning (markerade rött). Raderna sorteras efter tid när de sparas. Fortsätt?')) return;
+
+  const lrc = buildLrc();
+  $('saveBtn').disabled = true;
+  const { error } = await supabaseClient.from('songs').update({ lyrics_lrc: lrc }).eq('id', song.id);
+  $('saveBtn').disabled = false;
+  if (error) { alert('Kunde inte spara: ' + error.message); return; }
+  song.lyrics_lrc = lrc;
+  setDirty(false);
+  $('saveInfo').textContent = `Sparat ${new Date().toLocaleTimeString('sv-SE')} — ${lrc.split('\n').length - 2} rader.`;
+  toast('Synk sparad');
+}
+
+async function clearSync() {
+  if (!confirm('Ta bort den sparade synken för låten? Sångtexten påverkas inte.')) return;
+  const { error } = await supabaseClient.from('songs').update({ lyrics_lrc: null }).eq('id', song.id);
+  if (error) { alert('Kunde inte ta bort: ' + error.message); return; }
+  song.lyrics_lrc = null;
+  rows = rowsFromPlain(song.lyrics_plain);
+  undoStack.length = 0;
+  setDirty(false);
+  renderLines();
+  setCursor(firstUntimed(), false);
+  $('saveInfo').textContent = 'Synken borttagen.';
+}
+
+function exportLrc() {
+  const blob = new Blob([buildLrc()], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${song.title.replace(/[^\wåäöÅÄÖ\- ]+/g, '').trim() || 'lat'}.lrc`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+async function importLrc(file) {
+  const text = await file.text();
+  const parsed = parseLrc(text);
+  if (!parsed.length) { toast('Hittade inga tidsstämplar i filen'); return; }
+  if (rows.some(r => r.time != null) && !confirm('Ersätta nuvarande rader och tider med filens innehåll?')) return;
+  rows = parsed;
+  undoStack.length = 0;
+  setDirty(true);
+  renderLines();
+  setCursor(rows.length, false);
+  toast(`Importerade ${parsed.length} rader`);
+}
+
+// ---------- Händelser ----------
+function wireEvents() {
+  $('playBtn').addEventListener('click', togglePlay);
+  $('backBtn').addEventListener('click', () => seek(audio.currentTime - 3));
+  $('fwdBtn').addEventListener('click', () => seek(audio.currentTime + 3));
+  $('tapBtn').addEventListener('click', tap);
+  $('undoBtn').addEventListener('click', undo);
+  $('rateSelect').addEventListener('change', e => { audio.playbackRate = parseFloat(e.target.value); });
+  $('offsetInput').addEventListener('change', e => { try { localStorage.setItem('hv-sync-offset', e.target.value); } catch (_) {} });
+  $('trackSelect').addEventListener('change', e => loadTrack(e.target.value));
+
+  const sc = $('scrubber');
+  sc.addEventListener('input', () => { isScrubbing = true; $('timeReadout').textContent = `${fmt(+sc.value)} / ${fmt(audio.duration || 0, false)}`; });
+  sc.addEventListener('change', () => { seek(+sc.value); isScrubbing = false; });
+
+  const list = $('lineList');
+  list.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-act]');
+    if (btn) {
+      const i = +btn.dataset.i, r = rows[i];
+      switch (btn.dataset.act) {
+        case 'play':
+          if (r.time != null) { seek(Math.max(0, r.time - 1.5)); play(); }
+          else { setCursor(i); toast('Raden har ingen tid än'); }
+          return;
+        case 'minus': case 'plus':
+          if (r.time == null) return;
+          r.time = Math.max(0, +(r.time + (btn.dataset.act === 'plus' ? 0.1 : -0.1)).toFixed(2));
+          list.children[i].querySelector('.t').value = fmt(r.time);
+          setDirty(true); markOrderWarnings(); playingIdx = -2;
+          return;
+        case 'skip':
+          r.skip = !r.skip; setDirty(true); renderLines(); setCursor(cursor, false);
+          return;
+        case 'del':
+          rows.splice(i, 1); undoStack.length = 0; setDirty(true);
+          renderLines(); setCursor(Math.min(cursor, rows.length), false);
+          return;
+      }
+    }
+    if (e.target.classList.contains('t')) return; // klick i tidsfältet = redigering
+    const li = e.target.closest('.line');
+    if (li) setCursor(+li.dataset.i, false);
+  });
+  list.addEventListener('change', e => {
+    if (!e.target.classList.contains('t')) return;
+    const i = +e.target.dataset.i;
+    const t = parseTime(e.target.value);
+    if (Number.isNaN(t)) { toast('Ogiltig tid — använd t.ex. 1:23.45'); e.target.value = rows[i].time == null ? '' : fmt(rows[i].time); return; }
+    rows[i].time = t;
+    if (t != null) rows[i].skip = false;
+    setDirty(true);
+    renderLines(); setCursor(cursor, false);
+  });
+  list.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('t')) e.target.blur(); });
+
+  $('editLinesBtn').addEventListener('click', openEdit);
+  $('cancelEditBtn').addEventListener('click', closeEdit);
+  $('applyEditBtn').addEventListener('click', applyEdit);
+  $('addPauseBtn').addEventListener('click', () => {
+    const at = Math.min(cursor, rows.length);
+    rows.splice(at, 0, { text: '', time: null, skip: false });
+    undoStack.length = 0; setDirty(true);
+    renderLines(); setCursor(at);
+  });
+  $('rebuildBtn').addEventListener('click', () => {
+    if (!song.lyrics_plain) { toast('Låten har ingen sångtext — lägg in den under Låtar först'); return; }
+    if (rows.some(r => r.time != null) && !confirm('Börja om från sångtexten? Alla tider i editorn nollställs (det sparade påverkas inte förrän du sparar).')) return;
+    rows = rowsFromPlain(song.lyrics_plain);
+    undoStack.length = 0; setDirty(true);
+    renderLines(); setCursor(firstUntimed());
+  });
+
+  $('saveBtn').addEventListener('click', save);
+  $('clearBtn').addEventListener('click', clearSync);
+  $('exportBtn').addEventListener('click', exportLrc);
+  $('importInput').addEventListener('change', e => { const f = e.target.files[0]; if (f) importLrc(f); e.target.value = ''; });
+
+  document.addEventListener('keydown', e => {
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === 'Space') { e.preventDefault(); tap(); }
+    else if (e.key === 'Backspace') { e.preventDefault(); undo(); }
+    else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePlay(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); seek(audio.currentTime - 3); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); seek(audio.currentTime + 3); }
+  });
+  // Knappar ska inte "fånga" mellanslag efter klick
+  document.querySelectorAll('button').forEach(b => b.addEventListener('keydown', e => { if (e.code === 'Space') e.preventDefault(); }));
+
+  window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+}
+
+// ---------- Start ----------
+(async () => {
+  const member = await requireAuth('admin');
+  if (!member) return;
+
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { $('loadError').textContent = 'Ingen låt vald.'; return; }
+
+  const { data, error } = await supabaseClient.from('songs').select('*').eq('id', id).single();
+  if (error || !data) { $('loadError').textContent = 'Kunde inte hämta låten: ' + (error ? error.message : 'hittades inte'); return; }
+  song = data;
+  document.title = `Textsynk: ${song.title} — Heavy Voices Admin`;
+  $('songTitle').textContent = song.title;
+
+  try { const o = localStorage.getItem('hv-sync-offset'); if (o) $('offsetInput').value = o; } catch (_) {}
+
+  if (song.lyrics_lrc) {
+    rows = parseLrc(song.lyrics_lrc);
+    $('saveInfo').textContent = 'Laddade sparad synk.';
+  } else {
+    rows = rowsFromPlain(song.lyrics_plain);
+  }
+  if (!rows.length) {
+    $('loadError').textContent = 'Låten har ingen sångtext än. Lägg in texten under Låtar först (eller importera en .lrc-fil nedan).';
+  }
+
+  const tracks = trackOptions();
+  $('trackSelect').innerHTML = tracks.map(t => `<option value="${esc(t.path)}">${esc(t.label)}</option>`).join('');
+  $('editor').style.display = 'block';
+  wireEvents();
+  renderLines();
+  setCursor(firstUntimed(), false);
+  requestAnimationFrame(tick);
+
+  if (tracks.length) loadTrack(tracks[0].path);
+  else $('trackStatus').textContent = 'Inga ljudfiler uppladdade för låten.';
+})();
+</script>
+</body>
+</html>

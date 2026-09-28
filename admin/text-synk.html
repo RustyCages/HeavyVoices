@@ -77,6 +77,13 @@
   <h1 id="songTitle" style="margin-bottom: 0.2rem;">Textsynk</h1>
   <p class="muted" style="margin-top: 0;">Tajma sångtexten rad för rad mot ljudet — resultatet används som karaoke-text i spelaren.</p>
 
+  <div class="card static" style="margin-bottom: 1rem;">
+    <div class="row-flex">
+      <label class="muted" for="songSelect">Låt</label>
+      <select id="songSelect" style="flex: 1; min-width: 220px;"><option value="">Laddar repertoar...</option></select>
+    </div>
+  </div>
+
   <p class="error" id="loadError"></p>
 
   <div id="editor" style="display: none;">
@@ -433,17 +440,21 @@ function trackOptions() {
   return opts;
 }
 
+let trackToken = 0;
 async function loadTrack(path) {
+  const token = ++trackToken;
   const wasTime = audio.currentTime || 0;
   audio.pause();
   $('trackStatus').textContent = 'Laddar ljud...';
   $('tapBtn').disabled = true;
   const { data: signed, error } = await supabaseClient.storage.from(STEM_BUCKET).createSignedUrl(path, 3600);
+  if (token !== trackToken) return;
   if (error || !signed) { $('trackStatus').textContent = 'Kunde inte hämta ljudfilen'; return; }
   try {
     // Laddas ner helt som blob → exakt och snabb seek
     const res = await fetch(signed.signedUrl);
     const blob = await res.blob();
+    if (token !== trackToken) return; // låt/spår byttes under nedladdning
     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     currentBlobUrl = URL.createObjectURL(blob);
     audio.src = currentBlobUrl;
@@ -509,6 +520,7 @@ async function save() {
   if (error) { alert('Kunde inte spara: ' + error.message); return; }
   song.lyrics_lrc = lrc;
   setDirty(false);
+  refreshSongInList();
   $('saveInfo').textContent = `Sparat ${new Date().toLocaleTimeString('sv-SE')} — ${lrc.split('\n').length - 2} rader.`;
   toast('Synk sparad');
 }
@@ -518,6 +530,7 @@ async function clearSync() {
   const { error } = await supabaseClient.from('songs').update({ lyrics_lrc: null }).eq('id', song.id);
   if (error) { alert('Kunde inte ta bort: ' + error.message); return; }
   song.lyrics_lrc = null;
+  refreshSongInList();
   rows = rowsFromPlain(song.lyrics_plain);
   undoStack.length = 0;
   setDirty(false);
@@ -626,6 +639,7 @@ function wireEvents() {
   $('exportBtn').addEventListener('click', exportLrc);
   $('importInput').addEventListener('change', e => { const f = e.target.files[0]; if (f) importLrc(f); e.target.value = ''; });
 
+  ['trackSelect', 'rateSelect'].forEach(id => $(id).addEventListener('change', e => e.target.blur()));
   document.addEventListener('keydown', e => {
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -641,21 +655,54 @@ function wireEvents() {
   window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 }
 
-// ---------- Start ----------
-(async () => {
-  const member = await requireAuth('admin');
-  if (!member) return;
+// ---------- Låtval ----------
+let allSongs = [];
 
-  const id = new URLSearchParams(location.search).get('id');
-  if (!id) { $('loadError').textContent = 'Ingen låt vald.'; return; }
+function songOptionLabel(x) {
+  const mark = x.lyrics_lrc ? ' ✓ synkad' : (x.lyrics_plain ? '' : ' (ingen text)');
+  return esc(x.title) + mark;
+}
+function renderSongSelect(selectedId) {
+  $('songSelect').innerHTML = `<option value="">— Välj låt —</option>` +
+    allSongs.map(x => `<option value="${x.id}" ${x.id === selectedId ? 'selected' : ''}>${songOptionLabel(x)}</option>`).join('');
+}
+
+function resetEditorState() {
+  trackToken++; // avbryt ev. pågående spårladdning
+  audio.pause();
+  audio.removeAttribute('src');
+  audio.load();
+  if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
+  $('scrubber').max = 0; $('scrubber').value = 0;
+  rows = []; cursor = 0; undoStack.length = 0; playingIdx = -2;
+  $('loadError').textContent = '';
+  $('saveInfo').textContent = '';
+  $('trackStatus').textContent = '';
+  closeEdit();
+  setDirty(false);
+}
+
+async function loadSong(id) {
+  resetEditorState();
+  if (!id) {
+    song = null;
+    $('editor').style.display = 'none';
+    $('songTitle').textContent = 'Textsynk';
+    document.title = 'Textsynk — Heavy Voices Admin';
+    history.replaceState(null, '', location.pathname);
+    return;
+  }
 
   const { data, error } = await supabaseClient.from('songs').select('*').eq('id', id).single();
-  if (error || !data) { $('loadError').textContent = 'Kunde inte hämta låten: ' + (error ? error.message : 'hittades inte'); return; }
+  if (error || !data) {
+    $('editor').style.display = 'none';
+    $('loadError').textContent = 'Kunde inte hämta låten: ' + (error ? error.message : 'hittades inte');
+    return;
+  }
   song = data;
+  history.replaceState(null, '', `${location.pathname}?id=${encodeURIComponent(song.id)}`);
   document.title = `Textsynk: ${song.title} — Heavy Voices Admin`;
   $('songTitle').textContent = song.title;
-
-  try { const o = localStorage.getItem('hv-sync-offset'); if (o) $('offsetInput').value = o; } catch (_) {}
 
   if (song.lyrics_lrc) {
     rows = parseLrc(song.lyrics_lrc);
@@ -670,13 +717,50 @@ function wireEvents() {
   const tracks = trackOptions();
   $('trackSelect').innerHTML = tracks.map(t => `<option value="${esc(t.path)}">${esc(t.label)}</option>`).join('');
   $('editor').style.display = 'block';
-  wireEvents();
   renderLines();
   setCursor(firstUntimed(), false);
-  requestAnimationFrame(tick);
 
   if (tracks.length) loadTrack(tracks[0].path);
-  else $('trackStatus').textContent = 'Inga ljudfiler uppladdade för låten.';
+  else { $('trackStatus').textContent = 'Inga ljudfiler uppladdade för låten.'; updateProgress(); }
+}
+
+// Håll dropdownens ✓ i synk efter spara/ta bort
+function refreshSongInList() {
+  const x = allSongs.find(a => a.id === song.id);
+  if (x) { x.lyrics_lrc = song.lyrics_lrc; renderSongSelect(song.id); }
+}
+
+// ---------- Start ----------
+(async () => {
+  const member = await requireAuth('admin');
+  if (!member) return;
+
+  try { const o = localStorage.getItem('hv-sync-offset'); if (o) $('offsetInput').value = o; } catch (_) {}
+  wireEvents();
+  requestAnimationFrame(tick);
+
+  const { data: list, error } = await supabaseClient.from('songs').select('id, title, lyrics_plain, lyrics_lrc').order('title');
+  if (error) { $('loadError').textContent = 'Kunde inte hämta repertoaren: ' + error.message; return; }
+  allSongs = list || [];
+
+  const id = new URLSearchParams(location.search).get('id');
+  const startId = allSongs.some(x => x.id === id) ? id : '';
+  renderSongSelect(startId);
+
+  let currentId = startId;
+  $('songSelect').addEventListener('change', async e => {
+    const newId = e.target.value;
+    if (dirty && !confirm('Du har osparade ändringar i synken. Byta låt ändå?')) {
+      e.target.value = currentId;
+      return;
+    }
+    currentId = newId;
+    e.target.blur(); // så att mellanslag går till TAP direkt
+    await loadSong(newId);
+  });
+
+  if (startId) await loadSong(startId);
+  else if (!allSongs.length) $('loadError').textContent = 'Det finns inga låtar i repertoaren än.';
 })();
 </script>
 </body>

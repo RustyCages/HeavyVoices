@@ -153,6 +153,31 @@
   .k-line.k-active { color:var(--accent); opacity:1; transform:scale(1); text-shadow:0 0 18px rgba(229,169,104,0.35); }
   .k-line.k-past { opacity:0.2; }
   #karaoke.no-anim .k-reel, #karaoke.no-anim .k-line { transition:none; }
+
+  /* Förstora texten: knapp uppe till höger i spelarlisten */
+  #expandBtn {
+    position:absolute; top:0.4rem; right:0.6rem; z-index:2;
+    width:2.1rem; height:2.1rem; padding:0; border-radius:0.5rem; font-size:1rem;
+    background:rgba(255,255,255,0.06); color:var(--text); border:1px solid var(--border);
+  }
+  #expandBtn:hover { border-color:var(--accent); color:var(--accent); box-shadow:none; transform:none; }
+  #expandBtn.hidden { display:none; }
+
+  /* Helskärmsläge: spelarlisten täcker hela skärmen, texten tar all plats ovanför kontrollerna */
+  #playerBar.expanded {
+    top:0; padding-top:calc(1rem + env(safe-area-inset-top, 0px)); padding-bottom:calc(1rem + env(safe-area-inset-bottom, 0px));
+    background:var(--bg); background-image:var(--bg-gradient); backdrop-filter:none;
+  }
+  #playerBar.expanded #expandBtn { top:calc(0.75rem + env(safe-area-inset-top, 0px)); right:0.9rem; width:2.6rem; height:2.6rem; font-size:1.2rem; }
+  #playerBar.expanded #karaoke {
+    flex:1; height:auto; border-bottom:none; margin-bottom:0.5rem;
+    -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 18%, #000 82%, transparent 100%);
+            mask-image:linear-gradient(to bottom, transparent 0, #000 18%, #000 82%, transparent 100%);
+  }
+  #playerBar.expanded .k-line { font-size:clamp(1.7rem, 5vw, 3.2rem); padding:0.45rem 1.5rem; max-width:1100px; margin:0 auto; }
+  #playerBar.expanded .k-line.k-pause { font-size:clamp(1.3rem, 3.5vw, 2.2rem); }
+  #playerBar.expanded #playerTitle { font-size:1.1rem; }
+  body.player-expanded { overflow:hidden; }
   @media (prefers-reduced-motion: reduce) { .k-reel, .k-line { transition:none; } }
 
   #toast { position:fixed; bottom:8rem; right:1.5rem; background:var(--accent); color:#111317; padding:0.7rem 1.2rem; border-radius:0.6rem; font-weight:600; box-shadow:var(--card-shadow); z-index:999; display:none; }
@@ -185,6 +210,7 @@
 </div>
 
 <div id="playerBar" class="hidden">
+  <button type="button" id="expandBtn" class="hidden" title="Förstora texten">&#x26F6;</button>
   <div id="karaoke" class="hidden"><div class="k-reel"></div></div>
   <div id="playerTitle">–</div>
   <div id="playerScrubberRow">
@@ -1161,6 +1187,7 @@ function setPlayerSong(song) {
   btn.title = hasSync ? 'Visa/dölj synkad text' : 'Ingen synkad text för den här låten';
   buildKaraokeReel();
   document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
+  updateExpandAvailability();
   document.getElementById('lyricsDocBtn').classList.toggle('hidden', !(song && song.lyrics_pdf_path));
   renderKaraoke(true);
 }
@@ -1214,6 +1241,7 @@ document.getElementById('karaokeBtn').addEventListener('click', (e) => {
   e.currentTarget.classList.toggle('active', karaokeOn);
   const hasSync = karaokeLines.some(l => l.text);
   document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
+  updateExpandAvailability();
   karaokeIdx = -2;
   renderKaraoke(true);
 });
@@ -1231,6 +1259,59 @@ document.getElementById('lyricsDocBtn').addEventListener('click', async () => {
   if (win) win.location.href = url; else window.location.href = url;
 });
 
+// ---------- Förstorad text / helskärm ----------
+let wakeLock = null;
+
+function karaokeVisible() {
+  return !document.getElementById('karaoke').classList.contains('hidden');
+}
+function updateExpandAvailability() {
+  const canExpand = karaokeVisible();
+  document.getElementById('expandBtn').classList.toggle('hidden', !canExpand);
+  if (!canExpand && isExpanded()) setExpanded(false);
+}
+function isExpanded() {
+  return document.getElementById('playerBar').classList.contains('expanded');
+}
+async function setExpanded(on) {
+  const bar = document.getElementById('playerBar');
+  const btn = document.getElementById('expandBtn');
+  bar.classList.toggle('expanded', on);
+  document.body.classList.toggle('player-expanded', on);
+  btn.innerHTML = on ? '&#x2715;' : '&#x26F6;';
+  btn.title = on ? 'Stäng helskärm' : 'Förstora texten';
+
+  // Riktig helskärm där webbläsaren stödjer det (döljer adressfält m.m.). iPhone saknar stöd — då täcker vi bara fönstret.
+  const root = document.documentElement;
+  try {
+    if (on && !document.fullscreenElement && root.requestFullscreen) await root.requestFullscreen({ navigationUI: 'hide' });
+    if (!on && document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
+  } catch (e) { /* inte tillåtet — överlägget räcker */ }
+
+  // Håll skärmen tänd medan man sjunger med
+  try {
+    if (on && 'wakeLock' in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+    if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch (e) {}
+
+  karaokeIdx = -2;
+  renderKaraoke(true);
+}
+
+document.getElementById('expandBtn').addEventListener('click', () => setExpanded(!isExpanded()));
+// Esc / systemets "lämna helskärm" stänger även det förstorade läget
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && isExpanded()) setExpanded(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isExpanded() && !document.fullscreenElement) setExpanded(false); });
+// Wake lock släpps när fliken göms — begär igen när man kommer tillbaka
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && isExpanded() && !wakeLock && 'wakeLock' in navigator) {
+    try { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } catch (e) {}
+  }
+});
+
 if (window.ResizeObserver) {
   new ResizeObserver(() => renderKaraoke(true)).observe(document.getElementById('karaoke'));
 }
@@ -1239,7 +1320,7 @@ if (window.ResizeObserver) {
 if (window.ResizeObserver) {
   new ResizeObserver(() => {
     const bar = document.getElementById('playerBar');
-    if (!bar.classList.contains('hidden')) document.body.style.paddingBottom = (bar.offsetHeight + 16) + 'px';
+    if (!bar.classList.contains('hidden') && !bar.classList.contains('expanded')) document.body.style.paddingBottom = (bar.offsetHeight + 16) + 'px';
   }).observe(document.getElementById('playerBar'));
 }
 </script>

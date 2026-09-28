@@ -24,6 +24,8 @@
   #scrubber { width: 100%; margin: 0.6rem 0; padding: 0; accent-color: var(--accent); }
   .time-readout { font-variant-numeric: tabular-nums; font-family: 'Roboto Condensed', sans-serif; font-size: 1.1rem; min-width: 9.5rem; }
   #tapBtn { font-size: 1.1rem; padding: 0.8rem 1.6rem; min-width: 9rem; }
+  #gapBtn { padding: 0.8rem 1rem; }
+  #gapBtn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
   #tapBtn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
   /* Karaoke-förhandsvisning */
@@ -61,6 +63,9 @@
   .help summary { cursor: pointer; color: var(--text-muted); font-size: 0.85rem; }
   .help ul { margin: 0.5rem 0 0 1.1rem; padding: 0; font-size: 0.85rem; color: var(--text-muted); }
   .dirty-dot { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--accent); margin-right: 0.35rem; vertical-align: middle; }
+  #textCard summary { cursor: pointer; font-family: 'Roboto Condensed', sans-serif; font-size: 1.1rem; color: #fff; }
+  #textCard summary .muted { font-family: 'DM Sans', sans-serif; font-size: 0.85rem; margin-left: 0.4rem; }
+  #lyricsText { min-height: 260px; margin-top: 0.75rem; font-size: 0.9rem; line-height: 1.5; }
   #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 999; display: none; }
 
   @media (max-width: 560px) {
@@ -83,6 +88,20 @@
       <select id="songSelect" style="flex: 1; min-width: 220px;"><option value="">Laddar repertoar...</option></select>
     </div>
   </div>
+
+  <details class="card static" id="textCard" style="display: none; margin-bottom: 1rem;">
+    <summary>Sångtext <span class="muted" id="textSummaryInfo"></span></summary>
+    <p class="muted" style="margin: 0.6rem 0 0;">Klistra in eller skriv texten, eller läs in en fil (.docx, .txt, .pdf). Tom rad mellan stycken blir en valfri paus-rad i synken, och rubriker som "Vers 1" / "Refräng" hoppas över automatiskt.</p>
+    <textarea id="lyricsText" placeholder="Sångtext, en rad per textrad..."></textarea>
+    <div class="row-flex">
+      <label class="btn btn-outline btn-small" style="margin: 0;">
+        &#128196; Läs in fil
+        <input type="file" id="lyricsFile" accept=".docx,.txt,.pdf" style="display: none;">
+      </label>
+      <button type="button" class="btn-small" id="saveTextBtn">Spara text</button>
+      <span class="muted" id="textStatus"></span>
+    </div>
+  </details>
 
   <p class="error" id="loadError"></p>
 
@@ -116,6 +135,7 @@
           </div>
           <div class="row-flex">
             <button type="button" class="btn-outline btn-small" id="undoBtn" title="Backsteg">&#8617; Ångra</button>
+            <button type="button" class="btn-outline" id="gapBtn" disabled title="Enter — infoga en tom rad här (när det inte sjungs något)">&#9834; Tom rad</button>
             <button type="button" id="tapBtn" disabled>TAP</button>
           </div>
         </div>
@@ -145,7 +165,8 @@
           <li><kbd>Backsteg</kbd> ångrar senaste tryck. <kbd>P</kbd> spelar/pausar. <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> hoppar 3 s.</li>
           <li>Klicka på en rad för att flytta markören dit. Klicka på tiden för att skriva in den manuellt (t.ex. <code>1:23.45</code>).</li>
           <li><strong>&#9654;</strong> spelar från strax före raden, <strong>&minus;/+</strong> justerar 0,1 s, <strong>&#8856;</strong> hoppar över raden (t.ex. rubriker som "Refräng").</li>
-          <li>Paus-rader (&#9834;) blir tomma rader i spelaren — bra för instrumentala partier och slutet av låten.</li>
+          <li><strong>Tom rad:</strong> tryck <kbd>Enter</kbd> (eller &#9834; Tom rad) när sången tar slut, t.ex. inför ett instrumentalt parti. Då infogas en tom rad med den tiden och markören står kvar på nästa textrad — i spelaren släcks texten tills nästa rad börjar.</li>
+          <li><strong>&#9834;+</strong> på en rad infogar en tom rad efter den i efterhand (tajma den sen genom att klicka på den och trycka TAP, eller skriv in tiden).</li>
           <li>Sänk tempot till 75 % om det går fort — tiderna blir ändå rätt.</li>
         </ul>
       </details>
@@ -183,6 +204,8 @@
 <audio id="audio" preload="auto"></audio>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script>
@@ -302,6 +325,7 @@ function renderLines() {
         <button type="button" data-act="minus" data-i="${i}" title="-0,1 s">&minus;</button>
         <button type="button" data-act="plus" data-i="${i}" title="+0,1 s">+</button>
         <button type="button" data-act="skip" data-i="${i}" title="${r.skip ? 'Ta med raden' : 'Hoppa över raden'}">${r.skip ? '&#8634;' : '&#8856;'}</button>
+        <button type="button" data-act="gapafter" data-i="${i}" title="Infoga tom rad efter den här raden">&#9834;+</button>
         ${isPause(r) ? `<button type="button" data-act="del" data-i="${i}" title="Ta bort paus-rad">&times;</button>` : ''}
       </span>
     </li>`;
@@ -328,6 +352,7 @@ function updateProgress() {
   const done = needed.filter(r => r.time != null).length;
   $('progressInfo').textContent = `${done} av ${needed.length} rader tajmade`;
   $('tapBtn').disabled = !audio.src || cursor >= rows.length;
+  $('gapBtn').disabled = !audio.src;
   $('tapBtn').textContent = cursor >= rows.length ? 'Klart ✓' : 'TAP';
 }
 
@@ -393,36 +418,58 @@ function nextCursorFrom(i) {
   while (j < rows.length && rows[j].skip) j++;
   return j;
 }
+function tapTime() {
+  const offset = parseFloat($('offsetInput').value) || 0;
+  return Math.max(0, audio.currentTime - offset);
+}
 function tap() {
   if (!audio.src) return;
   if (audio.paused) { play(); return; } // första trycket startar bara ljudet
   if (cursor >= rows.length) return;
-  const offset = parseFloat($('offsetInput').value) || 0;
-  const t = Math.max(0, audio.currentTime - offset);
+  const t = tapTime();
   const r = rows[cursor];
+  const prev = { time: r.time, skip: r.skip };
   r.time = t; r.skip = false;
   const li = $('lineList').children[cursor];
   if (li) {
     li.classList.remove('skip');
     const inp = li.querySelector('.t'); inp.value = fmt(t); inp.classList.remove('empty');
   }
-  undoStack.push(cursor);
+  undoStack.push({ type: 'tap', i: cursor, prev });
   setDirty(true);
   markOrderWarnings();
   playingIdx = -2;
   setCursor(nextCursorFrom(cursor));
 }
+// Tom rad "nu": infogas före markerad rad, markören står kvar på samma textrad
+function tapGap() {
+  if (!audio.src) return;
+  if (audio.paused) { play(); return; }
+  const at = Math.min(cursor, rows.length);
+  // Ligger markören på slut-raden (tom) behövs ingen ny — tajma den i stället
+  if (at < rows.length && isPause(rows[at])) { tap(); return; }
+  rows.splice(at, 0, { text: '', time: tapTime(), skip: false });
+  undoStack.push({ type: 'insert', i: at });
+  setDirty(true);
+  renderLines();
+  setCursor(at + 1);
+}
 const undoStack = [];
 function undo() {
-  const i = undoStack.pop();
-  if (i == null) { toast('Inget att ångra'); return; }
-  rows[i].time = null;
-  const li = $('lineList').children[i];
-  if (li) { const inp = li.querySelector('.t'); inp.value = ''; inp.classList.add('empty'); }
+  const u = undoStack.pop();
+  if (!u) { toast('Inget att ångra'); return; }
+  if (u.type === 'insert') {
+    rows.splice(u.i, 1);
+    setDirty(true);
+    renderLines();
+    setCursor(u.i);
+    return;
+  }
+  rows[u.i].time = u.prev ? u.prev.time : null;
+  rows[u.i].skip = u.prev ? u.prev.skip : false;
   setDirty(true);
-  markOrderWarnings();
-  playingIdx = -2;
-  setCursor(i);
+  renderLines();
+  setCursor(u.i);
 }
 
 // ---------- Ljud ----------
@@ -447,6 +494,7 @@ async function loadTrack(path) {
   audio.pause();
   $('trackStatus').textContent = 'Laddar ljud...';
   $('tapBtn').disabled = true;
+  $('gapBtn').disabled = true;
   const { data: signed, error } = await supabaseClient.storage.from(STEM_BUCKET).createSignedUrl(path, 3600);
   if (token !== trackToken) return;
   if (error || !signed) { $('trackStatus').textContent = 'Kunde inte hämta ljudfilen'; return; }
@@ -567,6 +615,7 @@ function wireEvents() {
   $('backBtn').addEventListener('click', () => seek(audio.currentTime - 3));
   $('fwdBtn').addEventListener('click', () => seek(audio.currentTime + 3));
   $('tapBtn').addEventListener('click', tap);
+  $('gapBtn').addEventListener('click', tapGap);
   $('undoBtn').addEventListener('click', undo);
   $('rateSelect').addEventListener('change', e => { audio.playbackRate = parseFloat(e.target.value); });
   $('offsetInput').addEventListener('change', e => { try { localStorage.setItem('hv-sync-offset', e.target.value); } catch (_) {} });
@@ -594,6 +643,11 @@ function wireEvents() {
           return;
         case 'skip':
           r.skip = !r.skip; setDirty(true); renderLines(); setCursor(cursor, false);
+          return;
+        case 'gapafter':
+          rows.splice(i + 1, 0, { text: '', time: null, skip: false });
+          undoStack.length = 0; setDirty(true);
+          renderLines(); setCursor(i + 1, false);
           return;
         case 'del':
           rows.splice(i, 1); undoStack.length = 0; setDirty(true);
@@ -627,7 +681,7 @@ function wireEvents() {
     renderLines(); setCursor(at);
   });
   $('rebuildBtn').addEventListener('click', () => {
-    if (!song.lyrics_plain) { toast('Låten har ingen sångtext — lägg in den under Låtar först'); return; }
+    if (!song.lyrics_plain) { toast('Låten har ingen sångtext — lägg till den i rutan Sångtext ovan'); $('textCard').open = true; return; }
     if (rows.some(r => r.time != null) && !confirm('Börja om från sångtexten? Alla tider i editorn nollställs (det sparade påverkas inte förrän du sparar).')) return;
     rows = rowsFromPlain(song.lyrics_plain);
     undoStack.length = 0; setDirty(true);
@@ -645,6 +699,7 @@ function wireEvents() {
     if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === 'Space') { e.preventDefault(); tap(); }
     else if (e.key === 'Backspace') { e.preventDefault(); undo(); }
+    else if (e.key === 'Enter') { e.preventDefault(); tapGap(); }
     else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePlay(); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); seek(audio.currentTime - 3); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); seek(audio.currentTime + 3); }
@@ -653,6 +708,122 @@ function wireEvents() {
   document.querySelectorAll('button').forEach(b => b.addEventListener('keydown', e => { if (e.code === 'Space') e.preventDefault(); }));
 
   window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+}
+
+// ---------- Sångtext (lyrics_plain) ----------
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js';
+}
+
+// PDF: bygger rader utifrån textens y-position så radbrytningar (och luft mellan stycken) bevaras
+async function extractPdfText(file) {
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const content = await (await pdf.getPage(i)).getTextContent();
+    const lines = []; // { y, h, parts: [{x, str}] }
+    content.items.forEach(it => {
+      if (!it.str || !it.str.trim()) return;
+      const x = it.transform[4], y = it.transform[5], h = it.height || Math.abs(it.transform[3]) || 10;
+      let line = lines.find(l => Math.abs(l.y - y) < h * 0.5);
+      if (!line) { line = { y, h, parts: [] }; lines.push(line); }
+      line.parts.push({ x, str: it.str });
+    });
+    lines.sort((a, b) => b.y - a.y); // uppifrån och ner
+    let out = '', prev = null;
+    lines.forEach(l => {
+      const text = l.parts.sort((a, b) => a.x - b.x).map(p => p.str).join(' ').replace(/\s+/g, ' ').trim();
+      if (prev && (prev.y - l.y) > Math.max(prev.h, l.h) * 1.9) out += '\n'; // stort glapp = nytt stycke
+      out += text + '\n';
+      prev = l;
+    });
+    pages.push(out.trim());
+  }
+  return pages.join('\n\n');
+}
+
+async function readLyricsFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'docx') return (await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })).value;
+  if (ext === 'txt') return await file.text();
+  if (ext === 'pdf') return await extractPdfText(file);
+  throw new Error('Filtypen stöds inte (använd .docx, .txt eller .pdf)');
+}
+
+function normalizeLyrics(text) {
+  return (text || '').replace(/\r\n?/g, '\n').split('\n').map(l => l.replace(/\s+$/, '')).join('\n')
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function showTextCard() {
+  const has = !!(song.lyrics_plain && song.lyrics_plain.trim());
+  $('textCard').style.display = 'block';
+  $('textCard').open = !has;
+  $('lyricsText').value = song.lyrics_plain || '';
+  $('textSummaryInfo').textContent = has ? `(${song.lyrics_plain.split('\n').filter(l => l.trim()).length} rader)` : '(saknas — lägg till här)';
+  $('textStatus').textContent = '';
+}
+
+// Nya rader från texten, men behåll tid/hoppa-över för rader vars text inte ändrats
+function mergeRows(newRows) {
+  const old = rows.slice();
+  let from = 0;
+  return newRows.map(nr => {
+    for (let k = from; k < old.length; k++) {
+      if (old[k].text === nr.text) { from = k + 1; return { ...old[k] }; }
+    }
+    return nr;
+  });
+}
+
+async function saveLyricsText() {
+  if (!song) return;
+  const text = normalizeLyrics($('lyricsText').value);
+  $('saveTextBtn').disabled = true;
+  const { error } = await supabaseClient.from('songs').update({ lyrics_plain: text || null }).eq('id', song.id);
+  $('saveTextBtn').disabled = false;
+  if (error) { $('textStatus').textContent = 'Kunde inte spara: ' + error.message; return; }
+
+  song.lyrics_plain = text || null;
+  const x = allSongs.find(a => a.id === song.id);
+  if (x) { x.lyrics_plain = song.lyrics_plain; renderSongSelect(song.id); }
+  $('lyricsText').value = text;
+  $('textSummaryInfo').textContent = text ? `(${text.split('\n').filter(l => l.trim()).length} rader)` : '(saknas — lägg till här)';
+  $('textStatus').textContent = 'Sparat ✓';
+  toast('Sångtext sparad');
+
+  // Uppdatera synkraderna
+  const hasTimes = rows.some(r => r.time != null);
+  if (!hasTimes) {
+    rows = rowsFromPlain(text);
+  } else if (confirm('Uppdatera synkraderna med den nya texten?\nTider behålls för rader vars text inte ändrats.')) {
+    rows = mergeRows(rowsFromPlain(text));
+    setDirty(true);
+  } else {
+    return;
+  }
+  undoStack.length = 0;
+  $('loadError').textContent = rows.length ? '' : $('loadError').textContent;
+  renderLines();
+  setCursor(firstUntimed(), false);
+}
+
+function wireTextCard() {
+  $('saveTextBtn').addEventListener('click', saveLyricsText);
+  $('lyricsFile').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if ($('lyricsText').value.trim() && !confirm('Ersätta texten i rutan med innehållet i filen?')) return;
+    $('textStatus').textContent = 'Läser fil...';
+    try {
+      $('lyricsText').value = normalizeLyrics(await readLyricsFile(file));
+      $('textCard').open = true;
+      $('textStatus').textContent = 'Inläst — granska och klicka Spara text';
+    } catch (err) {
+      $('textStatus').textContent = 'Kunde inte läsa filen: ' + err.message;
+    }
+  });
 }
 
 // ---------- Låtval ----------
@@ -687,6 +858,7 @@ async function loadSong(id) {
   if (!id) {
     song = null;
     $('editor').style.display = 'none';
+    $('textCard').style.display = 'none';
     $('songTitle').textContent = 'Textsynk';
     document.title = 'Textsynk — Heavy Voices Admin';
     history.replaceState(null, '', location.pathname);
@@ -703,6 +875,7 @@ async function loadSong(id) {
   history.replaceState(null, '', `${location.pathname}?id=${encodeURIComponent(song.id)}`);
   document.title = `Textsynk: ${song.title} — Heavy Voices Admin`;
   $('songTitle').textContent = song.title;
+  showTextCard();
 
   if (song.lyrics_lrc) {
     rows = parseLrc(song.lyrics_lrc);
@@ -711,7 +884,7 @@ async function loadSong(id) {
     rows = rowsFromPlain(song.lyrics_plain);
   }
   if (!rows.length) {
-    $('loadError').textContent = 'Låten har ingen sångtext än. Lägg in texten under Låtar först (eller importera en .lrc-fil nedan).';
+    $('loadError').textContent = 'Låten har ingen sångtext än — lägg till den i rutan Sångtext ovan (eller importera en .lrc-fil nedan).';
   }
 
   const tracks = trackOptions();
@@ -737,6 +910,7 @@ function refreshSongInList() {
 
   try { const o = localStorage.getItem('hv-sync-offset'); if (o) $('offsetInput').value = o; } catch (_) {}
   wireEvents();
+  wireTextCard();
   requestAnimationFrame(tick);
 
   const { data: list, error } = await supabaseClient.from('songs').select('id, title, lyrics_plain, lyrics_lrc').order('title');

@@ -127,7 +127,17 @@
   #playerScrubberRow { display:flex; align-items:center; gap:0.6rem; }
   #playerScrubberRow input[type=range] { flex:1; margin-bottom:0; }
   #playerScrubberRow span { font-size:0.75rem; color:var(--text-muted); min-width:38px; text-align:center; }
-  #repeatBtn.active { color:var(--accent); box-shadow:0 0 8px rgba(229,169,104,0.4); }
+  #repeatBtn.active, #karaokeBtn.active { color:var(--accent); box-shadow:0 0 8px rgba(229,169,104,0.4); }
+  #karaokeBtn, #lyricsDocBtn { font-size:0.95rem; }
+  #lyricsDocBtn.hidden { display:none; }
+  @media (max-width: 420px) { #playerControls { gap:0.45rem; } }
+
+  /* Karaoke (synkad text) ovanför spelarkontrollerna */
+  #karaoke { text-align:center; padding:0.2rem 0.5rem 0.5rem; border-bottom:1px solid var(--border); margin-bottom:0.2rem; }
+  #karaoke.hidden { display:none; }
+  #karaoke div { line-height:1.35; min-height:1.35em; transition:opacity 0.2s ease, color 0.2s ease; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #karaoke .k-prev, #karaoke .k-next { color:var(--text-muted); font-size:0.85rem; opacity:0.55; }
+  #karaoke .k-cur { color:var(--accent); font-size:1.25rem; font-weight:700; font-family:'Roboto Condensed', sans-serif; white-space:normal; }
 
   #toast { position:fixed; bottom:8rem; right:1.5rem; background:var(--accent); color:#111317; padding:0.7rem 1.2rem; border-radius:0.6rem; font-weight:600; box-shadow:var(--card-shadow); z-index:999; display:none; }
 </style>
@@ -159,6 +169,11 @@
 </div>
 
 <div id="playerBar" class="hidden">
+  <div id="karaoke" class="hidden">
+    <div class="k-prev"></div>
+    <div class="k-cur"></div>
+    <div class="k-next"></div>
+  </div>
   <div id="playerTitle">–</div>
   <div id="playerScrubberRow">
     <span id="curTime">0:00</span>
@@ -170,6 +185,8 @@
     <button class="btn-outline" id="prevBtn" title="Föregående">⏮</button>
     <button class="btn-gold" id="playPauseBtn" title="Spela/Pausa">▶</button>
     <button class="btn-outline" id="nextBtn" title="Nästa">⏭</button>
+    <button class="btn-outline" id="karaokeBtn" title="Visa/dölj synkad text">🎤</button>
+    <button class="btn-outline hidden" id="lyricsDocBtn" title="Öppna sångtexten (dokument)">📄</button>
   </div>
 </div>
 
@@ -876,6 +893,7 @@ async function playTrackAt(index, offsetSeconds) {
   document.getElementById('durTime').textContent = '0:00';
   setPlayPauseIcon(false);
   markTrackRowLoading(item.rowId, true);
+  setPlayerSong(item.song);
 
   try {
     await ensureAudioCtx();
@@ -1087,6 +1105,108 @@ function updateMediaSession(item) {
     const newIdx = Math.min(currentPlaylist.items.length - 1, currentIndex + 1);
     playTrackAt(newIdx, 0);
   });
+}
+
+// =========================================================
+// Synkad text (karaoke) + sångtextdokument i spelaren
+// =========================================================
+let karaokeOn = true;
+try { karaokeOn = localStorage.getItem('hv-karaoke') !== 'off'; } catch (e) {}
+let karaokeLines = [];   // [{ time, text }] sorterat på tid
+let karaokeIdx = -2;
+let playerSong = null;
+
+function parseLrc(lrc) {
+  const out = [];
+  (lrc || '').split(/\r?\n/).forEach(line => {
+    const tags = [];
+    let rest = line, m;
+    while ((m = rest.match(/^\s*\[(\d+):(\d+(?:[.:]\d+)?)\]/))) {
+      tags.push(parseInt(m[1], 10) * 60 + parseFloat(m[2].replace(':', '.')));
+      rest = rest.slice(m[0].length);
+    }
+    if (!tags.length) return; // metadata som [ti:...]
+    const text = rest.replace(/<\d+:\d+(?:\.\d+)?>/g, '').trim();
+    tags.forEach(t => out.push({ time: t, text }));
+  });
+  return out.sort((a, b) => a.time - b.time);
+}
+
+function currentElapsed() {
+  if (!audioCtx) return 0;
+  if (isPlaying) return Math.max(0, playStartOffset + (audioCtx.currentTime - playStartCtxTime));
+  return pausedOffset || 0;
+}
+
+function setPlayerSong(song) {
+  playerSong = song;
+  karaokeLines = parseLrc(song && song.lyrics_lrc);
+  karaokeIdx = -2;
+  pausedOffset = 0;
+  const hasSync = karaokeLines.some(l => l.text);
+  const btn = document.getElementById('karaokeBtn');
+  btn.disabled = !hasSync;
+  btn.title = hasSync ? 'Visa/dölj synkad text' : 'Ingen synkad text för den här låten';
+  document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
+  document.getElementById('lyricsDocBtn').classList.toggle('hidden', !(song && song.lyrics_pdf_path));
+  renderKaraoke(true);
+}
+
+function renderKaraoke(force) {
+  if (!karaokeOn || !karaokeLines.length) return;
+  const t = currentElapsed();
+  let idx = -1;
+  for (let i = 0; i < karaokeLines.length; i++) {
+    if (karaokeLines[i].time <= t) idx = i; else break;
+  }
+  if (idx === karaokeIdx && !force) return;
+  karaokeIdx = idx;
+  const box = document.getElementById('karaoke');
+  const cur = idx >= 0 ? karaokeLines[idx] : null;
+  // föregående/nästa = närmaste rader med text (tomma rader = paus)
+  let prev = null, next = null;
+  for (let i = idx - 1; i >= 0; i--) { if (karaokeLines[i].text) { prev = karaokeLines[i]; break; } }
+  for (let i = idx + 1; i < karaokeLines.length; i++) { if (karaokeLines[i].text) { next = karaokeLines[i]; break; } }
+  const inPause = !cur || !cur.text;
+  box.querySelector('.k-prev').textContent = inPause ? '' : (prev ? prev.text : '');
+  box.querySelector('.k-cur').textContent = cur && cur.text ? cur.text : (idx >= 0 ? '♪' : '');
+  box.querySelector('.k-next').textContent = next ? next.text : '';
+}
+
+(function karaokeLoop() {
+  renderKaraoke(false);
+  requestAnimationFrame(karaokeLoop);
+})();
+
+document.getElementById('karaokeBtn').classList.toggle('active', karaokeOn);
+document.getElementById('karaokeBtn').addEventListener('click', (e) => {
+  karaokeOn = !karaokeOn;
+  try { localStorage.setItem('hv-karaoke', karaokeOn ? 'on' : 'off'); } catch (err) {}
+  e.currentTarget.classList.toggle('active', karaokeOn);
+  const hasSync = karaokeLines.some(l => l.text);
+  document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
+  renderKaraoke(true);
+});
+
+document.getElementById('lyricsDocBtn').addEventListener('click', async () => {
+  const path = playerSong && playerSong.lyrics_pdf_path;
+  if (!path) return;
+  // Öppna fönstret direkt (i klick-händelsen) så att popup-blockerare inte stoppar det
+  const win = window.open('', '_blank');
+  const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(path, 3600);
+  if (error || !data) { if (win) win.close(); toast('Kunde inte öppna dokumentet'); return; }
+  const url = path.toLowerCase().endsWith('.docx')
+    ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(data.signedUrl)}`
+    : data.signedUrl;
+  if (win) win.location.href = url; else window.location.href = url;
+});
+
+// Håll sidans nederkant fri från den (nu högre) spelarlisten
+if (window.ResizeObserver) {
+  new ResizeObserver(() => {
+    const bar = document.getElementById('playerBar');
+    if (!bar.classList.contains('hidden')) document.body.style.paddingBottom = (bar.offsetHeight + 16) + 'px';
+  }).observe(document.getElementById('playerBar'));
 }
 </script>
 </body>

@@ -276,7 +276,7 @@ footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--lin
 
   <footer>
     <div class="cta"><a class="cbtn main" href="/logga-in.html">Logga in</a><a class="cbtn" href="/registrera.html">Registrera dig</a><a class="cbtn" href="/">Till startsidan</a></div>
-    <p>Låtar, namn och datum i demon är exempel. Sökvägarna under varje rubrik är de riktiga sidorna på heavyvoices.se. Musiken är skriven för guiden och spelad med samplade instrument ur ljudbanken FluidR3 GM (MIT-licens).</p>
+    <p>Låtar, namn och datum i demon är exempel. Sökvägarna under varje rubrik är de riktiga sidorna på heavyvoices.se. Musik: <a href="https://freemusicarchive.org/music/Loyalty_Freak_Music/HYPER_METAL_/Loyalty_Freak_Music_-_HYPER_METAL__-_03_MEGA_METAL" target="_blank" rel="noopener" style="color:var(--accent)">MEGA METAL</a> av Loyalty Freak Music (CC0, fri att använda).</p>
   </footer>
 </div>
 
@@ -599,9 +599,9 @@ $('#playBtn').onclick = () => {
 };
 
 
-/* ---------- Bakgrundsmusik: egenkomponerad rockloop, inspelad med samplade riktiga instrument ---------- */
+/* ---------- Bakgrundsmusik: "MEGA METAL" av Loyalty Freak Music (CC0), loopas ---------- */
 const Music = (() => {
-  const SRC = 'guide-rock.mp3', LOOP_END = 96 * 60 / 138; // 24 takter i 138 BPM
+  const SRC = 'guide-musik.mp3';
   let ctx, gain, buf, src, on = false, loading = null;
   async function load() {
     ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
@@ -619,8 +619,7 @@ const Music = (() => {
     await ctx.resume();
     if (!src) {
       src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
-      src.loopStart = 0; src.loopEnd = Math.min(LOOP_END, buf.duration);
-      src.connect(gain); src.start();
+            src.connect(gain); src.start();
     }
     gain.gain.cancelScheduledValues(ctx.currentTime);
     gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);

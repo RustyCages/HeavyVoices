@@ -295,7 +295,6 @@ footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--lin
       <div class="now" aria-live="polite">
         <div class="count" id="count">Steg 1 av 10</div>
         <h2 id="title"></h2>
-        <code class="path" id="path"></code>
         <p id="desc"></p>
         <ul class="tips" id="tips"></ul>
       </div>
@@ -311,7 +310,7 @@ footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--lin
 
   <footer>
     <div class="cta" id="cta"></div>
-    <p>Låtar, namn och datum i demon är exempel. Sökvägarna under varje rubrik är de riktiga sidorna på heavyvoices.se. Musik: <a href="https://freemusicarchive.org/music/Loyalty_Freak_Music/" target="_blank" rel="noopener" style="color:var(--accent)">Dirty shoes blues</a> av Loyalty Freak Music (CC0, fri att använda).</p>
+    <p>Låtar, namn och datum i demon är exempel. Musik: <a href="https://freemusicarchive.org/music/Loyalty_Freak_Music/" target="_blank" rel="noopener" style="color:var(--accent)">Dirty shoes blues</a> av Loyalty Freak Music (CC0, fri att använda).</p>
   </footer>
 </div>
 
@@ -679,7 +678,6 @@ function render() {
   const step = track[idx]; const id = ++run;
   $('#count').textContent = `Steg ${idx+1} av ${track.length}`;
   $('#title').textContent = step.t;
-  $('#path').textContent = step.path;
   $('#desc').textContent = step.d;
   $('#tips').innerHTML = step.tips.map(t => `<li>${t}</li>`).join('');
   $('#url').innerHTML = step.url;

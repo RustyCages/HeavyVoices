@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="Animerad guide till Heavy Voices medlemsportal: registrering, repertoar, stämövning, kalender och admin.">
+<meta name="description" content="Animerade guider till Heavy Voices: så blir du medlem, så funkar medlemssidan och adminguide.">
 <link rel="icon" href="/heavyvoices-logo.png">
 <title>Heavy Voices Guide</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -179,6 +179,44 @@ button:focus-visible, .step:focus-visible { outline: 2px solid var(--accent); ou
 .ripple { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid var(--accent); z-index: 8; animation: rip .6s ease-out forwards; pointer-events: none; }
 @keyframes rip { to { transform: scale(4); opacity: 0; } }
 
+/* Rullande karaoke-text */
+.kbox { position: relative; height: 64px; overflow: hidden; margin-bottom: 2px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 28%, #000 72%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 28%, #000 72%, transparent 100%); }
+.kreel { position: absolute; left: 0; right: 0; top: 0; transition: transform .55s cubic-bezier(.22,1,.36,1); }
+.kl { text-align: center; font: 700 13px/1.3 var(--f-head); padding: 2px 8px; min-height: 1.3em; opacity: .35; transform: scale(.8); transition: transform .55s cubic-bezier(.22,1,.36,1), opacity .45s, color .45s, text-shadow .45s; }
+.kl.on { color: var(--accent); opacity: 1; transform: none; text-shadow: 0 0 12px rgba(229,169,104,.35); }
+.kl.past { opacity: .2; }
+.kl.kp { font-size: 11px; }
+.xbtn { position: absolute; top: 6px; right: 8px; width: 22px; height: 22px; border-radius: 6px; background: rgba(255,255,255,.08); border: 1px solid var(--line); display: grid; place-items: center; font-size: 11px; z-index: 2; transition: transform .15s; }
+.xbtn.big { top: 10px; right: 10px; width: 28px; height: 28px; font-size: 13px; }
+.xbtn.pressed { transform: scale(.88); }
+.fs { position: absolute; inset: 0; z-index: 7; flex-direction: column; gap: 8px; padding: 44px 10px 14px; animation: viewIn .35s ease both;
+  background: var(--bg); background-image: radial-gradient(circle at 50% 0%, #1d222e 0%, #121418 75%); }
+.fs .kbox { flex: 1; height: auto; }
+.fs .kl { font-size: 19px; padding: 6px 8px; }
+.fs .kl.kp { font-size: 15px; }
+.fsbot { display: flex; flex-direction: column; gap: 6px; font-size: 11px; text-align: center; }
+
+/* Admin: medlemsrader, mejl, bekräftelse */
+.mrow { display: grid; grid-template-columns: 16px minmax(0,1fr) auto auto; gap: 7px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; background: rgba(255,255,255,.03); transition: border-color .25s, opacity .3s; }
+.mrow .t b { display: block; font-weight: 500; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mrow .t small { display: block; color: var(--muted); font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mrow.hot, .mail.hot { border-color: rgba(229,169,104,.55); box-shadow: 0 0 18px rgba(229,169,104,.18); }
+.mrow.dim { opacity: .6; }
+.paid { font-size: 9.5px; color: var(--muted); white-space: nowrap; transition: color .3s, transform .15s; }
+.paid.on { color: var(--ok); }
+.pill.paused { background: rgba(248,113,113,.15); color: #f87171; }
+.pill.pressed, .paid.pressed { transform: scale(.92); }
+.mail { border: 1px solid var(--line); border-radius: 12px; background: #1c2029; padding: 11px; display: flex; flex-direction: column; gap: 6px; font-size: 11px; transition: border-color .25s, box-shadow .25s; }
+.mail small { color: var(--muted); font-size: 10px; }
+.mail b { font-size: 12.5px; line-height: 1.3; }
+.mail p { margin: 0; color: var(--muted); font-size: 10.5px; }
+.mail .btn { align-self: flex-start; margin-top: 4px; }
+.donecard { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; }
+.donecard .big { font-size: 34px; color: var(--ok); line-height: 1; }
+.confirm { border: 1px solid rgba(229,169,104,.4); border-radius: 10px; background: #232937; padding: 8px 10px; font-size: 10.5px; line-height: 1.4; }
+
 /* ---------- Text & kontroller ---------- */
 .side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .now { display: flex; flex-direction: column; gap: 8px; }
@@ -231,15 +269,12 @@ footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--lin
 <div class="wrap">
   <header>
     <div class="brand">
-      <small>heavyvoices.se · guide</small>
-      <h1>Så funkar Heavy Voices</h1>
-      <p>Följ med steg för steg: från registrering till att öva din stämma, och vad admin gör bakom kulisserna.</p>
+      <small id="kicker">heavyvoices.se · guide</small>
+      <h1 id="h1">Så funkar Heavy Voices</h1>
+      <p id="lead">Följ med steg för steg.</p>
     </div>
     <div class="hdr-right">
-    <div class="track" role="group" aria-label="Välj guide">
-      <button id="tMember" aria-pressed="true">Medlem</button>
-      <button id="tAdmin" aria-pressed="false">Admin</button>
-    </div>
+    <div class="track" id="trackSel" role="group" aria-label="Välj guide"></div>
     <button class="music" id="musicBtn" aria-pressed="false" title="Bakgrundsmusik"><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span><span id="musicLbl">Musik av</span></button>
     </div>
   </header>
@@ -275,7 +310,7 @@ footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--lin
   </div>
 
   <footer>
-    <div class="cta"><a class="cbtn main" href="/logga-in.html">Logga in</a><a class="cbtn" href="/registrera.html">Registrera dig</a><a class="cbtn" href="/">Till startsidan</a></div>
+    <div class="cta" id="cta"></div>
     <p>Låtar, namn och datum i demon är exempel. Sökvägarna under varje rubrik är de riktiga sidorna på heavyvoices.se. Musik: <a href="https://freemusicarchive.org/music/Loyalty_Freak_Music/" target="_blank" rel="noopener" style="color:var(--accent)">Dirty shoes blues</a> av Loyalty Freak Music (CC0, fri att använda).</p>
   </footer>
 </div>
@@ -293,35 +328,64 @@ const bar = (who) => `<div class="appbar"><span class="logo">Heavy Voices</span>
 const tile = (id, ic, name, sub) => `<div class="tile" id="${id}"><div class="ic">${IC[ic]}</div><b>${name}</b><span>${sub}</span></div>`;
 const toast = (txt) => `<div class="toast" id="toast"><span class="dot"></span>${txt}</div>`;
 const lyrics = ['Vi tänder ljusen, scenen är vår', 'varje röst en tråd i samma väv', 'när basen bär och tenoren slår', 'blir vi ett enda andetag'];
+const reel = (id) => `<div class="kbox" id="${id}box"><div class="kreel" id="${id}"><div class="kl"></div>${lyrics.map(l => `<div class="kl">${l}</div>`).join('')}<div class="kl kp">♪</div></div></div>`;
+const statusPill = (st) => ({ wait: 'Väntar', ok: 'Godkänd', paused: 'Pausad' }[st]);
+const mrow = (id, name, sub, paid, st) => `<div class="mrow" id="${id}"><span class="chk" id="${id}c"></span><div class="t"><b>${name}</b><small>${sub}</small></div><span class="paid${paid ? ' on' : ''}" id="${id}p">${paid ? '✓ Betalt' : 'Ej betalt'}</span><span class="pill ${st}" id="${id}s">${statusPill(st)}</span></div>`;
+const mail = (id, from, subj, body, btn) => `<div class="mail off" id="${id}"><small>${from}</small><b>${subj}</b><p>${body}</p>${btn ? `<div class="btn sm" id="${id}b">${btn}</div>` : ''}</div>`;
 
-const MEMBER = [
+/* ======================= KOM IGÅNG (startsidan) ======================= */
+const REG = [
  { t: 'Registrera dig', path: '/registrera.html', url: 'heavyvoices.se/<b>registrera.html</b>',
-   d: 'Nya medlemmar skapar sitt konto själva. Fyll i namn, e-post, vilken stämma du sjunger och ett lösenord.',
-   tips: ['Välj rätt stämma, den styr vilka övningsfiler som lyfts fram för dig.', 'Kontot är inte aktivt direkt. Det väntar på att en admin godkänner det.'],
-   html: `${bar()}<h3 class="s-h">Registrera dig</h3>
-     <div class="field"><label>Namn</label><div class="in ph" id="f1">Ditt namn</div></div>
-     <div class="field"><label>E-post</label><div class="in ph" id="f2">namn@exempel.se</div></div>
-     <div class="field"><label>Stämma</label><div class="in ph" id="f3">Välj stämma ▾</div></div>
-     <div class="field"><label>Lösenord</label><div class="in ph" id="f4">Minst 8 tecken</div></div>
-     <div class="btn" id="b1">Registrera</div>${toast('Konto skapat. Väntar på godkännande.')}`,
-   act: [['type','#f1','Anna Berg'],['type','#f2','anna.berg@exempel.se'],['tap','#f3'],['text','#f3','Alt'],['type','#f4','••••••••••'],['tap','#b1'],['add','#toast','in'],['wait',1400]] },
+   d: 'Nya medlemmar skapar sitt konto själva. Fyll i namn, e-post, vilken stämma du sjunger och ett lösenord, och tryck Registrera.',
+   tips: ['Vet du inte vilken stämma du sjunger? Välj "Vet inte / osäker", det går att ändra senare.', 'Lösenordet måste vara minst 6 tecken.'],
+   html: `${bar()}<div id="form" style="display:flex;flex-direction:column;gap:9px"><h3 class="s-h">Registrera dig</h3>
+     <div class="field"><label>Namn</label><div class="in ph" id="f1">Namn</div></div>
+     <div class="field"><label>E-post</label><div class="in ph" id="f2">E-post</div></div>
+     <div class="field"><label>Stämma</label><div class="in ph" id="f3">Välj din stämma ▾</div></div>
+     <div class="field"><label>Lösenord</label><div class="in ph" id="f4">Minst 6 tecken</div></div>
+     <div class="btn" id="b1">Registrera</div></div>
+     <div class="donecard off" id="done"><div class="big">✓</div><h3 class="s-h" style="font-size:17px">Tack för din registrering!</h3><p class="s-p">Admin har fått ett meddelande och godkänner ditt konto så snart som möjligt.</p><div class="btn" id="ok" style="width:100%">OK</div></div>`,
+   act: [['type','#f1','Anna Berg'],['type','#f2','anna.berg@exempel.se'],['tap','#f3'],['text','#f3','Alt'],['type','#f4','••••••••'],['tap','#b1'],['hide','#form'],['show','#done','flex'],['wait',900],['tap','#ok'],['wait',600]] },
+
+ { t: 'Admin får besked direkt', path: 'mejl till admin', url: 'e-post',
+   d: 'I samma ögonblick som du registrerar dig får körens admin ett mejl om att någon väntar på godkännande. Du behöver alltså inte höra av dig, det sköter sig självt.',
+   tips: ['Det brukar gå fort, men admin är också körmedlem med ett vanligt liv. Ge det gärna en dag.'],
+   html: `${bar('Admin')}<div class="center" style="flex:0;margin-top:8px"><div class="hour" style="animation:none">✉</div><p class="s-p">Adminens inkorg</p></div>
+     ${mail('m1','no-reply@heavyvoices.se','Ny registrering: Anna Berg väntar på godkännande','Namn: Anna Berg · Stämma: Alt','Öppna medlemmar och godkänn')}`,
+   act: [['wait',700],['show','#m1','flex'],['hot','#m1'],['wait',900],['tap','#m1b'],['wait',900]] },
 
  { t: 'Vänta på godkännande', path: '/vantar.html', url: 'heavyvoices.se/<b>vantar.html</b>',
-   d: 'Tills en admin har godkänt dig hamnar du på väntesidan, även om du försöker logga in. När du är godkänd kommer ett mejl.',
+   d: 'Försöker du logga in innan kontot är godkänt hamnar du på väntesidan. När admin har godkänt dig får du ett välkomstmejl.',
    tips: ['Mejlet kommer från no-reply@heavyvoices.se. Titta i skräpposten om det dröjer.'],
-   html: `${bar()}<div class="center"><div class="hour">⌛</div><h3 class="s-h">Väntar på godkännande</h3><p class="s-p">En admin går igenom din ansökan. Du får ett mejl när ditt konto är aktiverat.</p></div>
-     <div class="notif" id="nt"><small>E-post · no-reply@heavyvoices.se</small><b>Välkommen till Heavy Voices!</b> Ditt konto är godkänt, nu kan du logga in.</div>`,
-   act: [['wait',1800],['add','#nt','in'],['wait',2200]] },
+   html: `${bar()}<div class="center"><div class="hour">⌛</div><h3 class="s-h">Väntar på godkännande</h3><p class="s-p">Ditt konto är registrerat men väntar fortfarande på att en admin godkänner det.</p></div>
+     <div class="notif" id="nt"><small>E-post · no-reply@heavyvoices.se</small><b>Ditt konto hos Heavy Voices är godkänt</b><br>Välkommen, Anna! Nu kan du logga in.</div>`,
+   act: [['wait',1800],['add','#nt','in'],['wait',2400]] },
 
  { t: 'Logga in', path: '/logga-in.html', url: 'heavyvoices.se/<b>logga-in.html</b>',
-   d: 'Logga in med din e-post och ditt lösenord. Du kommer direkt till medlemssidan.',
-   tips: ['Glömt lösenordet? Be en admin skicka en ny inbjudan, eller byt lösenord under Mitt konto när du är inne.'],
+   d: 'Tryck Logga in i välkomstmejlet eller på startsidan. Använd e-postadressen och lösenordet du valde när du registrerade dig.',
+   tips: ['Glömt lösenordet? Hör av dig till en admin. När du är inloggad kan du själv byta lösenord under Mitt konto.'],
    html: `${bar()}<h3 class="s-h">Logga in</h3>
-     <div class="field"><label>E-post</label><div class="in ph" id="f1">namn@exempel.se</div></div>
+     <div class="field"><label>E-post</label><div class="in ph" id="f1">E-post</div></div>
      <div class="field"><label>Lösenord</label><div class="in ph" id="f2">Lösenord</div></div>
      <div class="btn" id="b1">Logga in</div><p class="s-p" style="text-align:center">Ny i kören? <span style="color:var(--accent)">Registrera dig</span></p>`,
-   act: [['type','#f1','anna.berg@exempel.se'],['type','#f2','••••••••••'],['tap','#b1'],['text','#b1','Loggar in…'],['wait',900]] },
+   act: [['type','#f1','anna.berg@exempel.se'],['type','#f2','••••••••'],['tap','#b1'],['text','#b1','Loggar in…'],['wait',900]] },
 
+ { t: 'Välkommen in!', path: '/medlem/', url: 'heavyvoices.se/<b>medlem/</b>',
+   d: 'Nu är du inne på medlemssidan. Här finns repertoaren med övningsfiler och karaoke-text, kalendern, information från styrelsen och ditt konto.',
+   tips: ['På medlemssidan finns en egen guide som visar hur allt fungerar.', 'Lägg sidan på hemskärmen, så är du ett tryck från repertoaren.'],
+   html: `${bar('Anna · Alt')}<h3 class="s-h">Hej Anna!</h3><p class="s-p">Vad vill du göra idag?</p>
+     <div class="tiles">${tile('k1','music','Repertoar','Öva låtar och stämmor')}${tile('k2','cal','Kalender','Rep och konserter')}${tile('k3','info','Information','Nyheter och filer')}${tile('k4','user','Mitt konto','Lösenord')}</div>`,
+   act: [['wait',500],['hot','#k1'],['wait',500],['hot','#k2'],['wait',500],['hot','#k3'],['wait',500],['hot','#k4'],['wait',1000]] },
+
+ { t: 'Om medlemskapet pausas', path: '/vantar.html', url: 'heavyvoices.se/<b>vantar.html</b>',
+   d: 'Admin kan pausa ett medlemskap, till exempel om terminsavgiften inte är betald. Då kommer du inte åt medlemssidorna förrän kontot öppnas igen.',
+   tips: ['Kontakta kören eller en admin, så öppnas kontot igen så fort det är löst.'],
+   html: `${bar()}<div class="center"><div class="hour" style="border-color:#f87171;color:#f87171;animation:none">❚❚</div><h3 class="s-h">Medlemskapet är pausat</h3><p class="s-p">Ditt medlemskap är tillfälligt pausat, till exempel för att medlemsavgiften inte är registrerad som betald.</p><div class="btn ghost">Logga ut</div></div>`,
+   act: [['wait',2600]] },
+];
+
+/* ======================= MEDLEM (efter inloggning) ======================= */
+const MEMBER = [
  { t: 'Medlemssidan', path: '/medlem/', url: 'heavyvoices.se/<b>medlem/</b>',
    d: 'Startsidan för medlemmar. Härifrån når du allt: repertoaren med övningsfiler, kalendern, information från styrelsen och ditt konto.',
    tips: ['Spara sidan som bokmärke eller lägg den på hemskärmen, så är du ett tryck från repertoaren.'],
@@ -349,16 +413,24 @@ const MEMBER = [
          ['style','#m1',{width:'20%'}],['text','#v1','20'],['style','#m3',{width:'20%'}],['text','#v3','20'],['style','#m4',{width:'20%'}],['text','#v4','20'],['wait',500],
          ['tap','#m2'],['style','#m2',{width:'100%'}],['text','#v2','100'],['wait',1600]] },
 
- { t: 'Text och karaoke', path: '/medlem/repertoar.html', url: 'heavyvoices.se/medlem/<b>repertoar.html</b>',
-   d: 'I spelaren finns två textknappar. Dokumentikonen visar hela sångtexten. Mikrofonen visar karaoke: raden som sjungs just nu lyser upp i takt med musiken.',
-   tips: ['Karaoke finns på låtar där en admin har synkat texten.', 'Knappen uppe till höger förstorar texten och fäller ut spelaren till helskärm.'],
-   html: `${bar('Anna · Alt')}<h3 class="s-h">Stormens öga</h3>
-     <div class="lyr plain off" id="lp">${lyrics.map(l=>`<p>${l}</p>`).join('')}</div>
-     <div class="lyr off" id="lk">${lyrics.map((l,i)=>`<p id="k${i}">${l}</p>`).join('')}</div>
-     <div class="player" id="pl"><div class="pt"><b>Stormens öga</b><span>1:05</span></div><div class="bar"><i id="pb" style="width:25%"></i></div>
-       <div class="ctrls"><span>⏮</span><span class="pp">❚❚</span><span>⏭</span><span class="ico" id="mic">🎤</span><span class="ico" id="doc">📄</span></div></div>`,
-   act: [['tap','#doc'],['add','#doc','on'],['show','#lp'],['wait',1500],['tap','#mic'],['rm','#doc','on'],['hide','#lp'],['add','#mic','on'],['show','#lk'],['style','#pb',{width:'70%'}],
-         ['add','#k0','on'],['wait',1100],['swap','#k0','#k1'],['wait',1100],['swap','#k1','#k2'],['wait',1100],['swap','#k2','#k3'],['wait',1200]] },
+ { t: 'Rullande karaoke-text', path: '/medlem/repertoar.html', url: 'heavyvoices.se/medlem/<b>repertoar.html</b>',
+   d: 'På låtar där texten är synkad visas den ovanför spelarkontrollerna. Raden som sjungs just nu lyser i guld och texten rullar mjukt uppåt i takt med musiken.',
+   tips: ['Mikrofonknappen 🎤 slår på och av texten. Ditt val sparas.', 'Dokumentknappen 📄 öppnar hela sångtexten som fil, om en sådan är uppladdad.', 'Tomma rader (♪) betyder att ingen sjunger just då, till exempel under ett solo.'],
+   html: `${bar('Anna · Alt')}<h3 class="s-h">Repertoar</h3>
+     <div class="row hot"><span class="play">❚❚</span><div class="t"><b>Stormens öga</b><small>Spelas nu</small></div></div>
+     <div class="player" id="pl" style="margin-top:auto"><div class="kwrap off" id="kw">${reel('rl')}</div><div class="pt"><b>Stormens öga</b><span>1:05</span></div><div class="bar"><i id="pb" style="width:25%"></i></div>
+       <div class="ctrls"><span>⏮</span><span class="pp">❚❚</span><span>⏭</span><span class="ico" id="mic">🎤</span><span class="ico">📄</span></div></div>`,
+   act: [['wait',500],['tap','#mic'],['add','#mic','on'],['show','#kw'],['kstep','#rl',0],['style','#pb',{width:'70%'}],['wait',600],
+         ['kstep','#rl',1],['wait',1300],['kstep','#rl',2],['wait',1300],['kstep','#rl',3],['wait',1300],['kstep','#rl',4],['wait',1300],['kstep','#rl',5],['wait',1400]] },
+
+ { t: 'Texten i helskärm', path: '/medlem/repertoar.html', url: 'heavyvoices.se/medlem/<b>repertoar.html</b>',
+   d: 'Tryck på förstora-knappen ⛶ uppe till höger i spelaren så fyller texten hela skärmen, med stor stil. Spelarkontrollerna finns kvar längst ner.',
+   tips: ['Skärmen hålls tänd så länge helskärmsläget är öppet, perfekt när du sjunger med.', 'Tryck ✕ för att gå tillbaka.'],
+   html: `${bar('Anna · Alt')}<h3 class="s-h">Repertoar</h3>
+     <div class="player" id="pl" style="margin-top:auto;position:relative"><span class="xbtn" id="ex">⛶</span>${reel('rs')}<div class="pt"><b>Stormens öga</b><span>1:20</span></div><div class="bar"><i style="width:35%"></i></div>
+       <div class="ctrls"><span>⏮</span><span class="pp">❚❚</span><span>⏭</span><span class="ico on">🎤</span><span class="ico">📄</span></div></div>
+     <div class="fs" id="fs" style="display:none"><span class="xbtn big" id="fx">✕</span>${reel('rb')}<div class="fsbot"><b>Stormens öga</b><div class="bar"><i style="width:40%"></i></div><div class="ctrls"><span>⏮</span><span class="pp">❚❚</span><span>⏭</span><span class="ico on">🎤</span></div></div></div>`,
+   act: [['kstep','#rs',2],['wait',900],['tap','#ex'],['style','#fs',{display:'flex'}],['kstep','#rb',2],['wait',900],['kstep','#rb',3],['wait',1300],['kstep','#rb',4],['wait',1300],['tap','#fx'],['style','#fs',{display:'none'}],['wait',700]] },
 
  { t: 'Egna spellistor', path: '/medlem/skapa-spellista.html', url: 'heavyvoices.se/medlem/<b>skapa-spellista.html</b>',
    d: 'Samla de låtar du vill öva på inför en viss konsert i en egen spellista. Listan sparar även din stämmix per låt, och spelas i ordning med ett tryck.',
@@ -402,36 +474,77 @@ const MEMBER = [
    d: 'Byt lösenord när du vill. Skriv det nya två gånger och spara.',
    tips: ['Fick du en inbjudan via mejl sätter du ditt första lösenord på en egen sida via länken i mejlet.'],
    html: `${bar('Anna · Alt')}<h3 class="s-h">Mitt konto</h3><p class="s-p">anna.berg@exempel.se · Alt</p>
-     <div class="field"><label>Nytt lösenord</label><div class="in ph" id="f1">Minst 8 tecken</div></div>
+     <div class="field"><label>Nytt lösenord</label><div class="in ph" id="f1">Minst 6 tecken</div></div>
      <div class="field"><label>Upprepa lösenord</label><div class="in ph" id="f2">Samma igen</div></div>
      <div class="btn" id="b1">Spara nytt lösenord</div>${toast('Lösenordet är uppdaterat.')}`,
-   act: [['type','#f1','••••••••••••'],['type','#f2','••••••••••••'],['tap','#b1'],['add','#toast','in'],['wait',1600]] },
+   act: [['type','#f1','••••••••••'],['type','#f2','••••••••••'],['tap','#b1'],['add','#toast','in'],['wait',1600]] },
 ];
 
+/* ======================= ADMIN ======================= */
 const ADMIN = [
  { t: 'Adminsidan', path: '/admin/', url: 'heavyvoices.se/<b>admin/</b>',
    d: 'Admin har en egen startsida med verktyg för att sköta kören. Som admin kommer du också åt allt i medlemsvyn.',
-   tips: ['Bara konton med rollen admin kommer in hit. Andra skickas vidare till medlemssidan.'],
+   tips: ['Bara godkända konton med rollen admin kommer in hit. Andra skickas vidare till medlemssidan.'],
    html: `${bar('Niklas · Admin')}<h3 class="s-h">Admin</h3>
-     <div class="tiles">${tile('k1','users','Medlemmar','Godkänn, bjud in, roller')}${tile('k2','music','Låtar','Stämfiler och text')}${tile('k3','cal','Kalender','Rep och konserter')}${tile('k4','info','Information','Nyheter till kören')}</div>
+     <div class="tiles">${tile('k1','users','Medlemmar','Godkänn, avgift, mejl')}${tile('k2','music','Repertoar','Stämfiler och text')}${tile('k3','cal','Kalender','Rep och konserter')}${tile('k4','info','Information','Nyheter till kören')}</div>
      ${tile('k5','folder','Filer','Dela och organisera dokument i mappar')}`,
    act: [['wait',500],['hot','#k2'],['wait',400],['hot','#k3'],['wait',400],['hot','#k4'],['wait',400],['hot','#k5'],['wait',400],['tap','#k1'],['hot','#k1'],['wait',900]] },
 
- { t: 'Godkänn och bjud in', path: '/admin/medlemmar.html', url: 'heavyvoices.se/admin/<b>medlemmar.html</b>',
-   d: 'Nya registreringar dyker upp som väntande. Godkänn dem med ett tryck. Du kan också bjuda in någon direkt via mejl, ändra roll eller ta bort ett konto.',
-   tips: ['Den som godkänns får ett mejl från no-reply@heavyvoices.se.', 'Att ta bort en medlem raderar även inloggningen helt.'],
+ { t: 'Mejl vid ny registrering', path: 'mejl till admin', url: 'e-post',
+   d: 'När någon registrerar sig får alla admins ett mejl direkt, med namn, e-post och stämma. Knappen i mejlet tar dig raka vägen till medlemslistan.',
+   tips: ['Svarar du på mejlet går svaret direkt till personen som registrerade sig.'],
+   html: `${bar('Niklas · Admin')}<div class="center" style="flex:0;margin-top:8px"><div class="hour" style="animation:none">✉</div><p class="s-p">Inkorgen</p></div>
+     ${mail('m1','no-reply@heavyvoices.se','Ny registrering: Anna Berg väntar på godkännande','Namn: Anna Berg · E-post: anna.berg@exempel.se · Stämma: Alt','Öppna medlemmar och godkänn')}`,
+   act: [['wait',700],['show','#m1','flex'],['hot','#m1'],['wait',1000],['tap','#m1b'],['wait',900]] },
+
+ { t: 'Godkänn nya medlemmar', path: '/admin/medlemmar.html', url: 'heavyvoices.se/admin/<b>medlemmar.html</b>',
+   d: 'Nya registreringar står som Väntar. Ändra statusen till Godkänd så får personen tillgång till sidan och ett välkomstmejl med länk till inloggningen.',
+   tips: ['Under "Bjud in ny medlem" kan du också lägga till någon själv, via mejlinbjudan eller med ett lösenord du sätter.', 'Rollen (Medlem/Admin) ändras i samma lista.'],
    html: `${bar('Niklas · Admin')}<h3 class="s-h">Medlemmar</h3>
-     <div class="row" id="r1"><div class="t"><b>Anna Berg</b><small>Alt · anna.berg@exempel.se</small></div><span class="pill wait" id="p1">Väntar</span></div>
-     <div class="btn sm" id="ok1" style="align-self:flex-end;margin-top:-4px">Godkänn</div>
-     <div class="row"><div class="t"><b>Johan Ek</b><small>Bas</small></div><span class="pill ok">Medlem</span></div>
-     <div class="row"><div class="t"><b>Sara Lind</b><small>Sopran</small></div><span class="pill ok">Admin</span></div>
-     <div class="field" style="margin-top:4px"><label>Bjud in via e-post</label><div class="in ph" id="f1">namn@exempel.se</div></div>
-     <div class="btn" id="b1">Skicka inbjudan</div>${toast('Inbjudan skickad till erik.sund@exempel.se')}`,
-   act: [['hot','#r1'],['wait',500],['tap','#ok1'],['text','#p1','Medlem'],['swapcls','#p1','wait','ok'],['hide','#ok1'],['wait',600],['type','#f1','erik.sund@exempel.se'],['tap','#b1'],['add','#toast','in'],['wait',1600]] },
+     ${mrow('a','Anna Berg','Alt · anna.berg@exempel.se',false,'wait')}
+     ${mrow('b','Johan Ek','Bas',true,'ok')}
+     ${mrow('c','Sara Lind','Sopran',true,'ok')}
+     ${toast('Anna är godkänd och har fått ett välkomstmejl.')}`,
+   act: [['hot','#a'],['wait',600],['tap','#as'],['text','#as','Godkänd'],['swapcls','#as','wait','ok'],['add','#toast','in'],['wait',1700]] },
+
+ { t: 'Medlemsavgift', path: '/admin/medlemmar.html', url: 'heavyvoices.se/admin/<b>medlemmar.html</b>',
+   d: 'Varje medlem har en ruta för om termins- eller månadsavgiften är betald. Överst ser du hur många av de godkända som har betalat.',
+   tips: ['"Ny avgiftsperiod…" nollställer alla till Ej betalt inför nästa termin.', 'Håll musen över Betalt för att se datumet då det markerades.'],
+   html: `${bar('Niklas · Admin')}<h3 class="s-h">Medlemmar</h3><p class="s-p" id="sum">Avgift betald: 1 av 4 godkända</p>
+     ${mrow('a','Anna Berg','Alt',false,'ok')}
+     ${mrow('b','Johan Ek','Bas',false,'ok')}
+     ${mrow('c','Sara Lind','Sopran',true,'ok')}
+     ${mrow('d','Erik Sund','Tenor',false,'ok')}
+     <div class="btn sm ghost" style="align-self:flex-end">Ny avgiftsperiod…</div>`,
+   act: [['wait',500],['tap','#ap'],['add','#ap','on'],['text','#ap','✓ Betalt'],['text','#sum','Avgift betald: 2 av 4 godkända'],['wait',300],
+         ['tap','#dp'],['add','#dp','on'],['text','#dp','✓ Betalt'],['text','#sum','Avgift betald: 3 av 4 godkända'],['wait',1500]] },
+
+ { t: 'Pausa medlemskap', path: '/admin/medlemmar.html', url: 'heavyvoices.se/admin/<b>medlemmar.html</b>',
+   d: 'Har någon inte betalat kan du sätta statusen till Pausad. Då kommer personen inte åt några medlemssidor, låtar eller filer förrän du ändrar tillbaka till Godkänd.',
+   tips: ['Den pausade ser ett meddelande om att medlemskapet är pausat och ombeds kontakta kören.', 'Du kan inte pausa dig själv.'],
+   html: `${bar('Niklas · Admin')}<h3 class="s-h">Medlemmar</h3>
+     ${mrow('a','Anna Berg','Alt',true,'ok')}
+     ${mrow('b','Johan Ek','Bas',false,'ok')}
+     ${mrow('c','Sara Lind','Sopran',true,'ok')}
+     <div class="confirm off" id="cf">Pausa Johan Ek? Hen kommer inte åt medlemssidorna förrän du ändrar tillbaka till Godkänd.<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px"><span class="btn sm ghost">Avbryt</span><span class="btn sm" id="cok">OK</span></div></div>`,
+   act: [['hot','#b'],['wait',500],['tap','#bs'],['show','#cf'],['wait',700],['tap','#cok'],['hide','#cf'],['text','#bs','Pausad'],['swapcls','#bs','ok','paused'],['add','#b','dim'],['wait',1700]] },
+
+ { t: 'Skicka mejl till medlemmar', path: '/admin/medlemmar.html', url: 'heavyvoices.se/admin/<b>medlemmar.html</b>',
+   d: 'Bocka i vilka som ska få mejlet, eller använd snabbknapparna Alla godkända eller Ej betalt. Skriv ämne och meddelande och tryck Skicka.',
+   tips: ['Skriv {namn} så byts det mot varje mottagares förnamn.', 'Alla får ett eget mejl och ser inte varandras adresser. Svar kommer till din e-post.'],
+   html: `${bar('Niklas · Admin')}<div class="tabs"><span>Alla godkända</span><span id="unp">Ej betalt</span><span>Inga</span></div>
+     ${mrow('a','Anna Berg','Alt',true,'ok')}
+     ${mrow('b','Johan Ek','Bas',false,'paused')}
+     ${mrow('d','Erik Sund','Tenor',false,'ok')}
+     <div class="field"><label>Ämne</label><div class="in ph" id="f1">Ämne</div></div>
+     <div class="field"><label>Meddelande</label><div class="in ph" id="f2" style="min-height:44px">Meddelande…</div></div>
+     <div class="btn" id="snd">Skicka mejl · <span id="cnt">0</span></div>${toast('Skickat till 2 st. ✓')}`,
+   act: [['tap','#unp'],['add','#unp','on'],['add','#bc','on'],['add','#dc','on'],['text','#cnt','2'],['wait',400],
+         ['type','#f1','Påminnelse: medlemsavgift'],['type','#f2','Hej {namn}! Glöm inte terminsavgiften.'],['tap','#snd'],['add','#toast','in'],['wait',1700]] },
 
  { t: 'Lägg till låtar', path: '/admin/latar.html', url: 'heavyvoices.se/admin/<b>latar.html</b>',
    d: 'Skapa en låt och ladda upp ett ljudspår per stämma plus komp. Lägg till sångtexten genom att klistra in den eller läsa in en fil, och bifoga noter som PDF.',
-   tips: ['Text från Word (.docx) och .txt behåller radbrytningarna. Från PDF hamnar varje sida på en rad, så kontrollera texten efteråt.'],
+   tips: ['Knappen 🎤 Synka text på varje låt tar dig direkt till textsynken. En ✓ visar att låten redan är synkad.'],
    html: `${bar('Niklas · Admin')}<h3 class="s-h">Låtar</h3>
      <div class="field"><label>Lägg till ny låt</label><div class="in ph" id="f1">Titel</div></div>
      <div class="btn" id="b1">Lägg till</div>
@@ -443,19 +556,21 @@ const ADMIN = [
          ['up','#u0'],['up','#u1'],['up','#u2'],['up','#u3'],['up','#u4'],['wait',500],['show','#tx','flex'],['wait',400],['show','#nt','flex'],['wait',1400]] },
 
  { t: 'Synka texten', path: '/admin/text-synk.html', url: 'heavyvoices.se/admin/<b>text-synk.html</b>',
-   d: 'Så skapas karaoke-texten. Spela låten och tryck TAP (eller mellanslag) i samma ögonblick som den markerade raden börjar sjungas. Spara, så syns texten rullande i medlemmarnas spelare.',
-   tips: ['Sänk tempot till 75 % om det går fort. Tiderna blir ändå rätt.', 'Tryck på en tid för att justera den för hand, t.ex. 1:23.45.', 'Synken kan exporteras och importeras som .lrc-fil.'],
-   html: `${bar('Niklas · Admin')}<h3 class="s-h">Textsynk</h3>
-     <div class="tabs"><span>50 %</span><span class="on" id="tp">75 %</span><span>100 %</span></div>
+   d: 'Välj låt i listan, spela och tryck TAP (eller mellanslag) när den markerade raden börjar sjungas. Tryck ♪ Paus (eller Enter) när det blir tyst. Spara, så rullar texten i medlemmarnas spelare.',
+   tips: ['Saknas texten kan du klistra in den eller läsa in en fil direkt på synksidan.', 'Sänk tempot till 75 % om det går fort. Tiderna blir ändå rätt.', 'Backsteg ångrar senaste tryck. Tider kan finjusteras med −/+.'],
+   html: `${bar('Niklas · Admin')}<div class="field"><label>Låt</label><div class="in" id="song">Stormens öga ▾</div></div>
      <div class="clock" id="clk">0:00.00</div>
-     <div class="sync">${lyrics.map((l,i)=>`<div class="sline${i===0?' cur':''}" id="s${i}"><code id="c${i}">–:–</code><span>${l}</span></div>`).join('')}</div>
-     <div class="tapbtn" id="tap">TAP</div>
-     <div class="btn ghost" id="sv" style="margin-top:auto">Spara synk</div>${toast('Synken är sparad. Karaoke är på.')}`,
-   act: [['clock','#clk'],['wait',700],
-         ['tap','#tap'],['text','#c0','0:12.40'],['synk',0],['wait',500],
-         ['tap','#tap'],['text','#c1','0:16.85'],['synk',1],['wait',500],
-         ['tap','#tap'],['text','#c2','0:21.10'],['synk',2],['wait',500],
-         ['tap','#tap'],['text','#c3','0:25.62'],['synk',3],['wait',400],
+     <div class="sync">${lyrics.slice(0,3).map((l,i)=>`<div class="sline${i===0?' cur':''}" id="s${i}"><code id="c${i}">–:–</code><span>${l}</span></div>`).join('')}
+       <div class="sline" id="sp" style="display:none"><code>0:24.80</code><span style="color:var(--muted)">♪ paus</span></div>
+       <div class="sline" id="s3"><code id="c3">–:–</code><span>${lyrics[3]}</span></div></div>
+     <div style="display:flex;gap:10px;justify-content:center;align-items:center"><div class="btn ghost" id="gap">♪ Paus</div><div class="tapbtn" id="tap">TAP</div></div>
+     <div class="btn ghost" id="sv" style="margin-top:auto">Spara synk</div>${toast('Synk sparad. Texten rullar nu i spelaren.')}`,
+   act: [['clock','#clk'],['wait',600],
+         ['tap','#tap'],['text','#c0','0:12.40'],['synk',0],['wait',400],
+         ['tap','#tap'],['text','#c1','0:16.85'],['synk',1],['wait',400],
+         ['tap','#tap'],['text','#c2','0:21.10'],['synk',2],['wait',400],
+         ['tap','#gap'],['style','#sp',{display:'grid'}],['wait',500],
+         ['tap','#tap'],['text','#c3','0:31.62'],['synk',3],['wait',400],
          ['tap','#sv'],['add','#toast','in'],['wait',1600]] },
 
  { t: 'Kalender', path: '/admin/kalender.html', url: 'heavyvoices.se/admin/<b>kalender.html</b>',
@@ -483,9 +598,21 @@ const ADMIN = [
    act: [['tap','#nf'],['show','#n1','flex'],['wait',300],['text','#nn','Noter'],['hot','#n1'],['wait',500],['tap','#ul'],['up','#u0'],['show','#n2','flex'],['add','#toast','in'],['wait',1600]] },
 ];
 
+const GUIDES = {
+  registrera: { steps: REG, label: 'Kom igång', kicker: 'heavyvoices.se · kom igång',
+    h1: 'Så blir du medlem', lead: 'Från registrering till första inloggningen: så går det till att gå med i Heavy Voices medlemsportal.',
+    cta: '<a class="cbtn main" href="/registrera.html">Registrera dig</a><a class="cbtn" href="/logga-in.html">Logga in</a><a class="cbtn" href="/">Till startsidan</a>' },
+  medlem: { steps: MEMBER, label: 'Medlem', kicker: 'heavyvoices.se · guide för medlemmar',
+    h1: 'Så funkar medlemssidan', lead: 'Öva din stämma, sjung med i den rullande texten, gör egna spellistor och håll koll på kalendern.',
+    cta: '<a class="cbtn main" href="/medlem/">Till medlemssidan</a><a class="cbtn" href="/medlem/repertoar.html">Till repertoaren</a>' },
+  admin: { steps: ADMIN, label: 'Admin', kicker: 'heavyvoices.se · guide för admin',
+    h1: 'Adminguide', lead: 'Godkänn medlemmar, håll koll på avgifter, skicka mejl, lägg upp låtar och synka texter.',
+    cta: '<a class="cbtn main" href="/admin/">Till adminsidan</a><a class="cbtn" href="/admin/medlemmar.html">Medlemmar</a>' },
+};
+
 const $ = (s, r=document) => r.querySelector(s);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-let track = MEMBER, idx = 0, playing = !reduce, run = 0, seen = new Set();
+let track = REG, idx = 0, playing = !reduce, run = 0, seen = new Set();
 const host = $('#viewHost'), finger = $('#finger'), screen = $('#screen');
 
 const sleep = (ms) => new Promise(r => setTimeout(r, reduce ? Math.min(ms, 60) : ms));
@@ -527,6 +654,13 @@ async function doAct(a, id) {
     case 'style': Object.assign(q(s).style, v); await sleep(200); break;
     case 'swap': q(s).classList.remove('on'); q(s).classList.add('done'); q(v).classList.add('on'); break;
     case 'up': { const el = q(s); el.querySelector('i').style.width = '100%'; await sleep(650); el.classList.add('done'); break; }
+    case 'kstep': {
+      const rl = q(s); if (!rl) break;
+      const box = rl.parentElement, els = rl.children, el = els[v]; if (!el) break;
+      [...els].forEach((c, i) => { c.classList.toggle('on', i === v && i > 0); c.classList.toggle('past', i < v); });
+      rl.style.transform = `translateY(${box.clientHeight / 2 - (el.offsetTop + el.offsetHeight / 2)}px)`;
+      await sleep(120); break;
+    }
     case 'synk': {
       const i = s; q('#s'+i).classList.remove('cur'); q('#s'+i).classList.add('set');
       const nx = q('#s'+(i+1)); if (nx) nx.classList.add('cur'); break;
@@ -582,15 +716,23 @@ function buildList() {
   });
 }
 function updatePlay() { $('#playBtn').textContent = playing ? 'Pausa' : (idx === track.length-1 ? 'Spela igen' : 'Spela'); }
-function setTrack(t) {
-  track = t; idx = 0; seen = new Set();
-  $('#tMember').setAttribute('aria-pressed', t === MEMBER); $('#tAdmin').setAttribute('aria-pressed', t === ADMIN);
-  try { localStorage.setItem('hv-guide-track', t === ADMIN ? 'admin' : 'member'); } catch (e) {}
+let trackKey = 'registrera';
+function setTrack(key) {
+  const g = GUIDES[key] || GUIDES.registrera;
+  trackKey = GUIDES[key] ? key : 'registrera';
+  track = g.steps; idx = 0; seen = new Set();
+  $('#kicker').textContent = g.kicker;
+  $('#h1').textContent = g.h1;
+  $('#lead').textContent = g.lead;
+  $('#cta').innerHTML = g.cta;
+  document.title = g.h1 + ' — Heavy Voices';
+  document.querySelectorAll('#trackSel button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === trackKey));
+  try { localStorage.setItem('hv-guide-track', trackKey); } catch (e) {}
   buildList(); render(); updatePlay();
 }
+$('#trackSel').innerHTML = Object.entries(GUIDES).map(([k, g]) => `<button data-k="${k}" aria-pressed="false">${g.label}</button>`).join('');
+document.querySelectorAll('#trackSel button').forEach(b => b.onclick = () => setTrack(b.dataset.k));
 
-$('#tMember').onclick = () => setTrack(MEMBER);
-$('#tAdmin').onclick = () => setTrack(ADMIN);
 $('#prev').onclick = () => { if (idx > 0) { idx--; render(); } };
 $('#next').onclick = () => { if (idx < track.length-1) { idx++; render(); } };
 $('#playBtn').onclick = () => {
@@ -644,9 +786,16 @@ document.addEventListener('visibilitychange', () => {
   else if (resumeMusic) { resumeMusic = false; Music.start(); }
 });
 
-let start = MEMBER;
-try { if (localStorage.getItem('hv-guide-track') === 'admin') start = ADMIN; } catch (e) {}
-setTrack(start);
+// ?guide=registrera|medlem|admin visar bara den guiden (utan väljare). Utan parameter: alla tre med väljare.
+const fixedGuide = new URLSearchParams(location.search).get('guide');
+if (fixedGuide && GUIDES[fixedGuide]) {
+  $('#trackSel').style.display = 'none';
+  setTrack(fixedGuide);
+} else {
+  let startKey = 'registrera';
+  try { const saved = localStorage.getItem('hv-guide-track'); if (GUIDES[saved]) startKey = saved; } catch (e) {}
+  setTrack(startKey);
+}
 </script>
 
 </body>

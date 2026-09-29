@@ -9,10 +9,11 @@
 </head>
 <body>
 
+<header class="site-header"><span class="site-logo">Heavy Voices</span></header>
 <div class="container">
-  <h1>Väntar på godkännande</h1>
+  <h1 id="waitTitle">Väntar på godkännande</h1>
   <div class="card" style="max-width: 400px; margin-top: 1.5rem;">
-    <p>Ditt konto är registrerat men väntar fortfarande på att en admin godkänner det. Hör av dig till kören om det dröjer.</p>
+    <p id="waitText">Ditt konto är registrerat men väntar fortfarande på att en admin godkänner det. Hör av dig till kören om det dröjer.</p>
     <button id="logoutBtn" style="margin-top: 1rem;">Logga ut</button>
   </div>
 </div>
@@ -22,6 +23,20 @@
 <script src="/js/auth.js"></script>
 <script>
 document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+(async () => {
+  const member = await getCurrentMember();
+  if (member && member.status === 'approved') {
+    window.location.href = member.role === 'admin' ? '/admin/' : '/medlem/';
+    return;
+  }
+  if (member && member.status === 'paused') {
+    document.title = 'Medlemskap pausat — Heavy Voices';
+    document.getElementById('waitTitle').textContent = 'Medlemskapet är pausat';
+    document.getElementById('waitText').textContent =
+      'Ditt medlemskap är tillfälligt pausat, till exempel för att medlemsavgiften inte är registrerad som betald. Kontakta kören eller en admin så öppnar vi kontot igen.';
+  }
+})();
 </script>
 
 </body>

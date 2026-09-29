@@ -70,6 +70,13 @@
   if (member) {
     document.getElementById('welcome').textContent = `Välkommen ${member.name}`;
     document.getElementById('roleBadge').textContent = member.role;
+    if (member.role === 'admin') {
+      const a = document.createElement('a');
+      a.href = '/admin/';
+      a.className = 'back-btn';
+      a.innerHTML = '&larr; Till adminsidan';
+      document.querySelector('.container').prepend(a);
+    }
   }
 })();
 

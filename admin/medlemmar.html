@@ -503,6 +503,491 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   .table-wrap { overflow-x: auto; }
   td input[type="checkbox"], th input[type="checkbox"] { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--accent); cursor: pointer; }
   .col-check { width: 2rem; }
+  .col-paid { width: 4.5rem; text-align: center; }
+  td.col-paid input[type="checkbox"] { accent-color: #4ade80; }
+  th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+  th.sortable:hover { color: var(--text); }
+  th.sortable::after { content: '↕'; opacity: 0.35; margin-left: 0.3rem; font-size: 0.8em; }
+  th.sortable.asc::after { content: '▲'; opacity: 1; color: var(--accent); }
+  th.sortable.desc::after { content: '▼'; opacity: 1; color: var(--accent); }
+  .status-select.st-pending { color: #facc15; border-color: rgba(250,204,21,0.5); }
+  .status-select.st-paused { color: #f87171; border-color: rgba(248,113,113,0.5); }
+  tr.row-paused td { opacity: 0.75; }
+  .toolbar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-top: 0.75rem; }
+  .toolbar button { padding: 0.35rem 0.8rem; font-size: 0.85rem; }
+  .muted { color: var(--text-muted); font-size: 0.85rem; }
+  .summary { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-muted); margin-top: 0.4rem; }
+  #mailMessage { min-height: 180px; line-height: 1.5; }
+  #mailRecipients { font-weight: 600; color: var(--accent); }
+</style>
+</head>
+  
+<body>
+<header class="site-header"><span class="site-logo">Heavy Voices</span></header>
+<div class="container">
+    
+ <a href="/admin/" class="back-btn">&larr; Tillbaka till admin</a>
+  <h1>Medlemmar</h1>
+
+  <div class="card">
+    <h3>Bjud in ny medlem</h3>
+    <form id="inviteForm">
+      <input type="text" id="inviteName" placeholder="Namn" required>
+      <input type="email" id="inviteEmail" placeholder="E-post" required>
+      <select id="inviteRole" style="width: 100%; margin-bottom: 0.75rem;">
+        <option value="medlem">Medlem</option>
+        <option value="admin">Admin</option>
+      </select>
+
+      <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">
+        <input type="radio" name="inviteMode" value="email" checked style="width: auto; margin-right: 0.4rem;">
+        Skicka inbjudan via mejl (personen sätter eget lösenord)
+      </label>
+      <label style="display: block; margin-bottom: 0.75rem; font-size: 0.9rem;">
+        <input type="radio" name="inviteMode" value="direct" style="width: auto; margin-right: 0.4rem;">
+        Sätt lösenord direkt (inget mejl skickas)
+      </label>
+
+      <input type="password" id="invitePassword" autocomplete="off" placeholder="Lösenord (minst 6 tecken)" style="display: none;" minlength="6">
+
+      <button type="submit">Lägg till medlem</button>
+      <p class="error" id="inviteError"></p>
+      <p class="success" id="inviteSuccess"></p>
+    </form>
+  </div>
+
+  <div class="card static" style="margin-top: 1.5rem;">
+    <h3 style="margin-bottom: 0.2rem;">Alla medlemmar</h3>
+    <div class="summary" id="memberSummary"></div>
+    <div class="toolbar">
+      <span class="muted">Markera:</span>
+      <button type="button" class="btn-outline" id="selAllBtn">Alla godkända</button>
+      <button type="button" class="btn-outline" id="selUnpaidBtn">Ej betalt</button>
+      <button type="button" class="btn-outline" id="selNoneBtn">Inga</button>
+      <span style="flex: 1;"></span>
+      <button type="button" class="btn-outline" id="exportCsvBtn" title="Laddar ner listan i nuvarande sortering. Är medlemmar markerade exporteras bara de.">Exportera CSV</button>
+      <button type="button" class="btn-outline" id="resetFeesBtn" title="Nollställ 'Betalt' för alla inför ny termin/period">Ny avgiftsperiod…</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" id="checkAll" title="Markera alla"></th>
+            <th class="sortable" data-sort="name">Namn</th><th class="sortable" data-sort="email">E-post</th><th class="sortable" data-sort="stamma">Stämma</th><th class="sortable col-paid" data-sort="fee_paid">Betald</th><th class="sortable" data-sort="status">Status</th><th class="sortable" data-sort="role">Roll</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="membersTableBody">
+          <tr><td colspan="8" class="text-muted">Laddar...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card static" style="margin-top: 1.5rem;" id="mailCard">
+    <h3 style="margin-bottom: 0.2rem;">Skicka mejl</h3>
+    <p class="muted" style="margin-top: 0;">Mottagare: <span id="mailRecipients">inga markerade</span> — markera i listan ovan. Varje person får ett eget mejl och svar går till din e-postadress.</p>
+    <input type="text" id="mailSubject" placeholder="Ämne" maxlength="200">
+    <textarea id="mailMessage" placeholder="Meddelande...&#10;&#10;Tips: skriv {namn} så byts det mot mottagarens förnamn."></textarea>
+    <div class="toolbar" style="margin-top: 0;">
+      <button type="button" id="sendMailBtn">Skicka mejl</button>
+      <span class="muted" id="mailStatus"></span>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/password-toggle.js" defer></script>
+<script src="/js/auth.js"></script>
+<script>
+let currentUserId = null;
+let currentMember = null;
+let members = [];
+const selected = new Set();
+
+const STATUS_LABELS = { pending: 'Väntar', approved: 'Godkänd', paused: 'Pausad' };
+
+function esc(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function fmtDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('sv-SE');
+}
+
+async function loadMembers() {
+  const { data, error } = await supabaseClient
+    .from('members')
+    .select('id, name, email, role, stamma, status, fee_paid, fee_paid_at')
+    .order('status')
+    .order('name');
+
+  const tbody = document.getElementById('membersTableBody');
+
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="8" class="error">Kunde inte hämta medlemmar: ${esc(error.message)}</td></tr>`;
+    return;
+  }
+
+  members = data || [];
+  // släng markeringar för medlemmar som inte finns kvar
+  [...selected].forEach(id => { if (!members.some(m => m.id === id)) selected.delete(id); });
+
+  renderMembers();
+}
+
+// ---------- Sortering ----------
+let sortKey = null;   // null = standard (status, namn)
+let sortDir = 1;      // 1 = stigande, -1 = fallande
+const STATUS_ORDER = { pending: 0, approved: 1, paused: 2 };
+const collator = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
+
+function sortValue(m, key) {
+  if (key === 'status') return STATUS_ORDER[m.status] ?? 9;
+  if (key === 'fee_paid') return m.fee_paid ? 1 : 0;
+  return m[key] ?? '';
+}
+
+function sortMembers() {
+  const key = sortKey;
+  members.sort((a, b) => {
+    if (!key) {
+      return (STATUS_ORDER[a.status] - STATUS_ORDER[b.status]) || collator.compare(a.name || '', b.name || '');
+    }
+    const va = sortValue(a, key), vb = sortValue(b, key);
+    // Tomma värden hamnar alltid sist
+    if (va === '' && vb !== '') return 1;
+    if (vb === '' && va !== '') return -1;
+    const cmp = typeof va === 'number' ? va - vb : collator.compare(String(va), String(vb));
+    return (cmp * sortDir) || collator.compare(a.name || '', b.name || '');
+  });
+}
+
+document.querySelectorAll('th.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if (sortKey !== key) { sortKey = key; sortDir = 1; }
+    else if (sortDir === 1) { sortDir = -1; }
+    else { sortKey = null; sortDir = 1; }   // tredje klicket återställer
+    document.querySelectorAll('th.sortable').forEach(h => h.classList.remove('asc', 'desc'));
+    if (sortKey) th.classList.add(sortDir === 1 ? 'asc' : 'desc');
+    renderMembers();
+  });
+});
+
+function renderMembers() {
+  const tbody = document.getElementById('membersTableBody');
+  sortMembers();
+
+  if (!members.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-muted">Inga medlemmar än.</td></tr>`;
+    updateSelectionUi();
+    return;
+  }
+
+  tbody.innerHTML = members.map(m => {
+    const self = m.id === currentUserId;
+    const statusOpts = ['pending', 'approved', 'paused']
+      .map(st => `<option value="${st}" ${m.status === st ? 'selected' : ''}>${STATUS_LABELS[st]}</option>`).join('');
+    return `
+    <tr class="${m.status === 'paused' ? 'row-paused' : ''}">
+      <td><input type="checkbox" class="rowCheck" data-id="${m.id}" ${selected.has(m.id) ? 'checked' : ''} ${m.email ? '' : 'disabled title="Saknar e-post"'}></td>
+      <td>${esc(m.name)}</td>
+      <td>${esc(m.email || '—')}</td>
+      <td>${esc(m.stamma || '—')}</td>
+      <td class="col-paid">
+        <input type="checkbox" class="paidCheck" data-id="${m.id}" ${m.fee_paid ? 'checked' : ''} title="${m.fee_paid && m.fee_paid_at ? 'Betald ' + fmtDate(m.fee_paid_at) : 'Ej betald'}" aria-label="Avgift betald för ${esc(m.name)}">
+      </td>
+      <td>
+        <select data-id="${m.id}" class="statusSelect status-select st-${m.status}" ${self ? 'disabled title="Du kan inte ändra din egen status"' : ''}>${statusOpts}</select>
+      </td>
+      <td>
+        <select data-id="${m.id}" class="roleSelect" ${self ? 'disabled title="Du kan inte ändra din egen roll"' : ''}>
+          <option value="medlem" ${m.role === 'medlem' ? 'selected' : ''}>Medlem</option>
+          <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
+        </select>
+      </td>
+      <td style="white-space: nowrap;">
+        <button class="btn-danger removeBtn" data-id="${m.id}" ${self ? 'disabled' : ''}>Ta bort</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  updateSummary();
+  updateSelectionUi();
+
+  tbody.querySelectorAll('.rowCheck').forEach(cb => {
+    cb.addEventListener('change', () => {
+      cb.checked ? selected.add(cb.dataset.id) : selected.delete(cb.dataset.id);
+      updateSelectionUi();
+    });
+  });
+
+  tbody.querySelectorAll('.paidCheck').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      const id = cb.dataset.id;
+      const paid = cb.checked;
+      const { error } = await supabaseClient.from('members')
+        .update({ fee_paid: paid, fee_paid_at: paid ? new Date().toISOString() : null })
+        .eq('id', id);
+      if (error) { alert('Kunde inte spara avgift: ' + error.message); cb.checked = !paid; return; }
+      const m = members.find(x => x.id === id);
+      if (m) { m.fee_paid = paid; m.fee_paid_at = paid ? new Date().toISOString() : null; }
+      cb.title = paid ? 'Betald ' + fmtDate(new Date().toISOString()) : 'Ej betald';
+      updateSummary();
+    });
+  });
+
+  tbody.querySelectorAll('.statusSelect').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const id = sel.dataset.id;
+      const m = members.find(x => x.id === id);
+      const newStatus = sel.value;
+      if (newStatus === 'paused' && !confirm(`Pausa ${m ? m.name : 'medlemmen'}? Hen kommer inte åt medlemssidorna förrän du ändrar tillbaka till Godkänd.`)) {
+        sel.value = m ? m.status : 'approved';
+        return;
+      }
+      const { error } = await supabaseClient.from('members').update({ status: newStatus }).eq('id', id);
+      if (error) { alert('Kunde inte ändra status: ' + error.message); }
+      loadMembers();
+    });
+  });
+
+  tbody.querySelectorAll('.roleSelect').forEach(sel => {
+    sel.addEventListener('change', async (e) => {
+      const id = e.target.dataset.id;
+      const newRole = e.target.value;
+      const { error } = await supabaseClient.from('members').update({ role: newRole }).eq('id', id);
+      if (error) {
+        alert('Kunde inte ändra roll: ' + error.message);
+        loadMembers();
+      }
+    });
+  });
+
+  tbody.querySelectorAll('.removeBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.id;
+      if (!confirm('Ta bort medlemmen helt? Detta raderar även deras inloggningskonto permanent.')) return;
+
+      const { data: { session } } = await supabaseClient.auth.getSession();
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/remove-member`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ id }),
+        });
+        const result = await res.json();
+
+        if (!res.ok) {
+          alert('Kunde inte ta bort: ' + (result.error || 'Något gick fel.'));
+          return;
+        }
+
+        loadMembers();
+      } catch (err) {
+        alert('Kunde inte nå servern: ' + err.message);
+      }
+    });
+  });
+}
+
+function updateSummary() {
+  const count = st => members.filter(m => m.status === st).length;
+  const active = members.filter(m => m.status === 'approved');
+  const paid = active.filter(m => m.fee_paid).length;
+  const parts = [`${members.length} totalt`, `${count('approved')} godkända`];
+  if (count('pending')) parts.push(`${count('pending')} väntar`);
+  if (count('paused')) parts.push(`${count('paused')} pausade`);
+  parts.push(`Avgift betald: ${paid} av ${active.length} godkända`);
+  document.getElementById('memberSummary').innerHTML = parts.map(p => `<span>${esc(p)}</span>`).join('');
+}
+
+function updateSelectionUi() {
+  const selectable = members.filter(m => m.email);
+  const n = selected.size;
+  document.getElementById('mailRecipients').textContent = n ? `${n} markerad${n === 1 ? '' : 'e'}` : 'inga markerade';
+  const all = document.getElementById('checkAll');
+  all.checked = selectable.length > 0 && selectable.every(m => selected.has(m.id));
+  all.indeterminate = n > 0 && !all.checked;
+  document.querySelectorAll('.rowCheck').forEach(cb => { cb.checked = selected.has(cb.dataset.id); });
+}
+
+function selectWhere(pred) {
+  selected.clear();
+  members.filter(m => m.email && pred(m)).forEach(m => selected.add(m.id));
+  updateSelectionUi();
+}
+
+document.getElementById('checkAll').addEventListener('change', (e) => {
+  e.target.checked ? selectWhere(() => true) : selectWhere(() => false);
+});
+document.getElementById('selAllBtn').addEventListener('click', () => selectWhere(m => m.status === 'approved'));
+document.getElementById('selUnpaidBtn').addEventListener('click', () => selectWhere(m => m.status !== 'pending' && !m.fee_paid));
+document.getElementById('selNoneBtn').addEventListener('click', () => selectWhere(() => false));
+
+// ---------- CSV-export ----------
+// Semikolon + UTF-8 BOM så att svenska Excel öppnar filen rätt med åäö direkt.
+function csvCell(v) {
+  const str = String(v ?? '');
+  return /[";\n\r]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
+}
+
+document.getElementById('exportCsvBtn').addEventListener('click', () => {
+  const rows = selected.size ? members.filter(m => selected.has(m.id)) : members;
+  if (!rows.length) { alert('Det finns inga medlemmar att exportera.'); return; }
+  const header = ['Namn', 'E-post', 'Stämma', 'Status', 'Roll', 'Avgift betald', 'Betald datum'];
+  const lines = rows.map(m => [
+    m.name, m.email, m.stamma, STATUS_LABELS[m.status] || m.status,
+    m.role === 'admin' ? 'Admin' : 'Medlem',
+    m.fee_paid ? 'Ja' : 'Nej', m.fee_paid ? fmtDate(m.fee_paid_at) : ''
+  ].map(csvCell).join(';'));
+  const csv = '\uFEFF' + [header.join(';'), ...lines].join('\r\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `heavy-voices-medlemmar-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('resetFeesBtn').addEventListener('click', async () => {
+  if (!confirm('Starta ny avgiftsperiod?\n\nAlla medlemmar markeras som "Ej betalt". Detta går inte att ångra.')) return;
+  const { error } = await supabaseClient.from('members')
+    .update({ fee_paid: false, fee_paid_at: null })
+    .eq('fee_paid', true);
+  if (error) { alert('Kunde inte nollställa: ' + error.message); return; }
+  loadMembers();
+});
+
+document.getElementById('sendMailBtn').addEventListener('click', async () => {
+  const subject = document.getElementById('mailSubject').value.trim();
+  const message = document.getElementById('mailMessage').value.trim();
+  const statusEl = document.getElementById('mailStatus');
+  const btn = document.getElementById('sendMailBtn');
+  statusEl.textContent = '';
+
+  const ids = [...selected];
+  if (!ids.length) { statusEl.textContent = 'Markera minst en mottagare i listan.'; return; }
+  if (!subject) { statusEl.textContent = 'Skriv ett ämne.'; return; }
+  if (!message) { statusEl.textContent = 'Skriv ett meddelande.'; return; }
+  if (!confirm(`Skicka "${subject}" till ${ids.length} medlem${ids.length === 1 ? '' : 'mar'}?`)) return;
+
+  btn.disabled = true;
+  statusEl.textContent = 'Skickar...';
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-member-email`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ subject, message, member_ids: ids }),
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      statusEl.textContent = 'Kunde inte skicka: ' + (result.error || `fel ${res.status}`);
+      return;
+    }
+    statusEl.textContent = `Skickat till ${result.sent} st.` + (result.failed && result.failed.length ? ` Misslyckades: ${result.failed.join(', ')}` : ' ✓');
+    if (!result.failed || !result.failed.length) {
+      document.getElementById('mailSubject').value = '';
+      document.getElementById('mailMessage').value = '';
+    }
+  } catch (err) {
+    statusEl.textContent = 'Kunde inte nå servern: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.querySelectorAll('input[name="inviteMode"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    const pwField = document.getElementById('invitePassword');
+    pwField.style.display = e.target.value === 'direct' ? 'block' : 'none';
+    pwField.required = e.target.value === 'direct';
+  });
+});
+
+document.getElementById('inviteForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('inviteName').value;
+  const email = document.getElementById('inviteEmail').value;
+  const role = document.getElementById('inviteRole').value;
+  const mode = document.querySelector('input[name="inviteMode"]:checked').value;
+  const password = mode === 'direct' ? document.getElementById('invitePassword').value : undefined;
+  const errorEl = document.getElementById('inviteError');
+  const successEl = document.getElementById('inviteSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-member`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name, email, role, password }),
+    });
+    const result = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = result.error || 'Något gick fel.';
+      return;
+    }
+
+    successEl.textContent = mode === 'direct'
+      ? `${name} kan nu logga in direkt med det satta lösenordet.`
+      : `Inbjudan skickad till ${email}.`;
+    document.getElementById('inviteForm').reset();
+    document.getElementById('invitePassword').style.display = 'none';
+    loadMembers();
+  } catch (err) {
+    errorEl.textContent = 'Kunde inte nå servern: ' + err.message;
+  }
+});
+
+(async () => {
+  const member = await requireAuth('admin');
+  if (member) {
+    currentUserId = member.id;
+    loadMembers();
+  }
+})();
+</script>
+
+</body>
+</html><!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medlemmar — Heavy Voices Admin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+  th, td { text-align: left; padding: 0.6rem; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-transform: uppercase; }
+  select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.5rem; }
+  .btn-danger { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .success { color: #4ade80; font-size: 0.9rem; }
+  .back-link { display: inline-block; margin-bottom: 1rem; color: var(--text-muted); }
+  .card.static:hover { transform: none; border-color: var(--border); box-shadow: var(--card-shadow); }
+  .table-wrap { overflow-x: auto; }
+  td input[type="checkbox"], th input[type="checkbox"] { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--accent); cursor: pointer; }
+  .col-check { width: 2rem; }
   .paid-label { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.85rem; white-space: nowrap; }
   .paid-yes { color: #4ade80; }
   .paid-no { color: var(--text-muted); }

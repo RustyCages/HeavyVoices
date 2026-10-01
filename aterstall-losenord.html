@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Glömt lösenord — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .success { color: #4ade80; font-size: 0.9rem; }
+  .step[hidden] { display: none; }
+</style>
+</head>
+<body>
+
+<header class="site-header"><span class="site-logo">Heavy Voices</span></header>
+<div class="container">
+  <p><a href="/logga-in.html" class="text-muted">&larr; Tillbaka till inloggning</a></p>
+  <h1 id="pageTitle">Glömt lösenord</h1>
+
+  <div class="card" style="max-width: 380px; margin-top: 1.5rem;">
+
+    <!-- Steg 1: be om länk -->
+    <div class="step" id="requestStep">
+      <p class="text-muted" style="margin-top: 0; font-size: 0.9rem;">Skriv in e-postadressen du loggar in med, så skickar vi en länk där du kan välja ett nytt lösenord.</p>
+      <form id="requestForm">
+        <input type="email" id="email" placeholder="E-post" required autocomplete="username">
+        <button type="submit" id="requestBtn">Skicka länk</button>
+        <p class="error" id="requestError"></p>
+      </form>
+    </div>
+
+    <!-- Steg 1b: länk skickad -->
+    <div class="step" id="sentStep" hidden>
+      <p class="success" style="margin-top: 0;">✓ Om adressen finns registrerad har vi skickat ett mejl med en länk.</p>
+      <p class="text-muted" style="font-size: 0.9rem;">Kolla inkorgen (och skräpposten) för ett mejl från <strong>no-reply@heavyvoices.se</strong>. Länken fungerar en gång och en begränsad tid.</p>
+      <button type="button" class="btn-outline" id="resendBtn">Skicka igen</button>
+    </div>
+
+    <!-- Steg 2: nytt lösenord (efter klick på länken i mejlet) -->
+    <div class="step" id="resetStep" hidden>
+      <p class="text-muted" style="margin-top: 0; font-size: 0.9rem;" id="resetFor"></p>
+      <form id="resetForm">
+        <input type="password" id="newPassword" placeholder="Nytt lösenord (minst 6 tecken)" required minlength="6" autocomplete="new-password">
+        <input type="password" id="newPasswordConfirm" placeholder="Upprepa nytt lösenord" required minlength="6" autocomplete="new-password">
+        <button type="submit" id="resetBtn">Spara nytt lösenord</button>
+        <p class="error" id="resetError"></p>
+      </form>
+    </div>
+
+    <!-- Fel i länken (utgången/redan använd) -->
+    <div class="step" id="linkErrorStep" hidden>
+      <p class="error" style="margin-top: 0;" id="linkErrorText">Länken är ogiltig eller har gått ut.</p>
+      <button type="button" id="newLinkBtn">Skicka en ny länk</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/password-toggle.js" defer></script>
+<script src="/js/auth.js"></script>
+<script>
+const steps = ['requestStep', 'sentStep', 'resetStep', 'linkErrorStep'];
+function show(id) { steps.forEach(s => { document.getElementById(s).hidden = s !== id; }); }
+
+// ---------- Steg 1: skicka återställningslänk ----------
+let lastEmail = '';
+async function sendLink(email) {
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: `${location.origin}/aterstall-losenord.html`,
+  });
+  return error;
+}
+
+document.getElementById('requestForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('requestBtn');
+  const errEl = document.getElementById('requestError');
+  errEl.textContent = '';
+  lastEmail = document.getElementById('email').value.trim();
+  btn.disabled = true; btn.textContent = 'Skickar…';
+  const error = await sendLink(lastEmail);
+  btn.disabled = false; btn.textContent = 'Skicka länk';
+  if (error) {
+    // Avslöja inte om adressen finns – men visa rate-limit och tekniska fel
+    errEl.textContent = /rate|seconds|too many/i.test(error.message)
+      ? 'Vänta en stund innan du begär en ny länk.'
+      : 'Kunde inte skicka: ' + error.message;
+    return;
+  }
+  show('sentStep');
+});
+
+document.getElementById('resendBtn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  const error = await sendLink(lastEmail);
+  btn.textContent = error ? 'Vänta en stund och försök igen' : 'Skickat igen ✓';
+  setTimeout(() => { btn.disabled = false; btn.textContent = 'Skicka igen'; }, 30000);
+});
+
+document.getElementById('newLinkBtn').addEventListener('click', () => {
+  history.replaceState(null, '', location.pathname);
+  show('requestStep');
+});
+
+// ---------- Steg 2: kommer tillbaka via länken i mejlet ----------
+const hash = new URLSearchParams(location.hash.slice(1));
+const query = new URLSearchParams(location.search);
+const linkError = hash.get('error_description') || query.get('error_description');
+const isRecoveryLink = hash.get('type') === 'recovery' || query.has('code');
+
+function enterResetStep(session) {
+  document.getElementById('pageTitle').textContent = 'Välj nytt lösenord';
+  const email = session && session.user && session.user.email;
+  document.getElementById('resetFor').textContent = email ? `Nytt lösenord för ${email}.` : 'Välj ett nytt lösenord.';
+  show('resetStep');
+  history.replaceState(null, '', location.pathname); // ta bort token ur adressfältet
+}
+
+if (linkError) {
+  const expired = /expired|invalid/i.test(linkError);
+  document.getElementById('linkErrorText').textContent = expired
+    ? 'Länken har gått ut eller redan använts. Begär en ny nedan.'
+    : 'Något gick fel med länken: ' + linkError;
+  show('linkErrorStep');
+} else if (isRecoveryLink) {
+  // supabase-js läser in sessionen från länken och skickar PASSWORD_RECOVERY
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY' || (session && document.getElementById('resetStep').hidden)) enterResetStep(session);
+  });
+  supabaseClient.auth.getSession().then(({ data }) => { if (data.session) enterResetStep(data.session); });
+}
+
+document.getElementById('resetForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pw = document.getElementById('newPassword').value;
+  const pw2 = document.getElementById('newPasswordConfirm').value;
+  const errEl = document.getElementById('resetError');
+  errEl.textContent = '';
+  if (pw !== pw2) { errEl.textContent = 'Lösenorden matchar inte.'; return; }
+
+  const btn = document.getElementById('resetBtn');
+  btn.disabled = true; btn.textContent = 'Sparar…';
+  const { error } = await supabaseClient.auth.updateUser({ password: pw });
+  if (error) {
+    btn.disabled = false; btn.textContent = 'Spara nytt lösenord';
+    errEl.textContent = /different from the old/i.test(error.message)
+      ? 'Det nya lösenordet måste skilja sig från det gamla.'
+      : /session|jwt|expired/i.test(error.message)
+        ? 'Länken har gått ut – begär en ny via "Glömt lösenord".'
+        : 'Kunde inte spara: ' + error.message;
+    return;
+  }
+
+  // Inloggad med det nya lösenordet → vidare till rätt sida
+  btn.textContent = 'Klart! Loggar in…';
+  const member = await getCurrentMember();
+  if (!member || member.status !== 'approved') { location.href = '/vantar.html'; return; }
+  location.href = member.role === 'admin' ? '/admin/' : '/medlem/';
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stämsynk — Heavy Voices Admin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .card.static:hover { transform: none; border-color: var(--border); box-shadow: var(--card-shadow); }
+  .row-flex { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  .hint { font-size: 0.85rem; color: var(--text-muted); margin: 0.25rem 0 1rem; }
+
+  .transport { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 1rem 0 0.25rem; }
+  .transport .time { font-variant-numeric: tabular-nums; font-size: 0.85rem; color: var(--text-muted); min-width: 4.2rem; text-align: center; }
+  .transport input[type=range] { flex: 1; min-width: 160px; margin: 0; padding: 0; }
+  .play-btn { width: 2.8rem; height: 2.8rem; border-radius: 50%; justify-content: center; font-size: 1.1rem; padding: 0; }
+
+  .stem-sync-row { display: grid; grid-template-columns: minmax(80px, 1fr) auto auto; gap: 0.5rem 0.75rem; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+  .stem-sync-row:last-child { border-bottom: none; }
+  .stem-name { font-weight: 600; min-width: 0; }
+  .stem-name small { display: block; font-weight: 400; font-size: 0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stem-name .ref-tag { font-size: 0.7rem; color: var(--accent); font-weight: 600; margin-left: 0.35rem; }
+  .ms-ctrl { display: flex; align-items: center; gap: 0.25rem; }
+  .ms-ctrl button { padding: 0.3rem 0.45rem; font-size: 0.75rem; min-width: 2.4rem; justify-content: center; }
+  .ms-ctrl input { width: 5.2rem; margin: 0; padding: 0.35rem 0.4rem; text-align: right; font-variant-numeric: tabular-nums; }
+  .ms-ctrl .unit { font-size: 0.75rem; color: var(--text-muted); }
+  .ms-ctrl input.changed { border-color: var(--accent); }
+  .ms-ctrl input.nonzero { color: var(--accent); }
+  .ms-ctrl input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
+  .toggles { display: flex; gap: 0.3rem; }
+  .toggles button { width: 2.1rem; height: 2.1rem; padding: 0; justify-content: center; font-size: 0.75rem; font-weight: 700; }
+  .toggles button svg { width: 16px; height: 16px; }
+  .toggles .muteBtn.on { background: #ef4444; color: #fff; border-color: #ef4444; }
+  .toggles .soloBtn.on { background: var(--accent); color: #111317; border-color: var(--accent); }
+  .suggestion { grid-column: 1 / -1; font-size: 0.8rem; color: var(--text-muted); }
+  .suggestion.low { color: #facc15; }
+
+  .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.25rem; align-items: center; }
+  .save-state { font-size: 0.85rem; color: var(--text-muted); }
+  .save-state.dirty { color: var(--accent); }
+  #loadingNote { color: var(--text-muted); }
+
+  @media (max-width: 640px) {
+    .stem-sync-row { grid-template-columns: 1fr auto; }
+    .ms-ctrl { grid-column: 1 / -1; justify-content: space-between; }
+    .ms-ctrl input { flex: 1; width: auto; }
+  }
+</style>
+</head>
+<body>
+<header class="site-header"><span class="site-logo">Heavy Voices</span></header>
+<div class="container">
+  <a href="/admin/latar.html" class="back-btn">&larr; Tillbaka till låtar</a>
+  <h1>Stämsynk</h1>
+  <p class="hint">Spela alla stämmor samtidigt och justera tills de ligger i fas. <strong>+ms</strong> = stämman spelas senare, <strong>−ms</strong> = tidigare. Ändringar hörs direkt; tryck <em>Spara</em> när det låter rätt. Tips: tysta alla utom två stämmor (eller använd S = solo) och lyssna på ett tydligt ansatsställe.</p>
+
+  <div class="card static">
+    <label class="hint" for="songSelect" style="display:block; margin:0 0 0.3rem;">Låt</label>
+    <select id="songSelect"><option value="">Laddar låtar…</option></select>
+
+    <div id="syncArea" hidden>
+      <div class="transport">
+        <button class="play-btn" id="playBtn" title="Spela/pausa (mellanslag)">▶</button>
+        <button class="btn-outline" id="backBtn" title="5 s bakåt">−5 s</button>
+        <span class="time" id="curTime">0:00.0</span>
+        <input type="range" id="scrubber" min="0" max="1" step="0.01" value="0">
+        <span class="time" id="durTime">0:00</span>
+      </div>
+
+      <div id="stemRows"></div>
+
+      <div class="actions">
+        <label class="hint" style="margin:0;" for="refSelect">Referens:</label>
+        <select id="refSelect" style="width:auto; margin:0;"></select>
+        <button class="btn-outline" id="autoBtn" title="Räknar ut förskjutningen för varje stämma mot referensen genom att jämföra ljudets energikurvor">Auto-synka</button>
+      </div>
+
+      <div class="actions">
+        <button id="saveBtn" disabled>Spara</button>
+        <button class="btn-outline" id="resetBtn">Nollställ alla</button>
+        <span class="save-state" id="saveState"></span>
+      </div>
+    </div>
+    <p id="loadingNote" hidden></p>
+  </div>
+</div>
+
+<div id="toast" style="position:fixed; bottom:1.5rem; right:1.5rem; background:var(--accent); color:#111317; padding:0.7rem 1.2rem; border-radius:0.6rem; font-weight:600; box-shadow:var(--card-shadow); z-index:999; display:none;"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+const STEMS_BUCKET = 'heavy-voices-stems';
+const FIXED_STEMS = [
+  { col: 'stem_backtrack_path', label: 'Backtrack' },
+  { col: 'stem_sopran_path',    label: 'Sopran' },
+  { col: 'stem_alt_path',       label: 'Alt' },
+  { col: 'stem_tenor_path',     label: 'Tenor' },
+  { col: 'stem_bas_path',       label: 'Bas' },
+];
+const MAX_OFFSET_MS = 5000;
+const MUTE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>';
+
+let songs = [];
+let song = null;
+let stems = [];            // { key, label, path, buffer, offsetMs, savedMs, muted, solo }
+let audioCtx = null;
+let sources = [];
+let playing = false;
+let startCtxTime = 0, startPos = 0, pausedPos = 0;
+let timer = null;
+let loadToken = 0;
+
+// ---------- hjälpare ----------
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', 2800); }
+function fmt(sec, tenths) {
+  sec = Math.max(0, sec || 0);
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return m + ':' + (tenths ? s.toFixed(1).padStart(4, '0') : String(Math.floor(s)).padStart(2, '0'));
+}
+function stemFilename(path) {
+  const base = (path || '').split('/').pop();
+  const parts = base.split('__');
+  return decodeURIComponent(parts.length > 1 ? parts.slice(1).join('__') : base);
+}
+function stemListFor(s) {
+  const list = FIXED_STEMS.filter(f => s[f.col]).map(f => ({ key: f.col, label: f.label, path: s[f.col] }));
+  (s.extra_stems || []).forEach(ex => list.push({ key: ex.id, label: ex.label, path: ex.path }));
+  return list;
+}
+async function ensureCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} }
+}
+
+// ---------- uppspelning ----------
+function duration() { return Math.max(0, ...stems.map(st => st.buffer ? st.buffer.duration + st.offsetMs / 1000 : 0)); }
+function position() { return playing ? startPos + (audioCtx.currentTime - startCtxTime) : pausedPos; }
+function audible(st) { const anySolo = stems.some(x => x.solo); return anySolo ? st.solo : !st.muted; }
+
+function stopSources() {
+  sources.forEach(({ src }) => { try { src.onended = null; src.stop(); } catch (e) {} try { src.disconnect(); } catch (e) {} });
+  sources = [];
+}
+
+function startAt(pos) {
+  stopSources();
+  const when = audioCtx.currentTime + 0.08;
+  startCtxTime = when; startPos = pos;
+  stems.forEach(st => {
+    if (!st.buffer) return;
+    const o = st.offsetMs / 1000;
+    const inFile = pos - o;
+    if (inFile >= st.buffer.duration) return;
+    const src = audioCtx.createBufferSource();
+    src.buffer = st.buffer;
+    const gain = audioCtx.createGain();
+    gain.gain.value = audible(st) ? 1 : 0;
+    src.connect(gain); gain.connect(audioCtx.destination);
+    if (inFile >= 0) src.start(when, inFile); else src.start(when - inFile, 0);
+    sources.push({ st, src, gain });
+  });
+  playing = true;
+  document.getElementById('playBtn').textContent = '⏸';
+  clearInterval(timer);
+  timer = setInterval(tick, 100);
+}
+
+function pause() {
+  if (!playing) return;
+  pausedPos = position();
+  stopSources();
+  playing = false;
+  clearInterval(timer);
+  document.getElementById('playBtn').textContent = '▶';
+  tick();
+}
+
+function tick() {
+  const d = duration();
+  let p = position();
+  if (playing && p >= d) { pause(); pausedPos = 0; p = 0; }
+  document.getElementById('curTime').textContent = fmt(p, true);
+  const sc = document.getElementById('scrubber');
+  if (!sc.matches(':active')) sc.value = Math.min(p, d);
+}
+
+function seek(pos) {
+  pos = Math.max(0, Math.min(pos, duration()));
+  if (playing) startAt(pos); else { pausedPos = pos; tick(); }
+}
+
+function applyGains() { sources.forEach(({ st, gain }) => { gain.gain.value = audible(st) ? 1 : 0; }); }
+
+// ---------- rader ----------
+function renderRows() {
+  const wrap = document.getElementById('stemRows');
+  const ref = document.getElementById('refSelect').value;
+  wrap.innerHTML = '';
+  stems.forEach((st, i) => {
+    const row = document.createElement('div');
+    row.className = 'stem-sync-row';
+    row.innerHTML = `
+      <div class="stem-name">${esc(st.label)}${st.key === ref ? '<span class="ref-tag">REF</span>' : ''}<small>${esc(stemFilename(st.path))}</small></div>
+      <div class="ms-ctrl">
+        <button class="btn-outline" data-d="-50">−50</button>
+        <button class="btn-outline" data-d="-10">−10</button>
+        <input type="number" step="1" min="${-MAX_OFFSET_MS}" max="${MAX_OFFSET_MS}" value="${st.offsetMs}" aria-label="Förskjutning för ${esc(st.label)} i millisekunder">
+        <span class="unit">ms</span>
+        <button class="btn-outline" data-d="10">+10</button>
+        <button class="btn-outline" data-d="50">+50</button>
+      </div>
+      <div class="toggles">
+        <button class="btn-outline muteBtn ${st.muted ? 'on' : ''}" title="Tysta">${MUTE_SVG}</button>
+        <button class="btn-outline soloBtn ${st.solo ? 'on' : ''}" title="Solo">S</button>
+      </div>
+      <div class="suggestion" hidden></div>`;
+    const input = row.querySelector('input');
+    const refreshInput = () => {
+      input.value = st.offsetMs;
+      input.classList.toggle('changed', st.offsetMs !== st.savedMs);
+      input.classList.toggle('nonzero', st.offsetMs !== 0);
+    };
+    refreshInput();
+    const setOffset = (ms) => {
+      ms = Math.round(Math.max(-MAX_OFFSET_MS, Math.min(MAX_OFFSET_MS, Number(ms) || 0)));
+      if (ms === st.offsetMs) { refreshInput(); return; }
+      st.offsetMs = ms;
+      refreshInput();
+      onOffsetsChanged();
+    };
+    st.setOffset = setOffset;
+    st.rowEl = row;
+    row.querySelectorAll('.ms-ctrl button').forEach(b => b.addEventListener('click', () => setOffset(st.offsetMs + Number(b.dataset.d))));
+    input.addEventListener('change', () => setOffset(input.value));
+    row.querySelector('.muteBtn').addEventListener('click', (e) => { st.muted = !st.muted; e.currentTarget.classList.toggle('on', st.muted); applyGains(); });
+    row.querySelector('.soloBtn').addEventListener('click', (e) => { st.solo = !st.solo; e.currentTarget.classList.toggle('on', st.solo); applyGains(); });
+    wrap.appendChild(row);
+  });
+}
+
+function onOffsetsChanged() {
+  const d = duration();
+  document.getElementById('scrubber').max = d || 1;
+  document.getElementById('durTime').textContent = fmt(d);
+  if (playing) startAt(position());   // hör ändringen direkt, från samma ställe
+  updateSaveState();
+}
+
+function updateSaveState() {
+  const dirty = stems.some(st => st.offsetMs !== st.savedMs);
+  document.getElementById('saveBtn').disabled = !dirty;
+  const el = document.getElementById('saveState');
+  el.textContent = dirty ? 'Osparade ändringar' : (stems.some(st => st.savedMs) ? 'Sparat' : '');
+  el.classList.toggle('dirty', dirty);
+}
+
+// ---------- ladda låt ----------
+async function loadSong(id) {
+  const myToken = ++loadToken;
+  pause(); pausedPos = 0;
+  song = songs.find(s => String(s.id) === String(id)) || null;
+  document.getElementById('syncArea').hidden = true;
+  if (!song) return;
+  history.replaceState(null, '', '?song=' + encodeURIComponent(id));
+
+  const note = document.getElementById('loadingNote');
+  note.hidden = false;
+  note.textContent = 'Laddar och avkodar stämfiler…';
+
+  const saved = song.stem_offsets || {};
+  try {
+    await ensureCtx();
+    const list = stemListFor(song);
+    const loaded = await Promise.all(list.map(async (st) => {
+      const { data, error } = await supabaseClient.storage.from(STEMS_BUCKET).createSignedUrl(st.path, 3600);
+      if (error) throw error;
+      const resp = await fetch(data.signedUrl);
+      if (!resp.ok) throw new Error(`${st.label}: HTTP ${resp.status}`);
+      const buffer = await audioCtx.decodeAudioData(await resp.arrayBuffer());
+      const ms = Math.round(Number(saved[st.key]) || 0);
+      return { ...st, buffer, offsetMs: ms, savedMs: ms, muted: false, solo: false };
+    }));
+    if (myToken !== loadToken) return;
+    stems = loaded;
+  } catch (e) {
+    if (myToken !== loadToken) return;
+    note.textContent = 'Kunde inte ladda stämfilerna: ' + (e.message || e);
+    return;
+  }
+
+  note.hidden = true;
+  const refSel = document.getElementById('refSelect');
+  const defaultRef = stems.find(st => st.key === 'stem_backtrack_path') || stems[0];
+  refSel.innerHTML = stems.map(st => `<option value="${esc(st.key)}" ${st === defaultRef ? 'selected' : ''}>${esc(st.label)}</option>`).join('');
+  renderRows();
+  onOffsetsChanged();
+  tick();
+  document.getElementById('syncArea').hidden = false;
+}
+
+// ---------- auto-synk ----------
+// Gör om varje spår till en energikurva (1 värde/ms), tar fram ansatser (ökning i energi)
+// och korskorrelerar mot referensen inom ±1 s. Toppen = hur mycket spåret ligger efter.
+const ENV_RATE = 1000;       // värden per sekund (1 ms upplösning)
+const ANALYSE_SEC = 90;      // analysera de första 90 s
+const MAX_LAG_MS = 1000;
+
+function onsetEnvelope(buffer) {
+  const hop = Math.max(1, Math.round(buffer.sampleRate / ENV_RATE));
+  const n = Math.min(Math.floor(buffer.length / hop), ANALYSE_SEC * ENV_RATE);
+  const chans = [];
+  for (let c = 0; c < buffer.numberOfChannels; c++) chans.push(buffer.getChannelData(c));
+  const env = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    const start = i * hop;
+    for (let j = 0; j < hop; j++) {
+      let v = 0;
+      for (const ch of chans) v += ch[start + j];
+      sum += v * v;
+    }
+    env[i] = Math.sqrt(sum / hop);
+  }
+  // utjämna lite (5 ms) och ta positiv derivata → ansatser
+  const out = new Float32Array(n);
+  let prev = 0;
+  for (let i = 0; i < n; i++) {
+    let s = 0, k = 0;
+    for (let j = Math.max(0, i - 2); j <= Math.min(n - 1, i + 2); j++) { s += env[j]; k++; }
+    const sm = s / k;
+    out[i] = Math.max(0, sm - prev);
+    prev = sm;
+  }
+  // normalisera (medel 0, varians 1) så att starka och svaga spår väger lika
+  let mean = 0; for (let i = 0; i < n; i++) mean += out[i]; mean /= n || 1;
+  let vr = 0; for (let i = 0; i < n; i++) { out[i] -= mean; vr += out[i] * out[i]; }
+  const sd = Math.sqrt(vr / (n || 1)) || 1;
+  for (let i = 0; i < n; i++) out[i] /= sd;
+  return out;
+}
+
+// Returnerar { lagMs, confidence }: lagMs > 0 betyder att spåret ligger efter referensen.
+function bestLag(ref, sig) {
+  const n = Math.min(ref.length, sig.length);
+  let best = -Infinity, bestLag = 0;
+  const scores = [];
+  for (let lag = -MAX_LAG_MS; lag <= MAX_LAG_MS; lag++) {
+    let s = 0;
+    const from = Math.max(0, -lag), to = Math.min(n, n - lag);
+    for (let t = from; t < to; t++) s += ref[t] * sig[t + lag];
+    s /= (to - from) || 1;
+    scores.push(s);
+    if (s > best) { best = s; bestLag = lag; }
+  }
+  // säkerhet: hur mycket toppen sticker ut jämfört med resten (z-värde)
+  const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const sd = Math.sqrt(scores.reduce((a, b) => a + (b - mean) ** 2, 0) / scores.length) || 1;
+  return { lagMs: bestLag, confidence: (best - mean) / sd };
+}
+
+async function autoSync() {
+  const refKey = document.getElementById('refSelect').value;
+  const ref = stems.find(st => st.key === refKey);
+  if (!ref || stems.length < 2) return;
+  const btn = document.getElementById('autoBtn');
+  btn.disabled = true; btn.textContent = 'Analyserar…';
+  await new Promise(r => setTimeout(r, 30)); // låt knapptexten ritas innan tung beräkning
+
+  try {
+    const refEnv = onsetEnvelope(ref.buffer);
+    let changed = 0;
+    for (const st of stems) {
+      const sugg = st.rowEl.querySelector('.suggestion');
+      if (st === ref) { sugg.hidden = true; continue; }
+      await new Promise(r => setTimeout(r, 0)); // håll sidan responsiv mellan spåren
+      const { lagMs, confidence } = bestLag(refEnv, onsetEnvelope(st.buffer));
+      // Filen ligger lagMs efter referensens fil → flytta den lagMs tidigare, relativt referensens offset.
+      const target = ref.offsetMs - lagMs;
+      const low = confidence < 6;
+      sugg.hidden = false;
+      sugg.classList.toggle('low', low);
+      if (low) {
+        sugg.textContent = `Osäker matchning (förslag ${target > 0 ? '+' : ''}${target} ms) – lyssna och justera manuellt.`;
+      } else {
+        sugg.textContent = `Auto: ${target > 0 ? '+' : ''}${target} ms (säkerhet ${confidence.toFixed(0)})`;
+        if (target !== st.offsetMs) { st.setOffset(target); changed++; }
+      }
+    }
+    toast(changed ? `Auto-synk justerade ${changed} stämm${changed === 1 ? 'a' : 'or'} – lyssna och spara` : 'Inga ändringar behövdes');
+  } catch (e) {
+    toast('Auto-synk misslyckades: ' + (e.message || e));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Auto-synka';
+  }
+}
+
+// ---------- spara ----------
+async function save() {
+  const offsets = { ...(song.stem_offsets || {}) };
+  stems.forEach(st => { if (st.offsetMs) offsets[st.key] = st.offsetMs; else delete offsets[st.key]; });
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  const { error } = await supabaseClient.from('songs').update({ stem_offsets: offsets }).eq('id', song.id);
+  if (error) { toast('Kunde inte spara: ' + error.message); updateSaveState(); return; }
+  song.stem_offsets = offsets;
+  stems.forEach(st => { st.savedMs = st.offsetMs; st.setOffset(st.offsetMs); });
+  updateSaveState();
+  stems.forEach(st => st.rowEl.querySelector('input').classList.remove('changed'));
+  toast('Sparat – medlemmarnas spelare använder nu de nya värdena');
+}
+
+// ---------- händelser ----------
+document.getElementById('songSelect').addEventListener('change', (e) => {
+  if (stems.some(st => st.offsetMs !== st.savedMs) && !confirm('Du har osparade ändringar. Byta låt ändå?')) {
+    e.target.value = song ? song.id : '';
+    return;
+  }
+  loadSong(e.target.value);
+});
+document.getElementById('playBtn').addEventListener('click', async () => {
+  if (!stems.length) return;
+  await ensureCtx();
+  if (playing) pause();
+  else startAt(pausedPos >= duration() ? 0 : pausedPos);
+});
+document.getElementById('backBtn').addEventListener('click', () => seek(position() - 5));
+document.getElementById('scrubber').addEventListener('change', (e) => seek(Number(e.target.value)));
+document.getElementById('scrubber').addEventListener('input', (e) => { document.getElementById('curTime').textContent = fmt(Number(e.target.value), true); });
+document.getElementById('refSelect').addEventListener('change', renderRows);
+document.getElementById('autoBtn').addEventListener('click', autoSync);
+document.getElementById('saveBtn').addEventListener('click', save);
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Nollställa förskjutningen för alla stämmor? (Sparas först när du trycker Spara.)')) return;
+  stems.forEach(st => st.setOffset(0));
+});
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && !e.target.matches('input, select, textarea, button')) {
+    e.preventDefault();
+    document.getElementById('playBtn').click();
+  }
+});
+window.addEventListener('beforeunload', (e) => {
+  if (stems.some(st => st.offsetMs !== st.savedMs)) { e.preventDefault(); e.returnValue = ''; }
+});
+
+(async () => {
+  const member = await requireAuth('admin');
+  if (!member) return;
+  const { data, error } = await supabaseClient.from('songs').select('*').order('title');
+  const sel = document.getElementById('songSelect');
+  if (error) { sel.innerHTML = `<option>Fel: ${esc(error.message)}</option>`; return; }
+  songs = (data || []).filter(s => stemListFor(s).length >= 2);
+  if (!songs.length) { sel.innerHTML = '<option value="">Ingen låt har två eller fler stämfiler</option>'; return; }
+  sel.innerHTML = '<option value="">Välj låt…</option>' +
+    songs.map(s => `<option value="${s.id}">${esc(s.title)} (${stemListFor(s).length} spår)</option>`).join('');
+  const pre = new URLSearchParams(location.search).get('song');
+  if (pre && songs.some(s => String(s.id) === pre)) { sel.value = pre; loadSong(songs.find(s => String(s.id) === pre).id); }
+})();
+</script>
+</body>
+</html>

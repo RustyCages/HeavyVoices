@@ -87,6 +87,12 @@
       <label class="muted" for="songSelect">Låt</label>
       <select id="songSelect" style="flex: 1; min-width: 220px;"><option value="">Laddar repertoar...</option></select>
     </div>
+    <div class="row-flex" id="voiceRow" style="margin-top: 0.6rem; display: none;">
+      <label class="muted" for="voiceSelect">Version</label>
+      <select id="voiceSelect" style="flex: 1; min-width: 220px;"></select>
+      <button type="button" class="btn-outline btn-small" id="copyCommonBtn" hidden title="Börja från den gemensamma synken och justera tiderna för stämman">Kopiera gemensam synk</button>
+    </div>
+    <p class="muted" id="voiceHint" style="margin: 0.4rem 0 0; display: none;"></p>
   </div>
 
   <details class="card static" id="textCard" style="display: none; margin-bottom: 1rem;">
@@ -218,6 +224,22 @@ const STEM_FIELDS = [
 ];
 // Rader som ser ut som sektionsrubriker hoppas över som standard
 const HEADER_RE = /^[\[(]?\s*(vers|verse|refräng|ref|chorus|brygga|bridge|stick|intro|outro|pre-?chorus|förrefräng|mellanspel|solo|slut|coda|alla|tutti|sopran|alt|tenor|bas)\b[^a-zåäö]*[\])]?\s*:?\s*$/i;
+
+// Karaoke per stämma: '' = gemensam (songs.lyrics_lrc / lyrics_plain),
+// annars nyckel i songs.lyrics_lrc_voices / lyrics_plain_voices.
+const VOICES = [
+  { key: '',       label: 'Gemensam (alla stämmor)', stem: null },
+  { key: 'sopran', label: 'Sopran', stem: 'stem_sopran_path' },
+  { key: 'alt',    label: 'Alt',    stem: 'stem_alt_path' },
+  { key: 'tenor',  label: 'Tenor',  stem: 'stem_tenor_path' },
+  { key: 'bas',    label: 'Bas',    stem: 'stem_bas_path' },
+];
+let voice = '';
+
+function lrcOf(v = voice) { return v ? ((song.lyrics_lrc_voices || {})[v] || null) : song.lyrics_lrc; }
+function ownPlainOf(v = voice) { return v ? ((song.lyrics_plain_voices || {})[v] || null) : song.lyrics_plain; }
+function plainOf(v = voice) { return ownPlainOf(v) || song.lyrics_plain; }
+function voiceLabel(v = voice) { return (VOICES.find(x => x.key === v) || VOICES[0]).label; }
 
 const audio = document.getElementById('audio');
 const $ = id => document.getElementById(id);
@@ -571,23 +593,36 @@ async function save() {
 
   const lrc = buildLrc();
   $('saveBtn').disabled = true;
-  const { error } = await supabaseClient.from('songs').update({ lyrics_lrc: lrc }).eq('id', song.id);
+  const patch = voice
+    ? { lyrics_lrc_voices: { ...(song.lyrics_lrc_voices || {}), [voice]: lrc } }
+    : { lyrics_lrc: lrc };
+  const { error } = await supabaseClient.from('songs').update(patch).eq('id', song.id);
   $('saveBtn').disabled = false;
   if (error) { alert('Kunde inte spara: ' + error.message); return; }
-  song.lyrics_lrc = lrc;
+  Object.assign(song, patch);
+  renderVoiceSelect();
   setDirty(false);
   refreshSongInList();
-  $('saveInfo').textContent = `Sparat ${new Date().toLocaleTimeString('sv-SE')} — ${lrc.split('\n').length - 2} rader.`;
+  $('saveInfo').textContent = `Sparat (${voiceLabel()}) ${new Date().toLocaleTimeString('sv-SE')} — ${lrc.split('\n').length - 2} rader.`;
   toast('Synk sparad');
 }
 
 async function clearSync() {
-  if (!confirm('Ta bort den sparade synken för låten? Sångtexten påverkas inte.')) return;
-  const { error } = await supabaseClient.from('songs').update({ lyrics_lrc: null }).eq('id', song.id);
+  if (!confirm(`Ta bort den sparade synken (${voiceLabel()})? Sångtexten påverkas inte.`)) return;
+  let patch;
+  if (voice) {
+    const v = { ...(song.lyrics_lrc_voices || {}) };
+    delete v[voice];
+    patch = { lyrics_lrc_voices: v };
+  } else {
+    patch = { lyrics_lrc: null };
+  }
+  const { error } = await supabaseClient.from('songs').update(patch).eq('id', song.id);
   if (error) { alert('Kunde inte ta bort: ' + error.message); return; }
-  song.lyrics_lrc = null;
+  Object.assign(song, patch);
   refreshSongInList();
-  rows = rowsFromPlain(song.lyrics_plain);
+  renderVoiceSelect();
+  rows = rowsFromPlain(plainOf());
   undoStack.length = 0;
   setDirty(false);
   renderLines();
@@ -599,7 +634,7 @@ function exportLrc() {
   const blob = new Blob([buildLrc()], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${song.title.replace(/[^\wåäöÅÄÖ\- ]+/g, '').trim() || 'lat'}.lrc`;
+  a.download = `${song.title.replace(/[^\wåäöÅÄÖ\- ]+/g, '').trim() || 'lat'}${voice ? ' - ' + voiceLabel() : ''}.lrc`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
@@ -683,9 +718,9 @@ function wireEvents() {
   $('cancelEditBtn').addEventListener('click', closeEdit);
   $('applyEditBtn').addEventListener('click', applyEdit);
   $('rebuildBtn').addEventListener('click', () => {
-    if (!song.lyrics_plain) { toast('Låten har ingen sångtext — lägg till den i rutan Sångtext ovan'); $('textCard').open = true; return; }
+    if (!plainOf()) { toast('Låten har ingen sångtext — lägg till den i rutan Sångtext ovan'); $('textCard').open = true; return; }
     if (rows.some(r => r.time != null) && !confirm('Börja om från sångtexten? Alla tider i editorn nollställs (det sparade påverkas inte förrän du sparar).')) return;
-    rows = rowsFromPlain(song.lyrics_plain);
+    rows = rowsFromPlain(plainOf());
     undoStack.length = 0; setDirty(true);
     renderLines(); setCursor(firstUntimed());
   });
@@ -758,11 +793,18 @@ function normalizeLyrics(text) {
 }
 
 function showTextCard() {
-  const has = !!(song.lyrics_plain && song.lyrics_plain.trim());
+  const own = ownPlainOf();
+  const text = plainOf() || '';
+  const has = !!text.trim();
   $('textCard').style.display = 'block';
   $('textCard').open = !has;
-  $('lyricsText').value = song.lyrics_plain || '';
-  $('textSummaryInfo').textContent = has ? `(${song.lyrics_plain.split('\n').filter(l => l.trim()).length} rader)` : '(saknas — lägg till här)';
+  $('lyricsText').value = text;
+  const lines = text.split('\n').filter(l => l.trim()).length;
+  let info;
+  if (!has) info = '(saknas — lägg till här)';
+  else if (voice && !own) info = `(${lines} rader — samma som gemensam text; spara här för en egen ${voiceLabel().toLowerCase()}text)`;
+  else info = `(${lines} rader${voice ? ', egen ' + voiceLabel().toLowerCase() + 'text' : ''})`;
+  $('textSummaryInfo').textContent = info;
   $('textStatus').textContent = '';
 }
 
@@ -782,15 +824,24 @@ async function saveLyricsText() {
   if (!song) return;
   const text = normalizeLyrics($('lyricsText').value);
   $('saveTextBtn').disabled = true;
-  const { error } = await supabaseClient.from('songs').update({ lyrics_plain: text || null }).eq('id', song.id);
+  let patch;
+  if (voice) {
+    // Tom text eller samma som gemensam = ingen egen stämtext (ärv den gemensamma)
+    const v = { ...(song.lyrics_plain_voices || {}) };
+    if (text && text !== song.lyrics_plain) v[voice] = text; else delete v[voice];
+    patch = { lyrics_plain_voices: v };
+  } else {
+    patch = { lyrics_plain: text || null };
+  }
+  const { error } = await supabaseClient.from('songs').update(patch).eq('id', song.id);
   $('saveTextBtn').disabled = false;
   if (error) { $('textStatus').textContent = 'Kunde inte spara: ' + error.message; return; }
 
-  song.lyrics_plain = text || null;
+  Object.assign(song, patch);
   const x = allSongs.find(a => a.id === song.id);
-  if (x) { x.lyrics_plain = song.lyrics_plain; renderSongSelect(song.id); }
-  $('lyricsText').value = text;
-  $('textSummaryInfo').textContent = text ? `(${text.split('\n').filter(l => l.trim()).length} rader)` : '(saknas — lägg till här)';
+  if (x && !voice) { x.lyrics_plain = song.lyrics_plain; renderSongSelect(song.id); }
+  showTextCard();
+  $('textCard').open = true;
   $('textStatus').textContent = 'Sparat ✓';
   toast('Sångtext sparad');
 
@@ -832,7 +883,8 @@ function wireTextCard() {
 let allSongs = [];
 
 function songOptionLabel(x) {
-  const mark = x.lyrics_lrc ? ' ✓ synkad' : (x.lyrics_plain ? '' : ' (ingen text)');
+  const nVoices = Object.keys(x.lyrics_lrc_voices || {}).length;
+  const mark = (x.lyrics_lrc ? ' ✓ synkad' : (x.lyrics_plain ? '' : ' (ingen text)')) + (nVoices ? ` + ${nVoices} stämm${nVoices === 1 ? 'a' : 'or'}` : '');
   return esc(x.title) + mark;
 }
 function renderSongSelect(selectedId) {
@@ -861,6 +913,8 @@ async function loadSong(id) {
     song = null;
     $('editor').style.display = 'none';
     $('textCard').style.display = 'none';
+    $('voiceRow').style.display = 'none';
+    $('voiceHint').style.display = 'none';
     $('songTitle').textContent = 'Textsynk';
     document.title = 'Textsynk — Heavy Voices Admin';
     history.replaceState(null, '', location.pathname);
@@ -874,35 +928,80 @@ async function loadSong(id) {
     return;
   }
   song = data;
-  history.replaceState(null, '', `${location.pathname}?id=${encodeURIComponent(song.id)}`);
+  if (!song.lyrics_lrc_voices) song.lyrics_lrc_voices = {};
+  if (!song.lyrics_plain_voices) song.lyrics_plain_voices = {};
+  const urlVoice = new URLSearchParams(location.search).get('voice') || '';
+  voice = VOICES.some(v => v.key === urlVoice) && !!(new URLSearchParams(location.search).get('id') === String(song.id)) ? urlVoice : '';
   document.title = `Textsynk: ${song.title} — Heavy Voices Admin`;
   $('songTitle').textContent = song.title;
-  showTextCard();
-
-  if (song.lyrics_lrc) {
-    rows = parseLrc(song.lyrics_lrc);
-    $('saveInfo').textContent = 'Laddade sparad synk.';
-  } else {
-    rows = rowsFromPlain(song.lyrics_plain);
-  }
-  if (!rows.length) {
-    $('loadError').textContent = 'Låten har ingen sångtext än — lägg till den i rutan Sångtext ovan (eller importera en .lrc-fil nedan).';
-  }
+  $('voiceRow').style.display = 'flex';
+  renderVoiceSelect();
 
   const tracks = trackOptions();
   $('trackSelect').innerHTML = tracks.map(t => `<option value="${esc(t.path)}">${esc(t.label)}</option>`).join('');
   $('editor').style.display = 'block';
+  loadVersion();
+
+  if (!tracks.length) { $('trackStatus').textContent = 'Inga ljudfiler uppladdade för låten.'; updateProgress(); }
+  else { const p = preferredTrack(); $('trackSelect').value = p; loadTrack(p); }
+}
+
+// Spåret som passar versionen: stämmans eget spår om det finns, annars det första
+function preferredTrack() {
+  const v = VOICES.find(x => x.key === voice);
+  if (v && v.stem && song[v.stem]) return song[v.stem];
+  return trackOptions()[0].path;
+}
+
+function renderVoiceSelect() {
+  $('voiceSelect').innerHTML = VOICES.map(v => {
+    const synced = !!lrcOf(v.key);
+    const ownText = v.key && ownPlainOf(v.key);
+    const tag = synced ? ' ✓ synkad' : (v.key ? ' — ingen egen synk' : '');
+    return `<option value="${v.key}" ${v.key === voice ? 'selected' : ''}>${esc(v.label)}${tag}${ownText ? ' (egen text)' : ''}</option>`;
+  }).join('');
+  $('copyCommonBtn').hidden = !(voice && song.lyrics_lrc);
+}
+
+// Läser in raderna för vald version (sparad synk, annars från texten)
+function loadVersion() {
+  history.replaceState(null, '', `${location.pathname}?id=${encodeURIComponent(song.id)}${voice ? '&voice=' + voice : ''}`);
+  rows = []; cursor = 0; undoStack.length = 0; playingIdx = -2;
+  $('loadError').textContent = '';
+  $('saveInfo').textContent = '';
+  closeEdit();
+  setDirty(false);
+  showTextCard();
+  renderVoiceSelect();
+
+  const hint = $('voiceHint');
+  if (voice) {
+    hint.style.display = 'block';
+    hint.textContent = lrcOf()
+      ? `Du redigerar ${voiceLabel().toLowerCase()}stämmans egen synk. Medlemmar som väljer ${voiceLabel()} i spelaren ser den här versionen.`
+      : `${voiceLabel()} har ingen egen synk än – medlemmar ser den gemensamma tills du sparar en här. Tips: "Kopiera gemensam synk" och justera bara de rader som skiljer sig.`;
+  } else {
+    hint.style.display = 'none';
+  }
+
+  const saved = lrcOf();
+  if (saved) {
+    rows = parseLrc(saved);
+    $('saveInfo').textContent = `Laddade sparad synk (${voiceLabel()}).`;
+  } else {
+    rows = rowsFromPlain(plainOf());
+  }
+  if (!rows.length) {
+    $('loadError').textContent = 'Låten har ingen sångtext än — lägg till den i rutan Sångtext ovan (eller importera en .lrc-fil nedan).';
+  }
   renderLines();
   setCursor(firstUntimed(), false);
-
-  if (tracks.length) loadTrack(tracks[0].path);
-  else { $('trackStatus').textContent = 'Inga ljudfiler uppladdade för låten.'; updateProgress(); }
 }
 
 // Håll dropdownens ✓ i synk efter spara/ta bort
 function refreshSongInList() {
   const x = allSongs.find(a => a.id === song.id);
-  if (x) { x.lyrics_lrc = song.lyrics_lrc; renderSongSelect(song.id); }
+  if (x) { x.lyrics_lrc = song.lyrics_lrc; x.lyrics_lrc_voices = song.lyrics_lrc_voices; renderSongSelect(song.id); }
 }
 
 // ---------- Start ----------
@@ -915,7 +1014,7 @@ function refreshSongInList() {
   wireTextCard();
   requestAnimationFrame(tick);
 
-  const { data: list, error } = await supabaseClient.from('songs').select('id, title, lyrics_plain, lyrics_lrc').order('title');
+  const { data: list, error } = await supabaseClient.from('songs').select('id, title, lyrics_plain, lyrics_lrc, lyrics_lrc_voices').order('title');
   if (error) { $('loadError').textContent = 'Kunde inte hämta repertoaren: ' + error.message; return; }
   allSongs = list || [];
 
@@ -933,6 +1032,29 @@ function refreshSongInList() {
     currentId = newId;
     e.target.blur(); // så att mellanslag går till TAP direkt
     await loadSong(newId);
+  });
+
+  $('voiceSelect').addEventListener('change', e => {
+    if (dirty && !confirm('Du har osparade ändringar i synken. Byta version ändå?')) {
+      e.target.value = voice;
+      return;
+    }
+    voice = e.target.value;
+    e.target.blur();
+    loadVersion();
+    const p = preferredTrack && trackOptions().length ? preferredTrack() : null;
+    if (p && p !== $('trackSelect').value) { $('trackSelect').value = p; loadTrack(p); }
+  });
+
+  $('copyCommonBtn').addEventListener('click', () => {
+    if (!song.lyrics_lrc) return;
+    if (rows.some(r => r.time != null) && !confirm(`Ersätta raderna i editorn med den gemensamma synken? (${voiceLabel()} sparas först när du trycker Spara synk.)`)) return;
+    rows = parseLrc(song.lyrics_lrc);
+    undoStack.length = 0;
+    setDirty(true);
+    renderLines();
+    setCursor(rows.length, false);
+    toast('Gemensam synk kopierad – justera och spara');
   });
 
   if (startId) await loadSong(startId);

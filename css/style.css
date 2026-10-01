@@ -17,9 +17,10 @@ Heavy Voices — Central Stilmall (style.css)
 --border-hover: rgba(229, 169, 104, 0.35);
 --card-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
 --card-shadow-hover: 0 14px 35px -10px rgba(0, 0, 0, 0.7), 0 0 20px rgba(229, 169, 104, 0.12);
+color-scheme: dark;
 }
 
-{
+*, *::before, *::after {
 box-sizing: border-box;
 }
 
@@ -208,6 +209,22 @@ width: 100%;
 margin-bottom: 0.85rem;
 outline: none;
 transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+/* Datum/tid: iOS Safari kollapsar tomma fält och ignorerar width utan detta */
+input[type="date"], input[type="time"] {
+display: block;
+min-width: 0;
+min-height: 2.75rem;
+-webkit-appearance: none;
+appearance: none;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+text-align: left;
+}
+input::-webkit-calendar-picker-indicator {
+filter: invert(0.75) sepia(0.4) saturate(3) hue-rotate(350deg);
+cursor: pointer;
 }
 
 input:focus, select:focus, textarea:focus {

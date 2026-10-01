@@ -94,7 +94,12 @@ function switchTab(name) {
 // =========================================================
 // Events
 // =========================================================
-function renderEventCard(ev, isPast) {
+function timeRange(ev) {
+  if (!ev.event_time) return '';
+  return ' ' + ev.event_time.slice(0,5) + (ev.end_time ? '–' + ev.end_time.slice(0,5) : '');
+}
+  
+  function renderEventCard(ev, isPast) {
   const details = document.createElement('details');
   details.className = 'event-card card modern-card' + (isPast ? ' past' : '');
 
@@ -102,7 +107,7 @@ function renderEventCard(ev, isPast) {
   summary.innerHTML = `
     <div class="row-between">
       <div class="event-summary-main">
-        <span class="event-date">${formatDate(ev.event_date)}${ev.event_time ? ' ' + ev.event_time.slice(0,5) : ''}</span>
+        <span class="event-date">${formatDate(ev.event_date)}${timeRange(ev)}</span>
         <span class="event-title event-type-${ev.event_type}">${escapeHtml(ev.title)}</span>
       </div>
       <span class="text-muted">Visa ▾</span>

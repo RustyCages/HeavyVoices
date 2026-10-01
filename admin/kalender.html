@@ -17,6 +17,18 @@
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
   .form-row > label { display: block; min-width: 0; }
   .field-label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+  .event-item { flex-wrap: wrap; }
+  .att-btn { padding: 0.3rem 0.7rem; font-size: 0.85rem; background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .att-btn.has { border-color: #4ade80; color: #4ade80; }
+  .att-panel { flex-basis: 100%; background: rgba(255,255,255,0.03); border-radius: 0.6rem; padding: 0.75rem 0.9rem; }
+  .att-summary { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem; }
+  .att-summary strong { color: var(--text); }
+  .att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.15rem 1rem; }
+  .att-member { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; padding: 0.25rem 0; cursor: pointer; }
+  .att-member input { width: 1.05rem; height: 1.05rem; margin: 0; accent-color: #4ade80; }
+  .att-member small { color: var(--text-muted); font-size: 0.75rem; }
+  .att-member .by-admin { font-size: 0.7rem; color: var(--text-muted); }
+  .att-group { grid-column: 1 / -1; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 0.4rem; }
   .series-badge { font-size: 0.75rem; color: var(--text-muted); margin-left: 0.4rem; }
   select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.9rem; width: 100%; margin-bottom: 0.75rem; }
 </style>
@@ -109,9 +121,85 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+// ---------- Närvaro ----------
+let adminId = null;
+let approvedMembers = [];          // [{ id, name, stamma }]
+let attendanceByEvent = new Map(); // eventId -> Map(memberId -> { checked_by })
+const openPanels = new Set();      // event-id:n vars närvarolista är utfälld
+const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' });
+const STAMMA_ORDER = ['sopran', 'alt', 'tenor', 'bas'];
+const svCollator = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
+
+function stammaRank(st) {
+  const s = String(st || '').toLowerCase();
+  const i = STAMMA_ORDER.findIndex(k => s.startsWith(k));
+  return i === -1 ? 99 : i;
+}
+
+async function loadAttendanceData() {
+  const [{ data: mem }, { data: att }] = await Promise.all([
+    supabaseClient.from('members').select('id, name, stamma').eq('status', 'approved'),
+    supabaseClient.from('attendance').select('event_id, member_id, checked_by'),
+  ]);
+  approvedMembers = (mem || []).sort((a, b) =>
+    (stammaRank(a.stamma) - stammaRank(b.stamma)) || svCollator.compare(a.stamma || '', b.stamma || '') || svCollator.compare(a.name || '', b.name || ''));
+  attendanceByEvent = new Map();
+  (att || []).forEach(a => {
+    const k = String(a.event_id);
+    if (!attendanceByEvent.has(k)) attendanceByEvent.set(k, new Map());
+    attendanceByEvent.get(k).set(a.member_id, { checked_by: a.checked_by });
+  });
+}
+
+function attCount(evId) { const m = attendanceByEvent.get(String(evId)); return m ? m.size : 0; }
+
+function renderAttPanel(evId, panel) {
+  const present = attendanceByEvent.get(String(evId)) || new Map();
+  const perStamma = {};
+  approvedMembers.forEach(m => {
+    const key = m.stamma || 'Ingen stämma';
+    perStamma[key] = perStamma[key] || { n: 0, of: 0 };
+    perStamma[key].of++;
+    if (present.has(m.id)) perStamma[key].n++;
+  });
+  const parts = Object.entries(perStamma).map(([k, v]) => `${escapeAtt(k)} ${v.n}/${v.of}`).join(' · ');
+  let lastGroup = null;
+  const rows = approvedMembers.map(m => {
+    const group = m.stamma || 'Ingen stämma';
+    const head = group !== lastGroup ? `<div class="att-group">${escapeAtt(group)}</div>` : '';
+    lastGroup = group;
+    const p = present.get(m.id);
+    return `${head}<label class="att-member"><input type="checkbox" data-member="${m.id}" ${p ? 'checked' : ''}>${escapeAtt(m.name)}${p && p.checked_by ? '<span class="by-admin">(admin)</span>' : ''}</label>`;
+  }).join('');
+  panel.innerHTML = `
+    <div class="att-summary"><strong>${present.size} av ${approvedMembers.length}</strong> närvarande${parts ? ' — ' + parts : ''}</div>
+    <div class="att-grid">${rows || '<span class="text-muted">Inga godkända medlemmar.</span>'}</div>`;
+
+  panel.querySelectorAll('input[data-member]').forEach(cb => cb.addEventListener('change', async () => {
+    const memberId = cb.dataset.member;
+    cb.disabled = true;
+    const { error } = cb.checked
+      ? await supabaseClient.from('attendance').insert({ event_id: evId, member_id: memberId, checked_by: adminId })
+      : await supabaseClient.from('attendance').delete().eq('event_id', evId).eq('member_id', memberId);
+    cb.disabled = false;
+    if (error && error.code !== '23505') { alert('Kunde inte spara närvaro: ' + error.message); cb.checked = !cb.checked; return; }
+    const k = String(evId);
+    if (!attendanceByEvent.has(k)) attendanceByEvent.set(k, new Map());
+    if (cb.checked) attendanceByEvent.get(k).set(memberId, { checked_by: adminId });
+    else attendanceByEvent.get(k).delete(memberId);
+    renderAttPanel(evId, panel);
+    const btn = document.querySelector(`.att-btn[data-id="${CSS.escape(String(evId))}"]`);
+    if (btn) { btn.textContent = `Närvaro (${attCount(evId)})`; btn.classList.toggle('has', attCount(evId) > 0); }
+  }));
+}
+
+function escapeAtt(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
 async function loadEvents() {
-  const { data: events, error } = await supabaseClient
-    .from('events').select('*').order('event_date').order('event_time');
+  const [{ data: events, error }] = await Promise.all([
+    supabaseClient.from('events').select('*').order('event_date').order('event_time'),
+    loadAttendanceData(),
+  ]);
 
   const el = document.getElementById('eventsList');
   if (error) { el.innerHTML = `<p class="error">${error.message}</p>`; return; }
@@ -126,11 +214,24 @@ async function loadEvents() {
         ${ev.notes ? `<div class="event-meta">${ev.notes}</div>` : ''}
       </div>
       <div style="display:flex; flex-direction:column; gap:0.35rem;">
+        ${ev.event_date <= todayStr ? `<button type="button" class="att-btn ${attCount(ev.id) ? 'has' : ''}" data-id="${ev.id}">Närvaro (${attCount(ev.id)})</button>` : ''}
         <button type="button" class="btn-danger deleteEventBtn" data-id="${ev.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort</button>
         ${ev.series_id ? `<button type="button" class="btn-danger deleteEventBtn" data-series="${ev.series_id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort serie</button>` : ''}
       </div>
+      <div class="att-panel" data-panel="${ev.id}" hidden></div>
     </div>
   `).join('');
+
+  document.querySelectorAll('.att-btn').forEach(btn => {
+    const id = btn.dataset.id;
+    const ev = events.find(x => String(x.id) === id);
+    const panel = document.querySelector(`.att-panel[data-panel="${CSS.escape(id)}"]`);
+    const open = () => { panel.hidden = false; renderAttPanel(ev.id, panel); openPanels.add(id); };
+    if (openPanels.has(id)) open();
+    btn.addEventListener('click', () => {
+      if (panel.hidden) open(); else { panel.hidden = true; openPanels.delete(id); }
+    });
+  });
 
   document.querySelectorAll('.deleteEventBtn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
@@ -194,7 +295,7 @@ document.getElementById('evRepeat').addEventListener('change', (e) => {
 
 (async () => {
   const member = await requireAuth('admin');
-  if (member) loadEvents();
+  if (member) { adminId = member.id; loadEvents(); }
 })();
 </script>
 

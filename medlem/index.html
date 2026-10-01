@@ -6,6 +6,16 @@
 <title>Medlem — Heavy Voices</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  #checkinCard { margin-top: 1.5rem; border-color: var(--border-hover); }
+  #checkinCard h3 { margin: 0 0 0.6rem; }
+  .checkin-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; padding: 0.6rem 0; border-top: 1px solid var(--border); }
+  .checkin-row:first-of-type { border-top: none; }
+  .checkin-info strong { display: block; }
+  .checkin-info span { font-size: 0.85rem; color: var(--text-muted); }
+  .checkin-btn { padding: 0.6rem 1.2rem; font-size: 0.95rem; }
+  .checked-in { color: #4ade80; font-weight: 600; font-size: 0.95rem; white-space: nowrap; }
+</style>
 </head>
 <body>
 
@@ -18,6 +28,11 @@
       <p id="welcome" class="text-muted">Laddar...</p>
     </div>
     <span id="roleBadge" class="badge"></span>
+  </div>
+
+  <div class="card" id="checkinCard" hidden>
+    <h3>Idag</h3>
+    <div id="checkinList"></div>
   </div>
 
   <div class="card" style="margin-top: 1.5rem;">
@@ -70,6 +85,7 @@
   if (member) {
     document.getElementById('welcome').textContent = `Välkommen ${member.name}`;
     document.getElementById('roleBadge').textContent = member.role;
+    loadCheckin(member);
     if (member.role === 'admin') {
       const a = document.createElement('a');
       a.href = '/admin/';
@@ -81,6 +97,66 @@
 })();
 
 document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+// ---------- Närvarocheck ----------
+const TYPE_LABELS = { rep: 'Repetition', konsert: 'Konsert', ovrigt: 'Övrigt' };
+function escHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function todayStockholm() { return new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' }); } // YYYY-MM-DD
+function hhmm(t) { return t ? t.slice(0, 5) : ''; }
+
+async function loadCheckin(member) {
+  if (member.status && member.status !== 'approved') return;
+  const today = todayStockholm();
+  const { data: events, error } = await supabaseClient
+    .from('events').select('id, title, event_type, event_time, end_time, location')
+    .eq('event_date', today).order('event_time', { nullsFirst: true });
+  if (error || !events || !events.length) return;
+
+  const { data: mine } = await supabaseClient
+    .from('attendance').select('event_id, checked_in_at')
+    .eq('member_id', member.id).in('event_id', events.map(e => e.id));
+  const checked = new Map((mine || []).map(a => [String(a.event_id), a.checked_in_at]));
+
+  const list = document.getElementById('checkinList');
+  list.innerHTML = '';
+  events.forEach(ev => {
+    const row = document.createElement('div');
+    row.className = 'checkin-row';
+    const time = ev.event_time ? hhmm(ev.event_time) + (ev.end_time ? '–' + hhmm(ev.end_time) : '') : '';
+    const meta = [TYPE_LABELS[ev.event_type] || '', time, ev.location || ''].filter(Boolean).join(' · ');
+    row.innerHTML = `<div class="checkin-info"><strong>${escHtml(ev.title)}</strong><span>${escHtml(meta)}</span></div><div class="checkin-action"></div>`;
+    const action = row.querySelector('.checkin-action');
+
+    const showChecked = (iso) => {
+      const at = new Date(iso).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm' });
+      action.innerHTML = `<span class="checked-in">✓ Incheckad ${at}</span>`;
+    };
+
+    if (checked.has(String(ev.id))) {
+      showChecked(checked.get(String(ev.id)));
+    } else {
+      const btn = document.createElement('button');
+      btn.className = 'checkin-btn';
+      btn.textContent = 'Checka in';
+      btn.addEventListener('click', async () => {
+        btn.disabled = true; btn.textContent = 'Checkar in…';
+        const { data, error } = await supabaseClient.from('attendance')
+          .insert({ event_id: ev.id, member_id: member.id }).select('checked_in_at').single();
+        if (error) {
+          // 23505 = redan incheckad (t.ex. från en annan enhet)
+          if (error.code === '23505') { showChecked(new Date().toISOString()); return; }
+          btn.disabled = false; btn.textContent = 'Checka in';
+          alert('Kunde inte checka in: ' + error.message);
+          return;
+        }
+        showChecked(data.checked_in_at);
+      });
+      action.appendChild(btn);
+    }
+    list.appendChild(row);
+  });
+  document.getElementById('checkinCard').hidden = false;
+}
 </script>
 
 </body>

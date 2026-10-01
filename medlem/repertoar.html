@@ -120,7 +120,18 @@
     backdrop-filter: blur(10px);
   }
   #playerBar.hidden { display:none; }
-  #playerTitle { font-weight:700; text-align:center; font-family:'Roboto Condensed', sans-serif; }
+  #playerTitle { font-weight:700; text-align:center; font-family:'Roboto Condensed', sans-serif; overflow:hidden; white-space:nowrap; }
+  #playerTitle .marquee-inner { display:inline-block; }
+  #playerTitle.marquee { text-align:left; }
+  #playerTitle.marquee .marquee-inner { animation: marquee-pingpong var(--marquee-time, 6s) ease-in-out infinite alternate; }
+  @keyframes marquee-pingpong {
+    0%, 15% { transform: translateX(0); }
+    85%, 100% { transform: translateX(calc(-1 * var(--marquee-dist, 0px))); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #playerTitle.marquee .marquee-inner { animation: none; }
+    #playerTitle { text-overflow: ellipsis; }
+  }
   #playerTitle .loading-tag { color:var(--accent); font-weight:500; font-size:0.8rem; margin-left:0.5rem; }
   #playerControls { display:flex; align-items:center; justify-content:center; gap:1rem; }
   #playerControls button { font-size:1.1rem; width:2.6rem; height:2.6rem; padding:0; border-radius:50%; display:flex; align-items:center; justify-content:center; }
@@ -288,15 +299,25 @@ function fmtTime(sec) {
 // Merge fixed + extra stems present on a song into one generic list
 function getStemDefs(song) {
   const defs = [];
+  const offsets = song.stem_offsets || {};
+  const offsetSec = (k) => (Number(offsets[k]) || 0) / 1000;
   FIXED_STEMS.forEach(f => {
     if (song[f.pathCol]) {
-      defs.push({ key: f.key, type: 'fixed', label: f.label, path: song[f.pathCol], volColumn: f.volColumn });
+      defs.push({ key: f.key, type: 'fixed', label: f.label, path: song[f.pathCol], volColumn: f.volColumn, offsetSec: offsetSec(f.pathCol) });
     }
   });
   (song.extra_stems || []).forEach(ex => {
-    defs.push({ key: ex.id, type: 'extra', label: ex.label, path: ex.path, volColumn: null });
+    defs.push({ key: ex.id, type: 'extra', label: ex.label, path: ex.path, volColumn: null, offsetSec: offsetSec(ex.id) });
   });
   return defs;
+}
+
+// Låtens totala längd med hänsyn till stämsynk-förskjutningar (sätts i admin → Stämsynk)
+function timelineDuration(item) {
+  return Math.max(0, ...item.stemDefs.map(def => {
+    const b = currentBuffers[def.key];
+    return b ? b.duration + (def.offsetSec || 0) : 0;
+  }));
 }
 
 let currentMember = null;
@@ -929,7 +950,7 @@ async function playTrackAt(index, offsetSeconds) {
   const item = items[index];
 
   document.getElementById('playerBar').classList.remove('hidden');
-  document.getElementById('playerTitle').innerHTML = `${escapeHtml(item.song.title)} <span class="loading-tag">laddar...</span>`;
+  setPlayerTitle(`${escapeHtml(item.song.title)} <span class="loading-tag">laddar...</span>`);
   document.getElementById('scrubber').value = 0;
   document.getElementById('curTime').textContent = '0:00';
   document.getElementById('durTime').textContent = '0:00';
@@ -955,10 +976,10 @@ async function playTrackAt(index, offsetSeconds) {
     currentBuffers = {};
     bufferEntries.forEach(([k, b]) => { currentBuffers[k] = b; });
 
-    trackDuration = Math.max(0, ...Object.values(currentBuffers).map(b => b.duration));
+    trackDuration = timelineDuration(item);
     document.getElementById('scrubber').max = trackDuration || 1;
     document.getElementById('durTime').textContent = fmtTime(trackDuration);
-    document.getElementById('playerTitle').textContent = item.song.title;
+    setPlayerTitle(escapeHtml(item.song.title));
     markTrackRowLoading(item.rowId, false);
 
     isLoadingTrack = false;
@@ -975,7 +996,7 @@ async function playTrackAt(index, offsetSeconds) {
   } catch (e) {
     console.error('playTrackAt failed:', e);
     toast('Kunde inte spela låten: ' + (e.message || e));
-    document.getElementById('playerTitle').textContent = item.song.title;
+    setPlayerTitle(escapeHtml(item.song.title));
     markTrackRowLoading(item.rowId, false);
     if (myRequestId === playRequestId) {
       isLoadingTrack = false;
@@ -984,6 +1005,29 @@ async function playTrackAt(index, offsetSeconds) {
     }
   }
 }
+
+// Titeln i spelaren: rullar fram och tillbaka om den inte får plats.
+function setPlayerTitle(html) {
+  const el = document.getElementById('playerTitle');
+  el.innerHTML = `<span class="marquee-inner">${html}</span>`;
+  requestAnimationFrame(() => updatePlayerTitleMarquee());
+}
+function updatePlayerTitleMarquee() {
+  const el = document.getElementById('playerTitle');
+  const inner = el.querySelector('.marquee-inner');
+  if (!inner) return;
+  const dist = inner.scrollWidth - el.clientWidth;
+  if (dist > 4) {
+    el.style.setProperty('--marquee-dist', dist + 'px');
+    el.style.setProperty('--marquee-time', Math.max(4, dist / 30) + 's'); // ~30 px/s
+    el.classList.add('marquee');
+  } else {
+    el.classList.remove('marquee');
+  }
+}
+// Mät om när spelaren byter storlek (fönster, utfälld/minimerad spelare)
+if ('ResizeObserver' in window) new ResizeObserver(() => updatePlayerTitleMarquee()).observe(document.getElementById('playerTitle'));
+else window.addEventListener('resize', updatePlayerTitleMarquee);
 
 function markTrackRowLoading(rowId, loading) {
   document.querySelectorAll(`.track-row[data-row-id="${rowId}"] .track-title`).forEach(el => {
@@ -996,9 +1040,15 @@ function schedulePlaybackFrom(item, offset) {
   playStartCtxTime = startAt;
   playStartOffset = offset;
 
+  let endKey = null, endTime = -Infinity;
   item.stemDefs.forEach(def => {
     const buffer = currentBuffers[def.key];
     if (!buffer) return;
+    // Förskjutning: +o = stämman ligger o s senare i tidslinjen än filen.
+    const o = def.offsetSec || 0;
+    const posInFile = offset - o;
+    if (posInFile >= buffer.duration) return;              // den här stämman är redan slut
+    if (buffer.duration + o > endTime) { endTime = buffer.duration + o; endKey = def.key; }
     const source = audioCtx.createBufferSource();
     source.buffer = buffer;
     const gain = audioCtx.createGain();
@@ -1006,14 +1056,15 @@ function schedulePlaybackFrom(item, offset) {
     gain.gain.value = muted ? 0 : ((item.volumes[def.key] ?? 100) / 100);
     source.connect(gain);
     gain.connect(audioCtx.destination);
-    source.start(startAt, offset);
+    if (posInFile >= 0) source.start(startAt, posInFile);
+    else source.start(startAt - posInFile, 0);           // stämman börjar lite senare
     currentSources[def.key] = source;
     gainNodesCurrent[def.key] = gain;
   });
 
-  const firstKey = item.stemDefs[0] && item.stemDefs[0].key;
-  if (firstKey && currentSources[firstKey]) {
-    currentSources[firstKey].onended = () => {
+  // Lyssna på den stämma som slutar sist (inte bara den första) så att inget klipps av.
+  if (endKey && currentSources[endKey]) {
+    currentSources[endKey].onended = () => {
       if (isPlaying) handleTrackEnded();
     };
   }

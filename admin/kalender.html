@@ -14,6 +14,10 @@
   .event-type-konsert { color: var(--accent); }
   .event-type-ovrigt { color: var(--text-muted); }
   .event-meta { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .form-row > label { display: block; min-width: 0; }
+  .field-label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+  .series-badge { font-size: 0.75rem; color: var(--text-muted); margin-left: 0.4rem; }
   select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.9rem; width: 100%; margin-bottom: 0.75rem; }
 </style>
 </head>
@@ -34,8 +38,23 @@
         <option value="konsert">Konsert</option>
         <option value="ovrigt">Övrigt</option>
       </select>
-      <input type="date" id="evDate" required>
-      <input type="time" id="evTime">
+      <label><span class="field-label">Datum</span>
+        <input type="date" id="evDate" required></label>
+      <div class="form-row">
+        <label><span class="field-label">Från</span><input type="time" id="evTime"></label>
+        <label><span class="field-label">Till</span><input type="time" id="evEndTime"></label>
+      </div>
+      <div class="form-row">
+        <label><span class="field-label">Upprepa</span>
+          <select id="evRepeat">
+            <option value="">Upprepas inte</option>
+            <option value="day">Varje dag</option>
+            <option value="week">Varje vecka</option>
+            <option value="month">Varje månad</option>
+          </select></label>
+        <label id="evRepeatUntilWrap" hidden><span class="field-label">Till och med</span>
+          <input type="date" id="evRepeatUntil"></label>
+      </div>
       <input type="text" id="evLocation" placeholder="Plats">
       <textarea id="evNotes" placeholder="Anteckningar" style="width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.6rem 0.9rem; font-family:inherit; min-height:70px; margin-bottom:0.75rem;"></textarea>
       <button type="submit">Lägg till</button>
@@ -55,6 +74,36 @@
 <script>
 const typeLabels = { rep: 'Repetition', konsert: 'Konsert', ovrigt: 'Övrigt' };
 
+const MAX_OCCURRENCES = 200;
+
+function timeRange(ev) {
+  if (!ev.event_time) return '';
+  return ' ' + ev.event_time.slice(0,5) + (ev.end_time ? '–' + ev.end_time.slice(0,5) : '');
+}
+
+// Datumräkning i UTC så att sommartid inte flyttar dagar
+function parseYmd(str) { const [y,m,d] = str.split('-').map(Number); return { y, m: m - 1, d }; }
+function toYmd(y, m, d) { const dt = new Date(Date.UTC(y, m, d)); return dt.toISOString().slice(0, 10); }
+
+function buildDates(startStr, repeat, untilStr) {
+  if (!repeat) return [startStr];
+  const { y, m, d } = parseYmd(startStr);
+  const dates = [];
+  for (let i = 0; dates.length < MAX_OCCURRENCES; i++) {
+    let next;
+    if (repeat === 'day')  next = toYmd(y, m, d + i);
+    if (repeat === 'week') next = toYmd(y, m, d + i * 7);
+    if (repeat === 'month') {
+      // 31 jan → 28/29 feb → 31 mar: håll fast vid ursprungsdagen, kläm till månadens sista dag
+      const lastDay = new Date(Date.UTC(y, m + i + 1, 0)).getUTCDate();
+      next = toYmd(y, m + i, Math.min(d, lastDay));
+    }
+    if (next > untilStr) break;
+    dates.push(next);
+  }
+  return dates;
+}
+
 function formatDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -70,19 +119,27 @@ async function loadEvents() {
 
   el.innerHTML = events.map(ev => `
     <div class="event-item">
-      <div class="event-date">${formatDate(ev.event_date)}${ev.event_time ? ' ' + ev.event_time.slice(0,5) : ''}</div>
+      <div class="event-date">${formatDate(ev.event_date)}${timeRange(ev)}</div>
       <div style="flex: 1;">
-        <strong class="event-type-${ev.event_type}">${typeLabels[ev.event_type]}</strong> — ${ev.title}
+        <strong class="event-type-${ev.event_type}">${typeLabels[ev.event_type]}</strong> — ${ev.title}${ev.series_id ? '<span class="series-badge">↻ serie</span>' : ''}
         ${ev.location ? `<div class="event-meta">${ev.location}</div>` : ''}
         ${ev.notes ? `<div class="event-meta">${ev.notes}</div>` : ''}
       </div>
-      <button type="button" class="btn-danger deleteEventBtn" data-id="${ev.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort</button>
+      <div style="display:flex; flex-direction:column; gap:0.35rem;">
+        <button type="button" class="btn-danger deleteEventBtn" data-id="${ev.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort</button>
+        ${ev.series_id ? `<button type="button" class="btn-danger deleteEventBtn" data-series="${ev.series_id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort serie</button>` : ''}
+      </div>
     </div>
   `).join('');
 
   document.querySelectorAll('.deleteEventBtn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
-      await supabaseClient.from('events').delete().eq('id', e.target.dataset.id);
+      const { id, series } = e.currentTarget.dataset;
+      const msg = series ? 'Ta bort ALLA tillfällen i serien?' : 'Ta bort denna händelse?';
+      if (!confirm(msg)) return;
+      const query = supabaseClient.from('events').delete();
+      const { error } = await (series ? query.eq('series_id', series) : query.eq('id', id));
+      if (error) { alert(error.message); return; }
       loadEvents();
     });
   });
@@ -93,19 +150,46 @@ document.getElementById('addEventForm').addEventListener('submit', async (e) => 
   const errorEl = document.getElementById('addEventError');
   errorEl.textContent = '';
 
-  const { error } = await supabaseClient.from('events').insert({
+  const startDate = document.getElementById('evDate').value;
+  const startTime = document.getElementById('evTime').value || null;
+  const endTime   = document.getElementById('evEndTime').value || null;
+  const repeat    = document.getElementById('evRepeat').value;
+  const until     = document.getElementById('evRepeatUntil').value;
+
+  if (endTime && !startTime) { errorEl.textContent = 'Ange en starttid om du anger en sluttid.'; return; }
+  if (endTime && endTime <= startTime) { errorEl.textContent = 'Sluttiden måste vara efter starttiden.'; return; }
+  if (repeat && !until) { errorEl.textContent = 'Välj hur länge händelsen ska upprepas.'; return; }
+  if (repeat && until < startDate) { errorEl.textContent = '"Till och med" måste vara efter startdatumet.'; return; }
+
+  const dates = buildDates(startDate, repeat, until);
+  if (repeat && dates.length >= MAX_OCCURRENCES &&
+      !confirm(`Serien begränsas till ${MAX_OCCURRENCES} tillfällen (t.o.m. ${dates[dates.length - 1]}). Fortsätta?`)) return;
+
+  const seriesId = dates.length > 1 ? crypto.randomUUID() : null;
+  const base = {
     title: document.getElementById('evTitle').value,
     event_type: document.getElementById('evType').value,
-    event_date: document.getElementById('evDate').value,
-    event_time: document.getElementById('evTime').value || null,
+    event_time: startTime,
+    end_time: endTime,
     location: document.getElementById('evLocation').value || null,
     notes: document.getElementById('evNotes').value || null,
-  });
+    series_id: seriesId,
+  };
+
+  const { error } = await supabaseClient.from('events')
+    .insert(dates.map(d => ({ ...base, event_date: d })));
 
   if (error) { errorEl.textContent = error.message; return; }
 
   document.getElementById('addEventForm').reset();
+  document.getElementById('evRepeatUntilWrap').hidden = true;
   loadEvents();
+});
+
+document.getElementById('evRepeat').addEventListener('change', (e) => {
+  const wrap = document.getElementById('evRepeatUntilWrap');
+  wrap.hidden = !e.target.value;
+  document.getElementById('evRepeatUntil').required = !!e.target.value;
 });
 
 (async () => {

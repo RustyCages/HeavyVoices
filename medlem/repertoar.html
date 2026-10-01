@@ -99,7 +99,12 @@
   .stem-check-row input[type=checkbox] { width:auto; flex-shrink:0; margin:0; }
   .doc-links { display:flex; flex-wrap:wrap; gap:0.6rem; margin:0.75rem 0; }
   .doc-links a { font-size:0.8rem; padding:0.4rem 0.8rem; border:1px solid var(--border); border-radius:0.4rem; }
-  .lyrics-preview { white-space:pre-wrap; max-height:150px; overflow-y:auto; background:rgba(0,0,0,0.2); padding:0.9rem; border-radius:0.5rem; font-size:0.85rem; margin:0.75rem 0; line-height:1.6; }
+  .doc-chip { display:inline-flex; align-items:stretch; border:1px solid var(--border); border-radius:0.4rem; overflow:hidden; }
+  .doc-chip a, .doc-chip button { font-size:0.8rem; padding:0.4rem 0.75rem; display:flex; align-items:center; background:none; border:none; border-radius:0; color:var(--accent); cursor:pointer; font-weight:500; }
+  .doc-links .doc-chip a { border:none; border-radius:0; }
+  .doc-chip button { border-left:1px solid var(--border); padding:0.4rem 0.55rem; color:var(--text-muted); }
+  .doc-chip button:hover, .doc-chip a:hover { background:rgba(255,255,255,0.05); color:var(--accent); }
+  .doc-chip svg { width:14px; height:14px; }
 
   .quick-create { display:flex; gap:0.6rem; margin-bottom:1.75rem; flex-wrap:wrap; }
   .quick-create input { width:auto; flex:1; margin-bottom:0; min-width:180px; }
@@ -142,6 +147,24 @@
   #repeatBtn.active, #karaokeBtn.active { color:var(--accent); box-shadow:0 0 8px rgba(229,169,104,0.4); }
   #karaokeBtn, #lyricsDocBtn { font-size:0.95rem; }
   #lyricsDocBtn.hidden { display:none; }
+  #karaokeBtn { position:relative; }
+  #karaokeBtn .voice-badge { position:absolute; bottom:-0.35rem; right:-0.45rem; font-size:0.6rem; font-weight:700; background:var(--accent); color:#111317; border-radius:0.6rem; padding:0.05rem 0.3rem; line-height:1.2; pointer-events:none; }
+  #karaokeBtn .voice-badge:empty { display:none; }
+
+  /* Popup-meny i spelaren (textversion / dokument) */
+  #playerMenu { position:fixed; bottom:6rem; left:50%; transform:translateX(-50%); width:min(92vw, 340px); max-height:60vh; overflow-y:auto; background:var(--bg); border:1px solid var(--border); border-radius:0.7rem; box-shadow:var(--card-shadow); padding:0.4rem; z-index:120; }
+  #playerMenu[hidden] { display:none; }
+  #playerMenu .pm-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); padding:0.45rem 0.6rem 0.25rem; }
+  #playerMenu .pm-item { display:flex; align-items:center; gap:0.5rem; width:100%; padding:0.55rem 0.6rem; border-radius:0.4rem; background:none; border:none; color:var(--text); font-weight:400; font-size:0.9rem; text-align:left; cursor:pointer; }
+  #playerMenu .pm-item:hover { background:rgba(255,255,255,0.05); color:var(--text); }
+  #playerMenu .pm-item .pm-check { width:1rem; color:var(--accent); flex-shrink:0; }
+  #playerMenu .pm-row { display:flex; align-items:center; gap:0.25rem; }
+  #playerMenu .pm-row .pm-item { flex:1; min-width:0; }
+  #playerMenu .pm-row .pm-item span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #playerMenu .pm-dl { flex-shrink:0; width:2.2rem; height:2.2rem; padding:0; justify-content:center; border-radius:0.4rem; background:none; border:1px solid var(--border); color:var(--text-muted); }
+  #playerMenu .pm-dl:hover { color:var(--accent); border-color:var(--accent); }
+  #playerMenu .pm-dl svg { width:15px; height:15px; }
+  #playerMenu hr { border:none; border-top:1px solid var(--border); margin:0.3rem 0; }
   @media (max-width: 420px) { #playerControls { gap:0.45rem; } }
 
   /* Karaoke (synkad text) ovanför spelarkontrollerna */
@@ -230,12 +253,13 @@
     <input type="range" id="scrubber" min="0" max="100" value="0" step="0.1">
     <span id="durTime">0:00</span>
   </div>
+  <div id="playerMenu" hidden role="menu"></div>
   <div id="playerControls">
     <button class="btn-outline" id="repeatBtn" title="Upprepa"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg></button>
     <button class="btn-outline" id="prevBtn" title="Föregående">⏮</button>
     <button class="btn-gold" id="playPauseBtn" title="Spela/Pausa">▶</button>
     <button class="btn-outline" id="nextBtn" title="Nästa">⏭</button>
-    <button class="btn-outline" id="karaokeBtn" title="Visa/dölj synkad text">🎤</button>
+    <button class="btn-outline" id="karaokeBtn" title="Visa/dölj synkad text">🎤<span class="voice-badge"></span></button>
     <button class="btn-outline hidden" id="lyricsDocBtn" title="Öppna sångtexten (dokument)">📄</button>
   </div>
 </div>
@@ -342,6 +366,11 @@ async function init() {
   const member = await requireAuth();
   if (!member) return;
   currentMember = member;
+  // Stämma används som standardval för karaoke per stämma
+  try {
+    const { data: me } = await supabaseClient.from('members').select('stamma').eq('id', member.id).single();
+    if (me) currentMember.stamma = me.stamma;
+  } catch (e) {}
 
   await loadPlaylists();
   await loadRepertoar();
@@ -654,13 +683,6 @@ function renderSongCard(s) {
   body.appendChild(docLinks);
   loadDocsForSong(s, docLinks);
 
-  // Lyrics preview
-  if (s.lyrics_plain) {
-    const pre = document.createElement('div');
-    pre.className = 'lyrics-preview';
-    pre.textContent = s.lyrics_plain;
-    body.appendChild(pre);
-  }
 
   // Stem checkboxes (fixed + extra) for adding to a playlist
   const stemDefs = getStemDefs(s);
@@ -711,45 +733,47 @@ function renderSongCard(s) {
   return details;
 }
 
+// Alla textdokument för en låt: noter, gemensam sångtext, stämtexter och extra texter
+function songDocs(s) {
+  const docs = [];
+  DOC_FIELDS.forEach(f => { if (s[f.col]) docs.push({ label: f.label, path: s[f.col], kind: f.col === 'sheet_music_path' ? 'noter' : 'text' }); });
+  STAMTEXT_FIELDS.forEach(f => { if (s[f.col]) docs.push({ label: f.label, path: s[f.col], kind: 'stamtext', voice: f.key }); });
+  (s.extra_lyrics || []).forEach(ex => { if (ex.path) docs.push({ label: ex.label, path: ex.path, kind: 'stamtext' }); });
+  return docs;
+}
+
+const DL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+
+// Öppnar i ny flik (docx via Office-visaren). Fönstret öppnas direkt i klicket så att popup-blockerare inte stoppar det.
+async function openDoc(path) {
+  const win = window.open('', '_blank');
+  const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(path, 3600);
+  if (error || !data) { if (win) win.close(); toast('Kunde inte öppna dokumentet'); return; }
+  const url = path.toLowerCase().endsWith('.docx')
+    ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(data.signedUrl)}`
+    : data.signedUrl;
+  if (win) win.location.href = url; else window.location.href = url;
+}
+
+// Laddar ner med ursprungligt filnamn (Supabase sätter Content-Disposition: attachment)
+async function downloadDoc(path) {
+  const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(path, 3600, { download: stemFilename(path) || true });
+  if (error || !data) { toast('Kunde inte ladda ner: ' + (error ? error.message : '')); return; }
+  const a = document.createElement('a');
+  a.href = data.signedUrl;
+  a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
 async function loadDocsForSong(s, container) {
   container.innerHTML = '';
-  for (const f of DOC_FIELDS) {
-    if (!s[f.col]) continue;
-    const a = document.createElement('a');
-    a.href = '#';
-    a.textContent = f.label;
-    a.addEventListener('click', async (e) => {
-      e.preventDefault();
-      const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(s[f.col], 3600);
-      if (error) { toast('Fel: ' + error.message); return; }
-      window.open(data.signedUrl, '_blank');
-    });
-    container.appendChild(a);
-  }
-  for (const f of STAMTEXT_FIELDS) {
-    if (!s[f.col]) continue;
-    const a = document.createElement('a');
-    a.href = '#';
-    a.textContent = f.label;
-    a.addEventListener('click', async (e) => {
-      e.preventDefault();
-      const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(s[f.col], 3600);
-      if (error) { toast('Fel: ' + error.message); return; }
-      window.open(data.signedUrl, '_blank');
-    });
-    container.appendChild(a);
-  }
-  (s.extra_lyrics || []).forEach(ex => {
-    const a = document.createElement('a');
-    a.href = '#';
-    a.textContent = ex.label;
-    a.addEventListener('click', async (e) => {
-      e.preventDefault();
-      const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(ex.path, 3600);
-      if (error) { toast('Fel: ' + error.message); return; }
-      window.open(data.signedUrl, '_blank');
-    });
-    container.appendChild(a);
+  songDocs(s).forEach(doc => {
+    const chip = document.createElement('span');
+    chip.className = 'doc-chip';
+    chip.innerHTML = `<a href="#">${escapeHtml(doc.label)}</a><button type="button" title="Ladda ner ${escapeHtml(doc.label)}" aria-label="Ladda ner ${escapeHtml(doc.label)}">${DL_SVG}</button>`;
+    chip.querySelector('a').addEventListener('click', (e) => { e.preventDefault(); openDoc(doc.path); });
+    chip.querySelector('button').addEventListener('click', () => downloadDoc(doc.path));
+    container.appendChild(chip);
   });
 }
 
@@ -1206,6 +1230,38 @@ function updateMediaSession(item) {
 let karaokeOn = true;
 try { karaokeOn = localStorage.getItem('hv-karaoke') !== 'off'; } catch (e) {}
 let karaokeLines = [];   // [{ time, text }] sorterat på tid
+// Vilken stämmas karaoke som visas: '' = gemensam. Sparas per enhet; standard = medlemmens egen stämma.
+const KARAOKE_VOICES = [
+  { key: 'sopran', label: 'Sopran', short: 'S' },
+  { key: 'alt',    label: 'Alt',    short: 'A' },
+  { key: 'tenor',  label: 'Tenor',  short: 'T' },
+  { key: 'bas',    label: 'Bas',    short: 'B' },
+];
+let karaokeVoice = null;
+try { karaokeVoice = localStorage.getItem('hv-karaoke-voice'); } catch (e) {}
+
+function voiceFromStamma(stamma) {
+  const s = String(stamma || '').toLowerCase();
+  const v = KARAOKE_VOICES.find(v => s.startsWith(v.key));
+  return v ? v.key : '';
+}
+function availableVoices(song) {
+  const voices = (song && song.lyrics_lrc_voices) || {};
+  return KARAOKE_VOICES.filter(v => voices[v.key]);
+}
+// Vilken version som faktiskt visas: vald stämma om den finns, annars gemensam, annars första stämversionen
+function effectiveVoice(song) {
+  const avail = availableVoices(song);
+  const want = karaokeVoice != null ? karaokeVoice : voiceFromStamma(currentMember && currentMember.stamma);
+  if (want && avail.some(v => v.key === want)) return want;
+  if (song && song.lyrics_lrc) return '';
+  return avail.length ? avail[0].key : '';
+}
+function lrcForSong(song) {
+  if (!song) return null;
+  const v = effectiveVoice(song);
+  return v ? song.lyrics_lrc_voices[v] : song.lyrics_lrc;
+}
 let karaokeIdx = -2;
 let playerSong = null;
 
@@ -1233,9 +1289,10 @@ function currentElapsed() {
 
 function setPlayerSong(song) {
   playerSong = song;
-  karaokeLines = parseLrc(song && song.lyrics_lrc);
+  karaokeLines = parseLrc(lrcForSong(song));
   karaokeIdx = -2;
   pausedOffset = 0;
+  closePlayerMenu();
   const hasSync = karaokeLines.some(l => l.text);
   const btn = document.getElementById('karaokeBtn');
   btn.disabled = !hasSync;
@@ -1243,8 +1300,9 @@ function setPlayerSong(song) {
   buildKaraokeReel();
   document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
   updateExpandAvailability();
-  document.getElementById('lyricsDocBtn').classList.toggle('hidden', !(song && song.lyrics_pdf_path));
+  document.getElementById('lyricsDocBtn').classList.toggle('hidden', !(song && songDocs(song).length));
   renderKaraoke(true);
+  updateVoiceBadge();
 }
 
 function buildKaraokeReel() {
@@ -1291,6 +1349,8 @@ function renderKaraoke(force) {
 
 document.getElementById('karaokeBtn').classList.toggle('active', karaokeOn);
 document.getElementById('karaokeBtn').addEventListener('click', (e) => {
+  // Finns stämversioner: visa meny (av / gemensam / stämmor) i stället för en ren av/på-knapp
+  if (availableVoices(playerSong).length) { e.stopPropagation(); togglePlayerMenu('voice'); return; }
   karaokeOn = !karaokeOn;
   try { localStorage.setItem('hv-karaoke', karaokeOn ? 'on' : 'off'); } catch (err) {}
   e.currentTarget.classList.toggle('active', karaokeOn);
@@ -1301,18 +1361,89 @@ document.getElementById('karaokeBtn').addEventListener('click', (e) => {
   renderKaraoke(true);
 });
 
-document.getElementById('lyricsDocBtn').addEventListener('click', async () => {
-  const path = playerSong && playerSong.lyrics_pdf_path;
-  if (!path) return;
-  // Öppna fönstret direkt (i klick-händelsen) så att popup-blockerare inte stoppar det
-  const win = window.open('', '_blank');
-  const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(path, 3600);
-  if (error || !data) { if (win) win.close(); toast('Kunde inte öppna dokumentet'); return; }
-  const url = path.toLowerCase().endsWith('.docx')
-    ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(data.signedUrl)}`
-    : data.signedUrl;
-  if (win) win.location.href = url; else window.location.href = url;
+document.getElementById('lyricsDocBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  togglePlayerMenu('docs');
 });
+
+// ---------- Popup-meny: textversion & dokument ----------
+let playerMenuKind = null;
+
+function closePlayerMenu() {
+  const m = document.getElementById('playerMenu');
+  m.hidden = true;
+  playerMenuKind = null;
+}
+
+function togglePlayerMenu(kind) {
+  if (playerMenuKind === kind) { closePlayerMenu(); return; }
+  const m = document.getElementById('playerMenu');
+  playerMenuKind = kind;
+  m.innerHTML = kind === 'voice' ? voiceMenuHtml() : docsMenuHtml();
+  // Placera precis ovanför knappraden (fungerar både i liten och utfälld spelare)
+  const ctrlTop = document.getElementById('playerControls').getBoundingClientRect().top;
+  m.style.bottom = Math.max(8, window.innerHeight - ctrlTop + 8) + 'px';
+  m.hidden = false;
+  m.querySelectorAll('[data-voice]').forEach(b => b.addEventListener('click', () => chooseKaraokeVoice(b.dataset.voice)));
+  m.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => { openDoc(b.dataset.open); closePlayerMenu(); }));
+  m.querySelectorAll('[data-dl]').forEach(b => b.addEventListener('click', () => { downloadDoc(b.dataset.dl); closePlayerMenu(); }));
+}
+
+function voiceMenuHtml() {
+  const cur = karaokeOn ? effectiveVoice(playerSong) : null;
+  const item = (val, label, on) => `<button class="pm-item" data-voice="${val}" role="menuitemradio" aria-checked="${on}"><span class="pm-check">${on ? '✓' : ''}</span><span>${label}</span></button>`;
+  let html = '<div class="pm-title">Synkad text</div>' + item('off', 'Dölj text', !karaokeOn);
+  if (playerSong && playerSong.lyrics_lrc) html += item('', 'Gemensam (alla)', cur === '');
+  availableVoices(playerSong).forEach(v => { html += item(v.key, v.label, cur === v.key); });
+  return html;
+}
+
+function docsMenuHtml() {
+  const docs = playerSong ? songDocs(playerSong) : [];
+  if (!docs.length) return '<div class="pm-title">Inga dokument</div>';
+  return '<div class="pm-title">Texter &amp; noter</div>' + docs.map(d => `
+    <div class="pm-row">
+      <button class="pm-item" data-open="${escapeHtml(d.path)}"><span>📄 ${escapeHtml(d.label)}</span></button>
+      <button class="pm-dl" data-dl="${escapeHtml(d.path)}" title="Ladda ner" aria-label="Ladda ner ${escapeHtml(d.label)}">${DL_SVG}</button>
+    </div>`).join('');
+}
+
+function chooseKaraokeVoice(val) {
+  if (val === 'off') {
+    karaokeOn = false;
+  } else {
+    karaokeOn = true;
+    karaokeVoice = val;
+    try { localStorage.setItem('hv-karaoke-voice', val); } catch (e) {}
+  }
+  try { localStorage.setItem('hv-karaoke', karaokeOn ? 'on' : 'off'); } catch (e) {}
+  closePlayerMenu();
+  karaokeLines = parseLrc(lrcForSong(playerSong));
+  buildKaraokeReel();
+  const hasSync = karaokeLines.some(l => l.text);
+  document.getElementById('karaokeBtn').classList.toggle('active', karaokeOn);
+  document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
+  updateExpandAvailability();
+  updateVoiceBadge();
+  karaokeIdx = -2;
+  renderKaraoke(true);
+}
+
+function updateVoiceBadge() {
+  const badge = document.querySelector('#karaokeBtn .voice-badge');
+  if (!badge) return;
+  const v = karaokeOn && availableVoices(playerSong).length ? effectiveVoice(playerSong) : '';
+  const def = KARAOKE_VOICES.find(x => x.key === v);
+  badge.textContent = def ? def.short : '';
+  document.getElementById('karaokeBtn').title = availableVoices(playerSong).length
+    ? 'Välj synkad text (gemensam eller per stämma)'
+    : (document.getElementById('karaokeBtn').disabled ? 'Ingen synkad text för den här låten' : 'Visa/dölj synkad text');
+}
+
+document.addEventListener('click', (e) => {
+  if (playerMenuKind && !e.target.closest('#playerMenu')) closePlayerMenu();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && playerMenuKind) closePlayerMenu(); });
 
 // ---------- Förstorad text / helskärm ----------
 let wakeLock = null;

@@ -22,8 +22,8 @@
 
   <div class="card" style="max-width: 400px; margin-top: 1.5rem;">
     <form id="registerForm">
-      <input type="text" id="regName" placeholder="Namn" required>
-      <input type="email" id="regEmail" placeholder="E-post" required>
+      <input type="text" id="regName" placeholder="Namn" required autocomplete="name">
+      <input type="email" id="regEmail" placeholder="E-post" required autocomplete="username" name="email">
       <select id="regStamma" required>
         <option value="" disabled selected>Välj din stämma</option>
         <option value="Sopran">Sopran</option>
@@ -32,7 +32,7 @@
         <option value="Bas">Bas</option>
         <option value="Osäker">Vet inte / osäker</option>
       </select>
-      <input type="password" id="regPassword" placeholder="Lösenord (minst 6 tecken)" required minlength="6">
+      <input type="password" id="regPassword" placeholder="Lösenord (minst 6 tecken)" required minlength="6" autocomplete="new-password" name="new-password">
       <button type="submit">Registrera</button>
       <p class="error" id="regError"></p>
     </form>
@@ -47,6 +47,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
+<script src="/js/password-toggle.js" defer></script>
 <script>
 document.getElementById('registerForm').addEventListener('submit', async (e) => {
   e.preventDefault();

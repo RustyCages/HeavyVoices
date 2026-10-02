@@ -18,6 +18,11 @@
   .table-wrap { overflow-x: auto; }
   td input[type="checkbox"], th input[type="checkbox"] { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--accent); cursor: pointer; }
   .col-check { width: 2rem; }
+  .stammaSelect { min-width: 6.5rem; }
+  .trash-btn { width: 2.1rem; height: 2.1rem; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 0.45rem; }
+  .trash-btn svg { width: 16px; height: 16px; }
+  .trash-btn:hover:not(:disabled) { background: #ef4444; border-color: #ef4444; color: #fff; }
+  .trash-btn:disabled { opacity: 0.3; cursor: not-allowed; }
   .col-paid { width: 4.5rem; text-align: center; }
   td.col-paid input[type="checkbox"] { accent-color: #4ade80; }
   th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
@@ -121,6 +126,17 @@ let members = [];
 const selected = new Set();
 
 const STATUS_LABELS = { pending: 'Väntar', approved: 'Godkänd', paused: 'Pausad' };
+// Samma val som på registreringssidan
+const STAMMOR = [['Sopran', 'Sopran'], ['Alt', 'Alt'], ['Tenor', 'Tenor'], ['Bas', 'Bas'], ['Osäker', 'Vet inte / osäker']];
+const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+
+function stammaOptions(current) {
+  const opts = STAMMOR.slice();
+  // Behåll ett äldre/eget värde som inte finns i listan
+  if (current && !opts.some(([v]) => v === current)) opts.push([current, current]);
+  return `<option value="" ${!current ? 'selected' : ''}>—</option>` +
+    opts.map(([v, label]) => `<option value="${esc(v)}" ${v === current ? 'selected' : ''}>${esc(label)}</option>`).join('');
+}
 
 function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -209,7 +225,7 @@ function renderMembers() {
       <td><input type="checkbox" class="rowCheck" data-id="${m.id}" ${selected.has(m.id) ? 'checked' : ''} ${m.email ? '' : 'disabled title="Saknar e-post"'}></td>
       <td>${esc(m.name)}</td>
       <td>${esc(m.email || '—')}</td>
-      <td>${esc(m.stamma || '—')}</td>
+      <td><select data-id="${m.id}" class="stammaSelect" aria-label="Stämma för ${esc(m.name)}">${stammaOptions(m.stamma)}</select></td>
       <td class="col-paid">
         <input type="checkbox" class="paidCheck" data-id="${m.id}" ${m.fee_paid ? 'checked' : ''} title="${m.fee_paid && m.fee_paid_at ? 'Betald ' + fmtDate(m.fee_paid_at) : 'Ej betald'}" aria-label="Avgift betald för ${esc(m.name)}">
       </td>
@@ -223,7 +239,7 @@ function renderMembers() {
         </select>
       </td>
       <td style="white-space: nowrap;">
-        <button class="btn-danger removeBtn" data-id="${m.id}" ${self ? 'disabled' : ''}>Ta bort</button>
+        <button class="btn-outline trash-btn removeBtn" data-id="${m.id}" ${self ? 'disabled title="Du kan inte ta bort dig själv"' : `title="Ta bort ${esc(m.name)}" aria-label="Ta bort ${esc(m.name)}"`}>${TRASH_SVG}</button>
       </td>
     </tr>`;
   }).join('');
@@ -280,9 +296,23 @@ function renderMembers() {
     });
   });
 
+  tbody.querySelectorAll('.stammaSelect').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const id = sel.dataset.id;
+      const m = members.find(x => x.id === id);
+      const prev = m ? m.stamma : null;
+      const value = sel.value || null;
+      sel.disabled = true;
+      const { error } = await supabaseClient.from('members').update({ stamma: value }).eq('id', id);
+      sel.disabled = false;
+      if (error) { alert('Kunde inte ändra stämma: ' + error.message); sel.value = prev || ''; return; }
+      if (m) m.stamma = value;
+    });
+  });
+
   tbody.querySelectorAll('.removeBtn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
-      const id = e.target.dataset.id;
+      const id = e.currentTarget.dataset.id;
       if (!confirm('Ta bort medlemmen helt? Detta raderar även deras inloggningskonto permanent.')) return;
 
       const { data: { session } } = await supabaseClient.auth.getSession();

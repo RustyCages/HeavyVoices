@@ -10,6 +10,17 @@
   .card.static:hover { transform: none; border-color: var(--border); box-shadow: var(--card-shadow); }
   .card.static:active { transform: none; }
   .row-flex { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  /* Tonriktning i texten: ↑ = upp, ↓ = ned */
+  .pitch { font-weight: 800; margin: 0 0.05em; }
+  .pitch.up { color: #4ade80; }
+  .pitch.down { color: #60a5fa; }
+  .pitch-tools { display: inline-flex; gap: 0.35rem; align-items: center; }
+  .pitch-tools button { padding: 0.3rem 0.65rem; font-size: 0.85rem; background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .pitch-tools button[data-ch="↑"] { color: #4ade80; border-color: rgba(74,222,128,0.45); }
+  .pitch-tools button[data-ch="↓"] { color: #60a5fa; border-color: rgba(96,165,250,0.45); }
+  .text-banner { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; padding: 0.8rem 1rem; margin-bottom: 1rem;
+    border: 1px solid var(--accent); border-radius: 0.7rem; background: rgba(229,169,104,0.08); font-size: 0.9rem; }
+  .text-banner span { flex: 1 1 260px; }
   .row-flex > * { margin-bottom: 0; }
   .row-flex select, .row-flex input { width: auto; }
   .muted { color: var(--text-muted); font-size: 0.85rem; }
@@ -104,12 +115,21 @@
         &#128196; Läs in fil
         <input type="file" id="lyricsFile" accept=".docx,.txt,.pdf" style="display: none;">
       </label>
+      <span class="pitch-tools" data-for="lyricsText" title="Infoga där markören står (Alt+↑ / Alt+↓)">
+        <button type="button" data-ch="↑">↑ upp</button><button type="button" data-ch="↓">↓ ned</button>
+      </span>
       <button type="button" class="btn-small" id="saveTextBtn">Spara text</button>
       <span class="muted" id="textStatus"></span>
     </div>
   </details>
 
   <p class="error" id="loadError"></p>
+
+  <div class="text-banner" id="textChangedBanner" hidden>
+    <span>Sångtexten har ändrats sedan synken sparades. Uppdatera synkraderna? Tider behålls för rader som inte ändrats.</span>
+    <button type="button" class="btn-small" id="applyTextChangeBtn">Uppdatera raderna</button>
+    <button type="button" class="btn-outline btn-small" id="ignoreTextChangeBtn">Ignorera</button>
+  </div>
 
   <div id="editor" style="display: none;">
 
@@ -173,6 +193,7 @@
           <li><strong>Paus:</strong> tryck <kbd>Enter</kbd> (eller &#9834; Paus) när sången tar slut, t.ex. inför ett instrumentalt parti. Under uppspelning läggs pausen in med den tiden direkt under raden som just sjöngs, och markören står kvar på nästa textrad. När ljudet är pausat läggs pausen in under den markerade raden (tajma den sen med TAP). I spelaren släcks texten tills nästa rad börjar.</li>
           <li><strong>&#9834;+</strong> på en rad infogar en tom rad efter den i efterhand (tajma den sen genom att klicka på den och trycka TAP, eller skriv in tiden).</li>
           <li>Sänk tempot till 75 % om det går fort — tiderna blir ändå rätt.</li>
+          <li><strong>Tonriktning:</strong> skriv <span class="pitch up">↑</span> eller <span class="pitch down">↓</span> i texten där stämman går upp eller ned (knapparna ↑ upp / ↓ ned, eller Alt+pil). Pilarna visas i karaoken. Lägg dem i stämmans egen version om bara en stämma ska ha dem. Tider behålls när du bara lägger till pilar.</li>
         </ul>
       </details>
 
@@ -181,6 +202,12 @@
       <div id="editPanel" style="display: none;">
         <p class="muted">En rad per textrad. Tom rad = paus-rad. Tider behålls för rader som har samma text som förut.</p>
         <textarea id="editArea"></textarea>
+        <div class="row-flex" style="margin-bottom: 0.5rem;">
+          <span class="muted">Tonriktning:</span>
+          <span class="pitch-tools" data-for="editArea" title="Infoga där markören står (Alt+↑ / Alt+↓)">
+            <button type="button" data-ch="↑">↑ upp</button><button type="button" data-ch="↓">↓ ned</button>
+          </span>
+        </div>
         <div class="row-flex">
           <button type="button" class="btn-small" id="applyEditBtn">Använd</button>
           <button type="button" class="btn-outline btn-small" id="cancelEditBtn">Avbryt</button>
@@ -311,6 +338,42 @@ function buildLrc() {
   return head.concat(timed.map(r => `[${fmtLrc(r.time)}]${r.text}`)).join('\n');
 }
 
+// ---------- Tonriktning (↑ upp / ↓ ned) ----------
+// Pilarna skrivs direkt i texten där tonen byter riktning. Vid jämförelse av rader
+// ignoreras pilarna, så att tider behålls när man bara lägger till/tar bort pilar.
+const bareText = t => String(t || '').replace(/[↑↓]/g, '').replace(/\s+/g, ' ').trim();
+const pitchHtml = t => esc(t)
+  .replace(/↑/g, '<span class="pitch up" title="Upp i ton">↑</span>')
+  .replace(/↓/g, '<span class="pitch down" title="Ned i ton">↓</span>');
+
+function insertAtCursor(ta, ch) {
+  const start = ta.selectionStart ?? ta.value.length, end = ta.selectionEnd ?? start;
+  ta.setRangeText(ch, start, end, 'end');
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  ta.focus();
+}
+function wirePitchTools() {
+  document.querySelectorAll('.pitch-tools').forEach(tools => {
+    const ta = $(tools.dataset.for);
+    tools.querySelectorAll('button').forEach(b => {
+      b.addEventListener('mousedown', e => e.preventDefault());   // behåll markören i textrutan
+      b.addEventListener('click', () => insertAtCursor(ta, b.dataset.ch));
+    });
+    ta.addEventListener('keydown', e => {
+      if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); insertAtCursor(ta, e.key === 'ArrowUp' ? '↑' : '↓'); }
+    });
+  });
+}
+
+// Visar bannern om den sparade synken har annan text än Sångtext
+function checkTextChanged() {
+  const banner = $('textChangedBanner');
+  if (!song || !lrcOf() || banner.dataset.ignored === '1' || dirty) { banner.hidden = true; return; }
+  const synced = parseLrc(lrcOf()).filter(r => r.text).map(r => r.text.trim());
+  const plain = rowsFromPlain(plainOf()).filter(r => r.text && !r.skip).map(r => r.text.trim());
+  banner.hidden = plain.length === 0 || JSON.stringify(synced) === JSON.stringify(plain);
+}
+
 function rowsFromPlain(plain) {
   const out = [];
   let lastWasBlank = true;
@@ -337,7 +400,7 @@ function renderLines() {
     if (i === cursor) cls.push('cursor');
     if (r.skip) cls.push('skip');
     if (isPause(r)) cls.push('pause');
-    const label = isPause(r) ? (i === rows.length - 1 ? '♪ slut' : '♪ paus') : esc(r.text);
+    const label = isPause(r) ? (i === rows.length - 1 ? '♪ slut' : '♪ paus') : pitchHtml(r.text);
     return `<li class="${cls.join(' ')}" data-i="${i}">
       <input class="t ${r.time == null ? 'empty' : ''}" data-i="${i}" value="${r.time == null ? '' : fmt(r.time)}" placeholder="--:--">
       <span class="txt">${label}</span>
@@ -418,9 +481,9 @@ function updatePlaying() {
   const cur = idx >= 0 ? rows[idx] : null;
   const prev = idx >= 0 ? neighbour(idx, -1) : null;
   const next = neighbour(idx, 1);
-  $('preview').querySelector('.p-prev').textContent = prev ? prev.text : '';
-  $('preview').querySelector('.p-cur').textContent = cur ? (cur.text || '♪') : '';
-  $('preview').querySelector('.p-next').textContent = next ? next.text : '';
+  $('preview').querySelector('.p-prev').innerHTML = prev ? pitchHtml(prev.text) : '';
+  $('preview').querySelector('.p-cur').innerHTML = cur ? (cur.text ? pitchHtml(cur.text) : '♪') : '';
+  $('preview').querySelector('.p-next').innerHTML = next ? pitchHtml(next.text) : '';
 
   // När allt är tajmat: följ uppspelningen i listan
   if (li && !audio.paused && cursor >= rows.length) li.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -565,7 +628,7 @@ function applyEdit() {
   let searchFrom = 0;
   const next = lines.map(text => {
     for (let k = searchFrom; k < old.length; k++) {
-      if (old[k].text === text) { searchFrom = k + 1; return { ...old[k] }; }
+      if (bareText(old[k].text) === bareText(text)) { searchFrom = k + 1; return { ...old[k], text }; }
     }
     return { text, time: null, skip: text ? HEADER_RE.test(text) : true };
   });
@@ -603,6 +666,7 @@ async function save() {
   renderVoiceSelect();
   setDirty(false);
   refreshSongInList();
+  checkTextChanged();
   $('saveInfo').textContent = `Sparat (${voiceLabel()}) ${new Date().toLocaleTimeString('sv-SE')} — ${lrc.split('\n').length - 2} rader.`;
   toast('Synk sparad');
 }
@@ -814,7 +878,7 @@ function mergeRows(newRows) {
   let from = 0;
   return newRows.map(nr => {
     for (let k = from; k < old.length; k++) {
-      if (old[k].text === nr.text) { from = k + 1; return { ...old[k] }; }
+      if (bareText(old[k].text) === bareText(nr.text)) { from = k + 1; return { ...old[k], text: nr.text }; }
     }
     return nr;
   });
@@ -853,12 +917,14 @@ async function saveLyricsText() {
     rows = mergeRows(rowsFromPlain(text));
     setDirty(true);
   } else {
+    checkTextChanged();   // nej tack → visa bannern så att det går att uppdatera senare
     return;
   }
   undoStack.length = 0;
   $('loadError').textContent = rows.length ? '' : $('loadError').textContent;
   renderLines();
   setCursor(firstUntimed(), false);
+  checkTextChanged();
 }
 
 function wireTextCard() {
@@ -996,6 +1062,8 @@ function loadVersion() {
   }
   renderLines();
   setCursor(firstUntimed(), false);
+  $('textChangedBanner').dataset.ignored = '';
+  checkTextChanged();
 }
 
 // Håll dropdownens ✓ i synk efter spara/ta bort
@@ -1012,6 +1080,20 @@ function refreshSongInList() {
   try { const o = localStorage.getItem('hv-sync-offset'); if (o) $('offsetInput').value = o; } catch (_) {}
   wireEvents();
   wireTextCard();
+  wirePitchTools();
+  $('applyTextChangeBtn').addEventListener('click', () => {
+    rows = mergeRows(rowsFromPlain(plainOf()));
+    undoStack.length = 0;
+    setDirty(true);
+    renderLines();
+    setCursor(firstUntimed(), false);
+    $('textChangedBanner').hidden = true;
+    toast('Raderna uppdaterade – tajma nya rader och tryck Spara synk');
+  });
+  $('ignoreTextChangeBtn').addEventListener('click', () => {
+    $('textChangedBanner').dataset.ignored = '1';
+    $('textChangedBanner').hidden = true;
+  });
   requestAnimationFrame(tick);
 
   const { data: list, error } = await supabaseClient.from('songs').select('id, title, lyrics_plain, lyrics_lrc, lyrics_lrc_voices').order('title');

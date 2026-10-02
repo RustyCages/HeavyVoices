@@ -66,6 +66,8 @@ async function loadInfo() {
 // Filer (skrivskyddad vy av samma bucket som admin/filer.html)
 // =========================================================
 const BUCKET = 'heavy-voices-filer';
+// Filnamn med åäö m.m. lagras kodade som (u00e5) – se admin/info.html. Avkodas för visning.
+const decName = name => String(name).replace(/\(u([0-9a-f]{4,6})\)/g, (_, h) => String.fromCodePoint(parseInt(h, 16)));
 const PLACEHOLDER = '.keep';
 let currentPath = [];
 
@@ -118,11 +120,11 @@ function renderBreadcrumbs() {
     if (idx === currentPath.length - 1) {
       const cur = document.createElement('span');
       cur.className = 'current';
-      cur.textContent = seg;
+      cur.textContent = decName(seg);
       el.appendChild(cur);
     } else {
       const a = document.createElement('a');
-      a.textContent = seg;
+      a.textContent = decName(seg);
       a.addEventListener('click', () => { currentPath = currentPath.slice(0, idx + 1); loadFiles(); });
       el.appendChild(a);
     }
@@ -156,7 +158,7 @@ async function loadFiles() {
   folders.forEach(folder => {
     const row = document.createElement('div');
     row.className = 'file-row folder-row';
-    row.innerHTML = `${folderIconSvg}<span class="file-name">${escapeHtml(folder.name)}</span>`;
+    row.innerHTML = `${folderIconSvg}<span class="file-name">${escapeHtml(decName(folder.name))}</span>`;
     row.addEventListener('click', () => {
       currentPath = [...currentPath, folder.name];
       loadFiles();
@@ -170,209 +172,16 @@ async function loadFiles() {
     row.className = 'file-row';
     row.innerHTML = `
       ${fileIconSvg}
-      <span class="file-name">${escapeHtml(file.name)}</span>
+      <span class="file-name">${escapeHtml(decName(file.name))}</span>
       <span class="file-meta">${fmtSize(file.metadata && file.metadata.size)} · ${fmtDate(file.created_at)}</span>
       <button class="btn-outline icon-btn downloadBtn" title="Ladda ner">${downloadIconSvg}</button>
     `;
     row.querySelector('.downloadBtn').addEventListener('click', async () => {
-      const { data: signed, error: signErr } = await supabaseClient.storage.from(BUCKET).createSignedUrl(fullPath, 3600);
+      const { data: signed, error: signErr } = await supabaseClient.storage.from(BUCKET).createSignedUrl(fullPath, 3600, { download: decName(file.name) });
       if (signErr) { toast('Fel: ' + signErr.message); return; }
-      window.open(signed.signedUrl, '_blank');
-    });
-    listEl.appendChild(row);
-  });
-}
-
-(async () => {
-  const member = await requireAuth();
-  if (member) {
-    loadInfo();
-    loadFiles();
-  }
-})();
-</script>
-
-</body>
-</html><!DOCTYPE html>
-<html lang="sv">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Information — Heavy Voices</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="/css/style.css">
-<style>
-  .info-content { white-space: pre-wrap; line-height: 1.7; }
-
-  .breadcrumbs { display:flex; align-items:center; flex-wrap:wrap; gap:0.35rem; margin-bottom:1.1rem; font-family:'Roboto Condensed', sans-serif; font-size:1.05rem; }
-  .breadcrumbs a { color:var(--accent); cursor:pointer; }
-  .breadcrumbs a:hover { text-decoration:underline; }
-  .breadcrumbs .sep { color:var(--text-muted); }
-  .breadcrumbs .current { color:var(--text); }
-
-  .file-row {
-    display:flex; align-items:center; gap:0.9rem; padding:0.75rem 0.5rem;
-    border-bottom:1px solid var(--border);
-  }
-  .file-row:last-child { border-bottom:none; }
-  .file-row.folder-row { cursor:pointer; border-radius:0.5rem; transition:background 0.15s ease; }
-  .file-row.folder-row:hover { background:rgba(255,255,255,0.03); }
-
-  .file-icon { flex-shrink:0; width:1.6rem; height:1.6rem; color:var(--text-muted); }
-  .file-icon.folder-icon { color:var(--accent); }
-  .file-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .file-meta { font-size:0.8rem; color:var(--text-muted); white-space:nowrap; }
-
-  .icon-btn { flex-shrink:0; width:2.2rem; height:2.2rem; min-width:2.2rem; border-radius:50%; padding:0; font-size:1rem; line-height:1; }
-</style>
-</head>
-<body>
-
-<header class="site-header"><span class="site-logo">Heavy Voices</span></header>
-<div class="container">
-    <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
-    <h1>Information</h1>
-
-  <div class="card">
-    <div class="info-content" id="infoContent"><p class="text-muted">Laddar...</p></div>
-  </div>
-
-  <h2 style="margin-top:2rem;">Filer</h2>
-  <div class="breadcrumbs" id="breadcrumbs"></div>
-  <div class="card">
-    <div id="fileList"><p class="text-muted">Laddar...</p></div>
-  </div>
-</div>
-
-<div id="toast" style="position:fixed; bottom:1.5rem; right:1.5rem; background:var(--accent); color:#111317; padding:0.7rem 1.2rem; border-radius:0.6rem; font-weight:600; box-shadow:var(--card-shadow); z-index:999; display:none;"></div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="/js/supabase-config.js"></script>
-<script src="/js/auth.js"></script>
-<script>
-async function loadInfo() {
-  const { data, error } = await supabaseClient.from('choir_info').select('content').eq('id', 1).single();
-  const el = document.getElementById('infoContent');
-  if (error) { el.innerHTML = `<p class="error">${error.message}</p>`; return; }
-  el.textContent = data.content || 'Ingen information tillagd än.';
-}
-
-// =========================================================
-// Filer (skrivskyddad vy av samma bucket som admin/filer.html)
-// =========================================================
-const BUCKET = 'heavy-voices-filer';
-const PLACEHOLDER = '.keep';
-let currentPath = [];
-
-function pathStr(segments) { return (segments || currentPath).join('/'); }
-function joinPath(prefix, name) { return prefix ? `${prefix}/${name}` : name; }
-
-function escapeHtml(str) {
-  if (str == null) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.display = 'block';
-  setTimeout(() => { t.style.display = 'none'; }, 2500);
-}
-
-function fmtSize(bytes) {
-  if (bytes == null) return '';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-function fmtDate(iso) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-const folderIconSvg = `<svg class="file-icon folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
-const fileIconSvg = `<svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`;
-const downloadIconSvg = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`;
-
-function renderBreadcrumbs() {
-  const el = document.getElementById('breadcrumbs');
-  el.innerHTML = '';
-
-  const rootLink = document.createElement('a');
-  rootLink.textContent = 'Filer';
-  rootLink.addEventListener('click', () => { currentPath = []; loadFiles(); });
-  el.appendChild(rootLink);
-
-  currentPath.forEach((seg, idx) => {
-    const sep = document.createElement('span');
-    sep.className = 'sep';
-    sep.textContent = ' / ';
-    el.appendChild(sep);
-
-    if (idx === currentPath.length - 1) {
-      const cur = document.createElement('span');
-      cur.className = 'current';
-      cur.textContent = seg;
-      el.appendChild(cur);
-    } else {
       const a = document.createElement('a');
-      a.textContent = seg;
-      a.addEventListener('click', () => { currentPath = currentPath.slice(0, idx + 1); loadFiles(); });
-      el.appendChild(a);
-    }
-  });
-}
-
-async function loadFiles() {
-  renderBreadcrumbs();
-  const listEl = document.getElementById('fileList');
-  listEl.innerHTML = '<p class="text-muted">Laddar...</p>';
-
-  const prefix = pathStr();
-  const { data, error } = await supabaseClient.storage.from(BUCKET).list(prefix, {
-    limit: 500,
-    sortBy: { column: 'name', order: 'asc' }
-  });
-
-  if (error) { listEl.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`; return; }
-
-  const items = (data || []).filter(item => item.name !== PLACEHOLDER);
-  const folders = items.filter(item => item.id === null);
-  const files = items.filter(item => item.id !== null);
-
-  if (!folders.length && !files.length) {
-    listEl.innerHTML = '<p class="text-muted">Mappen är tom.</p>';
-    return;
-  }
-
-  listEl.innerHTML = '';
-
-  folders.forEach(folder => {
-    const row = document.createElement('div');
-    row.className = 'file-row folder-row';
-    row.innerHTML = `${folderIconSvg}<span class="file-name">${escapeHtml(folder.name)}</span>`;
-    row.addEventListener('click', () => {
-      currentPath = [...currentPath, folder.name];
-      loadFiles();
-    });
-    listEl.appendChild(row);
-  });
-
-  files.forEach(file => {
-    const fullPath = joinPath(prefix, file.name);
-    const row = document.createElement('div');
-    row.className = 'file-row';
-    row.innerHTML = `
-      ${fileIconSvg}
-      <span class="file-name">${escapeHtml(file.name)}</span>
-      <span class="file-meta">${fmtSize(file.metadata && file.metadata.size)} · ${fmtDate(file.created_at)}</span>
-      <button class="btn-outline icon-btn downloadBtn" title="Ladda ner">${downloadIconSvg}</button>
-    `;
-    row.querySelector('.downloadBtn').addEventListener('click', async () => {
-      const { data: signed, error: signErr } = await supabaseClient.storage.from(BUCKET).createSignedUrl(fullPath, 3600);
-      if (signErr) { toast('Fel: ' + signErr.message); return; }
-      window.open(signed.signedUrl, '_blank');
+      a.href = signed.signedUrl;
+      document.body.appendChild(a); a.click(); a.remove();
     });
     listEl.appendChild(row);
   });

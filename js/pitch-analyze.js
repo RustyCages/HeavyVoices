@@ -244,6 +244,16 @@
     const d = new Float32Array(tauMax + 1);
     const ratio = audioCtx.sampleRate / SR;
     const recent = [];
+    let out = null, holdFrames = 0, pendVal = null, pendCount = 0;
+    const MEDIAN_N = opts.median || 5;      // utjämning över ~5 avläsningar
+    const HOLD = opts.hold || 7;            // behåll senaste ton vid korta avbrott (~120 ms)
+    const JUMP = 1.5;                       // större hopp (halvtoner) måste hålla i sig…
+    const JUMP_CONFIRM = 3;                 // …i så här många avläsningar innan vi följer med
+    const lost = () => {
+      if (out != null && holdFrames < HOLD) { holdFrames++; return out; }
+      out = null; recent.length = 0; pendCount = 0;
+      return null;
+    };
     return {
       read() {
         an.getFloatTimeDomainData(raw);
@@ -258,17 +268,24 @@
           x[i] = v; s += v * v;
         }
         const rms = Math.sqrt(s / need);
-        if (rms < (opts.gate || 0.008)) { recent.length = 0; return null; }
+        if (rms < (opts.gate || 0.012)) return lost();
         const r = yinFrame(x, 0, tauMin, tauMax, d);
-        if (!r || r.hz < fmin * 0.95 || r.hz > fmax * 1.05) { recent.length = 0; return null; }
+        if (!r || r.conf < 0.75 || r.hz < fmin * 0.95 || r.hz > fmax * 1.05) return lost();
         let m = hzToMidi(r.hz);
-        // oktavhopp mot senaste värdena rättas, och lite utjämning (median av 3)
-        if (recent.length) {
-          const last = recent[recent.length - 1], diff = m - last;
-          if (Math.abs(Math.abs(diff) - 12) < 1) m -= Math.sign(diff) * 12;
-        }
-        recent.push(m); if (recent.length > 3) recent.shift();
-        return median(recent);
+        // oktavhopp rättas mot nuvarande ton
+        if (out != null) { const diff = m - out; if (Math.abs(Math.abs(diff) - 12) < 1) m -= Math.sign(diff) * 12; }
+        // stora hopp: följ bara med om det nya läget håller i sig (filtrerar enstaka felavläsningar)
+        if (out != null && Math.abs(m - out) > JUMP) {
+          if (pendVal != null && Math.abs(m - pendVal) < 1) pendCount++; else { pendVal = m; pendCount = 1; }
+          if (pendCount < JUMP_CONFIRM) { holdFrames = 0; return out; }
+          recent.length = 0; out = null; pendCount = 0;
+        } else pendCount = 0;
+        holdFrames = 0;
+        recent.push(m); if (recent.length > MEDIAN_N) recent.shift();
+        const med = median(recent);
+        // mjuk följning (glider i stället för att skaka)
+        out = out == null ? med : out + (med - out) * 0.35;
+        return out;
       },
       stop() {
         try { src.disconnect(); } catch (e) {}

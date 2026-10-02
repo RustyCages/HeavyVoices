@@ -105,8 +105,13 @@
       <span class="mic-note" id="micNote">–</span>
       <span class="mic-cents" id="micCents">Sjung en ton…</span>
       <label class="hint" style="margin:0; display:inline-flex; gap:0.35rem; align-items:center;"><input type="checkbox" id="optOctave" checked style="width:auto; margin:0;"> Godkänn annan oktav</label>
+      <label class="hint" style="margin:0; display:inline-flex; gap:0.35rem; align-items:center;">Marginal <select id="optTol" style="width:auto; margin:0; padding:0.25rem 0.4rem;">
+        <option value="75">Snäll (±75 cent)</option>
+        <option value="50" selected>Normal (±50 cent)</option>
+        <option value="30">Strikt (±30 cent)</option>
+      </select></label>
       <span class="mic-score">Träff <b id="micHit">–</b> · noter <b id="micNotes">–</b></span>
-      <span class="mic-tip">🎧 Använd hörlurar – annars hör mikrofonen ljudet från högtalaren och "sjunger" med själv. Grönt = inom ±50 cent från noten.</span>
+      <span class="mic-tip">🎧 Använd hörlurar – annars hör mikrofonen ljudet från högtalaren och "sjunger" med själv. Grönt = inom vald marginal från noten.</span>
     </div>
     <div class="opts">
       <label><input type="checkbox" id="optStem" checked> <span id="optStemLabel">Stämljud</span></label>
@@ -742,7 +747,10 @@ function micStep() {
     let diff = m - target;
     if (document.getElementById('optOctave').checked) { diff -= 12 * Math.round(diff / 12); shown = target + diff; }
     cents = Math.round(diff * 100);
-    status = Math.abs(cents) <= 50 ? 1 : 0;
+    const tol = Number(document.getElementById('optTol').value) || 50;
+    status = Math.abs(cents) <= tol ? 1 : 0;
+    // magnet: inom marginalen dras pricken mot notens mitt så den ligger still
+    if (status === 1) shown = target + diff * 0.25;
   }
   if (playing) {
     voice.push([t, shown, status, ti]);

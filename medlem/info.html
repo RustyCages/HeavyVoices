@@ -26,6 +26,10 @@
   .file-icon { flex-shrink:0; width:1.6rem; height:1.6rem; color:var(--text-muted); }
   .file-icon.folder-icon { color:var(--accent); }
   .file-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-row.clickable { cursor: pointer; transition: background 0.15s ease; }
+  .file-row.clickable:hover { background: rgba(255,255,255,0.03); }
+  .file-row.clickable:hover .file-name { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+
   .file-meta { font-size:0.8rem; color:var(--text-muted); white-space:nowrap; }
 
   .icon-btn { flex-shrink:0; width:2.2rem; height:2.2rem; min-width:2.2rem; border-radius:50%; padding:0; font-size:1rem; line-height:1; }
@@ -67,6 +71,19 @@ async function loadInfo() {
 // =========================================================
 const BUCKET = 'heavy-voices-filer';
 // Filnamn med åäö m.m. lagras kodade som (u00e5) – se admin/info.html. Avkodas för visning.
+// Öppna en fil i en ny flik: PDF, bilder, ljud och text visas direkt i webbläsaren,
+// Word/Excel/PowerPoint via Microsofts visare. Fönstret öppnas direkt i klicket så att popup-blockerare släpper igenom det.
+const OFFICE_EXT = /\.(docx?|xlsx?|pptx?)$/i;
+async function openFile(fullPath, displayName) {
+  const win = window.open('', '_blank');
+  const { data, error } = await supabaseClient.storage.from(BUCKET).createSignedUrl(fullPath, 3600);
+  if (error || !data) { if (win) win.close(); toast('Kunde inte öppna filen' + (error ? ': ' + error.message : '')); return; }
+  const url = OFFICE_EXT.test(displayName)
+    ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(data.signedUrl)}`
+    : data.signedUrl;
+  if (win) win.location.href = url; else window.location.href = url;
+}
+
 const decName = name => String(name).replace(/\(u([0-9a-f]{4,6})\)/g, (_, h) => String.fromCodePoint(parseInt(h, 16)));
 const PLACEHOLDER = '.keep';
 let currentPath = [];
@@ -169,13 +186,15 @@ async function loadFiles() {
   files.forEach(file => {
     const fullPath = joinPath(prefix, file.name);
     const row = document.createElement('div');
-    row.className = 'file-row';
+    row.className = 'file-row clickable';
+    row.title = 'Öppna ' + decName(file.name);
     row.innerHTML = `
       ${fileIconSvg}
       <span class="file-name">${escapeHtml(decName(file.name))}</span>
       <span class="file-meta">${fmtSize(file.metadata && file.metadata.size)} · ${fmtDate(file.created_at)}</span>
       <button class="btn-outline icon-btn downloadBtn" title="Ladda ner">${downloadIconSvg}</button>
     `;
+    row.addEventListener('click', (e) => { if (!e.target.closest('button')) openFile(fullPath, decName(file.name)); });
     row.querySelector('.downloadBtn').addEventListener('click', async () => {
       const { data: signed, error: signErr } = await supabaseClient.storage.from(BUCKET).createSignedUrl(fullPath, 3600, { download: decName(file.name) });
       if (signErr) { toast('Fel: ' + signErr.message); return; }

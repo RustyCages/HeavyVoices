@@ -58,16 +58,24 @@
   /* Radlista */
   .lines { list-style: none; padding: 0; margin: 0; }
   .line {
-    display: grid; grid-template-columns: 6.2rem 1fr auto; gap: 0.6rem; align-items: center;
+    display: grid; grid-template-columns: 6.2rem 3.6rem 1fr auto; gap: 0.6rem; align-items: center;
     padding: 0.45rem 0.6rem; border-radius: 0.5rem; border: 1px solid transparent; cursor: pointer;
   }
   .line + .line { margin-top: 2px; }
+  .lines-head { cursor: default; padding-top: 0; padding-bottom: 0.2rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); text-align: center; }
+  .lines-head span:nth-child(3) { text-align: left; }
+  .lines-head:hover { background: none; }
   .line:hover { background: rgba(255,255,255,0.03); }
   .line .t {
     width: 100%; margin: 0; padding: 0.25rem 0.4rem; font-size: 0.85rem;
     font-variant-numeric: tabular-nums; text-align: center;
   }
   .line .t.empty { color: var(--text-muted); }
+  /* Visningstid (s): tomt = tills nästa rad börjar */
+  .line .d { width: 100%; margin: 0; padding: 0.25rem 0.3rem; font-size: 0.8rem; text-align: center; font-variant-numeric: tabular-nums; }
+  .line .d.empty { color: var(--text-muted); }
+  .line .d:disabled { opacity: 0.25; }
+  #tapBtn.holding { background: #4ade80; color: #111317; box-shadow: 0 0 0 3px rgba(74,222,128,0.3); }
   .line .txt { word-break: break-word; }
   .line .acts { display: flex; gap: 0.25rem; opacity: 0.55; }
   .line:hover .acts, .line.cursor .acts { opacity: 1; }
@@ -90,7 +98,7 @@
   #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 999; display: none; }
 
   @media (max-width: 560px) {
-    .line { grid-template-columns: 5.2rem 1fr; }
+    .line { grid-template-columns: 5.2rem 3.4rem 1fr; }
     .line .acts { grid-column: 1 / -1; justify-content: flex-end; }
   }
 </style>
@@ -202,11 +210,12 @@
       <details class="help" style="margin-bottom: 0.75rem;">
         <summary>Så funkar det / kortkommandon</summary>
         <ul>
-          <li>Tryck <kbd>Mellanslag</kbd> (eller TAP) i samma ögonblick som den markerade raden börjar sjungas. Är ljudet pausat startar första trycket bara uppspelningen.</li>
+          <li><strong>Håll inne</strong> <kbd>Mellanslag</kbd> (eller TAP) medan raden sjungs: nedtryckning = start, släpp = slut. Efter sluttiden visas &#9834; i karaoken. Ett snabbt tryck sätter bara starttid – då visas raden tills nästa börjar. Är ljudet pausat startar första trycket bara uppspelningen.</li>
+          <li><strong>Visningstid:</strong> rutan bredvid tiden visar hur länge raden syns (sekunder). Skriv in en egen tid för att korta eller förlänga visningen, eller töm rutan för att visa raden tills nästa börjar.</li>
           <li><kbd>Backsteg</kbd> ångrar senaste tryck. <kbd>P</kbd> spelar/pausar. <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> hoppar 3 s.</li>
           <li>Klicka på en rad för att flytta markören dit. Klicka på tiden för att skriva in den manuellt (t.ex. <code>1:23.45</code>).</li>
           <li><strong>&#9654;</strong> spelar från strax före raden, <strong>&minus;/+</strong> justerar 0,1 s, <strong>&#8856;</strong> hoppar över raden (t.ex. rubriker som "Refräng").</li>
-          <li><strong>Paus:</strong> tryck <kbd>Enter</kbd> (eller &#9834; Paus) när sången tar slut, t.ex. inför ett instrumentalt parti. Under uppspelning läggs pausen in med den tiden direkt under raden som just sjöngs, och markören står kvar på nästa textrad. När ljudet är pausat läggs pausen in under den markerade raden (tajma den sen med TAP). I spelaren släcks texten tills nästa rad börjar.</li>
+          <li><strong>Enter</strong> under uppspelning sätter sluttid på raden som just sjöngs (om du glömde hålla inne). När ljudet är pausat infogar Enter (eller &#9834; Paus) en tom paus-rad under den markerade raden.</li>
           <li><strong>&#9834;+</strong> på en rad infogar en tom rad efter den i efterhand (tajma den sen genom att klicka på den och trycka TAP, eller skriv in tiden).</li>
           <li>Sänk tempot till 75 % om det går fort — tiderna blir ändå rätt.</li>
           <li><strong>Stämmor som går upp/ned:</strong> markera texten (t.ex. refrängen), kryssa i stämmorna och tryck ↑ upp eller ↓ ned. Texten färgas och får en etikett, t.ex. <span class="seg up"><span class="seg-tag">S T&#8593;</span>Hurra</span>. Utan markering gäller det raden där markören står.</li>
@@ -214,6 +223,7 @@
         </ul>
       </details>
 
+      <div class="line lines-head" aria-hidden="true"><span>Start</span><span>Visas (s)</span><span>Text</span><span></span></div>
       <ol class="lines" id="lineList"></ol>
 
       <div id="editPanel" style="display: none;">
@@ -353,13 +363,31 @@ function parseLrc(lrc) {
     tags.forEach(t => out.push({ text, time: t, skip: false }));
   });
   out.sort((a, b) => a.time - b.time);
-  return out;
+  // En tom tidsrad direkt efter en textrad = textradens sluttid (visningstid)
+  const folded = [];
+  out.forEach(r => {
+    const prev = folded[folded.length - 1];
+    if (!r.text && prev && prev.text && prev.end == null && r.time > prev.time) { prev.end = r.time; return; }
+    folded.push(r);
+  });
+  return folded;
 }
+// Sluttiden sparas som en tom tidsrad – spelaren visar ♪ där. Ligger nästa rad tätt efter hoppas den över.
+const MIN_GAP = 0.3;
 function buildLrc() {
   const timed = rows.filter(r => !r.skip && r.time != null).slice().sort((a, b) => a.time - b.time);
   const head = [`[ti:${song.title}]`, `[by:Heavy Voices textsynk]`];
-  return head.concat(timed.map(r => `[${fmtLrc(r.time)}]${r.text}`)).join('\n');
+  const out = [];
+  timed.forEach((r, k) => {
+    out.push(`[${fmtLrc(r.time)}]${r.text}`);
+    if (r.text && r.end != null && r.end > r.time) {
+      const next = timed[k + 1];
+      if (!next || next.time - r.end >= MIN_GAP) out.push(`[${fmtLrc(r.end)}]`);
+    }
+  });
+  return head.concat(out).join('\n');
 }
+const durText = r => (r.end != null && r.time != null && r.end > r.time) ? (r.end - r.time).toFixed(1) : '';
 
 // ---------- Tonriktning (↑ upp / ↓ ned) ----------
 // Pilarna skrivs direkt i texten där tonen byter riktning. Vid jämförelse av rader
@@ -468,6 +496,8 @@ function renderLines() {
     const label = isPause(r) ? (i === rows.length - 1 ? '♪ slut' : '♪ paus') : pitchHtml(r.text);
     return `<li class="${cls.join(' ')}" data-i="${i}">
       <input class="t ${r.time == null ? 'empty' : ''}" data-i="${i}" value="${r.time == null ? '' : fmt(r.time)}" placeholder="--:--">
+      <input class="d ${r.end == null ? 'empty' : ''}" data-i="${i}" value="${durText(r)}" placeholder="–" inputmode="decimal"
+        title="Visningstid i sekunder. Tomt = visas tills nästa rad börjar." ${isPause(r) ? 'disabled' : ''}>
       <span class="txt">${label}</span>
       <span class="acts">
         <button type="button" data-act="play" data-i="${i}" title="Spela från raden">&#9654;</button>
@@ -534,10 +564,14 @@ function neighbour(idx, dir) {
   return n ? n.r : null;
 }
 
+let lastEnded = false;
 function updatePlaying() {
   const idx = activeIndexAt(audio.currentTime || 0);
-  if (idx === playingIdx) return;
+  const curRow = idx >= 0 ? rows[idx] : null;
+  const isEnded = !!(curRow && curRow.end != null && (audio.currentTime || 0) >= curRow.end);
+  if (idx === playingIdx && isEnded === lastEnded) return;
   playingIdx = idx;
+  lastEnded = isEnded;
   const list = $('lineList');
   list.querySelectorAll('.line.playing').forEach(el => el.classList.remove('playing'));
   const li = list.children[idx];
@@ -547,7 +581,8 @@ function updatePlaying() {
   const prev = idx >= 0 ? neighbour(idx, -1) : null;
   const next = neighbour(idx, 1);
   $('preview').querySelector('.p-prev').innerHTML = prev ? pitchHtml(prev.text) : '';
-  $('preview').querySelector('.p-cur').innerHTML = cur ? (cur.text ? pitchHtml(cur.text) : '♪') : '';
+  const ended = cur && cur.end != null && (audio.currentTime || 0) >= cur.end;
+  $('preview').querySelector('.p-cur').innerHTML = cur ? (cur.text && !ended ? pitchHtml(cur.text) : '♪') : '';
   $('preview').querySelector('.p-next').innerHTML = next ? pitchHtml(next.text) : '';
 
   // När allt är tajmat: följ uppspelningen i listan
@@ -577,8 +612,11 @@ function tap() {
   if (cursor >= rows.length) return;
   const t = tapTime();
   const r = rows[cursor];
-  const prev = { time: r.time, skip: r.skip };
+  const prev = { time: r.time, skip: r.skip, end: r.end ?? null };
+  // Behåll tidigare visningstid om raden tajmas om med ett snabbt tryck
+  if (r.end != null && r.time != null) r.end = t + (r.end - r.time);
   r.time = t; r.skip = false;
+  if (!isPause(r)) hold = { i: cursor, t };
   const li = $('lineList').children[cursor];
   if (li) {
     li.classList.remove('skip');
@@ -596,6 +634,7 @@ function tap() {
 function tapGap() {
   if (!song || !rows.length) return;
   if (audio.src && !audio.paused) {
+    if (setEndOfLast()) return;
     const at = Math.min(cursor, rows.length);
     // Ligger markören på en paus-rad (t.ex. slut) behövs ingen ny — tajma den i stället
     if (at < rows.length && isPause(rows[at])) { tap(); return; }
@@ -613,6 +652,40 @@ function tapGap() {
   renderLines();
   setCursor(at);
 }
+// Håll inne mellanslag/TAP medan raden sjungs: nedtryck = start, släpp = slut.
+// Ett snabbt tryck (< HOLD_MIN s) sätter bara starttid som förut.
+const HOLD_MIN = 0.35;
+let hold = null;
+function release() {
+  $('tapBtn').classList.remove('holding');
+  if (!hold) return;
+  const { i, t } = hold;
+  hold = null;
+  const end = tapTime();
+  if (end - t < HOLD_MIN || !rows[i]) return;
+  undoStack.push({ type: 'end', i, prevEnd: rows[i].end ?? null });
+  rows[i].end = end;
+  const li = $('lineList').children[i];
+  if (li) { const d = li.querySelector('.d'); d.value = durText(rows[i]); d.classList.remove('empty'); }
+  setDirty(true);
+}
+// Enter under uppspelning: sätt sluttid på raden som just sjöngs
+function setEndOfLast() {
+  for (let j = Math.min(cursor, rows.length) - 1; j >= 0; j--) {
+    const r = rows[j];
+    if (r.skip || isPause(r) || r.time == null) continue;
+    const end = tapTime();
+    if (end <= r.time) return false;
+    undoStack.push({ type: 'end', i: j, prevEnd: r.end ?? null });
+    r.end = end;
+    setDirty(true);
+    renderLines(); setCursor(cursor, false);
+    toast('Sluttid satt');
+    return true;
+  }
+  return false;
+}
+
 const undoStack = [];
 function undo() {
   const u = undoStack.pop();
@@ -624,8 +697,16 @@ function undo() {
     setCursor(u.cursor != null ? u.cursor : u.i);
     return;
   }
+  if (u.type === 'end') {
+    rows[u.i].end = u.prevEnd;
+    setDirty(true);
+    renderLines();
+    setCursor(cursor, false);
+    return;
+  }
   rows[u.i].time = u.prev ? u.prev.time : null;
   rows[u.i].skip = u.prev ? u.prev.skip : false;
+  rows[u.i].end = u.prev ? u.prev.end ?? null : null;
   setDirty(true);
   renderLines();
   setCursor(u.i);
@@ -786,7 +867,11 @@ function wireEvents() {
   $('playBtn').addEventListener('click', togglePlay);
   $('backBtn').addEventListener('click', () => seek(audio.currentTime - 3));
   $('fwdBtn').addEventListener('click', () => seek(audio.currentTime + 3));
-  $('tapBtn').addEventListener('click', tap);
+  // TAP: tryck = start, släpp = slut (om man höll inne)
+  $('tapBtn').addEventListener('pointerdown', e => { e.preventDefault(); $('tapBtn').classList.add('holding'); tap(); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => $('tapBtn').addEventListener(ev, release));
+  $('tapBtn').addEventListener('click', e => { if (e.detail === 0) tap(); });   // tangentbordsaktivering
+  $('tapBtn').addEventListener('contextmenu', e => e.preventDefault());       // långtryck i mobilen ska inte öppna meny
   $('gapBtn').addEventListener('click', tapGap);
   $('undoBtn').addEventListener('click', undo);
   $('rateSelect').addEventListener('change', e => { audio.playbackRate = parseFloat(e.target.value); });
@@ -809,7 +894,9 @@ function wireEvents() {
           return;
         case 'minus': case 'plus':
           if (r.time == null) return;
-          r.time = Math.max(0, +(r.time + (btn.dataset.act === 'plus' ? 0.1 : -0.1)).toFixed(2));
+          { const old = r.time;
+            r.time = Math.max(0, +(r.time + (btn.dataset.act === 'plus' ? 0.1 : -0.1)).toFixed(2));
+            if (r.end != null) r.end += r.time - old; }   // visningstiden följer med
           list.children[i].querySelector('.t').value = fmt(r.time);
           setDirty(true); markOrderWarnings(); playingIdx = -2;
           return;
@@ -827,21 +914,38 @@ function wireEvents() {
           return;
       }
     }
-    if (e.target.classList.contains('t')) return; // klick i tidsfältet = redigering
+    if (e.target.classList.contains('t') || e.target.classList.contains('d')) return; // klick i tidsfält = redigering
     const li = e.target.closest('.line');
     if (li) setCursor(+li.dataset.i, false);
   });
   list.addEventListener('change', e => {
+    if (e.target.classList.contains('d')) {
+      const i = +e.target.dataset.i, r = rows[i];
+      const raw = e.target.value.trim().replace(',', '.');
+      if (!raw) { r.end = null; }
+      else {
+        const d = parseFloat(raw);
+        if (!(d > 0)) { toast('Ange visningstid i sekunder, t.ex. 2.5'); e.target.value = durText(r); return; }
+        if (r.time == null) { toast('Tajma raden först'); e.target.value = ''; return; }
+        r.end = +(r.time + d).toFixed(2);
+      }
+      e.target.value = durText(r);
+      e.target.classList.toggle('empty', r.end == null);
+      setDirty(true);
+      return;
+    }
     if (!e.target.classList.contains('t')) return;
     const i = +e.target.dataset.i;
     const t = parseTime(e.target.value);
     if (Number.isNaN(t)) { toast('Ogiltig tid — använd t.ex. 1:23.45'); e.target.value = rows[i].time == null ? '' : fmt(rows[i].time); return; }
+    if (rows[i].end != null && rows[i].time != null && t != null) rows[i].end += t - rows[i].time;
+    if (t == null) rows[i].end = null;
     rows[i].time = t;
     if (t != null) rows[i].skip = false;
     setDirty(true);
     renderLines(); setCursor(cursor, false);
   });
-  list.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('t')) e.target.blur(); });
+  list.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.classList.contains('t') || e.target.classList.contains('d'))) e.target.blur(); });
 
   $('editLinesBtn').addEventListener('click', openEdit);
   $('cancelEditBtn').addEventListener('click', closeEdit);
@@ -863,7 +967,7 @@ function wireEvents() {
   document.addEventListener('keydown', e => {
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.code === 'Space') { e.preventDefault(); tap(); }
+    if (e.code === 'Space') { e.preventDefault(); if (e.repeat) return; $('tapBtn').classList.add('holding'); tap(); }
     else if (e.key === 'Backspace') { e.preventDefault(); undo(); }
     else if (e.key === 'Enter') { e.preventDefault(); tapGap(); }
     else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePlay(); }
@@ -872,6 +976,8 @@ function wireEvents() {
   });
   // Knappar ska inte "fånga" mellanslag efter klick
   document.querySelectorAll('button').forEach(b => b.addEventListener('keydown', e => { if (e.code === 'Space') e.preventDefault(); }));
+  document.addEventListener('keyup', e => { if (e.code === 'Space') release(); });
+  window.addEventListener('blur', release);
 
   window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 }

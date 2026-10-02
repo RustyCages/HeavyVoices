@@ -25,6 +25,9 @@
   .btn-small { padding: 0.35rem 0.8rem; font-size: 0.85rem; }
   .btn-danger { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
   details > summary { cursor: pointer; margin-top: 0.6rem; color: var(--text-muted); font-size: 0.85rem; }
+  details.lyrics-fold { margin-bottom: 0.4rem; }
+  details.lyrics-fold > summary { margin-top: 0.2rem; }
+  details.lyrics-fold textarea { margin-top: 0.5rem; }
   h4.section-heading { margin: 1.2rem 0 0.3rem 0; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
   .stem-row, .lyric-row {
@@ -542,15 +545,23 @@ async function loadSongs() {
         <summary>Redigera text och filer</summary>
 
         <div style="margin-top: 0.75rem;">
-          <h4 class="section-heading">Sångtext (redigerbar)</h4>
-          <textarea data-id="${s.id}" class="lyricsField" placeholder="Sångtext">${s.lyrics_plain || ''}</textarea>
-        <div class="field-row" style="margin-bottom: 0.75rem;">
-          <label>Läs in fil</label>  
-          <input type="file" accept=".docx,.txt,.pdf" class="docxInput" data-id="${s.id}">
-          <span class="docxStatus" data-id="${s.id}"></span>
-        </div>
-          <button type="button" class="saveLyricsBtn btn-small" data-id="${s.id}">Spara text</button>
-          <button type="button" class="btn-small btn-danger clearLyricsBtn" data-id="${s.id}">Ta bort sångtext</button>
+          <h4 class="section-heading">Sångtext &amp; karaoke</h4>
+          <div class="field-row" style="margin-bottom: 0.4rem;">
+            <span class="${s.lyrics_plain ? 'status-ok' : 'status-missing'}">${s.lyrics_plain ? '✓ ' + s.lyrics_plain.split('\n').filter(l => l.trim()).length + ' rader' : 'ingen text'}</span>
+            <span class="${s.lyrics_lrc ? 'status-ok' : 'status-missing'}">${s.lyrics_lrc ? '✓ synkad' : 'ej synkad'}</span>
+            <a href="/admin/text-synk.html?id=${encodeURIComponent(s.id)}" class="btn btn-outline btn-small">&#127908; Redigera text &amp; synk</a>
+          </div>
+          <details class="lyrics-fold">
+            <summary>Snabbredigera sångtexten här</summary>
+            <textarea data-id="${s.id}" class="lyricsField" placeholder="Sångtext">${s.lyrics_plain || ''}</textarea>
+            <div class="field-row" style="margin-bottom: 0.75rem;">
+              <label>Läs in fil</label>
+              <input type="file" accept=".docx,.txt,.pdf" class="docxInput" data-id="${s.id}">
+              <span class="docxStatus" data-id="${s.id}"></span>
+            </div>
+            <button type="button" class="saveLyricsBtn btn-small" data-id="${s.id}">Spara text</button>
+            <button type="button" class="btn-small btn-danger clearLyricsBtn" data-id="${s.id}">Ta bort sångtext</button>
+          </details>
 
           <h4 class="section-heading">Noter &amp; sångtext som fil</h4>
           <div id="docsArea-${s.id}">${DOC_FIELDS.map(f => docRow(s, f, 'heavy-voices-noter')).join('')}</div>

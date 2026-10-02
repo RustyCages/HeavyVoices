@@ -38,12 +38,6 @@
   .transport .time { font-variant-numeric: tabular-nums; font-size: 0.85rem; color: var(--text-muted); min-width: 4.2rem; text-align: center; }
   .transport input[type=range] { flex: 1; min-width: 140px; margin: 0; padding: 0; }
   .play-btn { width: 2.8rem; height: 2.8rem; border-radius: 50%; justify-content: center; font-size: 1.1rem; padding: 0; }
-  .opts { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; }
-  .opts label { display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; cursor: pointer; }
-  .opts input[type=checkbox] { width: auto; margin: 0; }
-  .opts select { width: auto; margin: 0; padding: 0.3rem 0.5rem; }
-  .legend { display: inline-flex; align-items: center; gap: 0.35rem; }
-  .swatch { display: inline-block; width: 18px; height: 8px; border-radius: 2px; }
   #loadingNote { color: var(--text-muted); }
   .karaoke { margin-top: 0.9rem; padding: 0.6rem 0.75rem; text-align: center; border-radius: 0.6rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border); min-height: 4.2rem; display: grid; align-content: center; gap: 0.15rem; }
   .k-now { font-family: 'Roboto Condensed', sans-serif; font-size: 1.45rem; font-weight: 700; line-height: 1.25; color: rgba(255,255,255,0.9);
@@ -53,21 +47,81 @@
   .k-src { font-size: 0.7rem; color: var(--text-muted); opacity: 0.7; }
   @media (max-width: 640px) { .k-now { font-size: 1.2rem; } }
   .mic-btn.on { background: #ef4444; border-color: #ef4444; color: #fff; }
-  .mic-panel { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; align-items: baseline; margin-top: 0.75rem; padding: 0.7rem 0.9rem; border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(0,0,0,0.2); font-variant-numeric: tabular-nums; }
-  .mic-note { font-family: 'Roboto Condensed', sans-serif; font-size: 1.8rem; font-weight: 700; line-height: 1; min-width: 3.2rem; color: var(--text-muted); }
+  /* poängrad när micken är på */
+  .scorebar { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 0.6rem; margin-top: 0.9rem; font-variant-numeric: tabular-nums; }
+  .stat { display: grid; gap: 0.1rem; align-content: start; padding: 0.6rem 0.8rem; border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(0,0,0,0.2); min-width: 0; }
+  .stat-k { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+  .stat b { font-family: 'Roboto Condensed', sans-serif; font-size: 1.6rem; line-height: 1.1; color: var(--text); }
+  .stat-s { font-size: 0.75rem; color: var(--text-muted); }
+  .mic-note { font-family: 'Roboto Condensed', sans-serif; font-size: 1.6rem; font-weight: 700; line-height: 1.1; color: var(--text-muted); }
   .mic-note.hit { color: #4ade80; } .mic-note.miss { color: #f87171; }
-  .mic-cents { font-size: 0.85rem; color: var(--text-muted); min-width: 9rem; }
-  .mic-score { font-size: 0.85rem; color: var(--text-muted); margin-left: auto; }
-  .mic-score b { color: var(--text); font-size: 1.05rem; }
-  .mic-tip { flex-basis: 100%; font-size: 0.78rem; color: var(--text-muted); }
+  .mic-cents { font-size: 0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* inställningar i tre grupper */
+  .settings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+  .set { margin: 0; padding: 0.75rem 0.9rem 0.85rem; border: 1px solid var(--border); border-radius: 0.6rem; display: grid; gap: 0.5rem; align-content: start; min-width: 0; }
+  .set legend { padding: 0 0.35rem; font-family: 'Roboto Condensed', sans-serif; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  .set label { display: flex; align-items: center; gap: 0.45rem; margin: 0; cursor: pointer; font-size: 0.9rem; color: var(--text); }
+  .set label small { color: var(--text-muted); font-size: 0.75rem; }
+  .set input[type=checkbox] { width: auto; margin: 0; accent-color: var(--accent); }
+  .set select { width: auto; margin: 0; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+  .set label.row { justify-content: space-between; }
+  .set-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; }
+  .set-tip { margin: 0.1rem 0 0; font-size: 0.75rem; color: var(--text-muted); line-height: 1.45; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.3rem; }
+  .chips label { font-size: 0.8rem; padding: 0.25rem 0.65rem 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 999px; gap: 0.3rem; }
+  .chips label:has(input:checked) { border-color: rgba(229,169,104,0.6); background: rgba(229,169,104,0.12); }
+
+  .legend-row { display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; margin-top: 0.8rem; font-size: 0.78rem; color: var(--text-muted); }
+  .legend-row span { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .swatch { display: inline-block; width: 18px; height: 9px; border-radius: 3px; }
+
+  /* guide */
+  .title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+  .title-row h1 { margin: 0.5rem 0; }
+  .guide { margin-bottom: 1.5rem; }
+  .guide h2 { margin: 0 0 0.25rem; font-size: 1.15rem; }
+  .guide ol { list-style: none; padding: 0; margin: 0.75rem 0 0; display: grid; gap: 0.85rem; counter-reset: g; }
+  .guide li { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 0.75rem; counter-increment: g; }
+  .guide li::before { content: counter(g); width: 2rem; height: 2rem; border-radius: 50%; display: grid; place-items: center; background: rgba(229,169,104,0.15); color: var(--accent); font-weight: 700; font-family: 'Roboto Condensed', sans-serif; }
+  .guide li b { display: block; color: var(--text); margin-bottom: 0.1rem; }
+  .guide li p { margin: 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; }
+  .guide .tips { margin: 1rem 0 0; padding: 0.7rem 0.9rem; border-radius: 0.6rem; background: rgba(0,0,0,0.2); font-size: 0.82rem; color: var(--text-muted); line-height: 1.6; }
+  .guide .tips b { color: var(--text); }
+
+  @media (max-width: 760px) {
+    .settings { grid-template-columns: 1fr; }
+    .scorebar { grid-template-columns: 1fr 1fr; }
+    .scorebar .stat:first-child { grid-column: 1 / -1; }
+  }
 </style>
 </head>
 <body>
 <header class="site-header"><span class="site-logo">Heavy Voices</span></header>
 <div class="container">
   <a href="/admin/latar.html" class="back-btn">&larr; Tillbaka till låtar</a>
-  <h1>Tonkurvor</h1>
-  <p class="hint">Första steget mot röstövning: sidan lyssnar igenom varje stämfil och räknar ut vilken ton som sjungs, 50 gånger i sekunden. Resultatet sparas och blir notbanan medlemmarna ska sjunga mot. Kontrollera kurvan genom att spela stämman med <em>referenstonen</em> på – låter pipet som stämman är analysen bra.</p>
+  <div class="title-row">
+    <h1>Tonkurvor</h1>
+    <button class="btn-outline" id="guideBtn" aria-expanded="false" aria-controls="guide">❔ Så funkar det</button>
+  </div>
+  <p class="hint">Räkna fram noterna i varje stämfil och sjung med mot notbanan i mikrofonen.</p>
+
+  <div class="card static guide" id="guide" hidden>
+    <h2>Så funkar Tonkurvor</h2>
+    <ol>
+      <li><div><b>Välj låt</b><p>Listan visar låtar som har minst en sångstämma uppladdad.</p></div></li>
+      <li><div><b>Analysera stämmorna</b><p>Tryck <em>Analysera alla sångstämmor</em> (eller <em>Analysera</em> på en stämma). Sidan lyssnar igenom ljudfilen och räknar fram vilka toner som sjungs. Resultatet sparas direkt. Byts stämfilen ut visas ⚠ – analysera då igen.</p></div></li>
+      <li><div><b>Kontrollera resultatet</b><p>Tryck <em>Visa</em> och sedan ▶ med <em>Referenston</em> på. Följer pipet stämman är analysen bra. Ligger det backvocals i filen kan det bli extra noter där.</p></div></li>
+      <li><div><b>Sjung med</b><p>Sätt i hörlurar, tryck <em>🎤 Sjung med</em>, tillåt mikrofonen och tryck ▶. Under <em>Lyssna</em> väljer du vad du vill höra: din stämma, referenstonen och andra spår som backtrack eller övriga stämmor.</p></div></li>
+      <li><div><b>Läs av</b><p>Den vita linjen är din röst. Noterna fylls <span style="color:#4ade80">grönt</span> där du träffar och <span style="color:#f87171">rött</span> där du missar. Uppe till höger ser du vilken ton du sjunger och hur många cent du ligger fel. Under spelaren visas träffprocent och hur många noter du klarat.</p></div></li>
+    </ol>
+    <div class="tips">
+      <b>Marginal</b> styr hur nära noten du måste ligga för grönt – börja gärna med <em>Snäll</em>.
+      <b>Godkänn annan oktav</b> låter dig sjunga en stämma en oktav upp eller ner.<br>
+      <b>Spola:</b> dra i notbanan, klicka i översikten överst, eller använd −5 s. <b>Mellanslag</b> spelar/pausar på dator.<br>
+      <b>Utan hörlurar</b> hör mikrofonen högtalaren och räknar det som sång – stäng då av allt utom referenstonen.
+    </div>
+  </div>
 
   <div class="card static">
     <label class="hint" for="songSelect" style="display:block; margin:0 0 0.3rem;">Låt</label>
@@ -101,32 +155,48 @@
       <span class="time" id="durTime">0:00</span>
       <button class="btn-outline mic-btn" id="micBtn" title="Sjung med i mikrofonen">🎤 Sjung med</button>
     </div>
-    <div class="mic-panel" id="micPanel" hidden>
-      <span class="mic-note" id="micNote">–</span>
-      <span class="mic-cents" id="micCents">Sjung en ton…</span>
-      <label class="hint" style="margin:0; display:inline-flex; gap:0.35rem; align-items:center;"><input type="checkbox" id="optOctave" checked style="width:auto; margin:0;"> Godkänn annan oktav</label>
-      <label class="hint" style="margin:0; display:inline-flex; gap:0.35rem; align-items:center;">Marginal <select id="optTol" style="width:auto; margin:0; padding:0.25rem 0.4rem;">
-        <option value="75">Snäll (±75 cent)</option>
-        <option value="50" selected>Normal (±50 cent)</option>
-        <option value="30">Strikt (±30 cent)</option>
-      </select></label>
-      <span class="mic-score">Träff <b id="micHit">–</b> · noter <b id="micNotes">–</b></span>
-      <span class="mic-tip">🎧 Använd hörlurar – annars hör mikrofonen ljudet från högtalaren och "sjunger" med själv. Grönt = inom vald marginal från noten.</span>
+    <div class="scorebar" id="micPanel" hidden>
+      <div class="stat"><span class="stat-k">Du sjunger</span><span class="mic-note" id="micNote">–</span><span class="mic-cents" id="micCents">Sjung en ton…</span></div>
+      <div class="stat"><span class="stat-k">Träff</span><b id="micHit">–</b><span class="stat-s">av tiden i noterna</span></div>
+      <div class="stat"><span class="stat-k">Noter klara</span><b id="micNotes">–</b><span class="stat-s">minst 60 % rätt</span></div>
     </div>
-    <div class="opts">
-      <label><input type="checkbox" id="optStem" checked> <span id="optStemLabel">Stämljud</span></label>
-      <label><input type="checkbox" id="optTone" checked> Referenston</label>
-      <label id="optKaraokeWrap" hidden><input type="checkbox" id="optKaraoke" checked> Karaoke</label>
-      <label>Zoom <select id="optZoom">
-        <option value="5">5 s</option>
-        <option value="10" selected>10 s</option>
-        <option value="20">20 s</option>
-        <option value="40">40 s</option>
-      </select></label>
-      <span class="legend"><span class="swatch" style="background: rgba(229,169,104,0.35); border: 1px solid var(--accent);"></span> noter</span>
-      <span class="legend"><span class="swatch" style="background: #fff; height: 2px;"></span> exakt tonkurva</span>
+
+    <div class="settings">
+      <fieldset class="set">
+        <legend>Lyssna</legend>
+        <label><input type="checkbox" id="optStem" checked> <span id="optStemLabel">Stämljud</span> <small>vald stämma</small></label>
+        <label><input type="checkbox" id="optTone" checked> Referenston <small>pip på noterna</small></label>
+        <div id="withWrap" hidden><div class="set-sub">Spela med</div><div class="chips" id="withRow"></div></div>
+      </fieldset>
+      <fieldset class="set">
+        <legend>Visa</legend>
+        <label id="optKaraokeWrap" hidden><input type="checkbox" id="optKaraoke" checked> Karaoke-text</label>
+        <label class="row">Zoom <select id="optZoom">
+          <option value="5">5 s</option>
+          <option value="10" selected>10 s</option>
+          <option value="20">20 s</option>
+          <option value="40">40 s</option>
+        </select></label>
+      </fieldset>
+      <fieldset class="set">
+        <legend>Sjung med</legend>
+        <label class="row">Marginal <select id="optTol">
+          <option value="75">Snäll ±75 cent</option>
+          <option value="50" selected>Normal ±50 cent</option>
+          <option value="30">Strikt ±30 cent</option>
+        </select></label>
+        <label><input type="checkbox" id="optOctave" checked> Godkänn annan oktav</label>
+        <p class="set-tip">🎧 Använd hörlurar – annars hör mikrofonen högtalaren.</p>
+      </fieldset>
     </div>
-    <div class="opts" id="withRow" hidden></div>
+
+    <div class="legend-row">
+      <span><i class="swatch" style="background: rgba(229,169,104,0.3); border: 1px solid var(--accent);"></i>noter att sjunga</span>
+      <span><i class="swatch" style="background: #45c871;"></i>träff</span>
+      <span><i class="swatch" style="background: #d8625f;"></i>miss</span>
+      <span><i class="swatch" style="background: #fff; height: 3px;"></i>din röst</span>
+      <span><i class="swatch" style="background: rgba(255,255,255,0.5); height: 2px;"></i>analysens kurva</span>
+    </div>
   </div>
 </div>
 
@@ -683,8 +753,8 @@ function renderWithRow() {
   const row = document.getElementById('withRow');
   document.getElementById('optStemLabel').textContent = current.label;
   const others = stems.filter(st => st !== current);
-  row.hidden = !others.length;
-  row.innerHTML = '<span>Spela med:</span>' + others.map(st =>
+  document.getElementById('withWrap').hidden = !others.length;
+  row.innerHTML = others.map(st =>
     `<label><input type="checkbox" data-key="${esc(st.key)}" ${playWith.has(st.key) ? 'checked' : ''}> ${esc(st.label)}</label>`).join('');
   row.querySelectorAll('input').forEach(inp => inp.addEventListener('change', async () => {
     const st = stems.find(x => x.key === inp.dataset.key);
@@ -809,6 +879,14 @@ function stopMic() {
 
 // ---------- händelser ----------
 document.getElementById('micBtn').addEventListener('click', toggleMic);
+(() => {
+  const g = document.getElementById('guide'), b = document.getElementById('guideBtn');
+  const set = (open) => { g.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? '✕ Stäng guiden' : '❔ Så funkar det'; };
+  let seen = null; try { seen = localStorage.getItem('hv-tonkurva-guide'); } catch (e) {}
+  set(!seen); // visas automatiskt första gången
+  if (!seen) { try { localStorage.setItem('hv-tonkurva-guide', '1'); } catch (e) {} }
+  b.addEventListener('click', () => { const open = g.hidden; set(open); try { localStorage.setItem('hv-tonkurva-guide', '1'); } catch (e) {} });
+})();
 document.getElementById('optKaraoke').addEventListener('change', e => {
   document.getElementById('karaoke').hidden = !e.target.checked || !kLines.some(x => x.text);
   kIdx = -2; tick();

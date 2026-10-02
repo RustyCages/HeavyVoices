@@ -96,6 +96,24 @@
   .status-bar { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
   #editArea { min-height: 320px; font-size: 0.9rem; line-height: 1.5; }
   .help summary { cursor: pointer; color: var(--text-muted); font-size: 0.85rem; }
+  /* Guide överst */
+  details.guide { margin-bottom: 1rem; }
+  details.guide > summary { cursor: pointer; font-family: 'Roboto Condensed', sans-serif; font-size: 1.15rem; font-weight: 700; list-style: none; display: flex; align-items: center; gap: 0.5rem; }
+  details.guide > summary::-webkit-details-marker { display: none; }
+  details.guide > summary::after { content: '▾ visa'; margin-left: auto; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
+  details.guide[open] > summary::after { content: '▴ dölj'; }
+  .guide-steps { list-style: none; counter-reset: gs; padding: 0; margin: 1rem 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.75rem; }
+  .guide-steps li { counter-increment: gs; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 0.7rem; padding: 0.8rem 0.9rem 0.8rem 3rem; position: relative; font-size: 0.88rem; line-height: 1.5; color: var(--text-muted); }
+  .guide-steps li::before { content: counter(gs); position: absolute; left: 0.85rem; top: 0.8rem; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--accent); color: #111317; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; }
+  .guide-steps li strong.h { display: block; color: var(--text); font-size: 0.95rem; margin-bottom: 0.15rem; }
+  .guide-extra { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.75rem 1.5rem; margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted); }
+  .guide-extra h4 { margin: 0 0 0.4rem; color: var(--text); font-size: 0.9rem; }
+  .guide-extra table { border-collapse: collapse; width: 100%; }
+  .guide-extra td { padding: 0.25rem 0.4rem 0.25rem 0; vertical-align: top; border-bottom: 1px solid var(--border); }
+  .guide-extra td:first-child { white-space: nowrap; color: var(--text); }
+  .guide-extra ul { margin: 0; padding-left: 1.1rem; }
+  .guide-extra li + li { margin-top: 0.3rem; }
+  kbd { font-family: inherit; font-size: 0.8em; padding: 0.05rem 0.4rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 0.3rem; background: rgba(255,255,255,0.05); color: var(--text); }
   .help ul { margin: 0.5rem 0 0 1.1rem; padding: 0; font-size: 0.85rem; color: var(--text-muted); }
   .dirty-dot { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--accent); margin-right: 0.35rem; vertical-align: middle; }
   #textCard summary { cursor: pointer; font-family: 'Roboto Condensed', sans-serif; font-size: 1.1rem; color: #fff; }
@@ -116,6 +134,46 @@
   <a href="/admin/latar.html" class="back-btn" id="backLink">&larr; Tillbaka till låtar</a>
   <h1 id="songTitle" style="margin-bottom: 0.2rem;">Textsynk</h1>
   <p class="muted" style="margin-top: 0;">Tajma sångtexten rad för rad mot ljudet — resultatet används som karaoke-text i spelaren.</p>
+
+  <details class="card static guide" id="guideCard" open>
+    <summary>&#128214; Så här fungerar Textsynk</summary>
+    <ol class="guide-steps">
+      <li><strong class="h">Välj låt och version</strong>
+        Välj låten nedan. Under <em>Version</em> väljer du <em>Gemensam</em> (alla stämmor) eller en egen version för en stämma. Rätt ljudspår väljs automatiskt – byt under <em>Spår</em> vid behov.</li>
+      <li><strong class="h">Kontrollera texten</strong>
+        Öppna <em>Sångtext</em>. En rad per textrad, tom rad mellan stycken. Rubriker som "Vers 1" och "Refräng" hoppas över automatiskt.</li>
+      <li><strong class="h">Tajma raderna</strong>
+        Tryck <em>Spela</em>. <strong>Håll inne</strong> <kbd>Mellanslag</kbd> eller <em>TAP</em> medan den markerade raden sjungs: ned = start, släpp = slut. Ett snabbt tryck sätter bara start. Sänk tempot om det går fort.</li>
+      <li><strong class="h">Finjustera</strong>
+        &#9654; på en rad spelar därifrån. <em>Start</em>: −/+ (0,1 s). <em>Visas</em>: −/+ (0,25 s) eller skriv sekunder. Under uppspelning sätter <em>&#9834; Slut här</em> (eller <kbd>Enter</kbd>) slut på raden som sjungs. <kbd>Backsteg</kbd> ångrar.</li>
+      <li><strong class="h">Färger och pilar <span class="muted">(valfritt)</span></strong>
+        Markera text, kryssa i <strong>S A T B</strong> och tryck <span class="pitch up">↑ upp</span> / <span class="pitch down">↓ ned</span> – texten färgas när de stämmorna går upp eller ned. Enstaka <span class="pitch up">↑</span><span class="pitch down">↓</span> mitt i texten visar tonriktning.</li>
+      <li><strong class="h">Spara synk</strong>
+        Ingenting syns för medlemmarna förrän du trycker <em>Spara synk</em> längst ner. Den gula pricken visar osparade ändringar.</li>
+    </ol>
+    <div class="guide-extra">
+      <div>
+        <h4>Kortkommandon</h4>
+        <table>
+          <tr><td><kbd>Mellanslag</kbd> håll</td><td>Tajma raden (start + slut)</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Slut här (spelar) / infoga paus (pausat)</td></tr>
+          <tr><td><kbd>Backsteg</kbd></td><td>Ångra</td></tr>
+          <tr><td><kbd>P</kbd></td><td>Spela / pausa</td></tr>
+          <tr><td><kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>Hoppa 3 s bakåt / framåt</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>&uarr;</kbd>/<kbd>&darr;</kbd></td><td>Infoga ↑ / ↓ i en textruta</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>Bra att veta</h4>
+        <ul>
+          <li>Efter en rads visningstid visas &#9834; i karaoken tills nästa rad börjar.</li>
+          <li>Ändrar du sångtexten efteråt visas en banner – <em>Uppdatera raderna</em> behåller tiderna för oförändrade rader.</li>
+          <li>Pilar och färgmarkeringar påverkar inte tiderna.</li>
+          <li>Medlemmar ser sin egen stämmas version om den finns, annars den gemensamma. Den egna stämmans färgmarkeringar visas starkare.</li>
+        </ul>
+      </div>
+    </div>
+  </details>
 
   <div class="card static" style="margin-bottom: 1rem;">
     <div class="row-flex">
@@ -214,7 +272,7 @@
       </div>
 
       <details class="help" style="margin-bottom: 0.75rem;">
-        <summary>Så funkar det / kortkommandon</summary>
+        <summary>Detaljer om knapparna i listan</summary>
         <ul>
           <li><strong>Håll inne</strong> <kbd>Mellanslag</kbd> (eller TAP) medan raden sjungs: nedtryckning = start, släpp = slut. Efter sluttiden visas &#9834; i karaoken. Ett snabbt tryck sätter bara starttid – då visas raden tills nästa börjar. Är ljudet pausat startar första trycket bara uppspelningen.</li>
           <li><strong>Visningstid:</strong> rutan bredvid tiden visar hur länge raden syns (sekunder). Använd <strong>−/+</strong> (0,25 s per tryck) för att korta eller förlänga – det syns direkt i förhandsvisningen. Du kan också skriva in en tid, eller tömma rutan för att visa raden tills nästa börjar.</li>
@@ -1293,6 +1351,8 @@ function refreshSongInList() {
   wireEvents();
   wireTextCard();
   wirePitchTools();
+  try { if (localStorage.getItem('hv-synk-guide') === 'closed') $('guideCard').open = false; } catch (_) {}
+  $('guideCard').addEventListener('toggle', () => { try { localStorage.setItem('hv-synk-guide', $('guideCard').open ? 'open' : 'closed'); } catch (_) {} });
   wireSegTools();
   $('applyTextChangeBtn').addEventListener('click', () => {
     rows = mergeRows(rowsFromPlain(plainOf()));

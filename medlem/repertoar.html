@@ -327,19 +327,27 @@ function fmtTime(sec) {
 }
 
 // Merge fixed + extra stems present on a song into one generic list
+// Eget namn/ordning från admin (songs.stem_meta / lyric_meta = { order: [nyckel], labels: { nyckel: namn } })
+function applyPartMeta(items, meta, keyOf) {
+  const m = meta || {}, labels = m.labels || {}, order = m.order || [];
+  items.forEach(it => { const k = keyOf(it); if (labels[k]) it.label = labels[k]; });
+  const pos = it => { const i = order.indexOf(keyOf(it)); return i === -1 ? 1e6 : i; };
+  return items.map((it, i) => ({ it, i })).sort((a, b) => (pos(a.it) - pos(b.it)) || (a.i - b.i)).map(x => x.it);
+}
+
 function getStemDefs(song) {
   const defs = [];
   const offsets = song.stem_offsets || {};
   const offsetSec = (k) => (Number(offsets[k]) || 0) / 1000;
   FIXED_STEMS.forEach(f => {
     if (song[f.pathCol]) {
-      defs.push({ key: f.key, type: 'fixed', label: f.label, path: song[f.pathCol], volColumn: f.volColumn, offsetSec: offsetSec(f.pathCol) });
+      defs.push({ key: f.key, metaKey: f.pathCol, type: 'fixed', label: f.label, path: song[f.pathCol], volColumn: f.volColumn, offsetSec: offsetSec(f.pathCol) });
     }
   });
   (song.extra_stems || []).forEach(ex => {
-    defs.push({ key: ex.id, type: 'extra', label: ex.label, path: ex.path, volColumn: null, offsetSec: offsetSec(ex.id) });
+    defs.push({ key: ex.id, metaKey: ex.id, type: 'extra', label: ex.label, path: ex.path, volColumn: null, offsetSec: offsetSec(ex.id) });
   });
-  return defs;
+  return applyPartMeta(defs, song.stem_meta, d => d.metaKey);
 }
 
 // Låtens totala längd med hänsyn till stämsynk-förskjutningar (sätts i admin → Stämsynk)
@@ -744,9 +752,12 @@ function renderSongCard(s) {
 function songDocs(s) {
   const docs = [];
   DOC_FIELDS.forEach(f => { if (s[f.col]) docs.push({ label: f.label, path: s[f.col], kind: f.col === 'sheet_music_path' ? 'noter' : 'text' }); });
-  STAMTEXT_FIELDS.forEach(f => { if (s[f.col]) docs.push({ label: f.label, path: s[f.col], kind: 'stamtext', voice: f.key }); });
-  (s.extra_lyrics || []).forEach(ex => { if (ex.path) docs.push({ label: ex.label, path: ex.path, kind: 'stamtext' }); });
-  return docs;
+  const parts = [];
+  STAMTEXT_FIELDS.forEach(f => { if (s[f.col]) parts.push({ metaKey: f.col, label: f.label, path: s[f.col], kind: 'stamtext', voice: f.key }); });
+  (s.extra_lyrics || []).forEach(ex => { if (ex.path) parts.push({ metaKey: ex.id, label: ex.label, path: ex.path, kind: 'stamtext' }); });
+  // Noter sist, sångtexter (gemensam + stämmor i adminens ordning) först
+  const noter = docs.filter(d => d.kind === 'noter'), common = docs.filter(d => d.kind !== 'noter');
+  return [...common, ...applyPartMeta(parts, s.lyric_meta, d => d.metaKey), ...noter];
 }
 
 const DL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';

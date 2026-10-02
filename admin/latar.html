@@ -38,6 +38,16 @@
   }
   .stem-row:last-of-type, .lyric-row:last-of-type { border-bottom: none; }
   .stem-label, .lyric-label { width: 110px; flex-shrink: 0; font-weight: 600; }
+  /* Ordning (↑↓) och eget namn (✎) */
+  .order-btns { display: inline-flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+  .order-btns button { width: 1.6rem; height: 1.1rem; padding: 0; font-size: 0.7rem; line-height: 1; justify-content: center;
+    background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); border-radius: 0.3rem; }
+  .order-btns button:disabled { opacity: 0.2; cursor: default; }
+  .label-edit { width: 130px; flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.3rem; margin-left: -0.3rem;
+    background: none; border: 1px dashed transparent; color: var(--text); font-weight: 600; font-size: 0.95rem; text-align: left; justify-content: flex-start; border-radius: 0.35rem; }
+  .label-edit:hover { border-color: var(--border); background: rgba(255,255,255,0.03); color: var(--text); }
+  .label-edit .pen { font-size: 0.75rem; opacity: 0.5; }
+  .label-edit .orig { font-size: 0.7rem; font-weight: 400; color: var(--text-muted); }
   .stem-filename, .lyric-filename { flex: 1; min-width: 140px; font-size: 0.8rem; color: var(--text-muted); word-break: break-all; }
   .stem-actions, .lyric-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
   .stem-add-row, .lyric-add-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.6rem; flex-wrap: wrap; }
@@ -256,30 +266,98 @@ function rerenderDocsAndStamtext(s) {
 }
 
 // ---------- Stämtexter (fasta STAMTEXT_FIELDS + extra_lyrics/"Annat") ----------
+// =========================================================
+// Eget namn och ordning på stämfiler och stämtexter.
+// songs.stem_meta / songs.lyric_meta = { order: [nyckel, ...], labels: { nyckel: 'Namn' } }
+// nyckel = kolumnnamn för fasta stämmor (t.ex. 'stem_sopran_path') eller id för "Annat".
+// =========================================================
+function esc(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function partItems(s, fields, extras, metaKey) {
+  const meta = s[metaKey] || {};
+  const labels = meta.labels || {}, order = meta.order || [];
+  const items = [
+    ...fields.filter(f => s[f.kind]).map(f => ({ key: f.kind, fixed: f.kind, defLabel: f.label, path: s[f.kind] })),
+    ...(extras || []).map(ex => ({ key: ex.id, extra: ex.id, defLabel: ex.label, path: ex.path })),
+  ];
+  items.forEach(it => { it.label = labels[it.key] || it.defLabel; });
+  const pos = k => { const i = order.indexOf(k); return i === -1 ? 1e6 : i; };
+  return items.map((it, i) => ({ it, i })).sort((a, b) => (pos(a.it.key) - pos(b.it.key)) || (a.i - b.i)).map(x => x.it);
+}
+
+function partControls(it, idx, count) {
+  const data = it.fixed ? `data-fixed="${it.fixed}"` : `data-extra="${it.extra}"`;
+  return `
+      <span class="order-btns">
+        <button type="button" class="moveBtn" data-key="${esc(it.key)}" data-dir="-1" title="Flytta upp" ${idx === 0 ? 'disabled' : ''}>&#9650;</button>
+        <button type="button" class="moveBtn" data-key="${esc(it.key)}" data-dir="1" title="Flytta ned" ${idx === count - 1 ? 'disabled' : ''}>&#9660;</button>
+      </span>
+      <button type="button" class="label-edit renameBtn" data-key="${esc(it.key)}" ${data} title="Byt namn">
+        <span>${esc(it.label)}</span><span class="pen">&#9998;</span>
+      </button>`;
+}
+
+async function saveMeta(s, metaKey, meta) {
+  const { error } = await supabaseClient.from('songs').update({ [metaKey]: meta }).eq('id', s.id);
+  if (error) {
+    alert('Kunde inte spara: ' + error.message + (/column|schema/i.test(error.message) ? '\n\nKör SQL-migreringen för stämnamn/ordning först.' : ''));
+    return false;
+  }
+  s[metaKey] = meta;
+  return true;
+}
+
+// Kopplar ↑↓ och ✎ i ett område. extrasKey = 'extra_stems' | 'extra_lyrics'
+function wirePartControls(area, s, fields, extrasKey, metaKey, rerender) {
+  area.querySelectorAll('.moveBtn').forEach(btn => btn.addEventListener('click', async () => {
+    const keys = partItems(s, fields, s[extrasKey], metaKey).map(it => it.key);
+    const i = keys.indexOf(btn.dataset.key), j = i + Number(btn.dataset.dir);
+    if (i < 0 || j < 0 || j >= keys.length) return;
+    [keys[i], keys[j]] = [keys[j], keys[i]];
+    const meta = { ...(s[metaKey] || {}), order: keys };
+    if (await saveMeta(s, metaKey, meta)) rerender();
+  }));
+  area.querySelectorAll('.renameBtn').forEach(btn => btn.addEventListener('click', async () => {
+    const it = partItems(s, fields, s[extrasKey], metaKey).find(x => x.key === btn.dataset.key);
+    if (!it) return;
+    const input = prompt(`Nytt namn (tomt = ${it.fixed ? 'standardnamnet "' + it.defLabel + '"' : 'oförändrat'}):`, it.label);
+    if (input == null) return;
+    const name = input.trim();
+    if (it.extra) {
+      if (!name || name === it.label) return;
+      // "Annat" har namnet i sin egen lista – uppdatera där så att alla sidor ser det
+      const list = (s[extrasKey] || []).map(x => x.id === it.extra ? { ...x, label: name } : x);
+      const { error } = await supabaseClient.from('songs').update({ [extrasKey]: list }).eq('id', s.id);
+      if (error) { alert('Kunde inte spara: ' + error.message); return; }
+      s[extrasKey] = list;
+    } else {
+      const labels = { ...((s[metaKey] || {}).labels || {}) };
+      if (!name || name === it.defLabel) delete labels[it.key]; else labels[it.key] = name;
+      if (!(await saveMeta(s, metaKey, { ...(s[metaKey] || {}), labels }))) return;
+    }
+    rerender();
+  }));
+}
+
 function renderLyricsArea(s) {
   if (!Array.isArray(s.extra_lyrics)) s.extra_lyrics = [];
 
-  const fixedRows = STAMTEXT_FIELDS.filter(f => s[f.kind]).map(f => `
+  const items = partItems(s, STAMTEXT_FIELDS, s.extra_lyrics, 'lyric_meta');
+  const fixedRows = items.map((it, idx) => {
+    const data = it.fixed ? `data-fixed="${it.fixed}"` : `data-extra="${it.extra}"`;
+    return `
     <div class="lyric-row">
-      <span class="lyric-label">${f.label}</span>
-      <span class="lyric-filename">${stemFilename(s[f.kind])}</span>
+      ${partControls(it, idx, items.length)}
+      <span class="lyric-filename">${stemFilename(it.path)}</span>
       <div class="lyric-actions">
-        <a class="btn-small openLyricBtn" data-id="${s.id}" data-fixed="${f.kind}" href="#" style="background: transparent; border: 1px solid var(--border);">Öppna</a>
-        <button type="button" class="btn-small btn-danger removeLyricBtn" data-id="${s.id}" data-fixed="${f.kind}">Ta bort</button>
+        <a class="btn-small openLyricBtn" data-id="${s.id}" ${data} href="#" style="background: transparent; border: 1px solid var(--border);">Öppna</a>
+        <button type="button" class="btn-small btn-danger removeLyricBtn" data-id="${s.id}" ${data}>Ta bort</button>
       </div>
-    </div>
-  `).join('');
-
-  const extraRows = s.extra_lyrics.map(ex => `
-    <div class="lyric-row">
-      <span class="lyric-label">${ex.label}</span>
-      <span class="lyric-filename">${stemFilename(ex.path)}</span>
-      <div class="lyric-actions">
-        <a class="btn-small openLyricBtn" data-id="${s.id}" data-extra="${ex.id}" href="#" style="background: transparent; border: 1px solid var(--border);">Öppna</a>
-        <button type="button" class="btn-small btn-danger removeLyricBtn" data-id="${s.id}" data-extra="${ex.id}">Ta bort</button>
-      </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+  const extraRows = '';
 
   const available = STAMTEXT_FIELDS.filter(f => !s[f.kind]);
   const options = available.map(f => `<option value="${f.kind}">${f.label}</option>`).join('') + `<option value="__other__">Annat...</option>`;
@@ -304,6 +382,7 @@ function renderLyricsArea(s) {
 function wireLyricsArea(s) {
   const area = document.getElementById(`stamtextArea-${s.id}`);
   if (!area) return;
+  wirePartControls(area, s, STAMTEXT_FIELDS, 'extra_lyrics', 'lyric_meta', () => rerenderDocsAndStamtext(s));
 
 area.querySelectorAll('.openLyricBtn').forEach(btn => {
   btn.addEventListener('click', async (e) => {
@@ -390,29 +469,21 @@ function renderStemsArea(s) {
   const uploaded = STEM_FIELDS.filter(f => s[f.kind]);
   const available = STEM_FIELDS.filter(f => !s[f.kind]);
 
-  const rows = uploaded.map(f => `
+  const items = partItems(s, STEM_FIELDS, s.extra_stems, 'stem_meta');
+  const rows = items.map((it, idx) => {
+    const data = it.fixed ? `data-fixed="${it.fixed}"` : `data-extra="${it.extra}"`;
+    return `
     <div class="stem-row">
-      <span class="stem-label">${f.label}</span>
-      <span class="stem-filename">${stemFilename(s[f.kind])}</span>
+      ${partControls(it, idx, items.length)}
+      <span class="stem-filename">${stemFilename(it.path)}</span>
       <div class="stem-actions">
-        <button type="button" class="btn-small playStemBtn" data-id="${s.id}" data-fixed="${f.kind}" style="background: transparent; border: 1px solid var(--border);">&#9658; Spela</button>
-        <button type="button" class="btn-small dlStemBtn" data-path="${s[f.kind]}" title="Ladda ner" style="background: transparent; border: 1px solid var(--border); color: var(--text);">&#11015;</button>
-        <button type="button" class="btn-small btn-danger removeStemBtn" data-id="${s.id}" data-fixed="${f.kind}">Ta bort</button>
+        <button type="button" class="btn-small playStemBtn" data-id="${s.id}" ${data} style="background: transparent; border: 1px solid var(--border);">&#9658; Spela</button>
+        <button type="button" class="btn-small dlStemBtn" data-path="${it.path}" title="Ladda ner" style="background: transparent; border: 1px solid var(--border); color: var(--text);">&#11015;</button>
+        <button type="button" class="btn-small btn-danger removeStemBtn" data-id="${s.id}" ${data}>Ta bort</button>
       </div>
-    </div>
-  `).join('');
-
-  const extraRows = s.extra_stems.map(ex => `
-    <div class="stem-row">
-      <span class="stem-label">${ex.label}</span>
-      <span class="stem-filename">${stemFilename(ex.path)}</span>
-      <div class="stem-actions">
-        <button type="button" class="btn-small playStemBtn" data-id="${s.id}" data-extra="${ex.id}" style="background: transparent; border: 1px solid var(--border);">&#9658; Spela</button>
-        <button type="button" class="btn-small dlStemBtn" data-path="${ex.path}" title="Ladda ner" style="background: transparent; border: 1px solid var(--border); color: var(--text);">&#11015;</button>
-        <button type="button" class="btn-small btn-danger removeStemBtn" data-id="${s.id}" data-extra="${ex.id}">Ta bort</button>
-      </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+  const extraRows = '';
 
   const options = available.map(f => `<option value="${f.kind}">${f.label}</option>`).join('') + `<option value="__other__">Annat...</option>`;
 
@@ -426,9 +497,8 @@ function renderStemsArea(s) {
   `;
 
   return `
-    ${uploaded.length ? rows : ''}
-    ${extraRows}
-    ${!uploaded.length && !extraRows ? '<p class="text-muted" style="font-size: 0.85rem;">Inga stämfiler uppladdade än.</p>' : ''}
+    ${rows}
+    ${!items.length ? '<p class="text-muted" style="font-size: 0.85rem;">Inga stämfiler uppladdade än.</p>' : ''}
     ${addRow}
     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem;">
       ${(uploaded.length + s.extra_stems.length) >= 2 ? `<a href="/admin/stam-synk.html?song=${encodeURIComponent(s.id)}" class="btn btn-outline btn-small">&#8644; Synka stämmorna</a>` : ''}
@@ -441,6 +511,7 @@ function renderStemsArea(s) {
 function wireStemsArea(s) {
   const area = document.getElementById(`stemsArea-${s.id}`);
   if (!area) return;
+  wirePartControls(area, s, STEM_FIELDS, 'extra_stems', 'stem_meta', () => { area.innerHTML = renderStemsArea(s); wireStemsArea(s); });
 
   area.querySelectorAll('.playStemBtn').forEach(btn => {
     btn.addEventListener('click', async (e) => {

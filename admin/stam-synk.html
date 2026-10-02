@@ -126,10 +126,17 @@ function stemFilename(path) {
   const parts = base.split('__');
   return decodeURIComponent(parts.length > 1 ? parts.slice(1).join('__') : base);
 }
+// Eget namn/ordning från admin (songs.stem_meta / lyric_meta = { order: [nyckel], labels: { nyckel: namn } })
+function applyPartMeta(items, meta, keyOf) {
+  const m = meta || {}, labels = m.labels || {}, order = m.order || [];
+  items.forEach(it => { const k = keyOf(it); if (labels[k]) it.label = labels[k]; });
+  const pos = it => { const i = order.indexOf(keyOf(it)); return i === -1 ? 1e6 : i; };
+  return items.map((it, i) => ({ it, i })).sort((a, b) => (pos(a.it) - pos(b.it)) || (a.i - b.i)).map(x => x.it);
+}
 function stemListFor(s) {
   const list = FIXED_STEMS.filter(f => s[f.col]).map(f => ({ key: f.col, label: f.label, path: s[f.col] }));
   (s.extra_stems || []).forEach(ex => list.push({ key: ex.id, label: ex.label, path: ex.path }));
-  return list;
+  return applyPartMeta(list, s.stem_meta, it => it.key);
 }
 async function ensureCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();

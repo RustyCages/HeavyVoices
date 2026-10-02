@@ -832,10 +832,17 @@ audio.addEventListener('pause', () => {
 });
 audio.addEventListener('loadedmetadata', () => { $('scrubber').max = audio.duration || 0; });
 
+// Eget namn/ordning från admin (songs.stem_meta / lyric_meta = { order: [nyckel], labels: { nyckel: namn } })
+function applyPartMeta(items, meta, keyOf) {
+  const m = meta || {}, labels = m.labels || {}, order = m.order || [];
+  items.forEach(it => { const k = keyOf(it); if (labels[k]) it.label = labels[k]; });
+  const pos = it => { const i = order.indexOf(keyOf(it)); return i === -1 ? 1e6 : i; };
+  return items.map((it, i) => ({ it, i })).sort((a, b) => (pos(a.it) - pos(b.it)) || (a.i - b.i)).map(x => x.it);
+}
 function trackOptions() {
-  const opts = STEM_FIELDS.filter(f => song[f.kind]).map(f => ({ label: f.label, path: song[f.kind] }));
-  (song.extra_stems || []).forEach(ex => opts.push({ label: ex.label, path: ex.path }));
-  return opts;
+  const opts = STEM_FIELDS.filter(f => song[f.kind]).map(f => ({ key: f.kind, label: f.label, path: song[f.kind] }));
+  (song.extra_stems || []).forEach(ex => opts.push({ key: ex.id, label: ex.label, path: ex.path }));
+  return applyPartMeta(opts, song.stem_meta, it => it.key);
 }
 
 let trackToken = 0;

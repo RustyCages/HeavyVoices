@@ -190,7 +190,7 @@
 
   <details class="card static" id="textCard" style="display: none; margin-bottom: 1rem;">
     <summary>Sångtext <span class="muted" id="textSummaryInfo"></span></summary>
-    <p class="muted" style="margin: 0.6rem 0 0;">Klistra in eller skriv texten, eller läs in en fil (.docx, .txt, .pdf). Tom rad mellan stycken blir en valfri paus-rad i synken, och rubriker som "Vers 1" / "Refräng" hoppas över automatiskt.</p>
+    <p class="muted" style="margin: 0.6rem 0 0;">Klistra in eller skriv texten, eller läs in en fil (.docx, .txt, .pdf). Tom rad mellan stycken är bara för läsbarhet, och rubriker som "Vers 1" / "Refräng" hoppas över automatiskt.</p>
     <textarea id="lyricsText" placeholder="Sångtext, en rad per textrad..."></textarea>
     <div class="seg-tools" data-for="lyricsText" title="Markera text först, välj stämmor och riktning">
         <span class="muted">Stämmor går:</span>
@@ -537,7 +537,8 @@ function rowsFromPlain(plain) {
   (plain || '').split(/\r?\n/).forEach(raw => {
     const text = raw.trim();
     if (!text) {
-      if (!lastWasBlank) out.push({ text: '', time: null, skip: true }); // paus-rad mellan stycken, valfri
+      // Tom rad mellan stycken blir ingen paus-rad längre – visningstiden (håll inne) ger ♪ där det behövs.
+      // Vill man ändå ha en paus: ♪+ på raden eller Enter när ljudet är pausat.
       lastWasBlank = true;
       return;
     }

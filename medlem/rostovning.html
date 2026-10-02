@@ -67,6 +67,8 @@
   .set select { width: auto; margin: 0; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
   .set label.row { justify-content: space-between; }
   .set-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; }
+  .set-warn { margin: 0.15rem 0 0; padding: 0.5rem 0.65rem; border-radius: 0.5rem; border: 1px solid rgba(250,204,21,0.45); background: rgba(250,204,21,0.08); font-size: 0.8rem; color: var(--text); line-height: 1.45; }
+  .set-warn b { color: #facc15; }
   .set-tip { margin: 0.1rem 0 0; font-size: 0.75rem; color: var(--text-muted); line-height: 1.45; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.3rem; }
   .chips label { font-size: 0.8rem; padding: 0.25rem 0.65rem 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 999px; gap: 0.3rem; }
@@ -137,6 +139,7 @@
     <div class="g-rec">
       <b>⭐ Så får du bäst resultat</b>
       <ol class="g-rec-steps">
+        <li><b>🎧 Använd hörlurar – det är nästan ett krav.</b> Mikrofonen hör allt i rummet. Spelar musiken i högtalaren tror den att musiken är du, och då blir resultatet fel.</li>
         <li>Välj <b>din stämma</b> (eller <b>Vocals</b>) som huvudspår under <em>Stämma</em> – <u>inte</u> backtracket. Det är huvudspåret som bestämmer vilka noter du ska sjunga.</li>
         <li>Lägg sedan till <b>Backtrack</b> under <em>Lyssna → Spela med</em>, så sjunger du till kompet.</li>
       </ol>
@@ -186,8 +189,8 @@
             <em>Strikt ±30</em> = för dig som vill finslipa.</dd>
           <dt>Godkänn annan oktav</dt>
           <dd>På = det räknas som rätt även om du sjunger en oktav (eller två) högre eller lägre än noten. Bra om du t.ex. är bas och vill öva på tenorstämman. Av = du måste ligga i exakt rätt läge.</dd>
-          <dt>🎧 Hörlurar</dt>
-          <dd>Mikrofonen hör allt i rummet. Spelar ljudet i högtalaren tror den att musiken är du. Med hörlurar hör den bara din röst.</dd>
+          <dt>🎧 Hörlurar – nästan ett krav</dt>
+          <dd><b class="g-strong">Sjung alltid med hörlurar.</b> Mikrofonen hör allt i rummet. Spelar ljudet i högtalaren tror den att musiken är du, och då blir det grönt eller rött fast du inte sjunger. Med hörlurar hör den bara din röst. Vanliga hörlurar med sladd eller trådlösa fungerar båda.</dd>
         </dl>
       </section>
     </div>
@@ -264,7 +267,7 @@
           <option value="30">Strikt ±30 cent</option>
         </select></label>
         <label><input type="checkbox" id="optOctave" checked> Godkänn annan oktav</label>
-        <p class="set-tip">🎧 Använd hörlurar – annars hör mikrofonen högtalaren.</p>
+        <p class="set-warn">🎧 <b>Hörlurar är nästan ett krav.</b> Utan hörlurar hör mikrofonen musiken i högtalaren och räknar den som din sång.</p>
       </fieldset>
     </div>
 
@@ -852,6 +855,7 @@ function renderWithRow() {
   row.querySelectorAll('input').forEach(inp => inp.addEventListener('change', async () => {
     const st = stems.find(x => x.key === inp.dataset.key);
     if (inp.checked) playWith.add(st.key); else playWith.delete(st.key);
+    try { localStorage.setItem('hv-play-with', JSON.stringify([...playWith])); } catch (e) {}
     if (inp.checked && !st.buffer) {
       const lbl = inp.parentElement, txt = lbl.lastChild;
       txt.textContent = ' ' + st.label + ' (laddar…)';
@@ -958,6 +962,7 @@ async function toggleMic() {
   b.classList.add('on'); b.textContent = '🎤 Stäng av mick';
   document.getElementById('micPanel').hidden = false;
   cancelAnimationFrame(micRaf); micRaf = requestAnimationFrame(micStep);
+  toast('🎧 Har du hörlurar i? Utan dem hör mikrofonen musiken och räknar den som din sång.', 6000);
 }
 
 function stopMic() {
@@ -1026,6 +1031,11 @@ window.addEventListener('resize', () => { if (current) { sizeCanvases(); tick();
   const member = await requireAuth();
   if (!member) return;
   isAdmin = member.role === 'admin';
+  // "Spela med": senaste valet sparas; första gången är Backtrack påslaget för medlemmar
+  let savedWith = null;
+  try { savedWith = JSON.parse(localStorage.getItem('hv-play-with') || 'null'); } catch (e) {}
+  if (Array.isArray(savedWith)) savedWith.forEach(k => playWith.add(k));
+  else if (!isAdmin) playWith.add('stem_backtrack_path');
   // admin-delar (analys) visas bara för admin
   document.querySelectorAll(isAdmin ? '.member-only' : '.admin-only').forEach(el => el.remove());
   if (!isAdmin) document.querySelector('#stemArea .bulk').remove();

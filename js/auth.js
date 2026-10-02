@@ -1,5 +1,8 @@
 // Delade auth-helpers. Kräver att supabase-config.js laddats först.
 
+// Inloggade sidor får bredare layout på dator (se html.app-wide i style.css)
+if (/^\/(admin|medlem)(\/|$)/.test(location.pathname)) document.documentElement.classList.add('app-wide');
+
 async function signIn(email, password) {
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) throw error;

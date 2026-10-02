@@ -32,7 +32,13 @@
   .event-meta { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
   .form-row > label { display: block; min-width: 0; }
-  [hidden] { display: none !important; } /* knapp- och gridstilar får inte ta över hidden */
+  [hidden] { display: none !important; }
+  .choice-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .choice-box { background: var(--bg); border: 1px solid var(--border); border-radius: 0.9rem; padding: 1.3rem 1.3rem 1rem; width: 100%; max-width: 380px; box-shadow: var(--card-shadow); }
+  .choice-box h3 { margin: 0 0 0.3rem; }
+  .choice-box p { margin: 0 0 1rem; color: var(--text-muted); font-size: 0.9rem; }
+  .choice-box .choice-btns { display: flex; flex-direction: column; gap: 0.5rem; }
+  .choice-box .choice-btns button { justify-content: center; padding: 0.7rem 1rem; font-size: 0.95rem; } /* knapp- och gridstilar får inte ta över hidden */
   /* Egen tidsväljare: skriv tiden eller stega ±15 min (ersätter webbläsarens snurrhjul) */
   .tp { display: flex; align-items: stretch; gap: 0.3rem; margin-bottom: 0.85rem; }
   .tp .tp-text { flex: 1; min-width: 0; margin: 0; text-align: center; font-size: 1.05rem; font-variant-numeric: tabular-nums; letter-spacing: 0.03em; }
@@ -258,7 +264,6 @@ function eventHtml(ev) {
       <div class="event-actions">
         ${ev.event_date <= todayStr ? `<button type="button" class="att-btn ${attCount(ev.id) ? 'has' : ''}" data-id="${ev.id}">Närvaro (${attCount(ev.id)})</button>` : ''}
         <button type="button" class="edit-btn" data-id="${ev.id}">Redigera</button>
-        ${ev.series_id ? `<button type="button" class="edit-btn" data-id="${ev.id}" data-scope="all">Redigera serie</button>` : ''}
         <button type="button" class="btn-danger deleteEventBtn" data-id="${ev.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort</button>
         ${ev.series_id ? `<button type="button" class="btn-danger deleteEventBtn" data-series="${ev.series_id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort serie</button>` : ''}
       </div>
@@ -317,7 +322,13 @@ async function loadEvents() {
   });
 
   document.querySelectorAll('.edit-btn').forEach(btn => {
-    btn.addEventListener('click', () => startEdit(events.find(x => String(x.id) === btn.dataset.id), btn.dataset.scope));
+    btn.addEventListener('click', async () => {
+      const ev = events.find(x => String(x.id) === btn.dataset.id);
+      if (!ev) return;
+      if (!ev.series_id) { startEdit(ev); return; }
+      const scope = await askSeriesScope(ev, events.filter(x => x.series_id === ev.series_id).length);
+      if (scope) startEdit(ev, scope);
+    });
   });
 
   document.querySelectorAll('.deleteEventBtn').forEach(btn => {
@@ -338,6 +349,34 @@ async function loadEvents() {
 let editing = null;   // händelsen som redigeras, annars null
 const $f = id => document.getElementById(id);
 const scopeValue = () => (document.querySelector('input[name="evScope"]:checked') || {}).value || 'one';
+
+// Frågar om ändringen gäller ett tillfälle eller hela serien. Svarar 'one', 'all' eller null (avbryt).
+function askSeriesScope(ev, count) {
+  return new Promise(resolve => {
+    const wrap = document.createElement('div');
+    wrap.className = 'choice-backdrop';
+    wrap.innerHTML = `
+      <div class="choice-box" role="dialog" aria-modal="true" aria-labelledby="choiceTitle">
+        <h3 id="choiceTitle">Redigera återkommande händelse</h3>
+        <p>"${escapeAtt(ev.title)}" ingår i en serie med ${count} tillfällen. Vad vill du ändra?</p>
+        <div class="choice-btns">
+          <button type="button" data-v="one">Bara ${formatDate(ev.event_date)}</button>
+          <button type="button" data-v="all">Alla tillfällen i serien</button>
+          <button type="button" class="btn-outline" data-v="">Avbryt</button>
+        </div>
+      </div>`;
+    const done = v => { wrap.remove(); document.removeEventListener('keydown', onKey); resolve(v || null); };
+    const onKey = e => { if (e.key === 'Escape') done(null); };
+    wrap.addEventListener('click', e => {
+      if (e.target === wrap) return done(null);
+      const b = e.target.closest('button[data-v]');
+      if (b) done(b.dataset.v);
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(wrap);
+    wrap.querySelector('button[data-v="one"]').focus();
+  });
+}
 
 function startEdit(ev, scope) {
   if (!ev) return;

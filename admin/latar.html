@@ -68,6 +68,7 @@
     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
       <a href="/admin/stam-synk.html" class="btn btn-outline">&#8644; Stämsynk</a>
       <a href="/admin/text-synk.html" class="btn btn-outline">&#127908; Textsynk (karaoke)</a>
+      <a href="/admin/tonkurva.html" class="btn btn-outline">&#127929; Tonkurvor</a>
     </div>
   </div>
 
@@ -502,6 +503,7 @@ function renderStemsArea(s) {
     ${addRow}
     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem;">
       ${(uploaded.length + s.extra_stems.length) >= 2 ? `<a href="/admin/stam-synk.html?song=${encodeURIComponent(s.id)}" class="btn btn-outline btn-small">&#8644; Synka stämmorna</a>` : ''}
+      ${(uploaded.length + s.extra_stems.length) >= 1 ? `<a href="/admin/tonkurva.html?song=${encodeURIComponent(s.id)}" class="btn btn-outline btn-small">&#127929; Tonkurvor</a>` : ''}
       ${(uploaded.length + s.extra_stems.length) >= 1 ? `<button type="button" class="btn-small zipStemsBtn" style="background: transparent; border: 1px solid var(--border); color: var(--text);">&#11015; Ladda ner alla (.zip)</button>` : ''}
     </div>
     <audio class="stem-preview" id="preview-${s.id}" controls></audio>

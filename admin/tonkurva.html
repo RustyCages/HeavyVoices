@@ -44,6 +44,13 @@
   .legend { display: inline-flex; align-items: center; gap: 0.35rem; }
   .swatch { display: inline-block; width: 18px; height: 8px; border-radius: 2px; }
   #loadingNote { color: var(--text-muted); }
+  .karaoke { margin-top: 0.9rem; padding: 0.6rem 0.75rem; text-align: center; border-radius: 0.6rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border); min-height: 4.2rem; display: grid; align-content: center; gap: 0.15rem; }
+  .k-now { font-family: 'Roboto Condensed', sans-serif; font-size: 1.45rem; font-weight: 700; line-height: 1.25; color: rgba(255,255,255,0.9);
+    background-image: linear-gradient(to right, var(--accent) var(--k, 0%), rgba(255,255,255,0.9) var(--k, 0%));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .k-next { font-size: 0.9rem; color: var(--text-muted); min-height: 1.3em; }
+  .k-src { font-size: 0.7rem; color: var(--text-muted); opacity: 0.7; }
+  @media (max-width: 640px) { .k-now { font-size: 1.2rem; } }
   .mic-btn.on { background: #ef4444; border-color: #ef4444; color: #fff; }
   .mic-panel { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; align-items: baseline; margin-top: 0.75rem; padding: 0.7rem 0.9rem; border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(0,0,0,0.2); font-variant-numeric: tabular-nums; }
   .mic-note { font-family: 'Roboto Condensed', sans-serif; font-size: 1.8rem; font-weight: 700; line-height: 1; min-width: 3.2rem; color: var(--text-muted); }
@@ -81,6 +88,10 @@
       <canvas id="overview" title="Hela låten – klicka för att hoppa"></canvas>
       <canvas id="roll" title="Dra i sidled för att spola"></canvas>
     </div>
+    <div class="karaoke" id="karaoke" hidden aria-live="off">
+      <div class="k-now" id="kNow">&nbsp;</div>
+      <div class="k-next" id="kNext"></div>
+    </div>
     <div class="transport">
       <button class="play-btn" id="playBtn" title="Spela/pausa (mellanslag)">▶</button>
       <button class="btn-outline" id="backBtn" title="5 s bakåt">−5 s</button>
@@ -99,6 +110,7 @@
     <div class="opts">
       <label><input type="checkbox" id="optStem" checked> <span id="optStemLabel">Stämljud</span></label>
       <label><input type="checkbox" id="optTone" checked> Referenston</label>
+      <label id="optKaraokeWrap" hidden><input type="checkbox" id="optKaraoke" checked> Karaoke</label>
       <label>Zoom <select id="optZoom">
         <option value="5">5 s</option>
         <option value="10" selected>10 s</option>
@@ -310,6 +322,7 @@ function showStem(st) {
   current = st;
   voice = []; noteStats = []; if (mic) updateScore();
   renderWithRow();
+  setupKaraoke();
   pausedPos = 0;
   document.querySelectorAll('.pitch-row').forEach(r => r.classList.toggle('active', r === st.rowEl));
   const p = st.pitch, s = p.stats || {};
@@ -468,6 +481,59 @@ function tick() {
   if (!sc.matches(':active')) sc.value = Math.min(p, d);
   drawRoll();
   drawOverview();
+  renderKaraoke(p);
+}
+
+// ---------- karaoke-rad (songs.lyrics_lrc / lyrics_lrc_voices) ----------
+let kLines = [], kIdx = -2;
+function parseLrc(lrc) {
+  const out = [];
+  (lrc || '').split(/\r?\n/).forEach(line => {
+    const tags = []; let rest = line, m;
+    while ((m = rest.match(/^\s*\[(\d+):(\d+(?:[.:]\d+)?)\]/))) {
+      tags.push(parseInt(m[1], 10) * 60 + parseFloat(m[2].replace(':', '.')));
+      rest = rest.slice(m[0].length);
+    }
+    if (!tags.length) return;
+    const text = rest.replace(/<\d+:\d+(?:\.\d+)?>/g, '').replace(/\[[SATB]{1,4}[↑↓]\]|\[\/\]/g, '').trim();
+    tags.forEach(t => out.push({ time: t, text }));
+  });
+  return out.sort((a, b) => a.time - b.time);
+}
+// Stämmans egen text om den finns (sopran/alt/tenor/bas utifrån namnet), annars gemensam
+function setupKaraoke() {
+  const voices = song.lyrics_lrc_voices || {};
+  const l = String(current.label || '').toLowerCase();
+  const vk = ['sopran', 'alt', 'tenor', 'bas'].find(k => l.startsWith(k));
+  const lrc = (vk && voices[vk]) || song.lyrics_lrc || Object.values(voices).find(Boolean) || '';
+  kLines = parseLrc(lrc).filter((x, i, a) => i === 0 || x.time !== a[i - 1].time || x.text);
+  kIdx = -2;
+  const has = kLines.some(x => x.text);
+  document.getElementById('optKaraokeWrap').hidden = !has;
+  document.getElementById('karaoke').hidden = !(has && document.getElementById('optKaraoke').checked);
+}
+function renderKaraoke(pos) {
+  const box = document.getElementById('karaoke');
+  if (box.hidden || !kLines.length || !current) return;
+  // karaoke-tiderna ligger på låtens gemensamma tidslinje → lägg på stämmans förskjutning
+  const t = pos + (Number((song.stem_offsets || {})[current.key]) || 0) / 1000;
+  let i = -1;
+  for (let k = 0; k < kLines.length; k++) { if (kLines[k].time <= t) i = k; else break; }
+  const now = i >= 0 ? kLines[i] : null;
+  const nextLine = kLines.slice(i + 1).find(x => x.text && x.text !== '♪');
+  const nowEl = document.getElementById('kNow');
+  if (i !== kIdx) {
+    kIdx = i;
+    nowEl.textContent = now && now.text ? now.text : (nextLine && i < 0 ? '…' : ' ');
+    document.getElementById('kNext').textContent = nextLine ? nextLine.text : '';
+  }
+  // svep: andel av raden som passerat (fram till nästa tidsstämpel, max 6 s)
+  let pct = 0;
+  if (now && now.text && now.text !== '♪') {
+    const end = i + 1 < kLines.length ? Math.min(kLines[i + 1].time, now.time + 6) : now.time + 4;
+    pct = Math.max(0, Math.min(100, (t - now.time) / Math.max(0.3, end - now.time) * 100));
+  }
+  nowEl.style.setProperty('--k', pct.toFixed(1) + '%');
 }
 
 function loop() { tick(); if (playing) raf = requestAnimationFrame(loop); }
@@ -688,6 +754,10 @@ function stopMic() {
 
 // ---------- händelser ----------
 document.getElementById('micBtn').addEventListener('click', toggleMic);
+document.getElementById('optKaraoke').addEventListener('change', e => {
+  document.getElementById('karaoke').hidden = !e.target.checked || !kLines.some(x => x.text);
+  kIdx = -2; tick();
+});
 document.getElementById('songSelect').addEventListener('change', e => loadSong(e.target.value));
 document.getElementById('analyzeAllBtn').addEventListener('click', analyzeAll);
 document.getElementById('playBtn').addEventListener('click', () => playing ? pause() : play());

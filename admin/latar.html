@@ -28,6 +28,8 @@
   details.lyrics-fold { margin-bottom: 0.4rem; }
   details.lyrics-fold > summary { margin-top: 0.2rem; }
   details.lyrics-fold textarea { margin-top: 0.5rem; }
+  .section-hint { margin: 0 0 0.4rem; font-size: 0.8rem; color: var(--text-muted); }
+  .common-lyric .field-row label { width: 110px; font-weight: 600; color: var(--text); }
   h4.section-heading { margin: 1.2rem 0 0.3rem 0; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
   .stem-row, .lyric-row {
@@ -175,6 +177,17 @@ function safeName(name) {
   return name.replace(/[^a-zA-Z0-9.\-]/g, '_');
 }
 
+// Gemensam sångtext (fil) visas ihop med stämtexterna; noter får en egen sektion längst ner.
+const NOTER_FIELD = DOC_FIELDS.find(f => f.kind === 'sheet_music_path');
+const COMMON_LYRIC_FIELD = { ...DOC_FIELDS.find(f => f.kind === 'lyrics_pdf_path'), label: 'Gemensam' };
+const DOC_AREAS = [
+  { field: COMMON_LYRIC_FIELD, area: id => `commonLyricArea-${id}` },
+  { field: NOTER_FIELD,        area: id => `noterArea-${id}` },
+];
+function wireDocAreas(s) {
+  DOC_AREAS.forEach(({ field, area }) => wireDocField(s, field, 'heavy-voices-noter', `#${area(s.id)}`));
+}
+
 function docRow(s, field, bucket) {
   const has = !!s[field.kind];
   return `
@@ -230,12 +243,12 @@ function wireDocField(s, field, bucket, containerSelector) {
 }
 
 function rerenderDocsAndStamtext(s) {
-  const docsArea = document.getElementById(`docsArea-${s.id}`);
   const stamtextArea = document.getElementById(`stamtextArea-${s.id}`);
-  if (docsArea) {
-    docsArea.innerHTML = DOC_FIELDS.map(f => docRow(s, f, 'heavy-voices-noter')).join('');
-    DOC_FIELDS.forEach(f => wireDocField(s, f, 'heavy-voices-noter', `#docsArea-${s.id}`));
-  }
+  DOC_AREAS.forEach(({ field, area }) => {
+    const el = document.getElementById(area(s.id));
+    if (el) el.innerHTML = docRow(s, field, 'heavy-voices-noter');
+  });
+  wireDocAreas(s);
   if (stamtextArea) {
     stamtextArea.innerHTML = renderLyricsArea(s);
     wireLyricsArea(s);
@@ -563,14 +576,16 @@ async function loadSongs() {
             <button type="button" class="btn-small btn-danger clearLyricsBtn" data-id="${s.id}">Ta bort sångtext</button>
           </details>
 
-          <h4 class="section-heading">Noter &amp; sångtext som fil</h4>
-          <div id="docsArea-${s.id}">${DOC_FIELDS.map(f => docRow(s, f, 'heavy-voices-noter')).join('')}</div>
-
-          <h4 class="section-heading">Stämtexter (per stämma)</h4>
+          <h4 class="section-heading">Sångtexter (dokument)</h4>
+          <p class="section-hint">Gemensam text för alla, och/eller en egen text per stämma. Medlemmarna kan öppna och ladda ner dem.</p>
+          <div id="commonLyricArea-${s.id}" class="common-lyric">${docRow(s, COMMON_LYRIC_FIELD, 'heavy-voices-noter')}</div>
           <div id="stamtextArea-${s.id}">${renderLyricsArea(s)}</div>
 
           <h4 class="section-heading">Stämfiler (ljud)</h4>
           <div id="stemsArea-${s.id}">${renderStemsArea(s)}</div>
+
+          <h4 class="section-heading">Noter</h4>
+          <div id="noterArea-${s.id}">${docRow(s, NOTER_FIELD, 'heavy-voices-noter')}</div>
 
           <button type="button" class="btn-danger btn-small deleteSongBtn" data-id="${s.id}" style="margin-top: 0.75rem;">Ta bort låt</button>
           <button type="button" class="btn-small closeDetailsBtn" data-id="${s.id}" style="margin-top: 0.75rem; margin-left: 0.5rem; background: transparent; border: 1px solid var(--border); color: var(--text);">OK / Stäng</button>
@@ -583,7 +598,7 @@ async function loadSongs() {
   songs.forEach(s => {
     wireStemsArea(s);
     wireLyricsArea(s);
-    DOC_FIELDS.forEach(f => wireDocField(s, f, 'heavy-voices-noter', `#docsArea-${s.id}`));
+    wireDocAreas(s);
   });
 
   document.querySelectorAll('.saveLyricsBtn').forEach(btn => {

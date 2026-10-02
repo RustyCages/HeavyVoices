@@ -228,7 +228,56 @@
     return out.getChannelData(0);
   }
 
-  const api = { analyze, toMono16k, rangeForLabel, midiToName, SR, HOP_SEC };
+  // Live-tonhöjd från mikrofon. read() returnerar MIDI (med decimaler) eller null.
+  // Läser senaste ~85 ms från en AnalyserNode, samplar om till 16 kHz och kör samma YIN.
+  function createLiveDetector(audioCtx, stream, opts = {}) {
+    const fmin = opts.fmin || 60, fmax = opts.fmax || 1300;
+    const tauMin = Math.max(2, Math.floor(SR / fmax));
+    const tauMax = Math.min(WIN - 1, Math.ceil(SR / fmin));
+    const need = WIN + tauMax + 1;
+    const src = audioCtx.createMediaStreamSource(stream);
+    const an = audioCtx.createAnalyser();
+    an.fftSize = 4096;
+    src.connect(an); // kopplas INTE till högtalarna
+    const raw = new Float32Array(an.fftSize);
+    const x = new Float32Array(need);
+    const d = new Float32Array(tauMax + 1);
+    const ratio = audioCtx.sampleRate / SR;
+    const recent = [];
+    return {
+      read() {
+        an.getFloatTimeDomainData(raw);
+        // ta de senaste 'need' samplen i 16 kHz (linjär interpolation + enkel medelvärdesbildning mot vikning)
+        const startPos = raw.length - 1 - (need - 1) * ratio;
+        if (startPos < 1) return null;
+        let s = 0;
+        for (let i = 0; i < need; i++) {
+          const p = startPos + i * ratio, k = Math.floor(p), f = p - k;
+          let v = raw[k] + (raw[k + 1] - raw[k]) * f;
+          if (ratio >= 2) v = (v + raw[k - 1] + raw[k + 1]) / 3;
+          x[i] = v; s += v * v;
+        }
+        const rms = Math.sqrt(s / need);
+        if (rms < (opts.gate || 0.008)) { recent.length = 0; return null; }
+        const r = yinFrame(x, 0, tauMin, tauMax, d);
+        if (!r || r.hz < fmin * 0.95 || r.hz > fmax * 1.05) { recent.length = 0; return null; }
+        let m = hzToMidi(r.hz);
+        // oktavhopp mot senaste värdena rättas, och lite utjämning (median av 3)
+        if (recent.length) {
+          const last = recent[recent.length - 1], diff = m - last;
+          if (Math.abs(Math.abs(diff) - 12) < 1) m -= Math.sign(diff) * 12;
+        }
+        recent.push(m); if (recent.length > 3) recent.shift();
+        return median(recent);
+      },
+      stop() {
+        try { src.disconnect(); } catch (e) {}
+        stream.getTracks().forEach(t => t.stop());
+      },
+    };
+  }
+
+  const api = { analyze, toMono16k, createLiveDetector, rangeForLabel, midiToName, SR, HOP_SEC };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PitchAnalyze = api;
 })(typeof window !== 'undefined' ? window : globalThis);

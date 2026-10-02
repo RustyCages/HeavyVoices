@@ -44,6 +44,14 @@
   .legend { display: inline-flex; align-items: center; gap: 0.35rem; }
   .swatch { display: inline-block; width: 18px; height: 8px; border-radius: 2px; }
   #loadingNote { color: var(--text-muted); }
+  .mic-btn.on { background: #ef4444; border-color: #ef4444; color: #fff; }
+  .mic-panel { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; align-items: baseline; margin-top: 0.75rem; padding: 0.7rem 0.9rem; border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(0,0,0,0.2); font-variant-numeric: tabular-nums; }
+  .mic-note { font-family: 'Roboto Condensed', sans-serif; font-size: 1.8rem; font-weight: 700; line-height: 1; min-width: 3.2rem; color: var(--text-muted); }
+  .mic-note.hit { color: #4ade80; } .mic-note.miss { color: #f87171; }
+  .mic-cents { font-size: 0.85rem; color: var(--text-muted); min-width: 9rem; }
+  .mic-score { font-size: 0.85rem; color: var(--text-muted); margin-left: auto; }
+  .mic-score b { color: var(--text); font-size: 1.05rem; }
+  .mic-tip { flex-basis: 100%; font-size: 0.78rem; color: var(--text-muted); }
 </style>
 </head>
 <body>
@@ -79,6 +87,14 @@
       <span class="time" id="curTime">0:00.0</span>
       <input type="range" id="scrubber" min="0" max="1" step="0.01" value="0">
       <span class="time" id="durTime">0:00</span>
+      <button class="btn-outline mic-btn" id="micBtn" title="Sjung med i mikrofonen">🎤 Sjung med</button>
+    </div>
+    <div class="mic-panel" id="micPanel" hidden>
+      <span class="mic-note" id="micNote">–</span>
+      <span class="mic-cents" id="micCents">Sjung en ton…</span>
+      <label class="hint" style="margin:0; display:inline-flex; gap:0.35rem; align-items:center;"><input type="checkbox" id="optOctave" checked style="width:auto; margin:0;"> Godkänn annan oktav</label>
+      <span class="mic-score">Träff <b id="micHit">–</b> · noter <b id="micNotes">–</b></span>
+      <span class="mic-tip">🎧 Använd hörlurar – annars hör mikrofonen stämljudet i högtalaren och "sjunger" med själv. Grönt = inom ±50 cent från noten.</span>
     </div>
     <div class="opts">
       <label><input type="checkbox" id="optStem" checked> Stämljud</label>
@@ -124,6 +140,12 @@ let loadToken = 0;
 let playing = false, startCtxTime = 0, startPos = 0, pausedPos = 0;
 let nodes = [];        // aktiva ljudnoder
 let raf = null;
+
+// sjung med (mikrofon)
+let mic = null;          // { det }
+let micRaf = null;
+let voice = [];          // [t, visad midi, status: 1 träff, 0 miss, -1 ingen not]
+let noteStats = [];      // per not: { hit, tot }
 
 // ---------- hjälpare ----------
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
@@ -284,6 +306,7 @@ async function analyzeAll() {
 function showStem(st) {
   stop();
   current = st;
+  voice = []; noteStats = []; if (mic) updateScore();
   pausedPos = 0;
   document.querySelectorAll('.pitch-row').forEach(r => r.classList.toggle('active', r === st.rowEl));
   const p = st.pitch, s = p.stats || {};
@@ -372,18 +395,24 @@ function drawRoll() {
 
   // noter
   const r = Math.min(6 * dpr, rowH / 2);
-  p.notes.forEach(n => {
+  p.notes.forEach((n, ni) => {
     if (n.t + n.d < t0 || n.t > t0 + span) return;
     const active = pos >= n.t && pos < n.t + n.d;
+    const ns = noteStats[ni];
     ctx.fillStyle = active ? 'rgba(229,169,104,0.7)' : 'rgba(229,169,104,0.28)';
     ctx.strokeStyle = ACCENT; ctx.lineWidth = 1 * dpr;
+    if (ns && ns.tot >= 3 && pos >= n.t + n.d) {
+      const ok = ns.hit / ns.tot >= 0.6;
+      ctx.fillStyle = ok ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.25)';
+      ctx.strokeStyle = ok ? '#4ade80' : '#f87171';
+    }
     ctx.beginPath();
     ctx.roundRect(x(n.t), y(n.n + 0.45), Math.max(2, n.d * pxs), rowH * 0.9, r);
     ctx.fill(); ctx.stroke();
   });
 
   // exakt kurva
-  ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5 * dpr;
+  ctx.strokeStyle = mic ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5 * dpr;
   ctx.beginPath();
   const i0 = Math.max(0, Math.floor(t0 / p.hop)), i1 = Math.min(p.midi.length, Math.ceil((t0 + span) / p.hop) + 1);
   let pen = false;
@@ -395,6 +424,19 @@ function drawRoll() {
     pen = true;
   }
   ctx.stroke();
+
+  // din röst (sjung med)
+  if (voice.length) {
+    ctx.lineWidth = 2.5 * dpr; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const col = { 1: '#4ade80', 0: '#f87171', '-1': 'rgba(147,197,253,0.9)' };
+    for (let i = 1; i < voice.length; i++) {
+      const a = voice[i - 1], b = voice[i];
+      if (b[0] < t0 || a[0] > t0 + span) continue;
+      if (a[1] == null || b[1] == null || b[0] - a[0] > 0.15) continue;
+      ctx.strokeStyle = col[b[2]];
+      ctx.beginPath(); ctx.moveTo(x(a[0]), y(a[1])); ctx.lineTo(x(b[0]), y(b[1])); ctx.stroke();
+    }
+  }
 
   // etiketter (C-rader) i vänsterkanten
   ctx.font = `${11 * dpr}px DM Sans, sans-serif`;
@@ -437,6 +479,7 @@ async function play() {
 
 function startAt(pos) {
   stopNodes();
+  if (mic) { voice = voice.filter(v => v[0] < pos - 0.05); recomputeStats(); }
   const when = audioCtx.currentTime + 0.06;
   startCtxTime = when; startPos = pos;
   if (document.getElementById('optStem').checked && current.buffer) {
@@ -500,7 +543,112 @@ function seek(pos) {
   if (playing) startAt(pos); else { pausedPos = pos; tick(); }
 }
 
+// ---------- sjung med ----------
+function micLatency() {
+  // tiden tills sångaren hör ljudet + halva analysfönstret
+  return (audioCtx.outputLatency || 0) + (audioCtx.baseLatency || 0) + 0.045;
+}
+
+function targetNoteIndex(t) {
+  const ns = current ? current.pitch.notes : [];
+  for (let i = 0; i < ns.length; i++) if (t >= ns[i].t && t < ns[i].t + ns[i].d) return i;
+  return -1;
+}
+
+function recomputeStats() {
+  noteStats = [];
+  voice.forEach(v => {
+    const i = targetNoteIndex(v[0]);
+    if (i < 0 || v[1] == null) return;
+    const s = noteStats[i] || (noteStats[i] = { hit: 0, tot: 0 });
+    s.tot++; if (v[2] === 1) s.hit++;
+  });
+  updateScore();
+}
+
+function updateScore() {
+  let hit = 0, tot = 0, done = 0, okNotes = 0;
+  const pos = position();
+  noteStats.forEach((s, i) => {
+    if (!s) return;
+    hit += s.hit; tot += s.tot;
+    const n = current.pitch.notes[i];
+    if (pos >= n.t + n.d && s.tot >= 3) { done++; if (s.hit / s.tot >= 0.6) okNotes++; }
+  });
+  document.getElementById('micHit').textContent = tot ? Math.round(100 * hit / tot) + '%' : '–';
+  document.getElementById('micNotes').textContent = done ? `${okNotes}/${done}` : '–';
+}
+
+function micStep() {
+  if (!mic) return;
+  const m = mic.det.read();
+  const noteEl = document.getElementById('micNote'), centsEl = document.getElementById('micCents');
+  const t = playing ? position() - micLatency() : null;
+  const ti = t != null ? targetNoteIndex(t) : -1;
+  const target = ti >= 0 ? current.pitch.notes[ti].n : null;
+  let shown = m, status = -1, cents = null;
+  if (m != null && target != null) {
+    let diff = m - target;
+    if (document.getElementById('optOctave').checked) { diff -= 12 * Math.round(diff / 12); shown = target + diff; }
+    cents = Math.round(diff * 100);
+    status = Math.abs(cents) <= 50 ? 1 : 0;
+  }
+  if (playing) {
+    voice.push([t, shown, status]);
+    if (ti >= 0 && m != null) {
+      const s = noteStats[ti] || (noteStats[ti] = { hit: 0, tot: 0 });
+      s.tot++; if (status === 1) s.hit++;
+    }
+    updateScore();
+  }
+  if (m == null) {
+    noteEl.textContent = target != null ? nm(target) : '–'; noteEl.className = 'mic-note';
+    centsEl.textContent = target != null ? 'Sjung ' + nm(target) : (playing ? 'Paus i stämman' : 'Sjung en ton…');
+  } else {
+    noteEl.textContent = nm(m);
+    noteEl.className = 'mic-note' + (status === 1 ? ' hit' : status === 0 ? ' miss' : '');
+    if (cents == null) centsEl.textContent = (Math.round((m - Math.round(m)) * 100) >= 0 ? '+' : '') + Math.round((m - Math.round(m)) * 100) + ' cent';
+    else if (status === 1) centsEl.textContent = Math.abs(cents) <= 10 ? 'Mitt i tonen ✓' : `${cents > 0 ? '+' : ''}${cents} cent`;
+    else centsEl.textContent = `${cents > 0 ? 'För högt' : 'För lågt'} – mål ${nm(target)}`;
+  }
+  if (!playing) tick();
+  micRaf = requestAnimationFrame(micStep);
+}
+
+async function toggleMic() {
+  if (mic) { stopMic(); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { toast('Webbläsaren saknar stöd för mikrofon (kräver https)'); return; }
+  await ensureCtx();
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+    });
+    mic = { det: PitchAnalyze.createLiveDetector(audioCtx, stream, { fmin: 60, fmax: 1300 }) };
+  } catch (e) {
+    toast(e && e.name === 'NotAllowedError'
+      ? 'Mikrofonen är blockerad. Tillåt den för heavyvoices.se i webbläsarens inställningar och försök igen.'
+      : 'Kunde inte starta mikrofonen: ' + (e.message || e), 6000);
+    return;
+  }
+  voice = []; noteStats = []; updateScore();
+  const b = document.getElementById('micBtn');
+  b.classList.add('on'); b.textContent = '🎤 Stäng av mick';
+  document.getElementById('micPanel').hidden = false;
+  cancelAnimationFrame(micRaf); micRaf = requestAnimationFrame(micStep);
+}
+
+function stopMic() {
+  if (mic) mic.det.stop();
+  mic = null;
+  cancelAnimationFrame(micRaf);
+  const b = document.getElementById('micBtn');
+  b.classList.remove('on'); b.textContent = '🎤 Sjung med';
+  document.getElementById('micPanel').hidden = true;
+  if (current) tick();
+}
+
 // ---------- händelser ----------
+document.getElementById('micBtn').addEventListener('click', toggleMic);
 document.getElementById('songSelect').addEventListener('change', e => loadSong(e.target.value));
 document.getElementById('analyzeAllBtn').addEventListener('click', analyzeAll);
 document.getElementById('playBtn').addEventListener('click', () => playing ? pause() : play());

@@ -184,6 +184,12 @@
   .k-pitch.up { color:#4ade80; }
   .k-pitch.down { color:#60a5fa; }
   .k-line.k-active .k-pitch { text-shadow:none; }
+  .k-seg.up { color:#4ade80; }
+  .k-seg.down { color:#60a5fa; }
+  .k-seg.other { opacity:0.75; }
+  .k-seg.mine { font-weight:800; text-decoration:underline; text-decoration-thickness:0.08em; text-underline-offset:0.18em; }
+  .k-seg-tag { font-size:0.5em; font-weight:700; vertical-align:super; margin-right:0.3em; padding:0 0.4em; border:1px solid currentColor; border-radius:0.6em; letter-spacing:0.04em; text-decoration:none; display:inline-block; }
+  .k-line.k-active .k-seg { text-shadow:none; }
   .k-line.k-intro { min-height:1.3em; }
   .k-line.k-active { color:var(--accent); opacity:1; transform:scale(1); text-shadow:0 0 18px rgba(229,169,104,0.35); }
   .k-line.k-past { opacity:0.2; }
@@ -1348,15 +1354,25 @@ function setPlayerSong(song) {
 }
 
 // Tonriktning som admin skrivit in i texten: ↑ = upp, ↓ = ned (se admin/text-synk.html)
-const pitchHtml = t => escapeHtml(t)
+// Stämmarkering: [ST↑]text[/] = sopran och tenor går upp i den texten. Egen stämma visas starkare.
+const SEG_RE = /\[([SATB]{1,4})([↑↓])\]([\s\S]*?)\[\/\]/g;
+function myVoiceLetter() {
+  const v = (typeof effectiveVoice === 'function' && playerSong && effectiveVoice(playerSong)) || voiceFromStamma(currentMember && currentMember.stamma);
+  return { sopran: 'S', alt: 'A', tenor: 'T', bas: 'B' }[v] || '';
+}
+const pitchHtml = (t, me = myVoiceLetter()) => escapeHtml(t)
+  .replace(SEG_RE, (m, v, d, inner) =>
+    `<span class="k-seg ${d === '↑' ? 'up' : 'down'} ${me && v.includes(me) ? 'mine' : 'other'}">` +
+    `<span class="k-seg-tag">${v.split('').join(' ')}${d === '↑' ? '&#8593;' : '&#8595;'}</span>${inner}</span>`)
   .replace(/↑/g, '<span class="k-pitch up" aria-label="upp">↑</span>')
   .replace(/↓/g, '<span class="k-pitch down" aria-label="ned">↓</span>');
 
 function buildKaraokeReel() {
   const reel = document.querySelector('#karaoke .k-reel');
   // Första elementet är en tom "intro"-rad så att första textraden väntar under mitten innan den börjar
+  const me = myVoiceLetter();
   reel.innerHTML = '<div class="k-line k-intro"></div>' + karaokeLines.map(l =>
-    l.text ? `<div class="k-line">${pitchHtml(l.text)}</div>` : '<div class="k-line k-pause">♪</div>'
+    l.text ? `<div class="k-line">${pitchHtml(l.text, me)}</div>` : '<div class="k-line k-pause">♪</div>'
   ).join('');
 }
 

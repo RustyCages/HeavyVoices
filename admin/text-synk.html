@@ -18,6 +18,16 @@
   .pitch-tools button { padding: 0.3rem 0.65rem; font-size: 0.85rem; background: transparent; border: 1px solid var(--border); color: var(--text); }
   .pitch-tools button[data-ch="↑"] { color: #4ade80; border-color: rgba(74,222,128,0.45); }
   .pitch-tools button[data-ch="↓"] { color: #60a5fa; border-color: rgba(96,165,250,0.45); }
+  /* Stämmarkering: [ST↑]text[/] – text där vissa stämmor går upp/ned */
+  .seg.up { color: #4ade80; }
+  .seg.down { color: #60a5fa; }
+  .seg-tag { font-size: 0.68em; font-weight: 700; vertical-align: super; margin-right: 0.25em; padding: 0 0.35em; border: 1px solid currentColor; border-radius: 0.6em; letter-spacing: 0.04em; }
+  .seg-tools { display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; align-items: center; margin: 0.4rem 0 0.6rem; font-size: 0.85rem; }
+  .seg-tools label { display: inline-flex; align-items: center; gap: 0.2rem; cursor: pointer; }
+  .seg-tools input { width: auto; margin: 0; accent-color: var(--accent); }
+  .seg-tools button { padding: 0.3rem 0.65rem; font-size: 0.85rem; background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .seg-tools button[data-dir="↑"] { color: #4ade80; border-color: rgba(74,222,128,0.45); }
+  .seg-tools button[data-dir="↓"] { color: #60a5fa; border-color: rgba(96,165,250,0.45); }
   .text-banner { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; padding: 0.8rem 1rem; margin-bottom: 1rem;
     border: 1px solid var(--accent); border-radius: 0.7rem; background: rgba(229,169,104,0.08); font-size: 0.9rem; }
   .text-banner span { flex: 1 1 260px; }
@@ -110,6 +120,12 @@
     <summary>Sångtext <span class="muted" id="textSummaryInfo"></span></summary>
     <p class="muted" style="margin: 0.6rem 0 0;">Klistra in eller skriv texten, eller läs in en fil (.docx, .txt, .pdf). Tom rad mellan stycken blir en valfri paus-rad i synken, och rubriker som "Vers 1" / "Refräng" hoppas över automatiskt.</p>
     <textarea id="lyricsText" placeholder="Sångtext, en rad per textrad..."></textarea>
+    <div class="seg-tools" data-for="lyricsText" title="Markera text först, välj stämmor och riktning">
+        <span class="muted">Stämmor går:</span>
+        <label><input type="checkbox" value="S">S</label><label><input type="checkbox" value="A">A</label><label><input type="checkbox" value="T">T</label><label><input type="checkbox" value="B">B</label>
+        <button type="button" data-dir="↑">↑ upp</button><button type="button" data-dir="↓">↓ ned</button>
+        <button type="button" data-clear="1">Ta bort markering</button>
+      </div>
     <div class="row-flex">
       <label class="btn btn-outline btn-small" style="margin: 0;">
         &#128196; Läs in fil
@@ -193,6 +209,7 @@
           <li><strong>Paus:</strong> tryck <kbd>Enter</kbd> (eller &#9834; Paus) när sången tar slut, t.ex. inför ett instrumentalt parti. Under uppspelning läggs pausen in med den tiden direkt under raden som just sjöngs, och markören står kvar på nästa textrad. När ljudet är pausat läggs pausen in under den markerade raden (tajma den sen med TAP). I spelaren släcks texten tills nästa rad börjar.</li>
           <li><strong>&#9834;+</strong> på en rad infogar en tom rad efter den i efterhand (tajma den sen genom att klicka på den och trycka TAP, eller skriv in tiden).</li>
           <li>Sänk tempot till 75 % om det går fort — tiderna blir ändå rätt.</li>
+          <li><strong>Stämmor som går upp/ned:</strong> markera texten (t.ex. refrängen), kryssa i stämmorna och tryck ↑ upp eller ↓ ned. Texten färgas och får en etikett, t.ex. <span class="seg up"><span class="seg-tag">S T&#8593;</span>Hurra</span>. Utan markering gäller det raden där markören står.</li>
           <li><strong>Tonriktning:</strong> skriv <span class="pitch up">↑</span> eller <span class="pitch down">↓</span> i texten där stämman går upp eller ned (knapparna ↑ upp / ↓ ned, eller Alt+pil). Pilarna visas i karaoken. Lägg dem i stämmans egen version om bara en stämma ska ha dem. Tider behålls när du bara lägger till pilar.</li>
         </ul>
       </details>
@@ -202,6 +219,12 @@
       <div id="editPanel" style="display: none;">
         <p class="muted">En rad per textrad. Tom rad = paus-rad. Tider behålls för rader som har samma text som förut.</p>
         <textarea id="editArea"></textarea>
+        <div class="seg-tools" data-for="editArea" title="Markera text först, välj stämmor och riktning">
+        <span class="muted">Stämmor går:</span>
+        <label><input type="checkbox" value="S">S</label><label><input type="checkbox" value="A">A</label><label><input type="checkbox" value="T">T</label><label><input type="checkbox" value="B">B</label>
+        <button type="button" data-dir="↑">↑ upp</button><button type="button" data-dir="↓">↓ ned</button>
+        <button type="button" data-clear="1">Ta bort markering</button>
+      </div>
         <div class="row-flex" style="margin-bottom: 0.5rem;">
           <span class="muted">Tonriktning:</span>
           <span class="pitch-tools" data-for="editArea" title="Infoga där markören står (Alt+↑ / Alt+↓)">
@@ -341,10 +364,52 @@ function buildLrc() {
 // ---------- Tonriktning (↑ upp / ↓ ned) ----------
 // Pilarna skrivs direkt i texten där tonen byter riktning. Vid jämförelse av rader
 // ignoreras pilarna, så att tider behålls när man bara lägger till/tar bort pilar.
-const bareText = t => String(t || '').replace(/[↑↓]/g, '').replace(/\s+/g, ' ').trim();
+// Stämmarkering i texten: [ST↑]text[/] = sopran och tenor går upp i den här texten.
+const SEG_RE = /\[([SATB]{1,4})([↑↓])\]([\s\S]*?)\[\/\]/g;
+const SEG_TAG_RE = /\[[SATB]{1,4}[↑↓]\]|\[\/\]/g;
+const VOICE_NAMES = { S: 'Sopran', A: 'Alt', T: 'Tenor', B: 'Bas' };
+const bareText = t => String(t || '').replace(SEG_TAG_RE, '').replace(/[↑↓]/g, '').replace(/\s+/g, ' ').trim();
+const segHtml = (v, d, inner) =>
+  `<span class="seg ${d === '↑' ? 'up' : 'down'}" title="${v.split('').map(c => VOICE_NAMES[c]).join(', ')} går ${d === '↑' ? 'upp' : 'ned'}">` +
+  `<span class="seg-tag">${v.split('').join(' ')}${d === '↑' ? '&#8593;' : '&#8595;'}</span>${inner}</span>`;
 const pitchHtml = t => esc(t)
+  .replace(SEG_RE, (m, v, d, inner) => segHtml(v, d, inner))
   .replace(/↑/g, '<span class="pitch up" title="Upp i ton">↑</span>')
   .replace(/↓/g, '<span class="pitch down" title="Ned i ton">↓</span>');
+
+// Markerar vald text (rad för rad) för valda stämmor, eller tar bort markeringen
+function applySegment(ta, voices, dir) {
+  let start = ta.selectionStart, end = ta.selectionEnd;
+  const v = ta.value;
+  if (start === end) {   // ingen markering → hela raden där markören står
+    start = v.lastIndexOf('\n', start - 1) + 1;
+    end = v.indexOf('\n', end); if (end === -1) end = v.length;
+  }
+  const sel = v.slice(start, end);
+  const out = sel.split('\n').map(line => {
+    const clean = line.replace(SEG_TAG_RE, '');
+    if (!dir) return clean;                      // ta bort markering
+    const m = clean.match(/^(\s*)(.*?)(\s*)$/);
+    return m[2] ? `${m[1]}[${voices}${dir}]${m[2]}[/]${m[3]}` : clean;
+  }).join('\n');
+  ta.setRangeText(out, start, end, 'select');
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  ta.focus();
+}
+function wireSegTools() {
+  document.querySelectorAll('.seg-tools').forEach(tools => {
+    const ta = $(tools.dataset.for);
+    tools.querySelectorAll('button').forEach(b => {
+      b.addEventListener('mousedown', e => e.preventDefault());   // behåll markeringen i textrutan
+      b.addEventListener('click', () => {
+        if (b.dataset.clear) { applySegment(ta, '', ''); return; }
+        const voices = [...tools.querySelectorAll('input:checked')].map(c => c.value).join('');
+        if (!voices) { toast('Kryssa i vilka stämmor (S A T B) det gäller'); return; }
+        applySegment(ta, voices, b.dataset.dir);
+      });
+    });
+  });
+}
 
 function insertAtCursor(ta, ch) {
   const start = ta.selectionStart ?? ta.value.length, end = ta.selectionEnd ?? start;
@@ -1081,6 +1146,7 @@ function refreshSongInList() {
   wireEvents();
   wireTextCard();
   wirePitchTools();
+  wireSegTools();
   $('applyTextChangeBtn').addEventListener('click', () => {
     rows = mergeRows(rowsFromPlain(plainOf()));
     undoStack.length = 0;

@@ -92,6 +92,13 @@
   .guide li::before { content: counter(g); width: 2rem; height: 2rem; border-radius: 50%; display: grid; place-items: center; background: rgba(229,169,104,0.15); color: var(--accent); font-weight: 700; font-family: 'Roboto Condensed', sans-serif; }
   .guide li b { display: block; color: var(--text); margin-bottom: 0.1rem; }
   .guide li p { margin: 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; }
+  .g-rec { margin: 0.9rem 0 0.4rem; padding: 0.8rem 1rem; border: 1px solid rgba(229,169,104,0.55); border-left: 4px solid var(--accent); border-radius: 0.6rem; background: rgba(229,169,104,0.1); font-size: 0.92rem; }
+  .g-rec > b { color: var(--accent); font-size: 1rem; }
+  .g-rec-steps { margin: 0.4rem 0 0 !important; padding-left: 1.2rem !important; display: block !important; list-style: decimal !important; }
+  .g-rec-steps li { display: list-item !important; margin: 0.25rem 0; color: var(--text); line-height: 1.5; }
+  .g-rec-steps li::before { content: none !important; }
+  .guide .g-rec-steps li b { display: inline; margin: 0; }
+  .g-strong { color: var(--accent); }
   .guide .g-h { margin: 1.4rem 0 0.25rem; font-size: 1rem; }
   .guide .g-p { margin: 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.55; }
   .guide .g-p b { color: var(--text); }
@@ -127,8 +134,15 @@
 
   <div class="card static guide" id="guide" hidden>
     <h2>Så funkar röstövningen</h2>
+    <div class="g-rec">
+      <b>⭐ Så får du bäst resultat</b>
+      <ol class="g-rec-steps">
+        <li>Välj <b>din stämma</b> (eller <b>Vocals</b>) som huvudspår under <em>Stämma</em> – <u>inte</u> backtracket. Det är huvudspåret som bestämmer vilka noter du ska sjunga.</li>
+        <li>Lägg sedan till <b>Backtrack</b> under <em>Lyssna → Spela med</em>, så sjunger du till kompet.</li>
+      </ol>
+    </div>
     <ol>
-      <li class="member-only"><div><b>Välj låt och stämma</b><p>Listan visar låtarna som går att öva på. Din egen stämma väljs automatiskt, men du kan byta till en annan.</p></div></li>
+      <li class="member-only"><div><b>Välj låt och stämma</b><p>Listan visar låtarna som går att öva på. Din egen stämma väljs automatiskt som huvudspår, men du kan byta till en annan stämma eller Vocals. Välj inte backtracket som huvudspår – lägg till det under <em>Spela med</em> i stället.</p></div></li>
       <li class="admin-only"><div><b>Välj låt</b><p>Listan visar låtar som har minst en sångstämma uppladdad.</p></div></li>
       <li class="admin-only"><div><b>Analysera stämmorna</b><p>Tryck <em>Analysera alla sångstämmor</em> (eller <em>Analysera</em> på en stämma). Sidan lyssnar igenom ljudfilen och räknar fram vilka toner som sjungs. Resultatet sparas direkt. Byts stämfilen ut visas ⚠ – analysera då igen.</p></div></li>
       <li class="admin-only"><div><b>Kontrollera resultatet</b><p>Tryck <em>Visa</em> och sedan ▶ med <em>Referenston</em> på. Följer pipet stämman är analysen bra. Ligger det backvocals i filen kan det bli extra noter där.</p></div></li>
@@ -148,7 +162,7 @@
           <dt>Referenston</dt>
           <dd>Ett enkelt pip som spelar exakt de noter du ser i notbanan. Bra för att höra tonerna tydligt, utan text och utan andra röster.</dd>
           <dt>Spela med</dt>
-          <dd>Knappar för låtens övriga spår – backtrack och de andra stämmorna. Tryck på en för att slå på den (den blir guldfärgad), tryck igen för att stänga av. Välj t.ex. <em>Backtrack</em> för att sjunga till kompet, eller alla stämmor för att öva som i kören.</dd>
+          <dd><b class="g-strong">Här lägger du till Backtrack</b> – huvudspåret ska vara din stämma eller Vocals. Knappar för låtens övriga spår – backtrack och de andra stämmorna. Tryck på en för att slå på den (den blir guldfärgad), tryck igen för att stänga av. Välj t.ex. <em>Backtrack</em> för att sjunga till kompet, eller alla stämmor för att öva som i kören.</dd>
         </dl>
       </section>
       <section class="g-set">

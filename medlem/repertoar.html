@@ -190,7 +190,7 @@
   .k-seg.mine { font-weight:800; text-decoration:underline; text-decoration-thickness:0.08em; text-underline-offset:0.18em; }
   .k-seg-tag { font-size:0.5em; font-weight:700; vertical-align:super; margin-right:0.3em; padding:0 0.4em; border:1px solid currentColor; border-radius:0.6em; letter-spacing:0.04em; text-decoration:none; display:inline-block; }
   .k-line.k-active .k-seg { text-shadow:none; }
-  .k-line.k-intro { min-height:1.3em; }
+  .k-line.k-intro, .k-line.k-gap { min-height:1.3em; }
   .k-line.k-active { color:var(--accent); opacity:1; transform:scale(1); text-shadow:0 0 18px rgba(229,169,104,0.35); }
   .k-line.k-past { opacity:0.2; }
   #karaoke.no-anim .k-reel, #karaoke.no-anim .k-line { transition:none; }
@@ -1372,7 +1372,10 @@ function buildKaraokeReel() {
   // Första elementet är en tom "intro"-rad så att första textraden väntar under mitten innan den börjar
   const me = myVoiceLetter();
   reel.innerHTML = '<div class="k-line k-intro"></div>' + karaokeLines.map(l =>
-    l.text ? `<div class="k-line">${pitchHtml(l.text, me)}</div>` : '<div class="k-line k-pause">♪</div>'
+    // "♪" = paus som admin lagt in (mellanspel/solo). Tom rad = radens visningstid är slut → visa ingenting.
+    l.text === '♪' ? '<div class="k-line k-pause">♪</div>'
+      : l.text ? `<div class="k-line">${pitchHtml(l.text, me)}</div>`
+      : '<div class="k-line k-gap"></div>'
   ).join('');
 }
 

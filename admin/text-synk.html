@@ -166,7 +166,7 @@
       <div>
         <h4>Bra att veta</h4>
         <ul>
-          <li>Efter en rads visningstid visas &#9834; i karaoken tills nästa rad börjar.</li>
+          <li>När en rads visningstid är slut släcks texten i karaoken. &#9834; visas bara där du lagt in en paus (&#9834;+ på en rad, eller <kbd>Enter</kbd> när ljudet är pausat) – t.ex. inför mellanspel och solon.</li>
           <li>Ändrar du sångtexten efteråt visas en banner – <em>Uppdatera raderna</em> behåller tiderna för oförändrade rader.</li>
           <li>Pilar och färgmarkeringar påverkar inte tiderna.</li>
           <li>Medlemmar ser sin egen stämmas version om den finns, annars den gemensamma. Den egna stämmans färgmarkeringar visas starkare.</li>
@@ -274,7 +274,7 @@
       <details class="help" style="margin-bottom: 0.75rem;">
         <summary>Detaljer om knapparna i listan</summary>
         <ul>
-          <li><strong>Håll inne</strong> <kbd>Mellanslag</kbd> (eller TAP) medan raden sjungs: nedtryckning = start, släpp = slut. Efter sluttiden visas &#9834; i karaoken. Ett snabbt tryck sätter bara starttid – då visas raden tills nästa börjar. Är ljudet pausat startar första trycket bara uppspelningen.</li>
+          <li><strong>Håll inne</strong> <kbd>Mellanslag</kbd> (eller TAP) medan raden sjungs: nedtryckning = start, släpp = slut. Efter sluttiden släcks raden i karaoken. Ett snabbt tryck sätter bara starttid – då visas raden tills nästa börjar. Är ljudet pausat startar första trycket bara uppspelningen.</li>
           <li><strong>Visningstid:</strong> rutan bredvid tiden visar hur länge raden syns (sekunder). Använd <strong>−/+</strong> (0,25 s per tryck) för att korta eller förlänga – det syns direkt i förhandsvisningen. Du kan också skriva in en tid, eller tömma rutan för att visa raden tills nästa börjar.</li>
           <li><kbd>Backsteg</kbd> ångrar senaste tryck. <kbd>P</kbd> spelar/pausar. <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> hoppar 3 s.</li>
           <li>Klicka på en rad för att flytta markören dit. Klicka på tiden för att skriva in den manuellt (t.ex. <code>1:23.45</code>).</li>
@@ -423,15 +423,19 @@ function parseLrc(lrc) {
       rest = rest.slice(m[0].length);
     }
     if (!tags.length) return; // metadata ([ti:], [ar:] ...) eller skräp
-    const text = rest.replace(/<\d+:\d+(?:\.\d+)?>/g, '').trim(); // strippa ev. ord-tider
-    tags.forEach(t => out.push({ text, time: t, skip: false }));
+    let text = rest.replace(/<\d+:\d+(?:\.\d+)?>/g, '').trim(); // strippa ev. ord-tider
+    // "♪" = manuellt inlagd paus (mellanspel/solo) – visas som paus-rad i editorn
+    const manualPause = text === '♪';
+    if (manualPause) text = '';
+    tags.forEach(t => out.push({ text, time: t, skip: false, manualPause }));
   });
   out.sort((a, b) => a.time - b.time);
   // En tom tidsrad direkt efter en textrad = textradens sluttid (visningstid)
   const folded = [];
   out.forEach(r => {
     const prev = folded[folded.length - 1];
-    if (!r.text && prev && prev.text && prev.end == null && r.time > prev.time) { prev.end = r.time; return; }
+    if (!r.text && !r.manualPause && prev && prev.text && prev.end == null && r.time > prev.time) { prev.end = r.time; return; }
+    delete r.manualPause;
     folded.push(r);
   });
   return folded;
@@ -442,8 +446,11 @@ function buildLrc() {
   const timed = rows.filter(r => !r.skip && r.time != null).slice().sort((a, b) => a.time - b.time);
   const head = [`[ti:${song.title}]`, `[by:Heavy Voices textsynk]`];
   const out = [];
+  const endMarker = rows.length && isPause(rows[rows.length - 1]) ? rows[rows.length - 1] : null;
   timed.forEach((r, k) => {
-    out.push(`[${fmtLrc(r.time)}]${r.text}`);
+    // Paus-rader som lagts in manuellt sparas som "♪" (visas i karaoken). Slutmarkören sparas tom (visas inte).
+    const text = r.text || (r === endMarker ? '' : '♪');
+    out.push(`[${fmtLrc(r.time)}]${text}`);
     if (r.text && r.end != null && r.end > r.time) {
       const next = timed[k + 1];
       if (!next || next.time - r.end >= MIN_GAP) out.push(`[${fmtLrc(r.end)}]`);
@@ -651,7 +658,7 @@ function updatePlaying() {
   const next = neighbour(idx, 1);
   $('preview').querySelector('.p-prev').innerHTML = prev ? pitchHtml(prev.text) : '';
   const ended = cur && cur.end != null && (audio.currentTime || 0) >= cur.end;
-  $('preview').querySelector('.p-cur').innerHTML = cur ? (cur.text && !ended ? pitchHtml(cur.text) : '♪') : '';
+  $('preview').querySelector('.p-cur').innerHTML = !cur ? '' : !cur.text ? '♪' : ended ? '' : pitchHtml(cur.text);
   $('preview').querySelector('.p-next').innerHTML = next ? pitchHtml(next.text) : '';
 
   // När allt är tajmat: följ uppspelningen i listan

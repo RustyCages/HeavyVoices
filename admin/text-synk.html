@@ -58,7 +58,7 @@
   /* Radlista */
   .lines { list-style: none; padding: 0; margin: 0; }
   .line {
-    display: grid; grid-template-columns: 6.2rem 3.6rem 1fr auto; gap: 0.6rem; align-items: center;
+    display: grid; grid-template-columns: 6.2rem 6.6rem 1fr auto; gap: 0.6rem; align-items: center;
     padding: 0.45rem 0.6rem; border-radius: 0.5rem; border: 1px solid transparent; cursor: pointer;
   }
   .line + .line { margin-top: 2px; }
@@ -75,6 +75,12 @@
   .line .d { width: 100%; margin: 0; padding: 0.25rem 0.3rem; font-size: 0.8rem; text-align: center; font-variant-numeric: tabular-nums; }
   .line .d.empty { color: var(--text-muted); }
   .line .d:disabled { opacity: 0.25; }
+  .dwrap { display: flex; align-items: center; gap: 0.15rem; }
+  .dwrap .d { flex: 1; min-width: 0; }
+  .dwrap button { flex: 0 0 auto; width: 1.7rem; height: 1.7rem; padding: 0; justify-content: center; font-size: 0.9rem;
+    background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); }
+  .dwrap button:hover { border-color: var(--accent); box-shadow: none; transform: none; }
+  .dwrap button:disabled { opacity: 0.25; }
   #tapBtn.holding { background: #4ade80; color: #111317; box-shadow: 0 0 0 3px rgba(74,222,128,0.3); }
   .line .txt { word-break: break-word; }
   .line .acts { display: flex; gap: 0.25rem; opacity: 0.55; }
@@ -98,7 +104,7 @@
   #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 999; display: none; }
 
   @media (max-width: 560px) {
-    .line { grid-template-columns: 5.2rem 3.4rem 1fr; }
+    .line { grid-template-columns: 5.2rem 6.4rem 1fr; }
     .line .acts { grid-column: 1 / -1; justify-content: flex-end; }
   }
 </style>
@@ -211,11 +217,11 @@
         <summary>Så funkar det / kortkommandon</summary>
         <ul>
           <li><strong>Håll inne</strong> <kbd>Mellanslag</kbd> (eller TAP) medan raden sjungs: nedtryckning = start, släpp = slut. Efter sluttiden visas &#9834; i karaoken. Ett snabbt tryck sätter bara starttid – då visas raden tills nästa börjar. Är ljudet pausat startar första trycket bara uppspelningen.</li>
-          <li><strong>Visningstid:</strong> rutan bredvid tiden visar hur länge raden syns (sekunder). Skriv in en egen tid för att korta eller förlänga visningen, eller töm rutan för att visa raden tills nästa börjar.</li>
+          <li><strong>Visningstid:</strong> rutan bredvid tiden visar hur länge raden syns (sekunder). Använd <strong>−/+</strong> (0,25 s per tryck) för att korta eller förlänga – det syns direkt i förhandsvisningen. Du kan också skriva in en tid, eller tömma rutan för att visa raden tills nästa börjar.</li>
           <li><kbd>Backsteg</kbd> ångrar senaste tryck. <kbd>P</kbd> spelar/pausar. <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> hoppar 3 s.</li>
           <li>Klicka på en rad för att flytta markören dit. Klicka på tiden för att skriva in den manuellt (t.ex. <code>1:23.45</code>).</li>
           <li><strong>&#9654;</strong> spelar från strax före raden, <strong>&minus;/+</strong> justerar 0,1 s, <strong>&#8856;</strong> hoppar över raden (t.ex. rubriker som "Refräng").</li>
-          <li><strong>Enter</strong> under uppspelning sätter sluttid på raden som just sjöngs (om du glömde hålla inne). När ljudet är pausat infogar Enter (eller &#9834; Paus) en tom paus-rad under den markerade raden.</li>
+          <li><strong>Enter</strong> eller <strong>&#9834; Slut här</strong> under uppspelning sätter sluttid på raden som sjungs just nu – bra för att justera i efterhand medan du lyssnar. När ljudet är pausat infogar Enter (eller &#9834; Paus) en tom paus-rad under den markerade raden.</li>
           <li><strong>&#9834;+</strong> på en rad infogar en tom rad efter den i efterhand (tajma den sen genom att klicka på den och trycka TAP, eller skriv in tiden).</li>
           <li>Sänk tempot till 75 % om det går fort — tiderna blir ändå rätt.</li>
           <li><strong>Stämmor som går upp/ned:</strong> markera texten (t.ex. refrängen), kryssa i stämmorna och tryck ↑ upp eller ↓ ned. Texten färgas och får en etikett, t.ex. <span class="seg up"><span class="seg-tag">S T&#8593;</span>Hurra</span>. Utan markering gäller det raden där markören står.</li>
@@ -496,8 +502,12 @@ function renderLines() {
     const label = isPause(r) ? (i === rows.length - 1 ? '♪ slut' : '♪ paus') : pitchHtml(r.text);
     return `<li class="${cls.join(' ')}" data-i="${i}">
       <input class="t ${r.time == null ? 'empty' : ''}" data-i="${i}" value="${r.time == null ? '' : fmt(r.time)}" placeholder="--:--">
-      <input class="d ${r.end == null ? 'empty' : ''}" data-i="${i}" value="${durText(r)}" placeholder="–" inputmode="decimal"
-        title="Visningstid i sekunder. Tomt = visas tills nästa rad börjar." ${isPause(r) ? 'disabled' : ''}>
+      <span class="dwrap">
+        <button type="button" data-act="dminus" data-i="${i}" title="Kortare visning (−0,25 s)" ${isPause(r) ? 'disabled' : ''}>&minus;</button>
+        <input class="d ${r.end == null ? 'empty' : ''}" data-i="${i}" value="${durText(r)}" placeholder="–" inputmode="decimal"
+          title="Visningstid i sekunder. Tomt = visas tills nästa rad börjar." ${isPause(r) ? 'disabled' : ''}>
+        <button type="button" data-act="dplus" data-i="${i}" title="Längre visning (+0,25 s)" ${isPause(r) ? 'disabled' : ''}>+</button>
+      </span>
       <span class="txt">${label}</span>
       <span class="acts">
         <button type="button" data-act="play" data-i="${i}" title="Spela från raden">&#9654;</button>
@@ -671,6 +681,17 @@ function release() {
 }
 // Enter under uppspelning: sätt sluttid på raden som just sjöngs
 function setEndOfLast() {
+  // Först: raden som spelas just nu (fungerar även när allt redan är tajmat och man spelar om)
+  const playing = activeIndexAt(audio.currentTime || 0);
+  const pr = playing >= 0 ? rows[playing] : null;
+  if (pr && pr.text && !pr.skip && pr.time != null && tapTime() > pr.time) {
+    undoStack.push({ type: 'end', i: playing, prevEnd: pr.end ?? null });
+    pr.end = tapTime();
+    setDirty(true);
+    renderLines(); setCursor(cursor, false);
+    toast('Sluttid satt');
+    return true;
+  }
   for (let j = Math.min(cursor, rows.length) - 1; j >= 0; j--) {
     const r = rows[j];
     if (r.skip || isPause(r) || r.time == null) continue;
@@ -717,8 +738,14 @@ function play() { audio.play().catch(err => toast('Kunde inte spela: ' + err.mes
 function togglePlay() { audio.paused ? play() : audio.pause(); }
 function seek(t) { audio.currentTime = Math.max(0, Math.min(t, audio.duration || t)); playingIdx = -2; }
 
-audio.addEventListener('play', () => { $('playBtn').innerHTML = '&#10074;&#10074; Paus'; updateProgress(); });
-audio.addEventListener('pause', () => { $('playBtn').innerHTML = '&#9654; Spela'; });
+audio.addEventListener('play', () => {
+  $('playBtn').innerHTML = '&#10074;&#10074; Paus'; updateProgress();
+  $('gapBtn').innerHTML = '&#9834; Slut här'; $('gapBtn').title = 'Enter — sätt sluttid på raden som sjungs nu';
+});
+audio.addEventListener('pause', () => {
+  $('playBtn').innerHTML = '&#9654; Spela';
+  $('gapBtn').innerHTML = '&#9834; Paus'; $('gapBtn').title = 'Enter — lägg in en paus (tom rad) under den markerade raden';
+});
 audio.addEventListener('loadedmetadata', () => { $('scrubber').max = audio.duration || 0; });
 
 function trackOptions() {
@@ -892,6 +919,20 @@ function wireEvents() {
           if (r.time != null) { seek(Math.max(0, r.time - 1.5)); play(); }
           else { setCursor(i); toast('Raden har ingen tid än'); }
           return;
+        case 'dminus': case 'dplus': {
+          if (r.time == null) { toast('Tajma raden först'); return; }
+          const DSTEP = 0.25;
+          // Utan sluttid: utgå från tiden fram till nästa rad (eller 3 s)
+          const nextStart = rows.slice(i + 1).find(x => !x.skip && x.time != null && x.time > r.time);
+          const base = r.end != null ? r.end : (nextStart ? nextStart.time : r.time + 3);
+          const prevEnd = r.end ?? null;
+          r.end = +Math.max(r.time + DSTEP, base + (btn.dataset.act === 'dplus' ? DSTEP : -DSTEP)).toFixed(2);
+          undoStack.push({ type: 'end', i, prevEnd });
+          const d = list.children[i].querySelector('.d');
+          d.value = durText(r); d.classList.remove('empty');
+          setDirty(true); playingIdx = -2; updatePlaying();
+          return;
+        }
         case 'minus': case 'plus':
           if (r.time == null) return;
           { const old = r.time;

@@ -94,10 +94,10 @@
       <span class="mic-cents" id="micCents">Sjung en ton…</span>
       <label class="hint" style="margin:0; display:inline-flex; gap:0.35rem; align-items:center;"><input type="checkbox" id="optOctave" checked style="width:auto; margin:0;"> Godkänn annan oktav</label>
       <span class="mic-score">Träff <b id="micHit">–</b> · noter <b id="micNotes">–</b></span>
-      <span class="mic-tip">🎧 Använd hörlurar – annars hör mikrofonen stämljudet i högtalaren och "sjunger" med själv. Grönt = inom ±50 cent från noten.</span>
+      <span class="mic-tip">🎧 Använd hörlurar – annars hör mikrofonen ljudet från högtalaren och "sjunger" med själv. Grönt = inom ±50 cent från noten.</span>
     </div>
     <div class="opts">
-      <label><input type="checkbox" id="optStem" checked> Stämljud</label>
+      <label><input type="checkbox" id="optStem" checked> <span id="optStemLabel">Stämljud</span></label>
       <label><input type="checkbox" id="optTone" checked> Referenston</label>
       <label>Zoom <select id="optZoom">
         <option value="5">5 s</option>
@@ -108,6 +108,7 @@
       <span class="legend"><span class="swatch" style="background: rgba(229,169,104,0.35); border: 1px solid var(--accent);"></span> noter</span>
       <span class="legend"><span class="swatch" style="background: #fff; height: 2px;"></span> exakt tonkurva</span>
     </div>
+    <div class="opts" id="withRow" hidden></div>
   </div>
 </div>
 
@@ -142,6 +143,7 @@ let nodes = [];        // aktiva ljudnoder
 let raf = null;
 
 // sjung med (mikrofon)
+let playWith = new Set(); // andra spår som spelas med (nycklar), behålls när man byter stämma
 let mic = null;          // { det }
 let micRaf = null;
 let voice = [];          // [t, visad midi, status: 1 träff, 0 miss, -1 ingen not]
@@ -307,6 +309,7 @@ function showStem(st) {
   stop();
   current = st;
   voice = []; noteStats = []; if (mic) updateScore();
+  renderWithRow();
   pausedPos = 0;
   document.querySelectorAll('.pitch-row').forEach(r => r.classList.toggle('active', r === st.rowEl));
   const p = st.pitch, s = p.stats || {};
@@ -473,7 +476,8 @@ function loop() { tick(); if (playing) raf = requestAnimationFrame(loop); }
 async function play() {
   if (!current) return;
   await ensureCtx();
-  try { await loadBuffer(current); } catch (e) { toast('Kunde inte ladda ljudet: ' + (e.message || e)); return; }
+  const extra = stems.filter(st => st !== current && playWith.has(st.key));
+  try { await Promise.all([current, ...extra].map(loadBuffer)); } catch (e) { toast('Kunde inte ladda ljudet: ' + (e.message || e)); return; }
   startAt(pausedPos >= durationOf() ? 0 : pausedPos);
 }
 
@@ -489,6 +493,20 @@ function startAt(pos) {
     src.start(when, pos);
     nodes.push(src);
   }
+  // andra spår: placeras på samma tidslinje via stämsynkens förskjutningar (songs.stem_offsets, ms)
+  const offs = song.stem_offsets || {};
+  const offCur = (Number(offs[current.key]) || 0) / 1000;
+  stems.forEach(st => {
+    if (st === current || !playWith.has(st.key) || !st.buffer) return;
+    const inFile = pos + offCur - (Number(offs[st.key]) || 0) / 1000;
+    if (inFile >= st.buffer.duration) return;
+    const src = audioCtx.createBufferSource();
+    src.buffer = st.buffer;
+    const g = audioCtx.createGain(); g.gain.value = 0.85;
+    src.connect(g); g.connect(audioCtx.destination);
+    if (inFile >= 0) src.start(when, inFile); else src.start(when - inFile, 0);
+    nodes.push(src, g);
+  });
   if (document.getElementById('optTone').checked) scheduleTones(when, pos);
   playing = true;
   document.getElementById('playBtn').textContent = '⏸';
@@ -541,6 +559,27 @@ function stop(keepPos) {
 function seek(pos) {
   pos = Math.max(0, Math.min(pos, durationOf()));
   if (playing) startAt(pos); else { pausedPos = pos; tick(); }
+}
+
+// ---------- spela med andra spår ----------
+function renderWithRow() {
+  const row = document.getElementById('withRow');
+  document.getElementById('optStemLabel').textContent = current.label;
+  const others = stems.filter(st => st !== current);
+  row.hidden = !others.length;
+  row.innerHTML = '<span>Spela med:</span>' + others.map(st =>
+    `<label><input type="checkbox" data-key="${esc(st.key)}" ${playWith.has(st.key) ? 'checked' : ''}> ${esc(st.label)}</label>`).join('');
+  row.querySelectorAll('input').forEach(inp => inp.addEventListener('change', async () => {
+    const st = stems.find(x => x.key === inp.dataset.key);
+    if (inp.checked) playWith.add(st.key); else playWith.delete(st.key);
+    if (inp.checked && !st.buffer) {
+      const lbl = inp.parentElement, txt = lbl.lastChild;
+      txt.textContent = ' ' + st.label + ' (laddar…)';
+      try { await loadBuffer(st); } catch (e) { toast('Kunde inte ladda ' + st.label + ': ' + (e.message || e)); }
+      txt.textContent = ' ' + st.label;
+    }
+    if (playing) startAt(position());
+  }));
 }
 
 // ---------- sjung med ----------

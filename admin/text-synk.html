@@ -444,7 +444,9 @@ function parseLrc(lrc) {
 const MIN_GAP = 0.3;
 function buildLrc() {
   const timed = rows.filter(r => !r.skip && r.time != null).slice().sort((a, b) => a.time - b.time);
-  const head = [`[ti:${song.title}]`, `[by:Heavy Voices textsynk]`];
+  // hv-text = fingeravtryck av sångtexten synken gjordes mot (för "texten har ändrats"-bannern).
+  // Metadata utan tid – ignoreras av spelaren.
+  const head = [`[ti:${song.title}]`, `[by:Heavy Voices textsynk]`, `[hv-text:${textHash(plainOf())}]`];
   const out = [];
   const endMarker = rows.length && isPause(rows[rows.length - 1]) ? rows[rows.length - 1] : null;
   timed.forEach((r, k) => {
@@ -529,13 +531,29 @@ function wirePitchTools() {
   });
 }
 
-// Visar bannern om den sparade synken har annan text än Sångtext
+function textHash(t) {
+  const str = String(t || '').replace(/\r/g, '').trim();
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+// Visar bannern om Sångtext har ändrats sedan synken sparades.
+// Överhoppade (⊘) och otajmade rader räknas inte som ändringar.
 function checkTextChanged() {
   const banner = $('textChangedBanner');
-  if (!song || !lrcOf() || banner.dataset.ignored === '1' || dirty) { banner.hidden = true; return; }
-  const synced = parseLrc(lrcOf()).filter(r => r.text).map(r => r.text.trim());
-  const plain = rowsFromPlain(plainOf()).filter(r => r.text && !r.skip).map(r => r.text.trim());
-  banner.hidden = plain.length === 0 || JSON.stringify(synced) === JSON.stringify(plain);
+  const lrc = lrcOf();
+  if (!song || !lrc || banner.dataset.ignored === '1' || dirty || !plainOf()) { banner.hidden = true; return; }
+  const m = lrc.match(/\[hv-text:([a-z0-9]+)\]/);
+  let changed;
+  if (m) {
+    changed = m[1] !== textHash(plainOf());
+  } else {
+    // Äldre synk utan fingeravtryck: ändrat om någon synkad rad inte längre finns i texten
+    const plainLines = new Set(rowsFromPlain(plainOf()).filter(r => r.text).map(r => r.text.trim()));
+    changed = parseLrc(lrc).some(r => r.text && !plainLines.has(r.text.trim()));
+  }
+  banner.hidden = !changed;
 }
 
 function rowsFromPlain(plain) {

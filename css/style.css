@@ -24,6 +24,11 @@ color-scheme: dark;
 box-sizing: border-box;
 }
 
+/* hidden-attributet ska alltid dölja, även om elementet har display: flex/grid/inline-flex */
+[hidden] {
+display: none !important;
+}
+
 /* --- Grundläggande Layout & Typografi --- */
 body {
 margin: 0;

@@ -1,0 +1,389 @@
+
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Heavy Voices Röstövning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: en "skärm" ur medlemsspelaren (notbana + stämapparat) ovanför en rad som förklarar stegen. Heavy Voices egna färger, medvetet bara mörkt tema. */
+:root {
+  --bg: #121418;
+  --panel: #1a1e26;
+  --panel-2: #222733;
+  --text: #f3f4f6;
+  --muted: #9ca3af;
+  --line: rgba(255,255,255,0.08);
+  --accent: #E5A968;
+  --hit: #4ade80;
+  --miss: #f87171;
+  --display: 'Roboto Condensed', 'Arial Narrow', sans-serif;
+  --body: 'DM Sans', system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--text); }
+body {
+  font-family: var(--body);
+  background: radial-gradient(circle at 50% 0%, #1d222e 0%, var(--bg) 70%) fixed;
+  padding-inline: 16px;
+  padding-block: 28px 40px;
+  line-height: 1.5;
+}
+.wrap { max-width: 1000px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: grid; gap: 4px; }
+.brand { font-family: var(--display); font-size: 0.8rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--display); font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 0; line-height: 1.1; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 62ch; }
+
+.player { background: linear-gradient(145deg, rgba(30,34,43,0.95), rgba(22,25,32,0.98)); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; box-shadow: 0 18px 40px -16px rgba(0,0,0,0.7); }
+.ptop { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.song { min-width: 0; }
+.song b { font-family: var(--display); font-size: 1.15rem; display: block; }
+.song span { color: var(--muted); font-size: 0.85rem; }
+.parts { display: flex; gap: 6px; flex-wrap: wrap; }
+.parts button { font: 500 0.82rem var(--body); color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.parts button[aria-pressed="true"] { color: #111317; background: var(--accent); border-color: var(--accent); }
+.parts button:focus-visible, .ctrl button:focus-visible, .ctrl label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.stage { position: relative; }
+canvas { display: block; width: 100%; height: 340px; }
+.tuner { position: absolute; top: 12px; right: 14px; display: grid; justify-items: end; gap: 2px; pointer-events: none; }
+.tuner .note { font-family: var(--display); font-size: 2.2rem; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tuner .cents { font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tuner .note.hit { color: var(--hit); } .tuner .note.miss { color: var(--miss); } .tuner .note.idle { color: var(--muted); }
+.lyric { padding: 12px 18px 4px; min-height: 2.4em; font-family: var(--display); font-size: 1.35rem; text-align: center; }
+.lyric .past { color: var(--accent); } .lyric .future { color: rgba(255,255,255,0.35); }
+
+.ctrl { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 18px 16px; border-top: 1px solid var(--line); }
+.ctrl .play { font: 700 0.95rem var(--body); background: var(--accent); color: #111317; border: 0; border-radius: 999px; padding: 10px 20px; cursor: pointer; }
+.ctrl label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 0.88rem; cursor: pointer; }
+.ctrl input { accent-color: var(--accent); }
+.score { margin-left: auto; display: flex; gap: 16px; font-variant-numeric: tabular-nums; font-size: 0.88rem; color: var(--muted); }
+.score b { color: var(--text); font-size: 1.1rem; font-family: var(--display); }
+
+.steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; list-style: none; padding: 0; margin: 0; }
+.steps li { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 4px; align-content: start; transition: border-color .3s, background .3s; }
+.steps li.on { border-color: rgba(229,169,104,0.5); background: var(--panel-2); }
+.steps .k { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+.steps h3 { margin: 0; font-family: var(--display); font-size: 1.05rem; }
+.steps p { margin: 0; color: var(--muted); font-size: 0.86rem; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 0.82rem; }
+.legend i { display: inline-block; width: 18px; height: 9px; border-radius: 3px; vertical-align: middle; margin-right: 6px; }
+.note-foot { color: var(--muted); font-size: 0.8rem; margin: 0; }
+
+@media (max-width: 760px) {
+  .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  canvas { height: 280px; }
+  .score { margin-left: 0; width: 100%; }
+}
+@media (max-width: 420px) { .steps { grid-template-columns: 1fr; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">Heavy Voices · Röstövning</div>
+    <h1>Sjung din stämma mot notbanan</h1>
+    <p class="lede">Så här är övningsläget tänkt i medlemsspelaren. Noterna rullar förbi i takt med låten, mikrofonen visar var din röst ligger, och det du träffar blir grönt. I demon sjunger en simulerad korist, med några medvetna miss.</p>
+  </header>
+
+  <section class="player" aria-label="Demo av övningsläget">
+    <div class="ptop">
+      <div class="song"><b>Demolåt – Rösterna bär</b><span id="partInfo">Tenor · omfång A3–E4</span></div>
+      <div class="parts" role="group" aria-label="Välj stämma">
+        <button type="button" data-p="Sopran" data-t="12" aria-pressed="false">Sopran</button>
+        <button type="button" data-p="Alt" data-t="7" aria-pressed="false">Alt</button>
+        <button type="button" data-p="Tenor" data-t="0" aria-pressed="true">Tenor</button>
+        <button type="button" data-p="Bas" data-t="-12" aria-pressed="false">Bas</button>
+      </div>
+    </div>
+    <div class="stage">
+      <canvas id="roll" aria-label="Notbana där noterna rullar från höger till vänster mot ett spelhuvud"></canvas>
+      <div class="tuner" aria-live="off">
+        <div class="note idle" id="tNote">–</div>
+        <div class="cents" id="tCents">väntar på ton</div>
+      </div>
+    </div>
+    <div class="lyric" id="lyric" aria-live="polite"></div>
+    <div class="ctrl">
+      <button type="button" class="play" id="soundBtn">▶ Slå på ljud</button>
+      <label><input type="checkbox" id="optRef" checked> Referenston</label>
+      <label><input type="checkbox" id="optVoice" checked> Demo-röst</label>
+      <div class="score">
+        <span>Träff <b id="sHit">0%</b></span>
+        <span>Noter klara <b id="sNotes">0/0</b></span>
+      </div>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span><i style="background: rgba(229,169,104,0.35); border: 1px solid var(--accent);"></i>noter att sjunga</span>
+    <span><i style="background: var(--hit);"></i>träff (inom ±50 cent)</span>
+    <span><i style="background: var(--miss);"></i>miss</span>
+    <span><i style="background: #fff; height: 2px;"></i>din röst</span>
+  </div>
+
+  <ol class="steps" id="steps">
+    <li data-s="0"><span class="k">Admin</span><h3>Tonkurvan tas fram</h3><p>Stämfilen analyseras i Tonkurvor (eller noter importeras från MIDI) och sparas per stämma.</p></li>
+    <li data-s="1"><span class="k">Medlem</span><h3>Notbanan rullar</h3><p>Välj stämma i spelaren. Noterna glider mot spelhuvudet i takt med ljudet, texten följer med under.</p></li>
+    <li data-s="2"><span class="k">Mikrofon</span><h3>Din röst ritas live</h3><p>Den vita linjen är du. Stämapparaten uppe till höger visar ton och hur många cent du ligger fel.</p></li>
+    <li data-s="3"><span class="k">Feedback</span><h3>Grönt när du träffar</h3><p>Noterna fylls grönt eller rött medan du sjunger, och du får en träffprocent per genomsjungning.</p></li>
+  </ol>
+  <p class="note-foot">Demon simulerar sången, eftersom mikrofonen inte går att använda på den här sidan. I riktiga spelaren används mikrofonen i telefonen eller datorn.</p>
+</div>
+
+<script>
+(() => {
+  // ---- melodi (tenorläge, MIDI) med text — originalfras skriven för demon ----
+  const BASE = [
+    // [start s, längd s, midi, stavelse]
+    [0.0, 0.5, 57, 'Vi'], [0.5, 0.5, 59, 'står'], [1.0, 0.5, 60, 'på'], [1.5, 1.0, 62, 'scen'],
+    [2.6, 0.5, 64, 'i'], [3.1, 1.2, 62, 'kväll,'],
+    [4.6, 0.5, 60, 'och'], [5.1, 0.5, 59, 'rös-'], [5.6, 0.5, 60, 'ter-'], [6.1, 1.0, 62, 'na'],
+    [7.2, 0.5, 60, 'bär'], [7.7, 0.5, 59, 'oss'], [8.2, 1.6, 57, 'fram.'],
+  ];
+  const LINES = [[0, 6], [6, 13]];
+  const LOOP = 11.5, LEAD = 1.5; // sekunder per varv, inräkning före första ton
+  // Simulerad sångare: små glid in i tonen, vibrato, och några medvetna fel
+  const FLAT = new Set([9]);        // sjungs en halvton för lågt
+  const LATE = new Set([4]);        // kommer in sent
+  const SHARP_END = new Set([12]);  // drar uppåt i slutet
+  const NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const nm = m => NAMES[((Math.round(m) % 12) + 12) % 12] + (Math.floor(Math.round(m) / 12) - 1);
+  const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+
+  let transpose = 0, partName = 'Tenor';
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const canvas = document.getElementById('roll');
+  const ctx = canvas.getContext('2d');
+  const tNote = document.getElementById('tNote'), tCents = document.getElementById('tCents');
+  const lyricEl = document.getElementById('lyric');
+  const steps = [...document.querySelectorAll('#steps li')];
+
+  let notes = [];
+  function buildNotes() {
+    notes = BASE.map(([t, d, m, syl], i) => ({ t: t + LEAD, d, n: m + transpose, syl, i, hits: [], done: false }));
+  }
+  buildNotes();
+
+  function singerPitch(t) {
+    // returnerar sungen ton (MIDI, med decimaler) eller null
+    for (const n of notes) {
+      let start = n.t + (LATE.has(n.i) ? 0.22 : 0.03), end = n.t + n.d - 0.04;
+      if (t < start || t > end) continue;
+      const into = t - start;
+      const prev = notes[n.i - 1];
+      let target = n.n + (FLAT.has(n.i) ? -0.9 : 0);
+      if (SHARP_END.has(n.i) && into > n.d * 0.6) target += Math.min(0.85, (into - n.d * 0.6) * 1.6);
+      let p = target;
+      if (prev && n.t - (prev.t + prev.d) < 0.15) { // legato: glid från föregående ton
+        const g = Math.min(1, into / 0.09);
+        p = prev.n + (target - prev.n) * (1 - Math.pow(1 - g, 3));
+      } else if (into < 0.06) p = target - 0.35 * (1 - into / 0.06);
+      const vib = into > 0.35 ? 0.18 * Math.sin(2 * Math.PI * 5.4 * t) : 0.04 * Math.sin(2 * Math.PI * 7 * t);
+      return p + vib + 0.04 * Math.sin(t * 23.7);
+    }
+    return null;
+  }
+
+  // ---- canvas ----
+  let W = 0, H = 0, dpr = 1;
+  function size() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = canvas.width = Math.round(canvas.clientWidth * dpr);
+    H = canvas.height = Math.round(canvas.clientHeight * dpr);
+  }
+  size();
+  addEventListener('resize', () => { size(); draw(clock); });
+
+  const SPAN = () => (W / dpr < 520 ? 5 : 7.5); // sekunder synliga
+  const HEAD = 0.3;                             // spelhuvudets läge (andel av bredd)
+  const trail = []; // [t, midi]
+
+  function yRange() {
+    const ms = notes.map(n => n.n);
+    return [Math.min(...ms) - 3, Math.max(...ms) + 3];
+  }
+
+  function draw(t) {
+    const span = SPAN(), t0 = t - span * HEAD, pxs = W / span;
+    const [lo, hi] = yRange(), rowH = H / (hi - lo);
+    const x = s => (s - t0) * pxs, y = m => H - (m - lo) * rowH;
+    ctx.clearRect(0, 0, W, H);
+
+    for (let m = Math.ceil(lo); m < hi; m++) {
+      const pc = ((m % 12) + 12) % 12;
+      if ([1, 3, 6, 8, 10].includes(pc)) { ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(0, y(m + 0.5), W, rowH); }
+      if (pc === 0) { ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, Math.round(y(m - 0.5)), W, 1); }
+    }
+    // taktslag (var 0.5 s)
+    ctx.fillStyle = 'rgba(255,255,255,0.045)';
+    for (let s = Math.ceil(t0 * 2) / 2; s < t0 + span; s += 0.5) ctx.fillRect(Math.round(x(s)), 0, 1, H);
+
+    const r = Math.min(7 * dpr, rowH * 0.45);
+    for (const n of notes) {
+      const nx = x(n.t), nw = n.d * pxs;
+      if (nx > W || nx + nw < 0) continue;
+      const top = y(n.n + 0.45), h = rowH * 0.9;
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(nx, top, nw, h, r); ctx.clip();
+      ctx.fillStyle = 'rgba(229,169,104,0.22)'; ctx.fillRect(nx, top, nw, h);
+      // fyll träff/miss bakom spelhuvudet
+      const seg = 1 / 60;
+      for (const [ht, ok] of n.hits) {
+        ctx.fillStyle = ok ? 'rgba(74,222,128,0.85)' : 'rgba(248,113,113,0.75)';
+        ctx.fillRect(x(ht) - 0.5, top, seg * pxs + 1, h);
+      }
+      ctx.restore();
+      ctx.lineWidth = 1.2 * dpr;
+      ctx.strokeStyle = n.done ? (score(n) >= 0.6 ? '#4ade80' : '#f87171') : '#E5A968';
+      ctx.beginPath(); ctx.roundRect(nx, top, nw, h, r); ctx.stroke();
+      if (nw > 26 * dpr) {
+        ctx.font = `500 ${11 * dpr}px DM Sans, sans-serif`;
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(n.syl, nx + 6 * dpr, top + h / 2, nw - 8 * dpr);
+      }
+    }
+
+    // din röst: spår
+    ctx.lineWidth = 2.2 * dpr; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    let pen = false;
+    ctx.beginPath();
+    for (let i = 0; i < trail.length; i++) {
+      const [tt, m] = trail[i];
+      if (m == null || tt < t0) { pen = false; continue; }
+      const px = x(tt), py = y(m);
+      if (pen) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+      pen = true;
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.stroke();
+
+    // etiketter
+    ctx.font = `${11 * dpr}px DM Sans, sans-serif`; ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.textBaseline = 'middle';
+    for (let m = Math.ceil(lo); m < hi; m++) if (((m % 12) + 12) % 12 === 0) ctx.fillText(nm(m), 8 * dpr, y(m));
+
+    // spelhuvud
+    const hx = Math.round(x(t));
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, 'rgba(255,255,255,0)'); grad.addColorStop(0.5, 'rgba(255,255,255,0.55)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad; ctx.fillRect(hx - dpr, 0, 2 * dpr, H);
+    const cur = trail.length ? trail[trail.length - 1][1] : null;
+    if (cur != null) {
+      const target = notes.find(n => t >= n.t && t < n.t + n.d);
+      const ok = target && Math.abs(cur - target.n) <= 0.5;
+      ctx.beginPath(); ctx.arc(hx, y(cur), 7 * dpr, 0, Math.PI * 2);
+      ctx.fillStyle = ok ? '#4ade80' : (target ? '#f87171' : '#ffffff');
+      ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 14 * dpr; ctx.fill(); ctx.shadowBlur = 0;
+    }
+  }
+
+  function score(n) { return n.hits.length ? n.hits.filter(h => h[1]).length / n.hits.length : 0; }
+
+  function updateHud(t, cur) {
+    const target = notes.find(n => t >= n.t && t < n.t + n.d);
+    if (cur == null) { tNote.textContent = target ? nm(target.n) : '–'; tNote.className = 'note idle'; tCents.textContent = target ? 'sjung ' + nm(target.n) : 'väntar på ton'; }
+    else {
+      const ref = target ? target.n : Math.round(cur);
+      const c = Math.round((cur - ref) * 100);
+      const ok = target && Math.abs(c) <= 50;
+      tNote.textContent = nm(cur);
+      tNote.className = 'note ' + (target ? (ok ? 'hit' : 'miss') : 'idle');
+      tCents.textContent = target ? (Math.abs(c) <= 50 ? (Math.abs(c) <= 10 ? 'mitt i tonen' : `${c > 0 ? '+' : ''}${c} cent`) : `${c > 0 ? 'för högt' : 'för lågt'} · mål ${nm(target.n)}`) : '';
+    }
+    // text
+    const li = t < notes[LINES[1][0]].t - 0.4 ? 0 : 1;
+    const [a, b] = LINES[li];
+    lyricEl.innerHTML = notes.slice(a, b).map(n => `<span class="${t >= n.t ? 'past' : 'future'}">${n.syl.replace(/-$/, '')}</span>`)
+      .reduce((s, w, k) => s + (k && !notes[a + k - 1].syl.endsWith('-') ? ' ' : '') + w, '');
+    // poäng
+    const all = notes.flatMap(n => n.hits);
+    document.getElementById('sHit').textContent = all.length ? Math.round(100 * all.filter(h => h[1]).length / all.length) + '%' : '0%';
+    document.getElementById('sNotes').textContent = `${notes.filter(n => n.done).length}/${notes.length}`;
+    // steg
+    const phase = t < LEAD ? 1 : (all.length < 25 ? 2 : 3);
+    steps.forEach((el, i) => el.classList.toggle('on', i === phase || (t < 0.8 && i === 0)));
+  }
+
+  // ---- klocka & loop ----
+  let clock = 0, last = performance.now(), loopStart = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    clock += dt;
+    if (clock >= LOOP) restart();
+    const cur = singerPitch(clock);
+    trail.push([clock, cur]);
+    while (trail.length && trail[0][0] < clock - 8) trail.shift();
+    const target = notes.find(n => clock >= n.t && clock < n.t + n.d);
+    if (target && cur != null) target.hits.push([clock, Math.abs(cur - target.n) <= 0.5]);
+    notes.forEach(n => { if (!n.done && clock >= n.t + n.d) n.done = true; });
+    draw(clock); updateHud(clock, cur); updateAudio(cur);
+    requestAnimationFrame(frame);
+  }
+  function restart() {
+    clock = 0; trail.length = 0; buildNotes(); scheduleRef();
+  }
+
+  // ---- ljud (startas av knapp) ----
+  let ac = null, voiceOsc = null, voiceGain = null, refBus = null, refNodes = [], soundOn = false, ctxAtClock0 = 0;
+  const btn = document.getElementById('soundBtn');
+  btn.addEventListener('click', async () => {
+    if (!soundOn) {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      await ac.resume();
+      if (!voiceOsc) {
+        const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 3;
+        voiceOsc = ac.createOscillator(); voiceOsc.type = 'sawtooth';
+        voiceGain = ac.createGain(); voiceGain.gain.value = 0;
+        voiceOsc.connect(lp); lp.connect(voiceGain); voiceGain.connect(ac.destination); voiceOsc.start();
+        refBus = ac.createGain(); refBus.gain.value = 0.16; refBus.connect(ac.destination);
+      }
+      soundOn = true; btn.textContent = '❚❚ Stäng av ljud';
+      scheduleRef();
+    } else {
+      soundOn = false; btn.textContent = '▶ Slå på ljud';
+      stopRef(); if (voiceGain) voiceGain.gain.setTargetAtTime(0, ac.currentTime, 0.02);
+    }
+  });
+  function stopRef() { refNodes.forEach(o => { try { o.stop(); } catch (e) {} }); refNodes = []; }
+  function scheduleRef() {
+    stopRef();
+    if (!soundOn || !document.getElementById('optRef').checked) return;
+    const base = ac.currentTime - clock;
+    for (const n of notes) {
+      const st = base + n.t, en = st + n.d;
+      if (en <= ac.currentTime) continue;
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'triangle'; o.frequency.value = hz(n.n);
+      const s0 = Math.max(st, ac.currentTime);
+      g.gain.setValueAtTime(0, s0); g.gain.linearRampToValueAtTime(1, s0 + 0.02);
+      g.gain.setValueAtTime(1, Math.max(s0 + 0.02, en - 0.05)); g.gain.linearRampToValueAtTime(0, en);
+      o.connect(g); g.connect(refBus); o.start(s0); o.stop(en + 0.02); refNodes.push(o);
+    }
+  }
+  function updateAudio(cur) {
+    if (!soundOn || !voiceOsc) return;
+    const on = cur != null && document.getElementById('optVoice').checked;
+    if (on) voiceOsc.frequency.setTargetAtTime(hz(cur), ac.currentTime, 0.01);
+    voiceGain.gain.setTargetAtTime(on ? 0.07 : 0, ac.currentTime, 0.03);
+  }
+  document.getElementById('optRef').addEventListener('change', scheduleRef);
+
+  // ---- stämval ----
+  document.querySelectorAll('.parts button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.parts button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    transpose = Number(b.dataset.t); partName = b.dataset.p;
+    const ms = BASE.map(n => n[2] + transpose);
+    document.getElementById('partInfo').textContent = `${partName} · omfång ${nm(Math.min(...ms))}–${nm(Math.max(...ms))}`;
+    restart();
+  }));
+
+  // första bild: mitt i första frasen, så sidan visar något även stilla
+  if (reduced) {
+    for (let t = 0; t < 4.2; t += 1 / 60) { const c = singerPitch(t); trail.push([t, c]); const tg = notes.find(n => t >= n.t && t < n.t + n.d); if (tg && c != null) tg.hits.push([t, Math.abs(c - tg.n) <= 0.5]); notes.forEach(n => { if (t >= n.t + n.d) n.done = true; }); }
+    clock = 4.2; draw(clock); updateHud(clock, singerPitch(clock));
+  } else {
+    requestAnimationFrame(t => { last = t; frame(t); });
+  }
+})();
+</script>
+
+</body></html>

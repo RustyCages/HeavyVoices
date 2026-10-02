@@ -33,6 +33,18 @@
   .file-meta { font-size:0.8rem; color:var(--text-muted); white-space:nowrap; }
 
   .icon-btn { flex-shrink:0; width:2.2rem; height:2.2rem; min-width:2.2rem; border-radius:50%; padding:0; font-size:1rem; line-height:1; }
+
+  /* Mobil: filer på två rader – namnet överst över hela bredden, storlek/datum + knappar under */
+  @media (max-width: 600px) {
+    .file-row:not(.folder-row) { display: grid; grid-template-columns: auto 1fr auto; column-gap: 0.75rem; row-gap: 0.4rem; align-items: center; }
+    .file-row:not(.folder-row) > .file-icon { grid-row: 1 / span 2; align-self: start; }
+    .file-row:not(.folder-row) > .file-name { grid-column: 2 / 4; }
+    .file-row:not(.folder-row) > .file-meta { display: block; grid-column: 2; font-size: 0.75rem; white-space: normal; }
+    .file-row:not(.folder-row) > .row-actions,
+    .file-row:not(.folder-row) > .downloadBtn { grid-column: 3; justify-self: end; }
+    /* Långa namn får bryta på två rader i stället för att klippas */
+    .file-name { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
+  }
 </style>
 </head>
 <body>

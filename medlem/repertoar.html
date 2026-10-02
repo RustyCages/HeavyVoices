@@ -47,7 +47,12 @@
   .mixer { margin:0.5rem 0 1.25rem; padding:1.1rem; background:rgba(255,255,255,0.03); border-radius:0.6rem; }
   .mixer-row { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; }
   .mixer-row:last-child { margin-bottom:0; }
-  .mixer-row .label { min-width:70px; flex-shrink:0; font-weight:600; font-size:0.85rem; }
+  .mixer-row .label { min-width:70px; max-width:9rem; flex-shrink:0; font-weight:600; font-size:0.85rem; overflow:hidden; white-space:nowrap; }
+  /* Rullande text (spelartitel + stämnamn i mixern) – styrs av attachMarquee() */
+  .mq-inner { display:inline-block; will-change:transform; }
+  .mq-on { text-overflow:clip !important; }
+  .mq-wrap { white-space:normal !important; }
+  .mq-wrap .mq-inner { display:inline; }
   .mixer-row .fname { color:var(--text-muted); font-size:0.75rem; min-width:0; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .mixer-row .muteBtn { padding:0.3rem; width:2rem; height:2rem; justify-content:center; flex-shrink:0; }
   .mixer-row .muteBtn svg { width:16px; height:16px; display:block; }
@@ -89,7 +94,7 @@
 
     .mixer { padding:0.85rem; }
     .mixer-row { flex-wrap:nowrap; gap:0.4rem; }
-    .mixer-row .label { flex:0 0 46px; width:46px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.7rem; order:1; }
+    .mixer-row .label { flex:0 0 58px; width:58px; min-width:0; overflow:hidden; white-space:nowrap; font-size:0.7rem; order:1; }
     .mixer-row input[type=range] { order:2; flex:1 1 auto; width:auto; min-width:0; }
     .mixer-row .muteBtn { order:3; flex:0 0 auto; padding:0.25rem; width:1.85rem; height:1.85rem; }
   }
@@ -126,11 +131,7 @@
   }
   #playerBar.hidden { display:none; }
   #playerTitle { font-weight:700; text-align:center; font-family:'Roboto Condensed', sans-serif; overflow:hidden; white-space:nowrap; }
-  #playerTitle .marquee-inner { display:inline-block; will-change:transform; }
-  #playerTitle.marquee { text-align:left; }
-  /* "Minska rörelse" påslaget: ingen rullning – visa hela namnet på två rader i stället */
-  #playerTitle.wrap { white-space:normal; }
-  #playerTitle.wrap .marquee-inner { display:inline; }
+  #playerTitle.mq-on { text-align:left; }
   #playerTitle .loading-tag { color:var(--accent); font-weight:500; font-size:0.8rem; margin-left:0.5rem; }
   #playerControls { display:flex; align-items:center; justify-content:center; gap:1rem; }
   #playerControls button { font-size:1.1rem; width:2.6rem; height:2.6rem; padding:0; border-radius:50%; display:flex; align-items:center; justify-content:center; }
@@ -592,6 +593,7 @@ function renderTracksForPlaylist(pl, items, containerEl) {
         btn.setAttribute('aria-pressed', isMuted);
         applyGainForKey(item, k, item.volumes[k]);
       });
+      attachMarquee(mrow.querySelector('.label'), { speed: 25 });
       mixer.appendChild(mrow);
     });
 
@@ -1024,41 +1026,69 @@ async function playTrackAt(index, offsetSeconds) {
   }
 }
 
-// Titeln i spelaren: rullar fram och tillbaka om den inte får plats.
-function setPlayerTitle(html) {
-  const el = document.getElementById('playerTitle');
-  el.innerHTML = `<span class="marquee-inner">${html}</span>`;
-  requestAnimationFrame(() => updatePlayerTitleMarquee());
-}
-// Rullningen görs med Web Animations API (exakta pixelvärden) i stället för CSS-variabler
-// i @keyframes – det senare fungerar inte pålitligt i Safari/iPhone.
-let titleAnim = null;
+// =========================================================
+// Rullande text: text som inte får plats glider fram och tillbaka.
+// Används för spelartiteln och stämnamnen i mixern. Görs med Web Animations API
+// (exakta pixelvärden) – CSS-variabler i @keyframes fungerar inte pålitligt i Safari.
+// "Minska rörelse" påslaget → ingen rullning, texten bryts på flera rader i stället.
+// =========================================================
 const reduceMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
-function updatePlayerTitleMarquee() {
-  const el = document.getElementById('playerTitle');
-  const inner = el.querySelector('.marquee-inner');
-  if (titleAnim) { titleAnim.cancel(); titleAnim = null; }
-  el.classList.remove('marquee', 'wrap');
-  if (!inner || !el.clientWidth) return;           // spelaren är dold – mäts igen när den visas
+const marqueeEls = new Set();
+const marqueeAnims = new WeakMap();
+const marqueeOpts = new WeakMap();
+const marqueeRO = 'ResizeObserver' in window ? new ResizeObserver(entries => entries.forEach(e => updateMarquee(e.target))) : null;
+
+function attachMarquee(el, opts = {}) {
+  if (!el) return;
+  marqueeOpts.set(el, opts);
+  if (!el.querySelector(':scope > .mq-inner')) {
+    const inner = document.createElement('span');
+    inner.className = 'mq-inner';
+    while (el.firstChild) inner.appendChild(el.firstChild);
+    el.appendChild(inner);
+  }
+  if (!marqueeEls.has(el)) {
+    marqueeEls.add(el);
+    if (marqueeRO) marqueeRO.observe(el);   // mäts om när elementet visas (t.ex. när mixern fälls ut)
+  }
+  requestAnimationFrame(() => updateMarquee(el));
+}
+
+function updateMarquee(el) {
+  const inner = el.querySelector(':scope > .mq-inner');
+  const old = marqueeAnims.get(el);
+  if (old) { old.cancel(); marqueeAnims.delete(el); }
+  el.classList.remove('mq-on', 'mq-wrap');
+  if (!inner || !el.clientWidth) return;            // dold – mäts igen när den syns
   const dist = Math.ceil(inner.scrollWidth - el.clientWidth);
-  if (dist <= 4) return;                           // får plats – centrerad, ingen rullning
-  if ((reduceMotion && reduceMotion.matches) || !inner.animate) { el.classList.add('wrap'); return; }
-  el.classList.add('marquee');
-  const move = Math.max(3000, dist / 30 * 1000);   // ~30 px/s
-  const pause = 1500;                              // stå still i varje ände
+  if (dist <= 2) return;                            // får plats
+  if ((reduceMotion && reduceMotion.matches) || !inner.animate) { el.classList.add('mq-wrap'); return; }
+  el.classList.add('mq-on');
+  const speed = (marqueeOpts.get(el) || {}).speed || 30;   // px per sekund
+  const move = Math.max(1500, dist / speed * 1000);
+  const pause = 1500;
   const total = move + 2 * pause;
   const p = pause / total;
-  titleAnim = inner.animate([
+  marqueeAnims.set(el, inner.animate([
     { transform: 'translateX(0)', offset: 0 },
     { transform: 'translateX(0)', offset: p, easing: 'ease-in-out' },
     { transform: `translateX(-${dist}px)`, offset: 1 - p },
     { transform: `translateX(-${dist}px)`, offset: 1 },
-  ], { duration: total, iterations: Infinity, direction: 'alternate' });
+  ], { duration: total, iterations: Infinity, direction: 'alternate' }));
 }
-if (reduceMotion && reduceMotion.addEventListener) reduceMotion.addEventListener('change', updatePlayerTitleMarquee);
-// Mät om när spelaren byter storlek (fönster, utfälld/minimerad spelare)
-if ('ResizeObserver' in window) new ResizeObserver(() => updatePlayerTitleMarquee()).observe(document.getElementById('playerTitle'));
-else window.addEventListener('resize', updatePlayerTitleMarquee);
+
+function refreshAllMarquees() {
+  marqueeEls.forEach(el => { if (el.isConnected) updateMarquee(el); else marqueeEls.delete(el); });
+}
+if (reduceMotion && reduceMotion.addEventListener) reduceMotion.addEventListener('change', refreshAllMarquees);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(refreshAllMarquees); // typsnittet ändrar bredden
+
+// Titeln i spelaren
+function setPlayerTitle(html) {
+  const el = document.getElementById('playerTitle');
+  el.innerHTML = html;
+  attachMarquee(el);
+}
 
 function markTrackRowLoading(rowId, loading) {
   document.querySelectorAll(`.track-row[data-row-id="${rowId}"] .track-title`).forEach(el => {

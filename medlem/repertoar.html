@@ -126,17 +126,11 @@
   }
   #playerBar.hidden { display:none; }
   #playerTitle { font-weight:700; text-align:center; font-family:'Roboto Condensed', sans-serif; overflow:hidden; white-space:nowrap; }
-  #playerTitle .marquee-inner { display:inline-block; }
+  #playerTitle .marquee-inner { display:inline-block; will-change:transform; }
   #playerTitle.marquee { text-align:left; }
-  #playerTitle.marquee .marquee-inner { animation: marquee-pingpong var(--marquee-time, 6s) ease-in-out infinite alternate; }
-  @keyframes marquee-pingpong {
-    0%, 15% { transform: translateX(0); }
-    85%, 100% { transform: translateX(calc(-1 * var(--marquee-dist, 0px))); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    #playerTitle.marquee .marquee-inner { animation: none; }
-    #playerTitle { text-overflow: ellipsis; }
-  }
+  /* "Minska rörelse" påslaget: ingen rullning – visa hela namnet på två rader i stället */
+  #playerTitle.wrap { white-space:normal; }
+  #playerTitle.wrap .marquee-inner { display:inline; }
   #playerTitle .loading-tag { color:var(--accent); font-weight:500; font-size:0.8rem; margin-left:0.5rem; }
   #playerControls { display:flex; align-items:center; justify-content:center; gap:1rem; }
   #playerControls button { font-size:1.1rem; width:2.6rem; height:2.6rem; padding:0; border-radius:50%; display:flex; align-items:center; justify-content:center; }
@@ -1036,19 +1030,32 @@ function setPlayerTitle(html) {
   el.innerHTML = `<span class="marquee-inner">${html}</span>`;
   requestAnimationFrame(() => updatePlayerTitleMarquee());
 }
+// Rullningen görs med Web Animations API (exakta pixelvärden) i stället för CSS-variabler
+// i @keyframes – det senare fungerar inte pålitligt i Safari/iPhone.
+let titleAnim = null;
+const reduceMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
 function updatePlayerTitleMarquee() {
   const el = document.getElementById('playerTitle');
   const inner = el.querySelector('.marquee-inner');
-  if (!inner) return;
-  const dist = inner.scrollWidth - el.clientWidth;
-  if (dist > 4) {
-    el.style.setProperty('--marquee-dist', dist + 'px');
-    el.style.setProperty('--marquee-time', Math.max(4, dist / 30) + 's'); // ~30 px/s
-    el.classList.add('marquee');
-  } else {
-    el.classList.remove('marquee');
-  }
+  if (titleAnim) { titleAnim.cancel(); titleAnim = null; }
+  el.classList.remove('marquee', 'wrap');
+  if (!inner || !el.clientWidth) return;           // spelaren är dold – mäts igen när den visas
+  const dist = Math.ceil(inner.scrollWidth - el.clientWidth);
+  if (dist <= 4) return;                           // får plats – centrerad, ingen rullning
+  if ((reduceMotion && reduceMotion.matches) || !inner.animate) { el.classList.add('wrap'); return; }
+  el.classList.add('marquee');
+  const move = Math.max(3000, dist / 30 * 1000);   // ~30 px/s
+  const pause = 1500;                              // stå still i varje ände
+  const total = move + 2 * pause;
+  const p = pause / total;
+  titleAnim = inner.animate([
+    { transform: 'translateX(0)', offset: 0 },
+    { transform: 'translateX(0)', offset: p, easing: 'ease-in-out' },
+    { transform: `translateX(-${dist}px)`, offset: 1 - p },
+    { transform: `translateX(-${dist}px)`, offset: 1 },
+  ], { duration: total, iterations: Infinity, direction: 'alternate' });
 }
+if (reduceMotion && reduceMotion.addEventListener) reduceMotion.addEventListener('change', updatePlayerTitleMarquee);
 // Mät om när spelaren byter storlek (fönster, utfälld/minimerad spelare)
 if ('ResizeObserver' in window) new ResizeObserver(() => updatePlayerTitleMarquee()).observe(document.getElementById('playerTitle'));
 else window.addEventListener('resize', updatePlayerTitleMarquee);

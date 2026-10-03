@@ -1619,20 +1619,27 @@ try { splitOn = localStorage.getItem('hv-karaoke-split') === 'on'; } catch (e) {
 let splitPanels = []; // [{ key, lines, idx, box }]
 let splitSong = null;
 // Delad skärm visas just nu bara för admin (testas innan den släpps till alla)
-function splitAvailable(song) { return !!(currentMember && currentMember.role === 'admin') && availableVoices(song).length >= 2; }
+// Rutorna: gemensam text (om den finns) + varje stämma med egen synkad text
+function splitParts(song) {
+  if (!song) return [];
+  const parts = song.lyrics_lrc ? [{ key: '', label: 'Gemensam', short: '', lrc: song.lyrics_lrc }] : [];
+  availableVoices(song).forEach(v => parts.push({ ...v, lrc: song.lyrics_lrc_voices[v.key] }));
+  return parts;
+}
+function splitAvailable(song) { return !!(currentMember && currentMember.role === 'admin') && splitParts(song).length >= 2; }
 function buildSplit(song) {
   const wrap = document.getElementById('karaokeSplit');
   const mine = voiceFromStamma(currentMember && currentMember.stamma);
-  const voices = availableVoices(song);
+  const voices = splitParts(song);
   wrap.style.setProperty('--n', voices.length);
   wrap.style.setProperty('--cols2', Math.min(2, voices.length));
-  wrap.innerHTML = voices.map(v => `<div class="ks-panel${v.key === mine ? ' mine' : ''}" data-voice="${v.key}"><div class="ks-head">${v.label}</div><div class="ks-box"><div class="k-reel"></div></div></div>`).join('');
+  wrap.innerHTML = voices.map(v => `<div class="ks-panel${v.key && v.key === mine ? ' mine' : ''}" data-voice="${v.key || 'gemensam'}"><div class="ks-head">${v.label}</div><div class="ks-box"><div class="k-reel"></div></div></div>`).join('');
   splitPanels = voices.map(v => {
-    const lines = parseLrc(song.lyrics_lrc_voices[v.key]);
-    const box = wrap.querySelector(`[data-voice="${v.key}"] .ks-box`);
+    const lines = parseLrc(v.lrc);
+    const box = wrap.querySelector(`[data-voice="${v.key || 'gemensam'}"] .ks-box`);
     box.querySelector('.k-reel').innerHTML = '<div class="k-line k-intro"></div>' + lines.map(l =>
       l.text === '♪' ? '<div class="k-line k-pause">♪</div>'
-        : l.text ? `<div class="k-line">${pitchHtml(l.text, v.short)}</div>`
+        : l.text ? `<div class="k-line">${pitchHtml(l.text, v.short || myVoiceLetter())}</div>`
         : '<div class="k-line k-gap"></div>').join('');
     return { key: v.key, lines, idx: -2, box };
   });

@@ -235,7 +235,7 @@
     <p class="g-p">Visas när mikrofonen är på. <b>Du sjunger</b> = tonen du tar just nu och hur många cent du ligger fel. <b>Träff</b> = hur stor del av tiden du legat rätt när det finns en not att sjunga. <b>Noter klara</b> = hur många noter du har klarat, där du legat rätt minst 60 % av notens längd. Allt nollställs när du startar om från början.</p>
 
     <div class="tips">
-      <span class="member-only"><b>Klicka</b> i notbanan för att spela/pausa. </span><b>Spola:</b> dra i notbanan åt sidan, klicka i den lilla översikten ovanför, eller tryck −5 s.
+      <b>Klicka</b> i notbanan för att spela/pausa. <b>Spola:</b> dra i notbanan åt sidan, klicka i den lilla översikten ovanför, eller tryck −5 s.
       <b>Mellanslag</b> spelar/pausar på dator.
     </div>
   </div>
@@ -1524,8 +1524,8 @@ document.getElementById('overview').addEventListener('click', e => {
     if (drag) { const n = drag.n, moved = drag.moved; drag = null; if (moved) afterEdit(n); return; }
     if (startX == null) return; startX = null; c.classList.remove('dragging');
     if (scrubbed) { if (wasPlaying) play(); return; }
-    // klick (utan att dra): spela/pausa för medlemmar. Admin klickar på noter → inget play/paus (använd mellanslag)
-    if (isAdmin) return;
+    // klick (utan att dra): spela/pausa – utom i redigeringsläget, där klick väljer noter (använd mellanslag)
+    if (editMode) return;
     if (playing) pause(); else play();
   };
   c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);

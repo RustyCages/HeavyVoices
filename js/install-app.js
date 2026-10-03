@@ -10,6 +10,8 @@
   const head = document.head;
   function ensure(selector, create) { if (!head.querySelector(selector)) head.appendChild(create()); }
   function el(tag, attrs) { const e = document.createElement(tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e; }
+  ensure('link[rel="icon"][sizes="32x32"]', () => el('link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/icons/favicon-32.png' }));
+  ensure('link[rel="icon"][sizes="96x96"]', () => el('link', { rel: 'icon', type: 'image/png', sizes: '96x96', href: '/icons/favicon-96.png' }));
   ensure('link[rel="manifest"]', () => el('link', { rel: 'manifest', href: '/manifest.webmanifest' }));
   ensure('meta[name="theme-color"]', () => el('meta', { name: 'theme-color', content: '#121418' }));
   ensure('link[rel="apple-touch-icon"]', () => el('link', { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' }));

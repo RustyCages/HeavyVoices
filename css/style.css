@@ -85,14 +85,9 @@ transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 color: inherit;
 }
 
+/* Kort lyfter inte – bara ramen lyser upp */
 .card:hover, .modern-card:hover {
-transform: translateY(-3px);
 border-color: var(--border-hover);
-box-shadow: var(--card-shadow-hover);
-}
-
-.card:active, .modern-card:active {
-transform: translateY(-1px);
 }
 
 /* Cirkel/ikonbehållare inuti kort */
@@ -108,10 +103,7 @@ justify-content: center;
 transition: transform 0.2s ease;
 }
 
-.card:hover .card-icon-box,
-.modern-card:hover .card-icon-box {
-transform: scale(1.1);
-}
+
 
 /* --- Sidhuvud (logga överst på varje sida) --- */
 .site-header .site-logo {

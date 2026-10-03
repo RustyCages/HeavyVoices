@@ -48,7 +48,10 @@
   @media (max-width: 640px) { .k-now { font-size: 1.2rem; } }
   .mic-btn.on { background: #ef4444; border-color: #ef4444; color: #fff; }
   /* poängrad när micken är på */
-  .scorebar { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 0.6rem; margin-top: 0.9rem; font-variant-numeric: tabular-nums; }
+  .score-overlay { position: absolute; right: 6px; top: 6px; height: 44px; box-sizing: border-box; align-items: center; display: flex; gap: 0.9rem; padding: 0.2rem 0.7rem; border-radius: 0.5rem; background: rgba(10,12,16,0.72); border: 1px solid var(--border); pointer-events: none; font-variant-numeric: tabular-nums; backdrop-filter: blur(3px); }
+  .score-overlay div { display: grid; line-height: 1.1; }
+  .score-overlay span { font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+  .score-overlay b { font-family: 'Roboto Condensed', sans-serif; font-size: 1.15rem; color: var(--text); }
   .stat { display: grid; gap: 0.1rem; align-content: start; padding: 0.6rem 0.8rem; border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(0,0,0,0.2); min-width: 0; }
   .stat-k { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
   .stat b { font-family: 'Roboto Condensed', sans-serif; font-size: 1.6rem; line-height: 1.1; color: var(--text); }
@@ -125,8 +128,6 @@
 
   @media (max-width: 760px) {
     .settings { grid-template-columns: 1fr; }
-    .scorebar { grid-template-columns: 1fr 1fr; }
-    .scorebar .stat:first-child { grid-column: 1 / -1; }
   }
   .progress-card h2 { margin: 0 0 0.2rem; }
   .prog-head { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; align-items: baseline; margin: 0.4rem 0 0.6rem; font-size: 0.9rem; color: var(--text-muted); }
@@ -245,6 +246,10 @@
     <div class="canvas-wrap">
       <canvas id="overview" title="Hela låten – klicka för att hoppa"></canvas>
       <canvas id="roll" title="Dra i sidled för att spola"></canvas>
+      <div class="score-overlay" id="micPanel" hidden>
+        <div title="Andel av tiden i noterna som du träffat"><span>Träff</span><b id="micHit">–</b></div>
+        <div title="Noter där du träffat minst 60 % av tiden"><span>Noter</span><b id="micNotes">–</b></div>
+      </div>
     </div>
     <div class="roll-bar">
       <div class="legend-row">
@@ -274,11 +279,7 @@
       <span class="time" id="durTime">0:00</span>
       <button class="btn-outline mic-btn" id="micBtn" title="Sjung med i mikrofonen">🎤 Sjung med</button>
     </div>
-    <div class="scorebar" id="micPanel" hidden>
-      <div class="stat"><span class="stat-k">Du sjunger</span><span class="mic-note" id="micNote">–</span><span class="mic-cents" id="micCents">Sjung en ton…</span></div>
-      <div class="stat"><span class="stat-k">Träff</span><b id="micHit">–</b><span class="stat-s">av tiden i noterna</span></div>
-      <div class="stat"><span class="stat-k">Noter klara</span><b id="micNotes">–</b><span class="stat-s">minst 60 % rätt</span></div>
-    </div>
+    <span id="micNote" hidden></span><span id="micCents" hidden></span>
 
     <div class="settings">
       <fieldset class="set">
@@ -290,7 +291,7 @@
       <fieldset class="set">
         <legend>Visa</legend>
         <label id="optKaraokeWrap" hidden><input type="checkbox" id="optKaraoke" checked> Karaoke-text</label>
-        <label><input type="checkbox" id="optFit" checked> Anpassa höjden efter tonerna</label>
+        <label><input type="checkbox" id="optFit"> Anpassa höjden efter tonerna</label>
       </fieldset>
       <fieldset class="set">
         <legend>Sjung med</legend>
@@ -472,8 +473,13 @@ async function loadSong(id) {
   document.getElementById('stemArea').hidden = false;
   const ready = stems.filter(st => st.pitch);
   const mine = myVoice && ready.find(st => String(st.label).toLowerCase().startsWith(myVoice));
-  const first = mine || ready.find(st => st.key !== 'stem_backtrack_path') || ready[0];
+  const NOT_VOICE = /full|mix|backtrack|komp|instrument|karaoke|playback|click|klick/i;
+  const isVoice = st => st.key !== 'stem_backtrack_path' && !NOT_VOICE.test(st.label || '');
+  const vocal = ready.find(st => isVoice(st) && /vocal|vokal|sång|lead|melodi|stämma/i.test(st.label || ''));
+  const named = ready.find(st => isVoice(st) && /sopran|alt|tenor|bas|baryton|stämma|röst|voice/i.test(st.label || ''));
+  const first = mine || vocal || named;
   if (first) showStem(first);
+  else if (ready.length) { const n = document.getElementById('loadingNote'); n.hidden = false; n.textContent = 'Välj vilken stämma du vill öva på ovan.'; }
   if (!isAdmin) renderRows();
 }
 
@@ -545,6 +551,7 @@ async function analyzeAll() {
 // ---------- visning ----------
 function showStem(st) {
   flushSession();
+  document.getElementById('loadingNote').hidden = true;
   stop();
   current = st;
   voice = []; noteStats = []; if (mic) updateScore();
@@ -591,14 +598,16 @@ function sizeCanvases() {
 function songRange() {
   if (current._rr) return current._rr;
   const ns = current.pitch.notes.slice().sort((a, b) => a.n - b.n);
-  const tot = ns.reduce((a, n) => a + n.d, 0) || 1;
-  const pct = q => { let acc = 0; for (const n of ns) { acc += n.d; if (acc / tot >= q) return n.n; } return ns.length ? ns[ns.length - 1].n : 60; };
   const s = current.pitch.stats || {};
-  let lo = ns.length ? pct(0.02) - 1.5 : (s.low ?? 48) - 1.5, hi = ns.length ? pct(0.98) + 1.5 : (s.high ?? 72) + 1.5;
+  // oktavfelen är redan rättade → ta med alla noter så ingen klipps
+  const pad = rangePad();
+  let lo = ns.length ? ns[0].n - pad : (s.low ?? 48) - pad, hi = ns.length ? ns[ns.length - 1].n + pad : (s.high ?? 72) + pad;
   if (hi - lo < 12) { const mid = (hi + lo) / 2; lo = mid - 6; hi = mid + 6; }
   return (current._rr = [lo, hi]);
 }
 function yRange() { return songRange(); }
+// luft över/under: notrutan (marginalen) + lite till, så inget klipps
+function rangePad() { return Math.max(0.45, (Number(document.getElementById('optTol').value) || 50) / 100) + 0.9; }
 
 // Notbanan: höjden följer tonerna som syns just nu (mjuk övergång)
 let viewLo = null, viewHi = null, viewFor = null;
@@ -607,7 +616,8 @@ function rollRange(t0, span) {
   const ns = current.pitch.notes.filter(n => n.t + n.d > t0 - 0.5 && n.t < t0 + span * 1.2);
   let lo, hi;
   if (ns.length) {
-    lo = Math.min(...ns.map(n => n.n)) - 1.5; hi = Math.max(...ns.map(n => n.n)) + 1.5;
+    const pad = rangePad();
+    lo = Math.min(...ns.map(n => n.n)) - pad; hi = Math.max(...ns.map(n => n.n)) + pad;
     if (hi - lo < 10) { const mid = (hi + lo) / 2; lo = mid - 5; hi = mid + 5; }
   } else if (viewLo != null && viewFor === current) { lo = viewLo; hi = viewHi; }
   else [lo, hi] = songRange();
@@ -1195,7 +1205,7 @@ document.querySelectorAll('.prog-tabs button').forEach(b => b.addEventListener('
 (() => {
   const tol = document.getElementById('optTol');
   try { const v = localStorage.getItem('hv-tol'); if (v && tol.querySelector(`option[value="${v}"]`)) tol.value = v; } catch (e) {}
-  tol.addEventListener('change', () => { try { localStorage.setItem('hv-tol', tol.value); } catch (e) {} tick(); });
+  tol.addEventListener('change', () => { try { localStorage.setItem('hv-tol', tol.value); } catch (e) {} stems.forEach(st => { st._rr = null; }); viewLo = null; if (current) tick(); });
 })();
 (() => {
   const g = document.getElementById('guide'), b = document.getElementById('guideBtn');
@@ -1232,7 +1242,11 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
   let saved = null; try { saved = Number(localStorage.getItem('hv-zoom')); } catch (e) {}
   set(STEPS.includes(saved) ? saved : (window.innerWidth < 600 ? 5 : 10));
 })();
-document.getElementById('optFit').addEventListener('change', () => { viewLo = null; if (current) tick(); });
+(() => {
+  const f = document.getElementById('optFit');
+  try { f.checked = localStorage.getItem('hv-fit') === '1'; } catch (e) {}
+  f.addEventListener('change', () => { try { localStorage.setItem('hv-fit', f.checked ? '1' : '0'); } catch (e) {} viewLo = null; if (current) tick(); });
+})();
 ['optStem', 'optTone'].forEach(id => document.getElementById(id).addEventListener('change', () => { if (playing) startAt(position()); }));
 document.getElementById('overview').addEventListener('click', e => {
   const r = e.currentTarget.getBoundingClientRect();

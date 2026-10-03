@@ -100,7 +100,17 @@ color: var(--accent);
 display: flex;
 align-items: center;
 justify-content: center;
-transition: transform 0.2s ease;
+border: 1px solid transparent;
+transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Ikonen i kort/menyrader lyfter lite och får en belyst ram */
+.card:hover .card-icon-box,
+.modern-card:hover .card-icon-box,
+.nav-item:hover .card-icon-box {
+transform: translateY(-2px);
+border-color: var(--border-hover);
+box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.6), 0 0 10px rgba(229, 169, 104, 0.15);
 }
 
 

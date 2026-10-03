@@ -166,9 +166,11 @@
 
   /* Karaoke (synkad text) ovanför spelarkontrollerna */
   /* Rullande textremsa: alla rader ligger i .k-reel som flyttas med transform så att aktuell rad hamnar i mitten */
+  /* Egen ram runt texten (ramen ligger utanför masken så den inte tonas bort) */
+  .k-frame { border:1px solid var(--border); border-radius:0.75rem; background:rgba(0,0,0,0.22); margin-bottom:0.25rem; padding:0.15rem 0; }
+  .k-frame:has(#karaoke.hidden) { display:none; }
   #karaoke {
     position:relative; height:6.4rem; overflow:hidden; text-align:center;
-    border-bottom:1px solid var(--border); margin-bottom:0.2rem;
     -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 28%, #000 72%, transparent 100%);
             mask-image:linear-gradient(to bottom, transparent 0, #000 28%, #000 72%, transparent 100%);
   }
@@ -211,8 +213,10 @@
     background:var(--bg); background-image:var(--bg-gradient); backdrop-filter:none;
   }
   #playerBar.expanded #expandBtn { top:calc(0.75rem + env(safe-area-inset-top, 0px)); right:0.9rem; width:2.6rem; height:2.6rem; font-size:1.2rem; }
+  #playerBar.expanded .k-frame { flex:1; display:flex; flex-direction:column; margin-bottom:0.5rem; min-height:0; }
+  #playerBar.expanded .k-frame:has(#karaoke.hidden) { display:none; }
   #playerBar.expanded #karaoke {
-    flex:1; height:auto; border-bottom:none; margin-bottom:0.5rem;
+    flex:1; height:auto;
     -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 18%, #000 82%, transparent 100%);
             mask-image:linear-gradient(to bottom, transparent 0, #000 18%, #000 82%, transparent 100%);
   }
@@ -253,7 +257,7 @@
 
 <div id="playerBar" class="hidden">
   <button type="button" id="expandBtn" class="hidden" title="Förstora texten">&#x26F6;</button>
-  <div id="karaoke" class="hidden"><div class="k-reel"></div></div>
+  <div class="k-frame"><div id="karaoke" class="hidden"><div class="k-reel"></div></div></div>
   <div id="playerTitle">–</div>
   <div id="playerScrubberRow">
     <span id="curTime">0:00</span>

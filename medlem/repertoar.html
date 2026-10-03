@@ -1618,16 +1618,8 @@ let splitOn = false;
 try { splitOn = localStorage.getItem('hv-karaoke-split') === 'on'; } catch (e) {}
 let splitPanels = []; // [{ key, lines, idx, box }]
 let splitSong = null;
-// Testflagga: ?beta=1 slår på (sparas på enheten), ?beta=0 stänger av. Ta bort när funktionen är klar för alla.
-const BETA_SPLIT = (() => {
-  const q = new URLSearchParams(location.search).get('beta');
-  try {
-    if (q === '1') localStorage.setItem('hv-beta-split', '1');
-    if (q === '0') localStorage.removeItem('hv-beta-split');
-    return localStorage.getItem('hv-beta-split') === '1';
-  } catch (e) { return q === '1'; }
-})();
-function splitAvailable(song) { return BETA_SPLIT && availableVoices(song).length >= 2; }
+// Delad skärm visas just nu bara för admin (testas innan den släpps till alla)
+function splitAvailable(song) { return !!(currentMember && currentMember.role === 'admin') && availableVoices(song).length >= 2; }
 function buildSplit(song) {
   const wrap = document.getElementById('karaokeSplit');
   const mine = voiceFromStamma(currentMember && currentMember.stamma);

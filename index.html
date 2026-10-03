@@ -85,9 +85,10 @@
     }
 
     /* Logotypen */
+    .main-content picture { display: contents; }
     .logo {
-      max-width: 1200px; /* Ändra storlek på loggan här */
-      width: 100%;
+      max-width: 380px; /* Ändra storlek på loggan här */
+      width: 72%;
       height: auto;
       display: block;
       filter: drop-shadow(0px 4px 15px rgba(0, 0, 0, 0.8));
@@ -135,6 +136,7 @@
         font-size: 1.05rem;
       }
       .logo {
+        width: 78%;
         margin-bottom: 15px;
       }
     }
@@ -160,7 +162,7 @@
 
   <!-- Centrerat innehåll: Logga + Citat -->
   <div class="main-content">
-    <img src="heavyvoices-logo.png" alt="Heavy Voices" class="logo">
+    <picture><source srcset="/icons/logo-large.webp" type="image/webp"><img src="/icons/logo-large.png" alt="Heavy Voices" class="logo" width="1200" height="924"></picture>
 
     <!-- Ramlös textruta med roterande citat -->
     <div class="quote-box">

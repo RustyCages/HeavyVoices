@@ -1049,7 +1049,7 @@ window.addEventListener('resize', () => { if (current) { sizeCanvases(); tick();
   const { data, error } = await supabaseClient.from('songs').select('*').order('title');
   const sel = document.getElementById('songSelect');
   if (error) { sel.innerHTML = `<option>Fel: ${esc(error.message)}</option>`; return; }
-  songs = (data || []).filter(s => stemListFor(s).some(st => st.key !== 'stem_backtrack_path'));
+  songs = (data || []).filter(s => (s.published !== false || isAdmin) && stemListFor(s).some(st => st.key !== 'stem_backtrack_path'));
   if (!isAdmin) {
     // medlemmar ser bara låtar där minst en stämma har tonkurva
     const { data: pr } = await supabaseClient.from('song_pitch').select('song_id');

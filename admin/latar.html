@@ -12,6 +12,12 @@
   .song-item { border-bottom: 1px solid var(--border); padding: 1rem 0; }
   .song-item:last-child { border-bottom: none; }
   .song-title { font-family: 'Roboto Condensed', sans-serif; font-size: 1.3rem; }
+  .song-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+  .song-item.is-hidden .song-title { color: var(--text-muted); }
+  .pubBtn { padding: 0.3rem 0.75rem; font-size: 0.8rem; border-radius: 1rem; display: inline-flex; align-items: center; gap: 0.35rem; }
+  .pubBtn.on { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.5); }
+  .pubBtn.off { background: transparent; color: var(--text-muted); border: 1px dashed var(--border); }
+  .pub-summary { font-size: 0.85rem; color: var(--text-muted); margin: -0.25rem 0 0.75rem; }
   .field-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.4rem 0; font-size: 0.9rem; flex-wrap: wrap; }
   .field-row label { width: 100px; color: var(--text-muted); flex-shrink: 0; }
   .field-row input[type="file"] { flex: 1; min-width: 160px; font-size: 0.85rem; }
@@ -623,9 +629,16 @@ async function loadSongs() {
     return;
   }
 
-  listEl.innerHTML = songs.map(s => `
-    <div class="song-item">
-      <div class="song-title">${s.title}</div>
+  const hiddenCount = songs.filter(x => x.published === false).length;
+  listEl.innerHTML = `<p class="pub-summary">${songs.length - hiddenCount} synliga för medlemmarna${hiddenCount ? ` · ${hiddenCount} dolda` : ''}</p>` + songs.map(s => `
+    <div class="song-item ${s.published === false ? 'is-hidden' : ''}">
+      <div class="song-head">
+        <div class="song-title">${esc(s.title)}</div>
+        <button type="button" class="pubBtn ${s.published === false ? 'off' : 'on'}" data-id="${s.id}"
+          title="${s.published === false ? 'Dold för medlemmar – klicka för att visa' : 'Synlig för medlemmar – klicka för att dölja'}">
+          ${s.published === false ? '&#128065;&#8205;&#128488; Dold' : '&#128065; Synlig'}
+        </button>
+      </div>
 
       <details>
         <summary>Redigera text och filer</summary>
@@ -667,6 +680,26 @@ async function loadSongs() {
       </details>
     </div>
   `).join('');
+
+  listEl.querySelectorAll('.pubBtn').forEach(btn => btn.addEventListener('click', async () => {
+    const s = songs.find(x => String(x.id) === btn.dataset.id);
+    if (!s) return;
+    const next = s.published === false;   // dold → synlig, synlig → dold
+    btn.disabled = true;
+    const { error } = await supabaseClient.from('songs').update({ published: next }).eq('id', s.id);
+    btn.disabled = false;
+    if (error) {
+      alert('Kunde inte ändra: ' + error.message + (/published|column|schema/i.test(error.message) ? '\n\nKör SQL-migreringen för synliga låtar först.' : ''));
+      return;
+    }
+    s.published = next;
+    btn.className = 'pubBtn ' + (next ? 'on' : 'off');
+    btn.innerHTML = next ? '&#128065; Synlig' : '&#128065;&#8205;&#128488; Dold';
+    btn.title = next ? 'Synlig för medlemmar – klicka för att dölja' : 'Dold för medlemmar – klicka för att visa';
+    btn.closest('.song-item').classList.toggle('is-hidden', !next);
+    const hidden = songs.filter(x => x.published === false).length;
+    listEl.querySelector('.pub-summary').textContent = `${songs.length - hidden} synliga för medlemmarna${hidden ? ` · ${hidden} dolda` : ''}`;
+  }));
 
   songs.forEach(s => {
     wireStemsArea(s);
@@ -752,7 +785,8 @@ document.getElementById('addSongForm').addEventListener('submit', async (e) => {
   const errorEl = document.getElementById('addError');
   errorEl.textContent = '';
 
-  const { error } = await supabaseClient.from('songs').insert({ title });
+  // Nya låtar är dolda för medlemmarna tills admin gör dem synliga
+  const { error } = await supabaseClient.from('songs').insert({ title, published: false });
   if (error) {
     errorEl.textContent = error.message;
     return;

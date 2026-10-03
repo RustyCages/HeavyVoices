@@ -61,7 +61,7 @@ async function loadSong() {
     .eq('id', songId)
     .single();
 
-  if (error || !song) {
+  if (error || !song || (song.published === false && !isAdminViewer)) {
     document.getElementById('songTitle').textContent = 'Kunde inte hitta låten.';
     return;
   }
@@ -140,10 +140,13 @@ document.getElementById('addToPlaylistBtn').addEventListener('click', async () =
   successEl.textContent = 'Tillagd i spellistan.';
 });
 
+let isAdminViewer = false;   // dolda låtar (published = false) visas bara för admin
+
 (async () => {
   const member = await requireAuth();
   if (member) {
     currentMemberId = member.id;
+    isAdminViewer = member.role === 'admin';
     loadSong();
   }
 })();

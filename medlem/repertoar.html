@@ -105,6 +105,7 @@
   .stem-check-row input[type=checkbox] { width:auto; flex-shrink:0; margin:0; }
   .doc-links { display:flex; flex-wrap:wrap; gap:0.6rem; margin:0.75rem 0; }
   .doc-links a { font-size:0.8rem; padding:0.4rem 0.8rem; border:1px solid var(--border); border-radius:0.4rem; }
+  .hidden-tag { font-size:0.7rem; font-weight:600; font-family:'DM Sans', sans-serif; padding:0.1rem 0.5rem; border:1px dashed var(--border); border-radius:1rem; color:var(--text-muted); vertical-align:middle; margin-left:0.4rem; }
   .doc-chip { display:inline-flex; align-items:stretch; border:1px solid var(--border); border-radius:0.4rem; overflow:hidden; }
   .doc-chip a, .doc-chip button { font-size:0.8rem; padding:0.4rem 0.75rem; display:flex; align-items:center; background:none; border:none; border-radius:0; color:var(--accent); cursor:pointer; font-weight:500; }
   .doc-links .doc-chip a { border:none; border-radius:0; }
@@ -519,9 +520,11 @@ async function loadPlaylistTracks(pl, containerEl) {
   const { data: songs, error: songsErr } = await supabaseClient.from('songs').select('*').in('id', songIds);
   if (songsErr) { containerEl.textContent = 'Fel: ' + songsErr.message; return; }
   const songsById = {};
-  songs.forEach(s => { songsById[s.id] = s; });
+  const isAdmin = currentMember && currentMember.role === 'admin';
+  songs.forEach(s => { if (s.published !== false || isAdmin) songsById[s.id] = s; });
 
-  const items = rows.map(row => {
+  // Låtar som admin har dolt hoppas över i spellistan
+  const items = rows.filter(row => songsById[row.song_id]).map(row => {
     const song = songsById[row.song_id];
     const extraVolumesRaw = row.extra_volumes || {};
     // Only include a stem if it was actually picked when the song was added to this
@@ -668,7 +671,9 @@ let repertoarCache = [];
 async function loadRepertoar() {
   const { data, error } = await supabaseClient.from('songs').select('*').order('title', { ascending: true });
   if (error) { document.getElementById('repertoarList').textContent = 'Fel: ' + error.message; return; }
-  repertoarCache = data || [];
+  // Dolda låtar (published = false) syns bara för admin, och märks "Dold"
+  const isAdmin = currentMember && currentMember.role === 'admin';
+  repertoarCache = (data || []).filter(s => s.published !== false || isAdmin);
   renderRepertoar();
 }
 
@@ -686,7 +691,7 @@ function renderSongCard(s) {
   details.className = 'song-card card modern-card';
 
   const summary = document.createElement('summary');
-  summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}</h3><span class="text-muted">Visa ▾</span></div>`;
+  summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}${s.published === false ? ' <span class="hidden-tag" title="Dold för medlemmar – syns bara för admin">Dold</span>' : ''}</h3><span class="text-muted">Visa ▾</span></div>`;
   details.appendChild(summary);
 
   const body = document.createElement('div');

@@ -232,7 +232,7 @@
     <p class="g-p">Visas när mikrofonen är på. <b>Du sjunger</b> = tonen du tar just nu och hur många cent du ligger fel. <b>Träff</b> = hur stor del av tiden du legat rätt när det finns en not att sjunga. <b>Noter klara</b> = hur många noter du har klarat, där du legat rätt minst 60 % av notens längd. Allt nollställs när du startar om från början.</p>
 
     <div class="tips">
-      <b>Spola:</b> dra i notbanan åt sidan, klicka i den lilla översikten ovanför, eller tryck −5 s.
+      <b>Klicka</b> i notbanan för att spela/pausa. <b>Spola:</b> dra i notbanan åt sidan, klicka i den lilla översikten ovanför, eller tryck −5 s.
       <b>Mellanslag</b> spelar/pausar på dator.
     </div>
   </div>
@@ -255,7 +255,7 @@
     <div class="stats" id="stats"></div>
     <div class="canvas-wrap">
       <canvas id="overview" title="Hela låten – klicka för att hoppa"></canvas>
-      <canvas id="roll" title="Dra i sidled för att spola"></canvas>
+      <canvas id="roll" title="Klicka för att spela/pausa – dra i sidled för att spola"></canvas>
       <div class="score-overlay" id="micPanel" hidden>
         <div title="Andel av tiden i noterna som du träffat"><span>Träff</span><b id="micHit">–</b></div>
         <div title="Noter där du träffat minst 60 % av tiden"><span>Noter</span><b id="micNotes">–</b></div>
@@ -290,7 +290,7 @@
         <button type="button" data-op="save">💾 Spara noter</button>
         <span class="edit-status" id="editStatus"></span>
       </div>
-      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. Dra i tom yta för att spola. Medlemmarna får de sparade noterna precis som de är.</p>
+      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. Klicka i tom yta för att spela/pausa, dra för att spola. Medlemmarna får de sparade noterna precis som de är.</p>
     </div>
     <div class="karaoke" id="karaoke" hidden aria-live="off">
       <div class="k-now" id="kNow">&nbsp;</div>
@@ -1476,7 +1476,7 @@ document.getElementById('overview').addEventListener('click', e => {
 // dra i notbanan för att spola
 (() => {
   const c = document.getElementById('roll');
-  let startX = null, startT = 0, wasPlaying = false;
+  let startX = null, startT = 0, wasPlaying = false, scrubbed = false, hadSel = false;
   let drag = null;
   const cxy = e => { const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1; return [(e.clientX - r.left) * d, (e.clientY - r.top) * d]; };
   c.addEventListener('pointerdown', e => {
@@ -1488,9 +1488,10 @@ document.getElementById('overview').addEventListener('click', e => {
         sel = h.i; drag = { n, zone: h.zone, x: e.clientX, y: e.clientY, o: { ...n }, moved: false };
         c.setPointerCapture(e.pointerId); tick(); return;
       }
-      sel = -1; tick();
+      hadSel = sel >= 0; sel = -1; tick();
     }
-    startX = e.clientX; startT = position(); wasPlaying = playing;
+    if (!editMode) hadSel = false;
+    startX = e.clientX; startT = position(); wasPlaying = playing; scrubbed = false;
     if (playing) pause();
     c.setPointerCapture(e.pointerId); c.classList.add('dragging');
   });
@@ -1510,13 +1511,20 @@ document.getElementById('overview').addEventListener('click', e => {
       c.style.cursor = !h ? 'grab' : h.zone === 'move' ? 'move' : 'ew-resize';
     }
     if (startX == null) return;
+    if (!scrubbed && Math.abs(e.clientX - startX) < 6) return;   // litet darr räknas som klick
+    scrubbed = true;
     const span = Number(document.getElementById('optZoom').value);
     pausedPos = Math.max(0, Math.min(durationOf(), startT - (e.clientX - startX) / c.clientWidth * span));
     tick();
   });
   const end = () => {
     if (drag) { const n = drag.n, moved = drag.moved; drag = null; if (moved) afterEdit(n); return; }
-    if (startX == null) return; startX = null; c.classList.remove('dragging'); if (wasPlaying) play(); };
+    if (startX == null) return; startX = null; c.classList.remove('dragging');
+    if (scrubbed) { if (wasPlaying) play(); return; }
+    // klick (utan att dra): spela/pausa – i redigeringsläget avmarkerar första klicket bara noten
+    if (hadSel) { hadSel = false; if (wasPlaying) play(); return; }
+    if (wasPlaying) { pausedPos = startT; tick(); } else play();
+  };
   c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
 })();
 document.getElementById('editToggle')?.addEventListener('click', () => setEditMode(!editMode));

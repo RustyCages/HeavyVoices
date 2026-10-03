@@ -389,6 +389,13 @@ async function ensureCtx() {
   if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} }
 }
 const nm = m => PitchAnalyze.midiToName(m);
+// rättar oktavfel (även i äldre sparade analyser) och räknar fram tonarten
+function prepPitch(p) {
+  if (!p) return p;
+  const q = PitchAnalyze.foldOctaves(p);
+  q.key = PitchAnalyze.detectKey(q.notes);
+  return q;
+}
 function fmtDate(iso) { const d = new Date(iso); return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }); }
 
 // ---------- stämrader ----------
@@ -458,7 +465,7 @@ async function loadSong(id) {
   }
   (data || []).forEach(r => {
     const st = stems.find(x => x.key === r.stem_key);
-    if (st) { st.pitch = r.data; st.pitchPath = r.stem_path; st.pitchAt = r.updated_at; }
+    if (st) { st.pitch = prepPitch(r.data); st.pitchPath = r.stem_path; st.pitchAt = r.updated_at; }
   });
   note.hidden = true;
   renderRows();
@@ -503,7 +510,7 @@ async function analyzeStem(st, show) {
       song_id: song.id, stem_key: st.key, stem_path: st.path, data: res, updated_at: res.created_at,
     });
     if (error) throw error;
-    st.pitch = res; st._rr = null; st.pitchPath = st.path; st.pitchAt = res.created_at;
+    st.pitch = prepPitch(res); st._rr = null; st.pitchPath = st.path; st.pitchAt = res.created_at;
     busy = false;
     renderRows();
     if (show) showStem(st);
@@ -548,7 +555,10 @@ function showStem(st) {
   const p = st.pitch, s = p.stats || {};
   document.getElementById('viewerTitle').textContent = `${song.title} – ${st.label}`;
   document.getElementById('stats').innerHTML =
-    `<b>${s.noteCount}</b> noter · omfång <b>${s.low != null ? nm(s.low) + '–' + nm(s.high) : '–'}</b> · ton i <b>${s.voicedPct}%</b> av låten · ${fmt(s.duration)} min`;
+    `<b>${s.noteCount}</b> noter · omfång <b>${s.low != null ? nm(s.low) + '–' + nm(s.high) : '–'}</b>` +
+    (p.key ? ` · tonart <b>${p.key.name}</b>` : '') +
+    ` · ton i <b>${s.voicedPct}%</b> av låten · ${fmt(s.duration)} min` +
+    (isAdmin && p.octFixed ? ` · <span title="Noter som analysen hörde en oktav fel har flyttats">${p.octFixed} oktavfel rättade</span>` : '');
   document.getElementById('viewer').hidden = false;
   const d = durationOf();
   document.getElementById('scrubber').max = d || 1;
@@ -644,8 +654,10 @@ function drawRoll() {
   // rutnät: en rad per halvton, svarta tangenter lite mörkare, C-linjer
   for (let m = Math.ceil(lo); m < hi; m++) {
     const pc = ((m % 12) + 12) % 12;
-    if ([1, 3, 6, 8, 10].includes(pc)) { ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(0, y(m + 0.5), W, rowH); }
-    if (pc === 0) { ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, Math.round(y(m - 0.5)), W, 1); }
+    const off = p.key ? !p.key.scale.includes(pc) : [1, 3, 6, 8, 10].includes(pc);
+    if (off) { ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(0, y(m + 0.5), W, rowH); }
+    else if (p.key && pc === p.key.tonic) { ctx.fillStyle = 'rgba(229,169,104,0.06)'; ctx.fillRect(0, y(m + 0.5), W, rowH); }
+    if (pc === (p.key ? p.key.tonic : 0)) { ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, Math.round(y(m - 0.5)), W, 1); }
   }
   // taktstreck var halv sekund, lite starkare på hela sekunder
   for (let s = Math.ceil(t0 * 2) / 2; s < t0 + span; s += 0.5) {
@@ -733,9 +745,11 @@ function drawRoll() {
   ctx.textBaseline = 'middle';
   const allNames = rowH >= 18 * dpr;
   for (let m = Math.ceil(lo); m < hi; m++) {
-    const isC = ((m % 12) + 12) % 12 === 0;
+    const pcm = ((m % 12) + 12) % 12;
+    const isC = p.key ? pcm === p.key.tonic : pcm === 0;
     if (!isC && !allNames) continue;
-    ctx.fillStyle = isC ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.22)';
+    if (!isC && p.key && !p.key.scale.includes(pcm)) continue;
+    ctx.fillStyle = isC ? 'rgba(229,169,104,0.75)' : 'rgba(255,255,255,0.3)';
     ctx.fillText(nm(m), 6 * dpr, y(m));
   }
 

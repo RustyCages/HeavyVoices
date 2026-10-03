@@ -108,7 +108,7 @@
     const midi = cleanCurve(raw);
     const notes = toNotes(midi);
     const voiced = midi.filter(v => v > 0);
-    return {
+    return foldOctaves({
       v: 1,
       hop: HOP_SEC,
       fmin, fmax,
@@ -121,7 +121,7 @@
         low: notes.length ? Math.min(...notes.map(n => n.n)) : null,
         high: notes.length ? Math.max(...notes.map(n => n.n)) : null,
       },
-    };
+    });
   }
 
   // Städa kurvan: oktavhopp, medianfilter, ta bort korta snuttar.
@@ -167,6 +167,85 @@
       i = j;
     }
     return sm;
+  }
+
+  // ---------- efterbehandling: oktavfel på hela noter + tonart ----------
+  function wMedian(items) { // [{n, d}] viktat med längd
+    const s = items.slice().sort((a, b) => a.n - b.n);
+    const tot = s.reduce((a, x) => a + x.d, 0); let acc = 0;
+    for (const x of s) { acc += x.d; if (acc >= tot / 2) return x.n; }
+    return s.length ? s[s.length - 1].n : 60;
+  }
+  // Noter som ligger en oktav fel jämfört med melodin runt omkring flyttas en oktav,
+  // och toner långt utanför stämmans kärnregister viks in. Analyskurvan följer med.
+  function foldOctaves(pitch) {
+    if (!pitch || !pitch.notes || !pitch.notes.length || pitch.folded) return pitch;
+    const notes = pitch.notes.map(n => ({ ...n, n0: n.n }));
+    // en not flyttas bara om melodin både FÖRE och EFTER ligger åt samma håll en oktav bort
+    // (då är det ett analysfel – ett äkta registerbyte har stöd på åtminstone ena sidan)
+    for (let pass = 0; pass < 2; pass++) {
+      const cur = notes.map(n => n.n);
+      notes.forEach((n, i) => {
+        const before = [], after = [];
+        notes.forEach((o, j) => {
+          if (j === i) return;
+          if (o.t < n.t && o.t + o.d > n.t - 3) before.push({ n: cur[j], d: o.d });
+          else if (o.t > n.t && o.t < n.t + n.d + 3) after.push({ n: cur[j], d: o.d });
+        });
+        if (!before.length || !after.length) {
+          const one = before.length ? before : after;
+          if (one.length < 3) return;
+          const ref = wMedian(one);
+          if (Math.abs(cur[i] - ref) > 9) { let v = cur[i]; while (v - ref > 7) v -= 12; while (ref - v > 7) v += 12; n.n = v; }
+          return;
+        }
+        const rb = wMedian(before), ra = wMedian(after);
+        const db = cur[i] - rb, da = cur[i] - ra;
+        if (Math.abs(db) > 8 && Math.abs(da) > 8 && Math.sign(db) === Math.sign(da)) {
+          const ref = (rb + ra) / 2; let v = cur[i];
+          while (v - ref > 8) v -= 12; while (ref - v > 8) v += 12;
+          n.n = v;
+        }
+      });
+    }
+    const center = wMedian(notes);
+    notes.forEach(n => { while (n.n - center > 14) n.n -= 12; while (center - n.n > 14) n.n += 12; });
+    let fixed = 0;
+    const hop = pitch.hop || HOP_SEC, midi = Array.from(pitch.midi || []);
+    notes.forEach(n => {
+      const sh = n.n - n.n0; if (!sh) return; fixed++;
+      const a = Math.floor(n.t / hop), b = Math.min(midi.length, Math.ceil((n.t + n.d) / hop));
+      for (let i = a; i < b; i++) if (midi[i]) midi[i] += sh;
+    });
+    for (let i = 0; i < midi.length; i++) if (midi[i]) { while (midi[i] - center > 15) midi[i] -= 12; while (center - midi[i] > 15) midi[i] += 12; }
+    const out = notes.map(({ n0, ...n }) => n);
+    return { ...pitch, notes: out, midi, folded: true, octFixed: fixed,
+      stats: { ...(pitch.stats || {}), low: Math.min(...out.map(n => n.n)), high: Math.max(...out.map(n => n.n)) } };
+  }
+  // Tonart (Krumhansl–Schmuckler) ur notlängder per tonklass
+  const KS_MAJ = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+  const KS_MIN = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+  const SV_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'H'];
+  function detectKey(notes) {
+    if (!notes || notes.length < 8) return null;
+    const h = new Array(12).fill(0);
+    notes.forEach(n => { h[((Math.round(n.n) % 12) + 12) % 12] += n.d; });
+    const corr = (prof, k) => {
+      const xs = h, ys = xs.map((_, i) => prof[(i - k + 12) % 12]);
+      const mx = xs.reduce((a, b) => a + b) / 12, my = ys.reduce((a, b) => a + b) / 12;
+      let num = 0, dx = 0, dy = 0;
+      for (let i = 0; i < 12; i++) { num += (xs[i] - mx) * (ys[i] - my); dx += (xs[i] - mx) ** 2; dy += (ys[i] - my) ** 2; }
+      return num / Math.sqrt(dx * dy || 1);
+    };
+    let best = { r: -2 };
+    for (let k = 0; k < 12; k++) {
+      const a = corr(KS_MAJ, k), b = corr(KS_MIN, k);
+      if (a > best.r) best = { r: a, tonic: k, minor: false };
+      if (b > best.r) best = { r: b, tonic: k, minor: true };
+    }
+    const steps = best.minor ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11];
+    return { tonic: best.tonic, minor: best.minor, name: SV_NAMES[best.tonic] + (best.minor ? '-moll' : '-dur'),
+      scale: steps.map(x => (x + best.tonic) % 12), confidence: Math.round(best.r * 100) / 100 };
   }
 
   // Dela tonade partier i noter: ny not när kurvan stadigt (≥ 3 ramar) lämnar
@@ -294,7 +373,7 @@
     };
   }
 
-  const api = { analyze, toMono16k, createLiveDetector, rangeForLabel, midiToName, SR, HOP_SEC };
+  const api = { analyze, toMono16k, createLiveDetector, rangeForLabel, midiToName, foldOctaves, detectKey, SR, HOP_SEC };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PitchAnalyze = api;
 })(typeof window !== 'undefined' ? window : globalThis);

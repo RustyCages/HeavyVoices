@@ -177,9 +177,12 @@
   #playerMenu { position:fixed; bottom:6rem; left:50%; transform:translateX(-50%); width:min(92vw, 340px); max-height:60vh; overflow-y:auto; background:var(--bg); border:1px solid var(--border); border-radius:0.7rem; box-shadow:var(--card-shadow); padding:0.4rem; z-index:120; }
   #playerMenu[hidden] { display:none; }
   #playerMenu .pm-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); padding:0.45rem 0.6rem 0.25rem; }
-  #playerMenu .pm-item { display:flex; align-items:center; gap:0.5rem; width:100%; padding:0.55rem 0.6rem; border-radius:0.4rem; background:none; border:none; color:var(--text); font-weight:400; font-size:0.9rem; text-align:left; cursor:pointer; }
+  #playerMenu .pm-item { display:flex; justify-content:flex-start; align-items:center; gap:0.5rem; width:100%; padding:0.55rem 0.6rem; border-radius:0.4rem; background:none; border:none; color:var(--text); font-weight:400; font-size:0.9rem; text-align:left; cursor:pointer; }
   #playerMenu .pm-item:hover { background:rgba(255,255,255,0.05); color:var(--text); }
   #playerMenu .pm-item .pm-check { width:1rem; color:var(--accent); flex-shrink:0; }
+  #playerMenu .pm-box { width:1.05rem; height:1.05rem; flex-shrink:0; border:1.5px solid var(--text-muted); border-radius:0.25rem; display:inline-flex; align-items:center; justify-content:center; font-size:0.7rem; line-height:1; color:#111317; }
+  #playerMenu .pm-box.on { background:var(--accent); border-color:var(--accent); }
+  #playerMenu .pm-sep { height:1px; background:var(--border); margin:0.3rem 0.4rem; }
   #playerMenu .pm-row { display:flex; align-items:center; gap:0.25rem; }
   #playerMenu .pm-row .pm-item { flex:1; min-width:0; }
   #playerMenu .pm-row .pm-item span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1543,11 +1546,37 @@ function togglePlayerMenu(kind) {
   m.hidden = false;
   m.querySelectorAll('[data-voice]').forEach(b => b.addEventListener('click', () => chooseKaraokeVoice(b.dataset.voice)));
   m.querySelectorAll('[data-split]').forEach(b => b.addEventListener('click', () => { if (!splitOn) document.getElementById('splitBtn').click(); else closePlayerMenu(); }));
+  m.querySelectorAll('[data-split-off]').forEach(b => b.addEventListener('click', () => { if (splitOn) document.getElementById('splitBtn').click(); closePlayerMenu(); }));
+  m.querySelectorAll('[data-part]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    const k = b.dataset.part, hidden = splitHidden(), i = hidden.indexOf(k);
+    if (i >= 0) hidden.splice(i, 1);
+    else {
+      if (splitParts(playerSong).filter(p => !hidden.includes(p.key || 'gemensam')).length <= 1) { toast('Minst en text måste visas'); return; }
+      hidden.push(k);
+    }
+    try { localStorage.setItem('hv-split-hidden', JSON.stringify(hidden)); } catch (err) {}
+    buildSplit(playerSong); syncSplit();
+    requestAnimationFrame(() => renderSplit(true));
+    const open = playerMenuKind; playerMenuKind = null; togglePlayerMenu(open); // rita om menyn, låt den vara öppen
+  }));
   m.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => { openDoc(b.dataset.open); closePlayerMenu(); }));
   m.querySelectorAll('[data-dl]').forEach(b => b.addEventListener('click', () => { downloadDoc(b.dataset.dl); closePlayerMenu(); }));
 }
 
 function voiceMenuHtml() {
+  if (splitOn && karaokeOn && splitAvailable(playerSong)) {
+    const hidden = splitHidden();
+    let html = '<div class="pm-title">Delad skärm – visa</div>';
+    splitParts(playerSong).forEach(p => {
+      const k = p.key || 'gemensam', on = !hidden.includes(k);
+      html += `<button class="pm-item" data-part="${k}" role="menuitemcheckbox" aria-checked="${on}"><span class="pm-box${on ? ' on' : ''}">${on ? '✓' : ''}</span><span>${p.label}</span></button>`;
+    });
+    html += '<div class="pm-sep"></div>' +
+      '<button class="pm-item" data-split-off="1"><span class="pm-check"></span><span>En text i taget</span></button>' +
+      '<button class="pm-item" data-voice="off"><span class="pm-check"></span><span>Dölj text</span></button>';
+    return html;
+  }
   const cur = karaokeOn ? effectiveVoice(playerSong) : null;
   const item = (val, label, on) => `<button class="pm-item" data-voice="${val}" role="menuitemradio" aria-checked="${on}"><span class="pm-check">${on ? '✓' : ''}</span><span>${label}</span></button>`;
   let html = '<div class="pm-title">Synkad text</div>' + item('off', 'Dölj text', !karaokeOn);
@@ -1626,11 +1655,16 @@ function splitParts(song) {
   availableVoices(song).forEach(v => parts.push({ ...v, lrc: song.lyrics_lrc_voices[v.key] }));
   return parts;
 }
+function splitHidden() {
+  try { const v = JSON.parse(localStorage.getItem('hv-split-hidden') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
 function splitAvailable(song) { return !!(currentMember && currentMember.role === 'admin') && splitParts(song).length >= 2; }
 function buildSplit(song) {
   const wrap = document.getElementById('karaokeSplit');
   const mine = voiceFromStamma(currentMember && currentMember.stamma);
-  const voices = splitParts(song);
+  const hidden = splitHidden();
+  let voices = splitParts(song).filter(p => !hidden.includes(p.key || 'gemensam'));
+  if (!voices.length) voices = splitParts(song);
   wrap.style.setProperty('--n', voices.length);
   wrap.style.setProperty('--cols2', Math.min(2, voices.length));
   wrap.innerHTML = voices.map(v => `<div class="ks-panel${v.key && v.key === mine ? ' mine' : ''}" data-voice="${v.key || 'gemensam'}"><div class="ks-head">${v.label}</div><div class="ks-box"><div class="k-reel"></div></div></div>`).join('');

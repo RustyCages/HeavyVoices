@@ -30,8 +30,8 @@
   .stats b { color: var(--text); font-weight: 600; }
   .canvas-wrap { position: relative; border: 1px solid var(--border); border-radius: 0.6rem; overflow: hidden; background: rgba(0,0,0,0.25); touch-action: none; }
   #overview { display: block; width: 100%; height: 56px; cursor: pointer; border-bottom: 1px solid var(--border); }
-  #roll { display: block; width: 100%; height: 340px; cursor: grab; }
-  @media (max-width: 640px) { #roll { height: 290px; } }
+  #roll { display: block; width: 100%; height: 420px; cursor: grab; }
+  @media (max-width: 640px) { #roll { height: 360px; } }
   #roll.dragging { cursor: grabbing; }
 
   .transport { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0.9rem 0 0.25rem; }
@@ -122,6 +122,22 @@
     .scorebar { grid-template-columns: 1fr 1fr; }
     .scorebar .stat:first-child { grid-column: 1 / -1; }
   }
+  .progress-card h2 { margin: 0 0 0.2rem; }
+  .prog-head { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; align-items: baseline; margin: 0.4rem 0 0.6rem; font-size: 0.9rem; color: var(--text-muted); }
+  .prog-head b { color: var(--text); font-size: 1.05rem; }
+  .prog-chart { width: 100%; height: 150px; display: block; }
+  .prog-list { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 0.6rem; font-variant-numeric: tabular-nums; }
+  .prog-list th { text-align: left; font-weight: 500; color: var(--text-muted); font-size: 0.78rem; padding: 0.3rem 0.4rem; border-bottom: 1px solid var(--border); }
+  .prog-list td { padding: 0.4rem; border-bottom: 1px solid var(--border); }
+  .prog-list td.num, .prog-list th.num { text-align: right; white-space: nowrap; }
+  .prog-list td:first-child { white-space: nowrap; }
+  @media (max-width: 640px) { .prog-list.stem-scope .c-what { display: none; } .prog-list { font-size: 0.82rem; } }
+  .prog-list tr.cur td { color: var(--accent); }
+  .prog-del { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0 0.2rem; font-size: 0.9rem; }
+  .prog-del:hover { color: #f87171; background: none; }
+  .prog-tabs { display: flex; gap: 0.4rem; margin-top: 0.8rem; }
+  .prog-tabs button { font-size: 0.82rem; padding: 0.3rem 0.7rem; }
+  .prog-tabs button[aria-pressed="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -262,8 +278,9 @@
       <fieldset class="set">
         <legend>Sjung med</legend>
         <label class="row">Marginal <select id="optTol">
-          <option value="75">Snäll ±75 cent</option>
-          <option value="50" selected>Normal ±50 cent</option>
+          <option value="100">Väldigt snäll ±100 cent</option>
+          <option value="75" selected>Snäll ±75 cent</option>
+          <option value="50">Normal ±50 cent</option>
           <option value="30">Strikt ±30 cent</option>
         </select></label>
         <label><input type="checkbox" id="optOctave" checked> Godkänn annan oktav</label>
@@ -278,6 +295,18 @@
       <span><i class="swatch" style="background: #fff; height: 3px;"></i>din röst</span>
       <span><i class="swatch" style="background: rgba(255,255,255,0.5); height: 2px;"></i>analysens kurva</span>
     </div>
+  </div>
+
+  <div class="card static progress-card" id="progressCard" hidden>
+    <h2>Min utveckling</h2>
+    <p class="hint" style="margin:0;">Varje gång du sjunger med i mikrofonen (minst 5 noter) sparas resultatet här – bara du och körledningen ser dina siffror.</p>
+    <div class="prog-tabs">
+      <button type="button" class="btn-outline" data-scope="stem" aria-pressed="true">Den här stämman</button>
+      <button type="button" class="btn-outline" data-scope="all" aria-pressed="false">Alla låtar</button>
+    </div>
+    <div class="prog-head" id="progHead"></div>
+    <svg class="prog-chart" id="progChart" role="img" aria-label="Träffprocent över tid"></svg>
+    <table class="prog-list" id="progTable"><thead><tr><th>När</th><th id="progColWhat" class="c-what">Stämma</th><th class="num">Träff</th><th class="num">Noter</th><th></th></tr></thead><tbody id="progRows"></tbody></table>
   </div>
 </div>
 
@@ -319,6 +348,10 @@ let micRaf = null;
 let voice = [];          // [t, visad midi, status: 1 träff, 0 miss, -1 ingen not]
 let micNow = null;       // { label, sub, status } för stämapparaten i notbanan
 let noteStats = [];      // per not: { hit, tot }
+let dispMidi = null;     // utjämnad visad ton
+let unsaved = false;     // nya sångdata sedan senaste sparning
+let sessions = [];       // mina sparade övningar
+let progScope = 'stem';
 
 // ---------- hjälpare ----------
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
@@ -389,6 +422,7 @@ function renderRows() {
 
 // ---------- ladda låt ----------
 async function loadSong(id) {
+  flushSession();
   const myToken = ++loadToken;
   stop();
   song = songs.find(s => String(s.id) === String(id)) || null;
@@ -491,6 +525,7 @@ async function analyzeAll() {
 
 // ---------- visning ----------
 function showStem(st) {
+  flushSession();
   stop();
   current = st;
   voice = []; noteStats = []; if (mic) updateScore();
@@ -509,6 +544,7 @@ function showStem(st) {
   sizeCanvases();
   drawOverview();
   tick();
+  renderProgress();
   // förladda ljudet i bakgrunden så Spela startar direkt
   loadBuffer(st).then(() => {
     if (current !== st) return;
@@ -531,8 +567,8 @@ function sizeCanvases() {
 
 function yRange() {
   const s = current.pitch.stats || {};
-  let lo = (s.low ?? 48) - 3, hi = (s.high ?? 72) + 3;
-  if (hi - lo < 14) { const mid = (hi + lo) / 2; lo = Math.floor(mid - 7); hi = Math.ceil(mid + 7); }
+  let lo = (s.low ?? 48) - 1.5, hi = (s.high ?? 72) + 1.5;
+  if (hi - lo < 12) { const mid = (hi + lo) / 2; lo = mid - 6; hi = mid + 6; }
   return [lo, hi];
 }
 
@@ -583,11 +619,14 @@ function drawRoll() {
   }
 
   // noter: rundade block, fylls grönt/rött där du sjungit
-  const r = Math.min(7 * dpr, rowH * 0.45);
+  // rutans höjd visar marginalen: allt inom rutan räknas som träff
+  const tolSemi = (Number(document.getElementById('optTol').value) || 50) / 100;
+  const boxHalf = Math.max(0.45, tolSemi);
+  const r = Math.min(8 * dpr, rowH * boxHalf);
   const vis = [];
   p.notes.forEach((n, ni) => { if (!(n.t + n.d < t0 || n.t > t0 + span)) vis.push([n, ni]); });
   vis.forEach(([n, ni]) => {
-    const nx = x(n.t), nw = Math.max(3, n.d * pxs), top = y(n.n + 0.45), h = rowH * 0.9;
+    const nx = x(n.t), nw = Math.max(3, n.d * pxs), top = y(n.n + boxHalf), h = rowH * boxHalf * 2;
     const active = pos >= n.t && pos < n.t + n.d;
     ctx.save();
     ctx.beginPath(); ctx.roundRect(nx, top, nw, h, r); ctx.clip();
@@ -661,8 +700,9 @@ function drawRoll() {
   ctx.fillStyle = g; ctx.fillRect(hx - dpr, 0, 2 * dpr, H);
 
   // lysande prick där din röst är just nu
-  const lastV = voice[voice.length - 1];
-  if (mic && lastV && lastV[1] != null && playing && position() - lastV[0] < 0.4) {
+  let lastV = null;
+  for (let i = voice.length - 1; i >= 0 && i >= voice.length - 30; i--) if (voice[i][1] != null) { lastV = voice[i]; break; }
+  if (mic && lastV && playing && position() - micLatency() - lastV[0] < 0.3) {
     const dx = x(lastV[0]), dy = y(lastV[1]);
     const col = lastV[2] === 1 ? '#4ade80' : lastV[2] === 0 ? '#f87171' : '#ffffff';
     ctx.beginPath(); ctx.arc(dx, dy, 7 * dpr, 0, Math.PI * 2);
@@ -692,7 +732,7 @@ function drawRoll() {
 function tick() {
   const d = durationOf();
   let p = position();
-  if (playing && p >= d) { stop(); pausedPos = 0; p = 0; }
+  if (playing && p >= d) { stop(); flushSession(); pausedPos = 0; p = 0; }
   document.getElementById('curTime').textContent = fmt(p, true);
   const sc = document.getElementById('scrubber');
   if (!sc.matches(':active')) sc.value = Math.min(p, d);
@@ -902,6 +942,106 @@ function updateScore() {
   document.getElementById('micNotes').textContent = done ? `${okNotes}/${done}` : '–';
 }
 
+// ---------- spara övningar / min utveckling ----------
+let meId = null, songTitles = {};
+async function flushSession() {
+  if (!unsaved || !song || !current) return;
+  unsaved = false;
+  let hit = 0, tot = 0, done = 0, ok = 0;
+  noteStats.forEach(st => {
+    if (!st) return;
+    hit += st.hit; tot += st.tot;
+    if (st.tot >= 3) { done++; if (st.hit / st.tot >= 0.6) ok++; }
+  });
+  if (done < 5 || !tot) return;
+  let sung = 0;
+  for (let i = 1; i < voice.length; i++) if (voice[i][1] != null && voice[i][3] >= 0) sung += Math.min(0.1, Math.max(0, voice[i][0] - voice[i - 1][0]));
+  const row = {
+    member_id: meId, song_id: song.id, stem_key: current.key, stem_label: current.label,
+    hit_pct: Math.round(100 * hit / tot), notes_ok: ok, notes_done: done,
+    notes_total: current.pitch.notes.length, sung_seconds: Math.round(sung * 10) / 10,
+    tolerance: Number(document.getElementById('optTol').value) || 50,
+  };
+  const { data, error } = await supabaseClient.from('practice_sessions').insert(row).select().single();
+  if (error) { toast('Kunde inte spara övningen: ' + error.message, 5000); return; }
+  sessions.unshift(data);
+  if (document.visibilityState !== 'hidden') toast(`Övningen sparad: ${row.hit_pct} % träff, ${ok}/${done} noter`);
+  renderProgress();
+}
+
+async function loadSessions() {
+  const { data, error } = await supabaseClient.from('practice_sessions')
+    .select('*').eq('member_id', meId).order('created_at', { ascending: false }).limit(500);
+  sessions = error ? [] : (data || []);
+  renderProgress();
+}
+
+function renderProgress() {
+  const card = document.getElementById('progressCard');
+  if (!song || !current) { card.hidden = true; return; }
+  card.hidden = false;
+  document.querySelectorAll('.prog-tabs button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.scope === progScope)));
+  const list = progScope === 'stem'
+    ? sessions.filter(x => String(x.song_id) === String(song.id) && x.stem_key === current.key)
+    : sessions;
+  const head = document.getElementById('progHead'), svg = document.getElementById('progChart'), body = document.getElementById('progRows');
+  document.getElementById('progColWhat').textContent = progScope === 'stem' ? 'Marginal' : 'Låt – stämma';
+  document.getElementById('progTable').classList.toggle('stem-scope', progScope === 'stem');
+  if (!list.length) {
+    head.innerHTML = progScope === 'stem'
+      ? `Inga sparade övningar för <b>${esc(current.label)}</b> än – tryck 🎤 Sjung med och spela.`
+      : 'Inga sparade övningar än.';
+    svg.style.display = 'none'; body.innerHTML = ''; return;
+  }
+  const latest = list[0], best = list.reduce((a, b) => b.hit_pct > a.hit_pct ? b : a, list[0]);
+  const chron = list.slice(0, 30).reverse();
+  let trend = '';
+  if (list.length >= 2) {
+    const n = Math.min(3, Math.floor(list.length / 2));
+    const avg = a => a.reduce((x, y) => x + y.hit_pct, 0) / a.length;
+    const d = Math.round(avg(list.slice(0, n)) - avg(list.slice(-n)));
+    trend = `<span>Utveckling <b style="color:${d > 0 ? '#4ade80' : d < 0 ? '#f87171' : 'inherit'}">${d > 0 ? '+' : ''}${d} %-enheter</b></span>`;
+  }
+  head.innerHTML = `<span>Senast <b>${latest.hit_pct} %</b></span><span>Bäst <b>${best.hit_pct} %</b></span>${trend}<span><b>${list.length}</b> övningar</span>`;
+
+  // diagram: träff % per övning (äldst till vänster)
+  svg.style.display = '';
+  const W = svg.clientWidth || 600, H = 150, L = 34, R = 10, T = 10, B = 22;
+  const xs = i => chron.length === 1 ? L + (W - L - R) / 2 : L + i * (W - L - R) / (chron.length - 1);
+  const ys = v => T + (100 - v) / 100 * (H - T - B);
+  let g = '';
+  [0, 50, 100].forEach(v => {
+    g += `<line x1="${L}" x2="${W - R}" y1="${ys(v)}" y2="${ys(v)}" stroke="rgba(255,255,255,${v === 50 ? 0.12 : 0.07})" ${v === 50 ? 'stroke-dasharray="3 4"' : ''}/>`;
+    g += `<text x="${L - 6}" y="${ys(v) + 4}" text-anchor="end" font-size="11" fill="rgba(255,255,255,0.45)">${v}%</text>`;
+  });
+  const pts = chron.map((x, i) => `${xs(i).toFixed(1)},${ys(x.hit_pct).toFixed(1)}`);
+  if (chron.length > 1) g += `<polyline points="${pts.join(' ')}" fill="none" stroke="${ACCENT}" stroke-width="2.2" stroke-linejoin="round"/>`;
+  chron.forEach((x, i) => {
+    g += `<circle cx="${xs(i)}" cy="${ys(x.hit_pct)}" r="4" fill="${x === latest ? '#fff' : ACCENT}"><title>${fmtDate(x.created_at)}: ${x.hit_pct} %</title></circle>`;
+  });
+  const dl = d => new Date(d).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
+  g += `<text x="${L}" y="${H - 5}" font-size="11" fill="rgba(255,255,255,0.45)">${dl(chron[0].created_at)}</text>`;
+  if (chron.length > 1) g += `<text x="${W - R}" y="${H - 5}" text-anchor="end" font-size="11" fill="rgba(255,255,255,0.45)">${dl(chron[chron.length - 1].created_at)}</text>`;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = g;
+
+  body.innerHTML = list.slice(0, 12).map(x => {
+    const what = progScope === 'stem'
+      ? `±${x.tolerance || '–'} cent`
+      : `${esc(songTitles[x.song_id] || 'Borttagen låt')} – ${esc(x.stem_label || '')}`;
+    const cur = progScope === 'all' && String(x.song_id) === String(song.id) && x.stem_key === current.key;
+    return `<tr class="${cur ? 'cur' : ''}"><td>${fmtDate(x.created_at)}</td><td class="c-what">${what}</td><td class="num">${x.hit_pct} %</td>` +
+      `<td class="num">${x.notes_ok}/${x.notes_done}</td><td class="num"><button type="button" class="prog-del" data-id="${x.id}" title="Ta bort">✕</button></td></tr>`;
+  }).join('');
+  body.querySelectorAll('.prog-del').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Ta bort den här övningen?')) return;
+    const { error } = await supabaseClient.from('practice_sessions').delete().eq('id', b.dataset.id);
+    if (error) { toast('Kunde inte ta bort: ' + error.message); return; }
+    sessions = sessions.filter(x => String(x.id) !== b.dataset.id);
+    renderProgress();
+  }));
+}
+
 function micStep() {
   if (!mic) return;
   const m = mic.det.read();
@@ -916,14 +1056,21 @@ function micStep() {
     cents = Math.round(diff * 100);
     const tol = Number(document.getElementById('optTol').value) || 50;
     status = Math.abs(cents) <= tol ? 1 : 0;
-    // magnet: inom marginalen dras pricken mot notens mitt så den ligger still
-    if (status === 1) shown = target + diff * 0.25;
+    // magnet: inom marginalen dras pricken mjukt mot notens mitt (utan hopp vid kanten)
+    if (status === 1) { const q = Math.abs(cents) / tol; shown = target + diff * (0.2 + 0.8 * q * q); }
   }
+  // extra utjämning av det som visas: små rörelser glider, riktiga tonbyten följs direkt
+  if (shown != null) {
+    if (dispMidi == null || Math.abs(shown - dispMidi) > 1.2) dispMidi = shown;
+    else dispMidi += (shown - dispMidi) * 0.25;
+    shown = dispMidi;
+  } else dispMidi = null;
   if (playing) {
     voice.push([t, shown, status, ti]);
     if (ti >= 0 && m != null) {
       const s = noteStats[ti] || (noteStats[ti] = { hit: 0, tot: 0 });
       s.tot++; if (status === 1) s.hit++;
+      unsaved = true;
     }
     updateScore();
   }
@@ -966,6 +1113,7 @@ async function toggleMic() {
 }
 
 function stopMic() {
+  flushSession();
   if (mic) mic.det.stop();
   mic = null; micNow = null;
   cancelAnimationFrame(micRaf);
@@ -977,6 +1125,14 @@ function stopMic() {
 
 // ---------- händelser ----------
 document.getElementById('micBtn').addEventListener('click', toggleMic);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSession(); });
+window.addEventListener('pagehide', flushSession);
+document.querySelectorAll('.prog-tabs button').forEach(b => b.addEventListener('click', () => { progScope = b.dataset.scope; renderProgress(); }));
+(() => {
+  const tol = document.getElementById('optTol');
+  try { const v = localStorage.getItem('hv-tol'); if (v && tol.querySelector(`option[value="${v}"]`)) tol.value = v; } catch (e) {}
+  tol.addEventListener('change', () => { try { localStorage.setItem('hv-tol', tol.value); } catch (e) {} tick(); });
+})();
 (() => {
   const g = document.getElementById('guide'), b = document.getElementById('guideBtn');
   const set = (open) => { g.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? '✕ Stäng guiden' : '❔ Så funkar det'; };
@@ -1025,12 +1181,13 @@ document.addEventListener('keydown', e => {
     e.preventDefault(); document.getElementById('playBtn').click();
   }
 });
-window.addEventListener('resize', () => { if (current) { sizeCanvases(); tick(); } });
+window.addEventListener('resize', () => { if (current) { sizeCanvases(); tick(); renderProgress(); } });
 
 (async () => {
   const member = await requireAuth();
   if (!member) return;
   isAdmin = member.role === 'admin';
+  meId = member.id;
   // "Spela med": senaste valet sparas; första gången är Backtrack påslaget för medlemmar
   let savedWith = null;
   try { savedWith = JSON.parse(localStorage.getItem('hv-play-with') || 'null'); } catch (e) {}
@@ -1049,6 +1206,8 @@ window.addEventListener('resize', () => { if (current) { sizeCanvases(); tick();
   const { data, error } = await supabaseClient.from('songs').select('*').order('title');
   const sel = document.getElementById('songSelect');
   if (error) { sel.innerHTML = `<option>Fel: ${esc(error.message)}</option>`; return; }
+  (data || []).forEach(s => { songTitles[s.id] = s.title; });
+  loadSessions();
   songs = (data || []).filter(s => (s.published !== false || isAdmin) && stemListFor(s).some(st => st.key !== 'stem_backtrack_path'));
   if (!isAdmin) {
     // medlemmar ser bara låtar där minst en stämma har tonkurva

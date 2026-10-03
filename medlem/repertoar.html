@@ -113,6 +113,8 @@
   .doc-chip button:hover, .doc-chip a:hover { background:rgba(255,255,255,0.05); color:var(--accent); }
   .doc-chip svg { width:14px; height:14px; }
 
+  .song-actions { display:inline-flex; align-items:center; gap:0.6rem; flex-shrink:0; }
+  .pl-quick { padding:0.3rem 0.65rem; font-size:0.8rem; }
   .quick-create { display:flex; gap:0.6rem; margin-bottom:1.75rem; flex-wrap:wrap; }
   .quick-create input { width:auto; flex:1; margin-bottom:0; min-width:180px; }
 
@@ -243,14 +245,14 @@
   </div>
 
   <div class="tab-panel active" id="tabRepertoar">
-    <div class="quick-create">
-      <input type="text" id="newPlaylistName" placeholder="Namn på ny spellista">
-      <button class="btn-gold" id="createPlaylistBtn">Skapa ny spellista</button>
-    </div>
     <div id="repertoarList">Laddar...</div>
   </div>
 
   <div class="tab-panel" id="tabSpellistor">
+    <div class="quick-create">
+      <input type="text" id="newPlaylistName" placeholder="Namn på ny spellista">
+      <button class="btn-gold" id="createPlaylistBtn">Skapa ny spellista</button>
+    </div>
     <div id="playlistList">Laddar...</div>
   </div>
 </div>
@@ -482,28 +484,41 @@ function renderPlaylistList() {
 
 // Keep every "lägg till i spellista"-dropdown in Repertoar in sync with playlistsCache
 // (a playlist created or deleted elsewhere no longer leaves stale options behind)
+const NEW_PL = '__new';
+function playlistOptionsHtml() {
+  return playlistsCache.map(pl => `<option value="${pl.id}">${escapeHtml(pl.name)}</option>`).join('') +
+    `<option value="${NEW_PL}">＋ Ny spellista…</option>`;
+}
+function lastPlaylistId() {
+  let id = null; try { id = localStorage.getItem('hv-last-playlist'); } catch (e) {}
+  return playlistsCache.some(pl => String(pl.id) === id) ? id : (playlistsCache[0] ? String(playlistsCache[0].id) : NEW_PL);
+}
 function refreshPlaylistSelects() {
-  const optionsHtml = playlistsCache.map(pl => `<option value="${pl.id}">${escapeHtml(pl.name)}</option>`).join('')
-    || '<option value="">Ingen spellista ännu</option>';
   document.querySelectorAll('.targetPlaylistSelect').forEach(sel => {
     const prevValue = sel.value;
-    sel.innerHTML = optionsHtml;
-    if (playlistsCache.some(pl => pl.id === prevValue)) sel.value = prevValue;
+    sel.innerHTML = playlistOptionsHtml();
+    sel.value = playlistsCache.some(pl => String(pl.id) === prevValue) ? prevValue : lastPlaylistId();
+    sel.dispatchEvent(new Event('change'));
   });
+}
+async function createPlaylist(name) {
+  name = (name || '').trim();
+  if (!name) { toast('Ange ett namn'); return null; }
+  const { data, error } = await supabaseClient.from('playlists').insert({ member_id: currentMember.id, name }).select().single();
+  if (error) { toast('Fel: ' + error.message); return null; }
+  playlistsCache.push(data);
+  try { localStorage.setItem('hv-last-playlist', String(data.id)); } catch (e) {}
+  renderPlaylistList();
+  refreshPlaylistSelects();
+  toast(`Spellistan "${name}" skapad`);
+  return data;
 }
 
 document.getElementById('createPlaylistBtn').addEventListener('click', async () => {
   const input = document.getElementById('newPlaylistName');
-  const name = input.value.trim();
-  if (!name) { toast('Ange ett namn'); return; }
-  const { data, error } = await supabaseClient.from('playlists').insert({ member_id: currentMember.id, name }).select().single();
-  if (error) { toast('Fel: ' + error.message); return; }
-  input.value = '';
-  playlistsCache.push(data);
-  renderPlaylistList();
-  refreshPlaylistSelects();
-  toast('Spellista skapad');
+  if (await createPlaylist(input.value)) input.value = '';
 });
+document.getElementById('newPlaylistName').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('createPlaylistBtn').click(); });
 
 // playlistTracksCache[playlistId] = [{ rowId, song, stemDefs, volumes, extraVolumesRaw, muted:Set }]
 const playlistTracksCache = {};
@@ -695,8 +710,15 @@ function renderSongCard(s) {
   details.className = 'song-card card modern-card';
 
   const summary = document.createElement('summary');
-  summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}${s.published === false ? ' <span class="hidden-tag" title="Dold för medlemmar – syns bara för admin">Dold</span>' : ''}</h3><span class="text-muted">Visa ▾</span></div>`;
+  summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}${s.published === false ? ' <span class="hidden-tag" title="Dold för medlemmar – syns bara för admin">Dold</span>' : ''}</h3>` +
+    `<span class="song-actions"><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="text-muted">Visa ▾</span></span></div>`;
   details.appendChild(summary);
+  summary.querySelector('.pl-quick').addEventListener('click', e => {
+    e.preventDefault(); e.stopPropagation();
+    details.open = true;
+    const sel = details.querySelector('.targetPlaylistSelect');
+    if (sel) { sel.closest('.add-row').scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(() => sel.focus(), 300); }
+  });
 
   const body = document.createElement('div');
   body.style.marginTop = '1rem';
@@ -738,20 +760,37 @@ function renderSongCard(s) {
   addWrap.style.display = 'flex';
   addWrap.style.gap = '0.6rem';
   addWrap.style.alignItems = 'center';
-  let plOptions = playlistsCache.map(pl => `<option value="${pl.id}">${escapeHtml(pl.name)}</option>`).join('');
+  addWrap.style.flexWrap = 'wrap';
   addWrap.innerHTML = `
+    <select class="targetPlaylistSelect" style="width:auto; flex:1; min-width:10rem; margin-bottom:0;" aria-label="Spellista">${playlistOptionsHtml()}</select>
+    <input type="text" class="newPlName" placeholder="Namn på ny spellista" style="width:auto; flex:1; min-width:10rem; margin-bottom:0;" hidden>
     <button class="btn-gold addToPlaylistBtn">Lägg till i spellista</button>
-    <select class="targetPlaylistSelect" style="width:auto; flex:1; margin-bottom:0;">${plOptions || '<option value="">Ingen spellista ännu</option>'}</select>
   `;
   body.appendChild(addWrap);
+  const plSel = addWrap.querySelector('.targetPlaylistSelect'), plName = addWrap.querySelector('.newPlName');
+  const syncNew = () => {
+    const isNew = plSel.value === NEW_PL;
+    plName.hidden = !isNew;
+    addWrap.querySelector('.addToPlaylistBtn').textContent = isNew ? 'Skapa & lägg till' : 'Lägg till i spellista';
+  };
+  plSel.value = lastPlaylistId();
+  plSel.addEventListener('change', () => { syncNew(); if (plSel.value === NEW_PL && document.activeElement === plSel) plName.focus(); });
+  syncNew();
 
-  addWrap.querySelector('.addToPlaylistBtn').addEventListener('click', async () => {
-    const playlistId = addWrap.querySelector('.targetPlaylistSelect').value;
-    if (!playlistId) { toast('Skapa en spellista först'); return; }
+  const doAdd = async () => {
+    let playlistId = plSel.value;
     const checked = Array.from(checksWrap.querySelectorAll('.stemCheck:checked')).map(c => c.value);
     if (!checked.length) { toast('Välj minst en stämma'); return; }
+    if (playlistId === NEW_PL) {
+      const pl = await createPlaylist(plName.value);
+      if (!pl) { plName.focus(); return; }
+      plName.value = ''; playlistId = pl.id; plSel.value = String(pl.id); syncNew();
+    }
+    try { localStorage.setItem('hv-last-playlist', String(playlistId)); } catch (e) {}
     await addToPlaylist(s, stemDefs, checked, playlistId);
-  });
+  };
+  addWrap.querySelector('.addToPlaylistBtn').addEventListener('click', doAdd);
+  plName.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
 
   details.appendChild(body);
   return details;

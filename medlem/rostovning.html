@@ -65,7 +65,8 @@
   .set label small { color: var(--text-muted); font-size: 0.75rem; }
   .set input[type=checkbox] { width: auto; margin: 0; accent-color: var(--accent); }
   .set select { width: auto; margin: 0; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
-  .set label.row { justify-content: space-between; }
+  .set label.row { justify-content: space-between; flex-wrap: wrap; }
+  .set label.row select { max-width: 100%; }
   .set-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; }
   .set-warn { margin: 0.15rem 0 0; padding: 0.5rem 0.65rem; border-radius: 0.5rem; border: 1px solid rgba(250,204,21,0.45); background: rgba(250,204,21,0.08); font-size: 0.8rem; color: var(--text); line-height: 1.45; }
   .set-warn b { color: #facc15; }
@@ -74,7 +75,12 @@
   .chips label { font-size: 0.8rem; padding: 0.25rem 0.65rem 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 999px; gap: 0.3rem; }
   .chips label:has(input:checked) { border-color: rgba(229,169,104,0.6); background: rgba(229,169,104,0.12); }
 
-  .legend-row { display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; margin-top: 0.8rem; font-size: 0.78rem; color: var(--text-muted); }
+  .roll-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; margin-top: 0.5rem; }
+  .legend-row { display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; font-size: 0.78rem; color: var(--text-muted); }
+  .zoom { display: inline-flex; align-items: center; gap: 0.35rem; margin-left: auto; }
+  .zoom-k { font-size: 0.78rem; color: var(--text-muted); }
+  .zoom button { width: 2rem; height: 2rem; padding: 0; justify-content: center; font-size: 1.1rem; line-height: 1; }
+  .zoom-v { min-width: 2.6rem; text-align: center; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
   .legend-row span { display: inline-flex; align-items: center; gap: 0.4rem; }
   .swatch { display: inline-block; width: 18px; height: 9px; border-radius: 3px; }
 
@@ -240,6 +246,22 @@
       <canvas id="overview" title="Hela låten – klicka för att hoppa"></canvas>
       <canvas id="roll" title="Dra i sidled för att spola"></canvas>
     </div>
+    <div class="roll-bar">
+      <div class="legend-row">
+        <span><i class="swatch" style="background: rgba(229,169,104,0.3); border: 1px solid var(--accent);"></i>noter att sjunga</span>
+        <span><i class="swatch" style="background: #45c871;"></i>träff</span>
+        <span><i class="swatch" style="background: #d8625f;"></i>miss</span>
+        <span><i class="swatch" style="background: #fff; height: 3px;"></i>din röst</span>
+        <span><i class="swatch" style="background: rgba(255,255,255,0.5); height: 2px;"></i>analysens kurva</span>
+      </div>
+      <div class="zoom" role="group" aria-label="Zooma notbanan">
+        <span class="zoom-k">Zoom</span>
+        <button type="button" class="btn-outline" id="zoomOut" title="Visa mer av låten">−</button>
+        <span class="zoom-v" id="zoomVal">10 s</span>
+        <button type="button" class="btn-outline" id="zoomIn" title="Visa mindre, större noter">+</button>
+        <input type="hidden" id="optZoom" value="10">
+      </div>
+    </div>
     <div class="karaoke" id="karaoke" hidden aria-live="off">
       <div class="k-now" id="kNow">&nbsp;</div>
       <div class="k-next" id="kNext"></div>
@@ -268,33 +290,22 @@
       <fieldset class="set">
         <legend>Visa</legend>
         <label id="optKaraokeWrap" hidden><input type="checkbox" id="optKaraoke" checked> Karaoke-text</label>
-        <label class="row">Zoom <select id="optZoom">
-          <option value="5">5 s</option>
-          <option value="10" selected>10 s</option>
-          <option value="20">20 s</option>
-          <option value="40">40 s</option>
-        </select></label>
+        <label><input type="checkbox" id="optFit" checked> Anpassa höjden efter tonerna</label>
       </fieldset>
       <fieldset class="set">
         <legend>Sjung med</legend>
-        <label class="row">Marginal <select id="optTol">
+        <label class="row">Träffmarginal <select id="optTol">
           <option value="100">Väldigt snäll ±100 cent</option>
           <option value="75" selected>Snäll ±75 cent</option>
           <option value="50">Normal ±50 cent</option>
           <option value="30">Strikt ±30 cent</option>
         </select></label>
+        <p class="set-sub" style="margin:0;">Hur nära tonen du måste ligga för att det ska räknas som träff. 100 cent = en halvton. Notrutans höjd visar marginalen.</p>
         <label><input type="checkbox" id="optOctave" checked> Godkänn annan oktav</label>
         <p class="set-warn">🎧 <b>Hörlurar är nästan ett krav.</b> Utan hörlurar hör mikrofonen musiken i högtalaren och räknar den som din sång.</p>
       </fieldset>
     </div>
 
-    <div class="legend-row">
-      <span><i class="swatch" style="background: rgba(229,169,104,0.3); border: 1px solid var(--accent);"></i>noter att sjunga</span>
-      <span><i class="swatch" style="background: #45c871;"></i>träff</span>
-      <span><i class="swatch" style="background: #d8625f;"></i>miss</span>
-      <span><i class="swatch" style="background: #fff; height: 3px;"></i>din röst</span>
-      <span><i class="swatch" style="background: rgba(255,255,255,0.5); height: 2px;"></i>analysens kurva</span>
-    </div>
   </div>
 
   <div class="card static progress-card" id="progressCard" hidden>
@@ -349,6 +360,7 @@ let voice = [];          // [t, visad midi, status: 1 träff, 0 miss, -1 ingen n
 let micNow = null;       // { label, sub, status } för stämapparaten i notbanan
 let noteStats = [];      // per not: { hit, tot }
 let dispMidi = null;     // utjämnad visad ton
+let lastTarget = null;   // senaste noten (för oktav mellan noterna)
 let unsaved = false;     // nya sångdata sedan senaste sparning
 let sessions = [];       // mina sparade övningar
 let progScope = 'stem';
@@ -491,7 +503,7 @@ async function analyzeStem(st, show) {
       song_id: song.id, stem_key: st.key, stem_path: st.path, data: res, updated_at: res.created_at,
     });
     if (error) throw error;
-    st.pitch = res; st.pitchPath = st.path; st.pitchAt = res.created_at;
+    st.pitch = res; st._rr = null; st.pitchPath = st.path; st.pitchAt = res.created_at;
     busy = false;
     renderRows();
     if (show) showStem(st);
@@ -565,11 +577,33 @@ function sizeCanvases() {
   });
 }
 
-function yRange() {
+// Låtens "riktiga" omfång: enstaka extremtoner (analysfel, skrik) räknas bort
+function songRange() {
+  if (current._rr) return current._rr;
+  const ns = current.pitch.notes.slice().sort((a, b) => a.n - b.n);
+  const tot = ns.reduce((a, n) => a + n.d, 0) || 1;
+  const pct = q => { let acc = 0; for (const n of ns) { acc += n.d; if (acc / tot >= q) return n.n; } return ns.length ? ns[ns.length - 1].n : 60; };
   const s = current.pitch.stats || {};
-  let lo = (s.low ?? 48) - 1.5, hi = (s.high ?? 72) + 1.5;
+  let lo = ns.length ? pct(0.02) - 1.5 : (s.low ?? 48) - 1.5, hi = ns.length ? pct(0.98) + 1.5 : (s.high ?? 72) + 1.5;
   if (hi - lo < 12) { const mid = (hi + lo) / 2; lo = mid - 6; hi = mid + 6; }
-  return [lo, hi];
+  return (current._rr = [lo, hi]);
+}
+function yRange() { return songRange(); }
+
+// Notbanan: höjden följer tonerna som syns just nu (mjuk övergång)
+let viewLo = null, viewHi = null, viewFor = null;
+function rollRange(t0, span) {
+  if (!document.getElementById('optFit').checked) return songRange();
+  const ns = current.pitch.notes.filter(n => n.t + n.d > t0 - 0.5 && n.t < t0 + span * 1.2);
+  let lo, hi;
+  if (ns.length) {
+    lo = Math.min(...ns.map(n => n.n)) - 1.5; hi = Math.max(...ns.map(n => n.n)) + 1.5;
+    if (hi - lo < 10) { const mid = (hi + lo) / 2; lo = mid - 5; hi = mid + 5; }
+  } else if (viewLo != null && viewFor === current) { lo = viewLo; hi = viewHi; }
+  else [lo, hi] = songRange();
+  if (viewLo == null || viewFor !== current || !playing) { viewLo = lo; viewHi = hi; viewFor = current; }
+  else { viewLo += (lo - viewLo) * 0.06; viewHi += (hi - viewHi) * 0.06; }
+  return [viewLo, viewHi];
 }
 
 function drawOverview() {
@@ -597,10 +631,11 @@ function drawRoll() {
   const W = c.width, H = c.height, dpr = window.devicePixelRatio || 1;
   ctx.clearRect(0, 0, W, H);
   if (!current) return;
-  const p = current.pitch, [lo, hi] = yRange();
+  const p = current.pitch;
   const span = Number(document.getElementById('optZoom').value);
   const pos = position();
   const t0 = viewStart(pos, span);
+  const [lo, hi] = rollRange(t0, span);
   const pxs = W / span;
   const rowH = H / (hi - lo);
   const x = t => (t - t0) * pxs;
@@ -665,25 +700,30 @@ function drawRoll() {
     const m = p.midi[i];
     if (!m) { pen = false; continue; }
     const px = x(i * p.hop), py = y(m);
+    if (pen && Math.abs(m - p.midi[i - 1]) > 1.5) pen = false;
     if (pen) ctx.lineTo(px, py); else ctx.moveTo(px, py);
     pen = true;
   }
   ctx.stroke();
 
   // din röst: tjock vit linje
+  // i noterna: tjock vit linje. Mellan noterna: tunn och svag (andning, glid). Inga lodräta streck vid hopp.
   if (voice.length) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 2.6 * dpr;
-    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 4 * dpr;
-    ctx.beginPath();
-    let on = false;
-    for (let i = 0; i < voice.length; i++) {
-      const v = voice[i], prev = voice[i - 1];
-      if (v[0] < t0 - 0.2 || v[1] == null) { on = false; continue; }
-      if (on && prev && v[0] - prev[0] > 0.15) on = false;
-      if (on) ctx.lineTo(x(v[0]), y(v[1])); else ctx.moveTo(x(v[0]), y(v[1]));
-      on = true;
-    }
-    ctx.stroke();
+    const tEnd = t0 + span;
+    [[false, 'rgba(255,255,255,0.28)', 1.4, 0], [true, 'rgba(255,255,255,0.95)', 2.6, 4]].forEach(([inNote, col, w, blur]) => {
+      ctx.strokeStyle = col; ctx.lineWidth = w * dpr;
+      ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = blur * dpr;
+      ctx.beginPath();
+      let on = false;
+      for (let i = 0; i < voice.length; i++) {
+        const v = voice[i], prev = voice[i - 1];
+        if (v[0] < t0 - 0.2 || v[0] > tEnd || v[1] == null || (v[3] >= 0) !== inNote) { on = false; continue; }
+        if (on && prev && (v[0] - prev[0] > 0.15 || prev[1] == null || Math.abs(v[1] - prev[1]) > 1.5)) on = false;
+        if (on) ctx.lineTo(x(v[0]), y(v[1])); else ctx.moveTo(x(v[0]), y(v[1]));
+        on = true;
+      }
+      ctx.stroke();
+    });
     ctx.shadowBlur = 0;
   }
 
@@ -691,7 +731,13 @@ function drawRoll() {
   ctx.font = `${11 * dpr}px DM Sans, sans-serif`;
   ctx.fillStyle = 'rgba(255,255,255,0.45)';
   ctx.textBaseline = 'middle';
-  for (let m = Math.ceil(lo); m < hi; m++) if (((m % 12) + 12) % 12 === 0) ctx.fillText(nm(m), 6 * dpr, y(m));
+  const allNames = rowH >= 18 * dpr;
+  for (let m = Math.ceil(lo); m < hi; m++) {
+    const isC = ((m % 12) + 12) % 12 === 0;
+    if (!isC && !allNames) continue;
+    ctx.fillStyle = isC ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.22)';
+    ctx.fillText(nm(m), 6 * dpr, y(m));
+  }
 
   // spelhuvud med mjuk toning
   const hx = Math.round(x(pos));
@@ -1050,6 +1096,10 @@ function micStep() {
   const ti = t != null ? targetNoteIndex(t) : -1;
   const target = ti >= 0 ? current.pitch.notes[ti].n : null;
   let shown = m, status = -1, cents = null;
+  if (target != null) lastTarget = target;
+  if (m != null && target == null && lastTarget != null && document.getElementById('optOctave').checked) {
+    shown = m - 12 * Math.round((m - lastTarget) / 12);
+  }
   if (m != null && target != null) {
     let diff = m - target;
     if (document.getElementById('optOctave').checked) { diff -= 12 * Math.round(diff / 12); shown = target + diff; }
@@ -1151,7 +1201,24 @@ document.getElementById('playBtn').addEventListener('click', () => playing ? pau
 document.getElementById('backBtn').addEventListener('click', () => seek(position() - 5));
 document.getElementById('scrubber').addEventListener('change', e => seek(Number(e.target.value)));
 document.getElementById('scrubber').addEventListener('input', e => { if (!playing) { pausedPos = Number(e.target.value); tick(); } });
-document.getElementById('optZoom').addEventListener('change', tick);
+(() => {
+  const STEPS = [3, 5, 10, 20, 40];
+  const z = document.getElementById('optZoom');
+  const set = v => {
+    z.value = String(v);
+    document.getElementById('zoomVal').textContent = v + ' s';
+    document.getElementById('zoomIn').disabled = v === STEPS[0];
+    document.getElementById('zoomOut').disabled = v === STEPS[STEPS.length - 1];
+    try { localStorage.setItem('hv-zoom', String(v)); } catch (e) {}
+    if (current) tick();
+  };
+  const step = d => { const i = STEPS.indexOf(Number(z.value)); set(STEPS[Math.max(0, Math.min(STEPS.length - 1, (i < 0 ? 2 : i) + d))]); };
+  document.getElementById('zoomIn').addEventListener('click', () => step(-1));
+  document.getElementById('zoomOut').addEventListener('click', () => step(1));
+  let saved = null; try { saved = Number(localStorage.getItem('hv-zoom')); } catch (e) {}
+  set(STEPS.includes(saved) ? saved : (window.innerWidth < 600 ? 5 : 10));
+})();
+document.getElementById('optFit').addEventListener('change', () => { viewLo = null; if (current) tick(); });
 ['optStem', 'optTone'].forEach(id => document.getElementById(id).addEventListener('change', () => { if (playing) startAt(position()); }));
 document.getElementById('overview').addEventListener('click', e => {
   const r = e.currentTarget.getBoundingClientRect();
@@ -1221,7 +1288,6 @@ window.addEventListener('resize', () => { if (current) { sizeCanvases(); tick();
   }
   sel.innerHTML = '<option value="">Välj låt…</option>' +
     songs.map(s => `<option value="${s.id}">${esc(s.title)}</option>`).join('');
-  if (window.innerWidth < 600) document.getElementById('optZoom').value = '5';
   const pre = new URLSearchParams(location.search).get('song');
   if (pre && songs.some(s => String(s.id) === pre)) { sel.value = pre; loadSong(pre); }
   else if (!isAdmin && songs.length === 1) { sel.value = songs[0].id; loadSong(songs[0].id); }

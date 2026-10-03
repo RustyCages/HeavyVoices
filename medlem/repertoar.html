@@ -145,7 +145,25 @@
   #playerScrubberRow span { font-size:0.75rem; color:var(--text-muted); min-width:38px; text-align:center; }
   #repeatBtn.active, #karaokeBtn.active { color:var(--accent); box-shadow:0 0 8px rgba(229,169,104,0.4); }
   #karaokeBtn, #lyricsDocBtn { font-size:0.95rem; }
-  #lyricsDocBtn.hidden { display:none; }
+  #lyricsDocBtn.hidden, #splitBtn.hidden { display:none; }
+  #splitBtn.active { color:var(--accent); box-shadow:0 0 8px rgba(229,169,104,0.4); }
+  /* Alla stämmor: en ruta per stämma som rullar samtidigt */
+  .k-split { display:grid; grid-template-columns:repeat(var(--cols2, 2), minmax(0, 1fr)); gap:0.4rem; margin-bottom:0.25rem; }
+  .k-split.hidden { display:none; }
+  @media (min-width: 900px) { .k-split { grid-template-columns:repeat(var(--n, 2), minmax(0, 1fr)); } }
+  .ks-panel { border:1px solid var(--border); border-radius:0.7rem; background:rgba(0,0,0,0.22); min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+  .ks-panel.mine { border-color:rgba(229,169,104,0.55); }
+  .ks-head { font-family:'Roboto Condensed', sans-serif; font-size:0.72rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted); text-align:center; padding:0.25rem 0 0; }
+  .ks-panel.mine .ks-head { color:var(--accent); font-weight:700; }
+  .ks-box { position:relative; height:4.6rem; overflow:hidden; text-align:center;
+    -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 25%, #000 75%, transparent 100%);
+            mask-image:linear-gradient(to bottom, transparent 0, #000 25%, #000 75%, transparent 100%); }
+  .ks-box .k-line { font-size:0.98rem; padding:0.12rem 0.45rem; }
+  .ks-box.no-anim .k-reel, .ks-box.no-anim .k-line { transition:none; }
+  #playerBar.expanded .k-split { grid-template-columns:repeat(var(--cols2, 2), minmax(0, 1fr)); flex:1; min-height:0; grid-auto-rows:minmax(0, 1fr); margin-bottom:0.5rem; }
+  #playerBar.expanded .ks-box { flex:1; height:auto; }
+  #playerBar.expanded .ks-box .k-line { font-size:clamp(1.05rem, 2.6vw, 2rem); padding:0.3rem 0.8rem; }
+  #playerBar.expanded .ks-head { font-size:0.85rem; padding-top:0.45rem; }
   #karaokeBtn { position:relative; }
   #karaokeBtn .voice-badge { position:absolute; bottom:-0.35rem; right:-0.45rem; font-size:0.6rem; font-weight:700; background:var(--accent); color:#111317; border-radius:0.6rem; padding:0.05rem 0.3rem; line-height:1.2; pointer-events:none; }
   #karaokeBtn .voice-badge:empty { display:none; }
@@ -260,6 +278,7 @@
 <div id="playerBar" class="hidden">
   <button type="button" id="expandBtn" class="hidden" title="Förstora texten">&#x26F6;</button>
   <div class="k-frame"><div id="karaoke" class="hidden"><div class="k-reel"></div></div></div>
+  <div class="k-split hidden" id="karaokeSplit"></div>
   <div id="playerTitle">–</div>
   <div id="playerScrubberRow">
     <span id="curTime">0:00</span>
@@ -273,6 +292,7 @@
     <button class="btn-gold" id="playPauseBtn" title="Spela/Pausa">▶</button>
     <button class="btn-outline" id="nextBtn" title="Nästa">⏭</button>
     <button class="btn-outline" id="karaokeBtn" title="Visa/dölj synkad text">🎤<span class="voice-badge"></span></button>
+    <button class="btn-outline hidden" id="splitBtn" title="Alla stämmor samtidigt (delad skärm)" aria-pressed="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></button>
     <button class="btn-outline hidden" id="lyricsDocBtn" title="Öppna sångtexten (dokument)">📄</button>
   </div>
 </div>
@@ -1410,6 +1430,7 @@ function setPlayerSong(song) {
   document.getElementById('lyricsDocBtn').classList.toggle('hidden', !(song && songDocs(song).length));
   renderKaraoke(true);
   updateVoiceBadge();
+  syncSplit();
 }
 
 // Tonriktning som admin skrivit in i texten: ↑ = upp, ↓ = ned (se admin/text-synk.html)
@@ -1481,7 +1502,7 @@ document.getElementById('karaokeBtn').addEventListener('click', (e) => {
   e.currentTarget.classList.toggle('active', karaokeOn);
   const hasSync = karaokeLines.some(l => l.text);
   document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
-  updateExpandAvailability();
+  syncSplit();
   karaokeIdx = -2;
   renderKaraoke(true);
 });
@@ -1510,6 +1531,7 @@ function togglePlayerMenu(kind) {
   m.style.bottom = Math.max(8, window.innerHeight - ctrlTop + 8) + 'px';
   m.hidden = false;
   m.querySelectorAll('[data-voice]').forEach(b => b.addEventListener('click', () => chooseKaraokeVoice(b.dataset.voice)));
+  m.querySelectorAll('[data-split]').forEach(b => b.addEventListener('click', () => { if (!splitOn) document.getElementById('splitBtn').click(); else closePlayerMenu(); }));
   m.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => { openDoc(b.dataset.open); closePlayerMenu(); }));
   m.querySelectorAll('[data-dl]').forEach(b => b.addEventListener('click', () => { downloadDoc(b.dataset.dl); closePlayerMenu(); }));
 }
@@ -1519,7 +1541,8 @@ function voiceMenuHtml() {
   const item = (val, label, on) => `<button class="pm-item" data-voice="${val}" role="menuitemradio" aria-checked="${on}"><span class="pm-check">${on ? '✓' : ''}</span><span>${label}</span></button>`;
   let html = '<div class="pm-title">Synkad text</div>' + item('off', 'Dölj text', !karaokeOn);
   if (playerSong && playerSong.lyrics_lrc) html += item('', 'Gemensam (alla)', cur === '');
-  availableVoices(playerSong).forEach(v => { html += item(v.key, v.label, cur === v.key); });
+  availableVoices(playerSong).forEach(v => { html += item(v.key, v.label, cur === v.key && !(splitOn && karaokeOn)); });
+  if (splitAvailable(playerSong)) html += `<button class="pm-item" data-split="1" role="menuitemradio" aria-checked="${splitOn && karaokeOn}"><span class="pm-check">${splitOn && karaokeOn ? '✓' : ''}</span><span>Alla stämmor (delad skärm)</span></button>`;
   return html;
 }
 
@@ -1548,7 +1571,8 @@ function chooseKaraokeVoice(val) {
   const hasSync = karaokeLines.some(l => l.text);
   document.getElementById('karaokeBtn').classList.toggle('active', karaokeOn);
   document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
-  updateExpandAvailability();
+  if (val !== 'off' && splitOn) { splitOn = false; try { localStorage.setItem('hv-karaoke-split', 'off'); } catch (e) {} } // vald stämma → en ruta
+  syncSplit();
   updateVoiceBadge();
   karaokeIdx = -2;
   renderKaraoke(true);
@@ -1574,8 +1598,87 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && playerMe
 let wakeLock = null;
 
 function karaokeVisible() {
-  return !document.getElementById('karaoke').classList.contains('hidden');
+  return !document.getElementById('karaoke').classList.contains('hidden') ||
+    !document.getElementById('karaokeSplit').classList.contains('hidden');
 }
+
+// ---------- Alla stämmor (delad skärm) ----------
+let splitOn = false;
+try { splitOn = localStorage.getItem('hv-karaoke-split') === 'on'; } catch (e) {}
+let splitPanels = []; // [{ key, lines, idx, box }]
+let splitSong = null;
+function splitAvailable(song) { return availableVoices(song).length >= 2; }
+function buildSplit(song) {
+  const wrap = document.getElementById('karaokeSplit');
+  const mine = voiceFromStamma(currentMember && currentMember.stamma);
+  const voices = availableVoices(song);
+  wrap.style.setProperty('--n', voices.length);
+  wrap.style.setProperty('--cols2', Math.min(2, voices.length));
+  wrap.innerHTML = voices.map(v => `<div class="ks-panel${v.key === mine ? ' mine' : ''}" data-voice="${v.key}"><div class="ks-head">${v.label}</div><div class="ks-box"><div class="k-reel"></div></div></div>`).join('');
+  splitPanels = voices.map(v => {
+    const lines = parseLrc(song.lyrics_lrc_voices[v.key]);
+    const box = wrap.querySelector(`[data-voice="${v.key}"] .ks-box`);
+    box.querySelector('.k-reel').innerHTML = '<div class="k-line k-intro"></div>' + lines.map(l =>
+      l.text === '♪' ? '<div class="k-line k-pause">♪</div>'
+        : l.text ? `<div class="k-line">${pitchHtml(l.text, v.short)}</div>`
+        : '<div class="k-line k-gap"></div>').join('');
+    return { key: v.key, lines, idx: -2, box };
+  });
+  splitSong = song;
+}
+function syncSplit() {
+  const active = splitOn && karaokeOn && splitAvailable(playerSong);
+  const btn = document.getElementById('splitBtn');
+  btn.classList.toggle('hidden', !splitAvailable(playerSong));
+  btn.classList.toggle('active', active);
+  btn.setAttribute('aria-pressed', String(active));
+  const wrap = document.getElementById('karaokeSplit');
+  if (active) {
+    if (splitSong !== playerSong) buildSplit(playerSong);
+    document.getElementById('karaoke').classList.add('hidden');
+    wrap.classList.remove('hidden');
+    splitPanels.forEach(p => { p.idx = -2; });
+    renderSplit(true);
+  } else {
+    wrap.classList.add('hidden');
+    const hasSync = karaokeLines.some(l => l.text);
+    document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
+  }
+  updateExpandAvailability();
+}
+function renderSplit(force) {
+  const wrap = document.getElementById('karaokeSplit');
+  if (wrap.classList.contains('hidden')) return;
+  const t = currentElapsed();
+  splitPanels.forEach(p => {
+    let idx = -1;
+    for (let i = 0; i < p.lines.length; i++) { if (p.lines[i].time <= t) idx = i; else break; }
+    if (idx === p.idx && !force) return;
+    const jump = force || p.idx < -1 || Math.abs(idx - p.idx) > 2;
+    p.idx = idx;
+    const reel = p.box.querySelector('.k-reel'), els = reel.children, activeEl = els[idx + 1];
+    if (!activeEl) return;
+    for (let i = 0; i < els.length; i++) {
+      els[i].classList.toggle('k-active', i === idx + 1 && idx >= 0);
+      els[i].classList.toggle('k-past', i < idx + 1);
+    }
+    const y = p.box.clientHeight / 2 - (activeEl.offsetTop + activeEl.offsetHeight / 2);
+    if (jump) p.box.classList.add('no-anim');
+    reel.style.transform = `translateY(${y}px)`;
+    if (jump) { void reel.offsetHeight; p.box.classList.remove('no-anim'); }
+  });
+}
+(function splitLoop() { renderSplit(false); requestAnimationFrame(splitLoop); })();
+document.getElementById('splitBtn').addEventListener('click', () => {
+  splitOn = !splitOn;
+  if (splitOn && !karaokeOn) { karaokeOn = true; document.getElementById('karaokeBtn').classList.add('active'); try { localStorage.setItem('hv-karaoke', 'on'); } catch (e) {} }
+  try { localStorage.setItem('hv-karaoke-split', splitOn ? 'on' : 'off'); } catch (e) {}
+  closePlayerMenu();
+  syncSplit();
+  // storleken ändras (t.ex. helskärm) → räkna om positionerna
+  requestAnimationFrame(() => renderSplit(true));
+});
+window.addEventListener('resize', () => renderSplit(true));
 function updateExpandAvailability() {
   const canExpand = karaokeVisible();
   document.getElementById('expandBtn').classList.toggle('hidden', !canExpand);
@@ -1589,6 +1692,7 @@ async function setExpanded(on) {
   const btn = document.getElementById('expandBtn');
   bar.classList.toggle('expanded', on);
   document.body.classList.toggle('player-expanded', on);
+  requestAnimationFrame(() => renderSplit(true));
   btn.innerHTML = on ? '&#x2715;' : '&#x26F6;';
   btn.title = on ? 'Stäng helskärm' : 'Förstora texten';
 

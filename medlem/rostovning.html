@@ -292,6 +292,7 @@
         <legend>Visa</legend>
         <label id="optKaraokeWrap" hidden><input type="checkbox" id="optKaraoke" checked> Karaoke-text</label>
         <label><input type="checkbox" id="optFit"> Anpassa höjden efter tonerna</label>
+        <label><input type="checkbox" id="optMerge" checked> Slå ihop noter <small>per textrad</small></label>
       </fieldset>
       <fieldset class="set">
         <legend>Sjung med</legend>
@@ -466,7 +467,7 @@ async function loadSong(id) {
   }
   (data || []).forEach(r => {
     const st = stems.find(x => x.key === r.stem_key);
-    if (st) { st.pitch = prepPitch(r.data); st.pitchPath = r.stem_path; st.pitchAt = r.updated_at; }
+    if (st) { st.pitch = st.pitchBase = prepPitch(r.data); st.pitchPath = r.stem_path; st.pitchAt = r.updated_at; }
   });
   note.hidden = true;
   renderRows();
@@ -516,7 +517,7 @@ async function analyzeStem(st, show) {
       song_id: song.id, stem_key: st.key, stem_path: st.path, data: res, updated_at: res.created_at,
     });
     if (error) throw error;
-    st.pitch = prepPitch(res); st._rr = null; st.pitchPath = st.path; st.pitchAt = res.created_at;
+    st.pitch = st.pitchBase = prepPitch(res); st._rr = null; st.pitchPath = st.path; st.pitchAt = res.created_at;
     busy = false;
     renderRows();
     if (show) showStem(st);
@@ -557,6 +558,7 @@ function showStem(st) {
   voice = []; noteStats = []; if (mic) updateScore();
   renderWithRow();
   setupKaraoke();
+  applyMerge(st);
   pausedPos = 0;
   document.querySelectorAll('.pitch-row').forEach(r => r.classList.toggle('active', !!st.rowEl && r === st.rowEl));
   const p = st.pitch, s = p.stats || {};
@@ -809,6 +811,47 @@ function tick() {
   drawRoll();
   drawOverview();
   renderKaraoke(p);
+}
+
+// ---------- slå ihop noter per textrad (färre småklipp) ----------
+function lyricSpans() {
+  const off = (Number((song.stem_offsets || {})[current.key]) || 0) / 1000;
+  const out = [];
+  kLines.forEach((l, i) => {
+    if (!l.text || l.text === '♪') return;
+    const end = i + 1 < kLines.length ? kLines[i + 1].time : l.time + 8;
+    out.push([l.time - off, end - off]);
+  });
+  return out;
+}
+function mergeNotes(notes, spans) {
+  const spanOf = n => { const mid = n.t + n.d / 2; for (let i = 0; i < spans.length; i++) if (mid >= spans[i][0] - 0.15 && mid < spans[i][1] + 0.15) return i; return -1; };
+  const out = [];
+  notes.slice().sort((a, b) => a.t - b.t).forEach(n0 => {
+    const n = { t: n0.t, d: n0.d, n: n0.n, sp: spanOf(n0) };
+    const prev = out[out.length - 1];
+    if (!prev) { out.push(n); return; }
+    const gap = n.t - (prev.t + prev.d), same = prev.sp === n.sp, inLine = same && n.sp >= 0;
+    const near = Math.abs(n.n - prev.n) <= 1;
+    const end = () => Math.max(prev.t + prev.d, n.t + n.d) - prev.t;
+    if (same && n.n === prev.n && gap <= (inLine ? 0.6 : 0.25)) { prev.d = end(); return; }      // samma ton, kort uppehåll
+    if (same && near && gap <= 0.3 && n.d < 0.15) { prev.d = end(); return; }                    // kort snutt → grannen
+    if (same && near && gap <= 0.3 && prev.d < 0.15) { prev.n = n.n; prev.d = end(); return; }
+    if (inLine && gap > 0 && gap <= 0.25) prev.d = n.t - prev.t;                                 // stäng små glapp i raden
+    out.push(n);
+  });
+  // ensamma pyttesnuttar utanför text räknas inte som noter
+  return out.filter(n => n.d >= 0.1 || n.sp >= 0).map(({ sp, ...n }) => n);
+}
+function applyMerge(st) {
+  const base = st.pitchBase || st.pitch;
+  if (!document.getElementById('optMerge').checked) { st.pitch = base; }
+  else {
+    const notes = mergeNotes(base.notes, kLines.length ? lyricSpans() : []);
+    st.pitch = { ...base, notes, stats: { ...(base.stats || {}), noteCount: notes.length } };
+  }
+  st._rr = null; viewLo = null;
+  if (voice.length) recomputeStats();
 }
 
 // ---------- karaoke-rad (songs.lyrics_lrc / lyrics_lrc_voices) ----------
@@ -1243,6 +1286,16 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
   set(STEPS.includes(saved) ? saved : (window.innerWidth < 600 ? 5 : 10));
 })();
 (() => {
+  const mg = document.getElementById('optMerge');
+  try { mg.checked = localStorage.getItem('hv-merge') !== '0'; } catch (e) {}
+  mg.addEventListener('change', () => {
+    try { localStorage.setItem('hv-merge', mg.checked ? '1' : '0'); } catch (e) {}
+    if (!current) return;
+    applyMerge(current);
+    const s = current.pitch.stats || {};
+    document.querySelector('#stats b').textContent = s.noteCount;
+    tick();
+  });
   const f = document.getElementById('optFit');
   try { f.checked = localStorage.getItem('hv-fit') === '1'; } catch (e) {}
   f.addEventListener('change', () => { try { localStorage.setItem('hv-fit', f.checked ? '1' : '0'); } catch (e) {} viewLo = null; if (current) tick(); });

@@ -44,19 +44,23 @@
     /* Logga in-knapp */
     .header {
       position: fixed;
-      top: 20px;
-      right: 20px;
+      top: 16px;
+      right: 16px;
       z-index: 3;
     }
 
-    .header { display: flex; gap: 10px; }
+    .header { display: flex; gap: 8px; }
+    @media (max-width: 600px) {
+      .header { top: 12px; right: 12px; gap: 6px; }
+      .login-btn { padding: 5px 11px; font-size: 13px; }
+    }
 
     .login-btn {
       background-color: rgba(0, 0, 0, 0.6);
-      border: 2px solid #ffffff;
+      border: 1.5px solid #ffffff;
       color: #ffffff;
-      padding: 10px 24px;
-      font-size: 16px;
+      padding: 6px 14px;
+      font-size: 14px;
       font-weight: bold;
       border-radius: 4px;
       text-decoration: none;

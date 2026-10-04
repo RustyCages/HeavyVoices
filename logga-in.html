@@ -6,13 +6,21 @@
 <title>Logga in — Heavy Voices</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  /* Mobil: allt ska få plats utan att sidan scrollar */
+  @media (max-width: 600px) {
+    .site-header--logo { padding-top: 0.8rem; }
+    .login-page { padding-top: 0.6rem; padding-bottom: 0.6rem; }
+    .login-page > p:first-child { margin: 0 0 0.4rem; }
+    .login-page h1 { margin: 0 0 0.2rem; font-size: 1.7rem; }
+    .login-page .card { margin-top: 0.8rem !important; padding: 1.1rem; }
+  }
+</style>
 </head>
 <body>
 
 <header class="site-header site-header--logo"><a href="/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo.webp" type="image/webp"><img src="/icons/logo.png" alt="Heavy Voices" class="site-logo-img" width="640" height="493"></picture></a></header>
-<div class="container">
-
-<div class="container">
+<div class="container login-page">
   <p><a href="/" class="text-muted">&larr; Tillbaka</a></p>
   <h1>Logga in</h1>
 

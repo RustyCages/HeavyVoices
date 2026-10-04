@@ -40,6 +40,7 @@ color: var(--text);
 font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
 line-height: 1.5;
 min-height: 100vh;
+min-height: 100dvh; /* mobil: synlig höjd, så sidan inte scrollar i onödan */
 }
 
 h1, h2, h3, h4, .font-heading {

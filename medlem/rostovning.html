@@ -61,7 +61,7 @@
   .mic-cents { font-size: 0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* inställningar i tre grupper */
-  .settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+  .settings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-top: 1rem; }
   .set { margin: 0; padding: 0.75rem 0.9rem 0.85rem; border: 1px solid var(--border); border-radius: 0.6rem; display: grid; gap: 0.5rem; align-content: start; min-width: 0; }
   .set legend { padding: 0 0.35rem; font-family: 'Roboto Condensed', sans-serif; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
   .set label { display: flex; align-items: center; gap: 0.45rem; margin: 0; cursor: pointer; font-size: 0.9rem; color: var(--text); }
@@ -127,7 +127,7 @@
   .mic-btn:hover { filter: brightness(1.08); }
 
   /* advanced settings */
-  .adv-toggle { font-size: 0.85rem; color: var(--text-muted); cursor: pointer; text-decoration: underline; }
+  .adv-toggle { font-size: 0.85rem; padding: 0.45rem 0.9rem; }
   .adv-settings { display: none; }
   .adv-settings.open { display: grid; }
 
@@ -167,6 +167,7 @@
   @media (max-width: 760px) {
     .settings { grid-template-columns: 1fr; }
   }
+  .progress-card { margin-top: 2rem; }
   .progress-card h2 { margin: 0 0 0.2rem; }
   .prog-head { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; align-items: baseline; margin: 0.4rem 0 0.6rem; font-size: 0.9rem; color: var(--text-muted); }
   .prog-head b { color: var(--text); font-size: 1.05rem; }
@@ -210,7 +211,7 @@
       <li class="admin-only"><div><b>Välj låt</b><p>Listan visar låtar som har minst en sångstämma uppladdad.</p></div></li>
       <li class="admin-only"><div><b>Analysera stämmorna</b><p>Tryck <em>Analysera alla sångstämmor</em> (eller <em>Analysera</em> på en stämma). Sidan lyssnar igenom ljudfilen och räknar fram vilka toner som sjungs. Resultatet sparas direkt. Byts stämfilen ut visas ⚠ – analysera då igen.</p></div></li>
       <li class="admin-only"><div><b>Kontrollera resultatet</b><p>Tryck <em>Välj</em> på stämman och sedan ▶ med <em>Referenston</em> på. Följer pipet stämman är analysen bra. Ligger det backvocals i filen kan det bli extra noter där.</p></div></li>
-      <li><div><b>Sjung med</b><p>Tryck ▶ för att lyssna på stämman. Sätt sedan i hörlurar, tryck <em>🎤 Sjung med</em>, tillåt mikrofonen och tryck ▶. Under <em>Låt och stämma</em> väljer du vad du vill höra: din stämma, referenstonen och backtrack.</p></div></li>
+      <li><div><b>Sjung med</b><p>Tryck ▶ för att lyssna på stämman. Sätt sedan i hörlurar, tryck <em>🎤 Sjung med</em>, tillåt mikrofonen och tryck ▶. Under <em>Låt och stämma</em> väljer du vad du vill höra: referenstonen, backtrack och övriga stämmor.</p></div></li>
       <li><div><b>Läs av</b><p>Den vita linjen är din röst. Noterna fylls <span style="color:#4ade80">grönt</span> där du träffar och <span style="color:#f87171">rött</span> där du missar. Uppe till höger ser du vilken ton du sjunger och hur många cent du ligger fel. Under spelaren visas träffprocent och hur många noter du klarat.</p></div></li>
     </ol>
 
@@ -220,8 +221,6 @@
         <h4>Lyssna</h4>
         <p class="g-what">Bestämmer vad du <b>hör</b> i hörlurarna. Påverkar inte vad som räknas som rätt.</p>
         <dl>
-          <dt>Din stämma</dt>
-          <dd>På = du hör inspelningen av stämman du övar på. Stäng av när du kan stämman och vill sjunga den själv.</dd>
           <dt>Referenston <em>(?)</em></dt>
           <dd>Ett enkelt pip som spelar exakt de noter du ser i notbanan. Tryck på <em>?</em> för förklaring.</dd>
           <dt>Spela med</dt>
@@ -244,6 +243,8 @@
         <h4>Fler inställningar</h4>
         <p class="g-what">Under <b>⚙ Fler inställningar</b> finns det som de flesta inte behöver.</p>
         <dl>
+          <dt>Spela upp vald stämma</dt>
+          <dd>Du hör alltid stämman du valt. Stäng av när du kan den och vill sjunga själv.</dd>
           <dt>Anpassa höjden / Slå ihop noter</dt>
           <dd>Hur notbanan ritas.</dd>
           <dt>Godkänn annan oktav</dt>
@@ -269,7 +270,6 @@
       <div id="stemRows"></div>
       <div id="withWrap" class="with-wrap" hidden><div class="vp-k">Spela med</div><div class="chips" id="withRow"></div></div>
       <div class="practice-controls">
-        <label><input type="checkbox" id="optStem" checked> <span id="optStemLabel">Din stämma</span></label>
         <span class="opt"><label><input type="checkbox" id="optTone" checked> Referenston</label><button type="button" class="help" data-help="tone" aria-label="Vad är referenston?">?</button></span>
         <label id="optWithBackWrap" hidden><input type="checkbox" id="optWithBackMember"> Spela med backtrack</label>
         <span class="opt diff"><label for="optTol">Svårighetsgrad</label>
@@ -349,10 +349,14 @@
 
     <!-- Advanced settings (dolt för medlemmar per default) -->
     <div style="margin-top: 1rem;">
-      <a href="#" class="adv-toggle member-only" id="advToggle">⚙ Fler inställningar</a>
+      <button type="button" class="btn-outline adv-toggle member-only" id="advToggle" aria-expanded="false" aria-controls="advSettings">⚙ Fler inställningar</button>
     </div>
 
     <div class="settings adv-settings" id="advSettings">
+      <fieldset class="set">
+        <legend>Lyssna</legend>
+        <label><input type="checkbox" id="optStem" checked> Spela upp <span id="optStemLabel">vald stämma</span> <small>stäng av när du kan stämman</small></label>
+      </fieldset>
       <fieldset class="set">
         <legend>Visa <button type="button" class="help" data-help="visa" aria-label="Vad gör Visa-inställningarna?">?</button></legend>
         <label><input type="checkbox" id="optFit"> Anpassa höjden efter tonerna</label>
@@ -1534,6 +1538,7 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
     toggle.addEventListener('click', (e) => {
       e.preventDefault();
       settings.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', String(settings.classList.contains('open')));
     });
   }
 

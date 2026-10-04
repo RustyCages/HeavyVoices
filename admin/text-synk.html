@@ -249,8 +249,8 @@
           </div>
           <div class="row-flex">
             <button type="button" class="btn-outline btn-small" id="undoBtn" title="Backsteg">&#8617; Ångra</button>
-            <button type="button" class="btn-outline" id="gapBtn" disabled title="Enter — lägg in en paus (tom rad) under texten">&#9834; Paus</button>
             <button type="button" id="tapBtn" disabled>TAP</button>
+            <button type="button" class="btn-outline" id="gapBtn" disabled title="Enter — lägg in en paus (tom rad) under texten">&#9834; Paus</button>
           </div>
         </div>
 
@@ -585,12 +585,16 @@ function renderLines() {
     if (isPause(r)) cls.push('pause');
     const label = isPause(r) ? (i === rows.length - 1 ? '♪ slut' : '♪ paus') : pitchHtml(r.text);
     return `<li class="${cls.join(' ')}" data-i="${i}">
-      <input class="t ${r.time == null ? 'empty' : ''}" data-i="${i}" value="${r.time == null ? '' : fmt(r.time)}" placeholder="--:--">
+      <span style="display: flex; align-items: center; gap: 0.3rem;">
+        <input class="t ${r.time == null ? 'empty' : ''}" data-i="${i}" value="${r.time == null ? '' : fmt(r.time)}" placeholder="--:--">
+        <button type="button" data-act="cleartime" data-i="${i}" title="Rensa starttid" style="width: 1.7rem; height: 1.7rem; padding: 0; flex-shrink: 0; font-size: 0.8rem;" ${r.time == null ? 'disabled' : ''}>⊘</button>
+      </span>
       <span class="dwrap">
         <button type="button" data-act="dminus" data-i="${i}" title="Kortare visning (−0,25 s)" ${isPause(r) ? 'disabled' : ''}>&minus;</button>
         <input class="d ${r.end == null ? 'empty' : ''}" data-i="${i}" value="${durText(r)}" placeholder="–" inputmode="decimal"
           title="Visningstid i sekunder. Tomt = visas tills nästa rad börjar." ${isPause(r) ? 'disabled' : ''}>
         <button type="button" data-act="dplus" data-i="${i}" title="Längre visning (+0,25 s)" ${isPause(r) ? 'disabled' : ''}>+</button>
+        <button type="button" data-act="cleardur" data-i="${i}" title="Rensa varaktighet" style="width: 1.7rem; height: 1.7rem; padding: 0; flex-shrink: 0; font-size: 0.8rem;" ${r.end == null && !r.text ? 'disabled' : ''}>⊘</button>
       </span>
       <span class="txt">${label}</span>
       <span class="acts">
@@ -669,11 +673,7 @@ function updatePlaying() {
   const list = $('lineList');
   list.querySelectorAll('.line.playing').forEach(el => el.classList.remove('playing'));
   const li = list.children[idx];
-  if (li) {
-    li.classList.add('playing');
-    // Under uppspelning: följa med markerad rad (för synkning)
-    if (!audio.paused) setCursor(idx, true);
-  }
+  if (li) li.classList.add('playing');
 
   const cur = idx >= 0 ? rows[idx] : null;
   const prev = idx >= 0 ? neighbour(idx, -1) : null;
@@ -1035,6 +1035,14 @@ function wireEvents() {
             if (r.end != null) r.end += r.time - old; }   // visningstiden följer med
           list.children[i].querySelector('.t').value = fmt(r.time);
           setDirty(true); markOrderWarnings(); playingIdx = -2;
+          return;
+        case 'cleartime':
+          r.time = null; r.end = null;
+          undoStack.length = 0; setDirty(true); renderLines(); setCursor(cursor, false);
+          return;
+        case 'cleardur':
+          r.end = null;
+          setDirty(true); renderLines();
           return;
         case 'skip':
           r.skip = !r.skip; setDirty(true); renderLines(); setCursor(cursor, false);

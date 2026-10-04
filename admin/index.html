@@ -6,18 +6,36 @@
 <title>Admin — Heavy Voices</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  /* Rubrik och rollmärke på samma rad */
+  .title-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .title-row h1 { margin: 0; }
+  #welcome { margin: 0.2rem 0 0; }
+  /* Mobil: hela sidan ska rymmas utan att scrolla */
+  @media (max-width: 600px) {
+    .site-header--logo { padding-top: 0.6rem; }
+    .site-logo-img { height: 74px; }
+    .container { padding-top: 0.6rem; padding-bottom: 0.8rem; }
+    .title-row h1 { font-size: 1.75rem; }
+    .card { padding: 0.35rem 0.9rem; margin-top: 0.8rem !important; }
+    #checkinCard { padding: 0.8rem 0.9rem; }
+    .nav-item { padding: 0.7rem 0.1rem; gap: 0.9rem; }
+    .nav-item .card-icon-box { width: 2.9rem; height: 2.9rem; border-radius: 0.8rem; }
+    .nav-item-text h3 { font-size: 1.08rem; margin: 0; }
+    .nav-item-text p { font-size: 0.86rem; margin: 0.1rem 0 0; }
+    .page-footer { margin-top: 0.8rem; }
+  }
+</style>
 </head>
 <body>
 
 <header class="site-header site-header--logo"><a href="/admin/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo.webp" type="image/webp"><img src="/icons/logo.png" alt="Heavy Voices" class="site-logo-img" width="640" height="493"></picture></a></header>
 <div class="container">
-  <div class="page-header">
-    <div>
-      <h1>Admin</h1>
-      <p id="welcome" class="text-muted">Laddar...</p>
-    </div>
+  <div class="title-row">
+    <h1>Admin</h1>
     <span id="roleBadge" class="badge"></span>
   </div>
+  <p id="welcome" class="text-muted">Laddar...</p>
  
   <div class="card" style="margin-top: 1.5rem;">
     <ul class="nav-list">

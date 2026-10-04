@@ -29,6 +29,9 @@
     border-radius: 6px; padding: 0.6rem 0.9rem; font-family: inherit; min-height: 100px; margin-bottom: 0.5rem;
   }
   .btn-small { padding: 0.35rem 0.8rem; font-size: 0.85rem; }
+  .btn-ghost, button.btn-ghost, a.btn-ghost { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover, button.btn-ghost:hover, a.btn-ghost:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  select.stemTypeSel { width: auto; margin: 0; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
   .btn-danger { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
   details > summary { cursor: pointer; margin-top: 0.6rem; color: var(--text-muted); font-size: 0.85rem; }
   details.lyrics-fold { margin-bottom: 0.4rem; }
@@ -359,7 +362,7 @@ function renderLyricsArea(s) {
       ${partControls(it, idx, items.length)}
       <span class="lyric-filename">${stemFilename(it.path)}</span>
       <div class="lyric-actions">
-        <a class="btn-small openLyricBtn" data-id="${s.id}" ${data} href="#" style="background: transparent; border: 1px solid var(--border);">Öppna</a>
+        <a class="btn-small btn btn-ghost openLyricBtn" data-id="${s.id}" ${data} href="#">Öppna</a>
         <button type="button" class="btn-small btn-danger removeLyricBtn" data-id="${s.id}" ${data}>Ta bort</button>
       </div>
     </div>`;
@@ -470,6 +473,63 @@ area.querySelectorAll('.openLyricBtn').forEach(btn => {
 }
 
 // ---------- Stämfiler (ljud: fasta STEM_FIELDS + extra_stems/"Annat") ----------
+// Byt typ av stämma (Backtrack/Sopran/Alt/Tenor/Bas) på en redan uppladdad fil.
+function stemTypeSelect(s, it) {
+  const opts = STEM_FIELDS.map(f => {
+    const taken = !!s[f.kind] && f.kind !== it.fixed;
+    const dis = taken && !it.fixed;   // "Annat" kan bara flyttas till en ledig plats
+    return `<option value="${f.kind}" ${f.kind === it.fixed ? 'selected' : ''} ${dis ? 'disabled' : ''}>${f.label}${taken ? (dis ? ' (upptagen)' : ' ⇄ byt plats') : ''}</option>`;
+  }).join('');
+  return `<select class="stemTypeSel" data-key="${esc(it.key)}" title="Byt typ av stämma">${it.fixed ? '' : '<option value="" selected>Annat</option>'}${opts}</select>`;
+}
+
+async function changeStemType(s, fromKey, toKind) {
+  const fromFixed = STEM_FIELDS.some(f => f.kind === fromKey);
+  const extra = fromFixed ? null : (s.extra_stems || []).find(x => x.id === fromKey);
+  const fromPath = fromFixed ? s[fromKey] : (extra && extra.path);
+  if (!fromPath || fromKey === toKind) return false;
+  const toLabel = STEM_FIELDS.find(f => f.kind === toKind).label;
+  const swap = !!s[toKind];
+  if (swap && !fromFixed) return false;
+  if (!confirm(swap
+    ? `Byt plats på de två stämfilerna? Filen blir ${toLabel} och nuvarande ${toLabel} tar dess plats. Tonkurvor och synk följer med filerna.`
+    : `Ändra typ till ${toLabel}? Tonkurvor och synk följer med filen.`)) return false;
+
+  const offs = { ...(s.stem_offsets || {}) };
+  const meta = JSON.parse(JSON.stringify(s.stem_meta || {}));
+  meta.labels = meta.labels || {};
+  const mv = (m, a, b) => { if (a in m) { m[b] = m[a]; delete m[a]; } else delete m[b]; };
+  const sw = (m, a, b) => { const x = m[a], y = m[b]; if (y === undefined) delete m[a]; else m[a] = y; if (x === undefined) delete m[b]; else m[b] = x; };
+  const update = {};
+  if (swap) {
+    update[toKind] = fromPath; update[fromKey] = s[toKind];
+    sw(offs, fromKey, toKind); sw(meta.labels, fromKey, toKind);
+  } else {
+    update[toKind] = fromPath;
+    if (fromFixed) update[fromKey] = null; else update.extra_stems = s.extra_stems.filter(x => x.id !== fromKey);
+    mv(offs, fromKey, toKind); mv(meta.labels, fromKey, toKind);
+    if (Array.isArray(meta.order)) meta.order = [...new Set(meta.order.map(k => k === fromKey ? toKind : k))];
+  }
+  update.stem_offsets = offs; update.stem_meta = meta;
+  const { error } = await supabaseClient.from('songs').update(update).eq('id', s.id);
+  if (error) { alert('Kunde inte spara: ' + error.message); return false; }
+  Object.assign(s, update);
+
+  // tonkurvorna (Röstövning) hör till stämnyckeln – flytta dem med filen
+  const T = supabaseClient.from.bind(supabaseClient, 'song_pitch');
+  let perr = null;
+  if (swap) {
+    perr = (await T().update({ stem_key: '__tmp__' }).eq('song_id', s.id).eq('stem_key', fromKey)).error
+      || (await T().update({ stem_key: fromKey }).eq('song_id', s.id).eq('stem_key', toKind)).error
+      || (await T().update({ stem_key: toKind }).eq('song_id', s.id).eq('stem_key', '__tmp__')).error;
+  } else {
+    await T().delete().eq('song_id', s.id).eq('stem_key', toKind);
+    perr = (await T().update({ stem_key: toKind }).eq('song_id', s.id).eq('stem_key', fromKey)).error;
+  }
+  if (perr) alert('Typen ändrades, men tonkurvorna kunde inte flyttas: ' + perr.message + '\nAnalysera stämman igen under Röstövning.');
+  return true;
+}
+
 function renderStemsArea(s) {
   if (!Array.isArray(s.extra_stems)) s.extra_stems = [];
 
@@ -484,7 +544,8 @@ function renderStemsArea(s) {
       ${partControls(it, idx, items.length)}
       <span class="stem-filename">${stemFilename(it.path)}</span>
       <div class="stem-actions">
-        <button type="button" class="btn-small playStemBtn" data-id="${s.id}" ${data} style="background: transparent; border: 1px solid var(--border);">&#9658; Spela</button>
+        ${stemTypeSelect(s, it)}
+        <button type="button" class="btn-small btn-ghost playStemBtn" data-id="${s.id}" ${data}>&#9658; Spela</button>
         <button type="button" class="btn-small dlStemBtn" data-path="${it.path}" title="Ladda ner" style="background: transparent; border: 1px solid var(--border); color: var(--text);">&#11015;</button>
         <button type="button" class="btn-small btn-danger removeStemBtn" data-id="${s.id}" ${data}>Ta bort</button>
       </div>
@@ -521,6 +582,10 @@ function wireStemsArea(s) {
   const area = document.getElementById(`stemsArea-${s.id}`);
   if (!area) return;
   wirePartControls(area, s, STEM_FIELDS, 'extra_stems', 'stem_meta', () => { area.innerHTML = renderStemsArea(s); wireStemsArea(s); });
+  area.querySelectorAll('.stemTypeSel').forEach(sel => sel.addEventListener('change', async () => {
+    const ok = sel.value ? await changeStemType(s, sel.dataset.key, sel.value) : false;
+    area.innerHTML = renderStemsArea(s); wireStemsArea(s);
+  }));
   const btChk = area.querySelector('.practiceBtChk');
   if (btChk) btChk.addEventListener('change', async () => {
     const { error } = await supabaseClient.from('songs').update({ practice_backtrack: btChk.checked }).eq('id', s.id);

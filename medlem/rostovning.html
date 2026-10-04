@@ -106,6 +106,18 @@
   .voice-pick button { padding: 0.45rem 0.95rem; border-radius: 999px; font-size: 0.9rem; }
   .voice-pick button[aria-pressed="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
 
+  /* medlem: enkel kontrollpanel */
+  .member-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.8rem 0; }
+  .member-controls label { display: flex; align-items: center; gap: 0.4rem; margin: 0; }
+  .member-controls input[type=checkbox] { width: auto; margin: 0; accent-color: var(--accent); }
+
+  /* advanced settings */
+  .adv-toggle { font-size: 0.85rem; color: var(--text-muted); cursor: pointer; text-decoration: underline; }
+  .adv-settings { display: none; }
+  .adv-settings.open { display: grid; }
+  .member-only .settings { display: none; }
+  .member-only .settings.advanced-open { display: grid; }
+
   /* guide */
   .title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
   .title-row h1 { margin: 0.5rem 0; }
@@ -309,7 +321,19 @@
     </div>
     <span id="micNote" hidden></span><span id="micCents" hidden></span>
 
-    <div class="settings">
+    <!-- Enkla inställningar för medlemmar -->
+    <div class="member-controls member-only">
+      <label><input type="checkbox" id="optStemMember" checked> <span id="optStemLabelMember">Din stämma</span></label>
+      <label><input type="checkbox" id="optToneMember" checked> Referenston</label>
+      <label><input type="checkbox" id="optWithBackMember"> Backtrack</label>
+    </div>
+
+    <!-- Advanced settings (dolt för medlemmar per default) -->
+    <div style="margin-top: 1rem;">
+      <a href="#" class="adv-toggle member-only" id="advToggle">⚙ Fler inställningar</a>
+    </div>
+
+    <div class="settings adv-settings" id="advSettings">
       <fieldset class="set">
         <legend>Lyssna</legend>
         <label><input type="checkbox" id="optStem" checked> <span id="optStemLabel">Stämljud</span> <small>vald stämma</small></label>
@@ -1172,13 +1196,17 @@ function seek(pos) {
 function renderWithRow() {
   const row = document.getElementById('withRow');
   document.getElementById('optStemLabel').textContent = current.label;
+  const _ml = document.getElementById('optStemLabelMember'); if (_ml) _ml.textContent = current.label;
   const others = stems.filter(st => st !== current);
+  const _mb = document.getElementById('optWithBackMember');
+  if (_mb) { _mb.checked = playWith.has('stem_backtrack_path'); _mb.closest('label').hidden = !stems.some(st => st.key === 'stem_backtrack_path' && st !== current); }
   document.getElementById('withWrap').hidden = !others.length;
   row.innerHTML = others.map(st =>
     `<label><input type="checkbox" data-key="${esc(st.key)}" ${playWith.has(st.key) ? 'checked' : ''}> ${esc(st.label)}</label>`).join('');
   row.querySelectorAll('input').forEach(inp => inp.addEventListener('change', async () => {
     const st = stems.find(x => x.key === inp.dataset.key);
     if (inp.checked) playWith.add(st.key); else playWith.delete(st.key);
+    if (st.key === 'stem_backtrack_path') { const m = document.getElementById('optWithBackMember'); if (m) m.checked = inp.checked; }
     try { localStorage.setItem('hv-play-with', JSON.stringify([...playWith])); } catch (e) {}
     if (inp.checked && !st.buffer) {
       const lbl = inp.parentElement, txt = lbl.lastChild;
@@ -1472,6 +1500,52 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
   try { f.checked = localStorage.getItem('hv-fit') === '1'; } catch (e) {}
   f.addEventListener('change', () => { try { localStorage.setItem('hv-fit', f.checked ? '1' : '0'); } catch (e) {} viewLo = null; if (current) tick(); });
 })();
+// Member controls: advanced settings toggle + sync
+(() => {
+  const toggle = document.getElementById('advToggle');
+  const settings = document.getElementById('advSettings');
+  if (toggle && settings) {
+    toggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      settings.classList.toggle('open');
+    });
+  }
+
+  // Sync member controls with advanced settings
+  const memberStem = document.getElementById('optStemMember');
+  const memberTone = document.getElementById('optToneMember');
+  const memberWithBack = document.getElementById('optWithBackMember');
+  const advStem = document.getElementById('optStem');
+  const advTone = document.getElementById('optTone');
+
+  if (memberStem && advStem) {
+    memberStem.addEventListener('change', () => { advStem.checked = memberStem.checked; advStem.dispatchEvent(new Event('change')); });
+    advStem.addEventListener('change', () => { memberStem.checked = advStem.checked; });
+  }
+  if (memberTone && advTone) {
+    memberTone.addEventListener('change', () => { advTone.checked = memberTone.checked; advTone.dispatchEvent(new Event('change')); });
+    advTone.addEventListener('change', () => { memberTone.checked = advTone.checked; });
+  }
+
+  // Backtrack sync: add/remove from playWith Set
+  if (memberWithBack) {
+    memberWithBack.addEventListener('change', async () => {
+      const bt = stems.find(st => st.key === 'stem_backtrack_path');
+      if (memberWithBack.checked) {
+        playWith.add('stem_backtrack_path');
+        if (bt && !bt.buffer) { try { await loadBuffer(bt); } catch (e) { toast('Kunde inte ladda backtrack'); } }
+      } else {
+        playWith.delete('stem_backtrack_path');
+      }
+      const chip = document.querySelector('#withRow input[data-key="stem_backtrack_path"]'); if (chip) chip.checked = memberWithBack.checked;
+      // Persist choice
+      try { localStorage.setItem('hv-play-with', JSON.stringify(Array.from(playWith))); } catch (e) {}
+      // Restart playback with new stems
+      if (playing) startAt(position());
+    });
+  }
+})();
+
 ['optStem', 'optTone'].forEach(id => document.getElementById(id).addEventListener('change', () => { if (playing) startAt(position()); }));
 document.getElementById('overview').addEventListener('click', e => {
   const r = e.currentTarget.getBoundingClientRect();
@@ -1569,8 +1643,12 @@ window.addEventListener('resize', () => { if (current) { sizeCanvases(); tick();
   try { savedWith = JSON.parse(localStorage.getItem('hv-play-with') || 'null'); } catch (e) {}
   if (Array.isArray(savedWith)) savedWith.forEach(k => playWith.add(k));
   else if (!isAdmin) playWith.add('stem_backtrack_path');
+  // Sync member control checkbox with playWith set
+  const memberWithBack = document.getElementById('optWithBackMember');
+  if (memberWithBack) memberWithBack.checked = playWith.has('stem_backtrack_path');
   // admin-delar (analys) visas bara för admin
   document.querySelectorAll(isAdmin ? '.member-only' : '.admin-only').forEach(el => el.remove());
+  if (isAdmin) document.getElementById('advSettings').classList.add('open');
   if (!isAdmin) document.querySelector('#stemArea .bulk').remove();
   if (isAdmin && /\/admin\//.test(document.referrer)) {
     const b = document.getElementById('backLink'); b.href = '/admin/latar.html'; b.innerHTML = '&larr; Tillbaka till låtar';

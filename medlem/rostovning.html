@@ -46,7 +46,7 @@
   .k-next { font-size: 0.9rem; color: var(--text-muted); min-height: 1.3em; }
   .k-src { font-size: 0.7rem; color: var(--text-muted); opacity: 0.7; }
   @media (max-width: 640px) { .k-now { font-size: 1.2rem; } }
-  .mic-btn.on { background: #ef4444; border-color: #ef4444; color: #fff; }
+  .mic-btn.on { background: #ef4444; border-color: #ef4444; color: #fff; box-shadow: 0 0 0 4px rgba(239,68,68,0.25); }
   /* poängrad när micken är på */
   .score-overlay { position: absolute; right: 6px; top: 6px; height: 44px; box-sizing: border-box; align-items: center; display: flex; gap: 0.9rem; padding: 0.2rem 0.7rem; border-radius: 0.5rem; background: rgba(10,12,16,0.72); border: 1px solid var(--border); pointer-events: none; font-variant-numeric: tabular-nums; backdrop-filter: blur(3px); }
   .score-overlay div { display: grid; line-height: 1.1; }
@@ -106,17 +106,25 @@
   .voice-pick button { padding: 0.45rem 0.95rem; border-radius: 999px; font-size: 0.9rem; }
   .voice-pick button[aria-pressed="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
 
-  /* medlem: enkel kontrollpanel */
-  .member-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.8rem 0; }
-  .member-controls label { display: flex; align-items: center; gap: 0.4rem; margin: 0; }
-  .member-controls input[type=checkbox] { width: auto; margin: 0; accent-color: var(--accent); }
+  /* kontroller under låt och stämma */
+  .practice-controls { display: flex; flex-wrap: wrap; gap: 0.6rem 1.4rem; align-items: center; margin: 1rem 0 0.2rem; }
+  .practice-controls label { display: flex; align-items: center; gap: 0.4rem; margin: 0; cursor: pointer; }
+  .practice-controls input[type=checkbox] { width: auto; margin: 0; accent-color: var(--accent); }
+  .practice-controls select { width: auto; margin: 0; padding: 0.3rem 0.5rem; font-size: 0.9rem; }
+  .practice-controls .opt { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .practice-controls .diff label { cursor: default; }
+  .help { width: 1.35rem; height: 1.35rem; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; font-size: 0.78rem; font-weight: 700; line-height: 1; background: transparent; border: 1px solid var(--text-muted); color: var(--text-muted); cursor: pointer; }
+  .help:hover, .help[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); background: transparent; }
+  #helpPop { position: absolute; z-index: 1000; max-width: min(320px, calc(100vw - 24px)); padding: 0.75rem 0.9rem; border-radius: 0.6rem; background: #1c1f26; border: 1px solid var(--accent); box-shadow: 0 8px 24px rgba(0,0,0,0.5); font-size: 0.85rem; line-height: 1.5; color: var(--text); }
+  #helpPop p { margin: 0 0 0.4rem; } #helpPop p:last-child { margin: 0; } #helpPop b { color: var(--accent); }
+  .mic-cta { margin-top: 1rem; display: grid; gap: 0.6rem; }
+  .mic-btn { width: 100%; padding: 1rem 1.2rem; font-size: 1.15rem; font-weight: 700; border-radius: 0.8rem; background: var(--accent); color: #111317; border: 2px solid var(--accent); box-shadow: 0 0 0 4px rgba(229,169,104,0.2); cursor: pointer; justify-content: center; }
+  .mic-btn:hover { filter: brightness(1.08); }
 
   /* advanced settings */
   .adv-toggle { font-size: 0.85rem; color: var(--text-muted); cursor: pointer; text-decoration: underline; }
   .adv-settings { display: none; }
   .adv-settings.open { display: grid; }
-  .member-only .settings { display: none; }
-  .member-only .settings.advanced-open { display: grid; }
 
   /* guide */
   .title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
@@ -189,59 +197,56 @@
       <ol class="g-rec-steps">
         <li><b>🎧 Använd hörlurar – det är nästan ett krav.</b> Mikrofonen hör allt i rummet. Spelar musiken i högtalaren tror den att musiken är du, och då blir resultatet fel.</li>
         <li>Välj <b>din stämma</b> (eller <b>Vocals</b>) som huvudspår under <em>Stämma</em> – <u>inte</u> backtracket. Det är huvudspåret som bestämmer vilka noter du ska sjunga.</li>
-        <li>Lägg sedan till <b>Backtrack</b> under <em>Lyssna → Spela med</em>, så sjunger du till kompet.</li>
+        <li>Kryssa sedan i <b>Backtrack</b> under <em>Låt och stämma</em> (om körledningen har aktiverat det för låten), så sjunger du till kompet.</li>
       </ol>
     </div>
     <ol>
-      <li class="member-only"><div><b>Välj låt och stämma</b><p>Listan visar låtarna som går att öva på. Din egen stämma väljs automatiskt som huvudspår, men du kan byta till en annan stämma eller Vocals. Välj inte backtracket som huvudspår – lägg till det under <em>Spela med</em> i stället.</p></div></li>
+      <li class="member-only"><div><b>Välj låt och stämma</b><p>Listan visar låtarna som går att öva på. Din egen stämma väljs automatiskt som huvudspår, men du kan byta till en annan stämma eller Vocals. Välj inte backtracket som huvudspår – kryssa i <em>Backtrack</em> i stället.</p></div></li>
       <li class="admin-only"><div><b>Välj låt</b><p>Listan visar låtar som har minst en sångstämma uppladdad.</p></div></li>
       <li class="admin-only"><div><b>Analysera stämmorna</b><p>Tryck <em>Analysera alla sångstämmor</em> (eller <em>Analysera</em> på en stämma). Sidan lyssnar igenom ljudfilen och räknar fram vilka toner som sjungs. Resultatet sparas direkt. Byts stämfilen ut visas ⚠ – analysera då igen.</p></div></li>
       <li class="admin-only"><div><b>Kontrollera resultatet</b><p>Tryck <em>Välj</em> på stämman och sedan ▶ med <em>Referenston</em> på. Följer pipet stämman är analysen bra. Ligger det backvocals i filen kan det bli extra noter där.</p></div></li>
-      <li><div><b>Sjung med</b><p>Tryck ▶ för att lyssna på stämman. Sätt sedan i hörlurar, tryck <em>🎤 Sjung med</em>, tillåt mikrofonen och tryck ▶. Under <em>Lyssna</em> väljer du vad du vill höra: din stämma, referenstonen och andra spår som backtrack eller övriga stämmor.</p></div></li>
+      <li><div><b>Sjung med</b><p>Tryck ▶ för att lyssna på stämman. Sätt sedan i hörlurar, tryck <em>🎤 Sjung med</em>, tillåt mikrofonen och tryck ▶. Under <em>Låt och stämma</em> väljer du vad du vill höra: din stämma, referenstonen och backtrack.</p></div></li>
       <li><div><b>Läs av</b><p>Den vita linjen är din röst. Noterna fylls <span style="color:#4ade80">grönt</span> där du träffar och <span style="color:#f87171">rött</span> där du missar. Uppe till höger ser du vilken ton du sjunger och hur många cent du ligger fel. Under spelaren visas träffprocent och hur många noter du klarat.</p></div></li>
     </ol>
 
-    <h3 class="g-h">Inställningarna under spelaren</h3>
-    <p class="g-p">Under spelknapparna finns tre rutor. Allt du ändrar där gäller direkt, även medan låten spelar.</p>
+    <h3 class="g-h">Valen under Låt och stämma</h3>
     <div class="g-sets">
       <section class="g-set">
         <h4>Lyssna</h4>
         <p class="g-what">Bestämmer vad du <b>hör</b> i hörlurarna. Påverkar inte vad som räknas som rätt.</p>
         <dl>
           <dt>Din stämma</dt>
-          <dd>Rutan med stämmans namn (t.ex. <em>Tenor</em>). På = du hör inspelningen av stämman du övar på. Stäng av när du kan stämman och vill sjunga den själv.</dd>
-          <dt>Referenston</dt>
-          <dd>Ett enkelt pip som spelar exakt de noter du ser i notbanan. Bra för att höra tonerna tydligt, utan text och utan andra röster.</dd>
-          <dt>Spela med</dt>
-          <dd><b class="g-strong">Här lägger du till Backtrack</b> – huvudspåret ska vara din stämma eller Vocals. Knappar för låtens övriga spår – backtrack och de andra stämmorna. Tryck på en för att slå på den (den blir guldfärgad), tryck igen för att stänga av. Välj t.ex. <em>Backtrack</em> för att sjunga till kompet, eller alla stämmor för att öva som i kören.</dd>
+          <dd>På = du hör inspelningen av stämman du övar på. Stäng av när du kan stämman och vill sjunga den själv.</dd>
+          <dt>Referenston <em>(?)</em></dt>
+          <dd>Ett enkelt pip som spelar exakt de noter du ser i notbanan. Tryck på <em>?</em> för förklaring.</dd>
+          <dt>Backtrack</dt>
+          <dd><b class="g-strong">Sjung till kompet.</b> Rutan syns bara om körledningen har aktiverat backtrack för låten.</dd>
         </dl>
       </section>
       <section class="g-set">
-        <h4>Visa</h4>
-        <p class="g-what">Bestämmer vad du <b>ser</b> på skärmen.</p>
+        <h4>Svårighetsgrad</h4>
+        <p class="g-what">Bestämmer hur din <b>sång bedöms</b> när mikrofonen är på.</p>
         <dl>
-          <dt>Karaoke-text</dt>
-          <dd>Visar sångtexten i en rad mellan notbanan och spelknapparna. Raden som sjungs nu fylls i guld från vänster, och nästa rad står i mindre text under. Finns bara om låten har synkad text.</dd>
-          <dt>Zoom</dt>
-          <dd>Hur många sekunder av låten som syns i notbanan samtidigt. <em>5 s</em> = stora noter, lätt att se detaljer (bra på mobil). <em>20–40 s</em> = du ser längre fram i låten.</dd>
-        </dl>
-      </section>
-      <section class="g-set">
-        <h4>Sjung med</h4>
-        <p class="g-what">Bestämmer hur din <b>sång bedöms</b> när mikrofonen är på (🎤 Sjung med).</p>
-        <dl>
-          <dt>Marginal</dt>
-          <dd>Hur nära noten du måste ligga för att det ska bli grönt. 100 cent = ett halvt tonsteg.
-            <em>Snäll ±75</em> = förlåtande, bra att börja med.
-            <em>Normal ±50</em> = du får ligga högst en kvarts ton fel.
-            <em>Strikt ±30</em> = för dig som vill finslipa.</dd>
-          <dt>Godkänn annan oktav</dt>
-          <dd>På = det räknas som rätt även om du sjunger en oktav (eller två) högre eller lägre än noten. Bra om du t.ex. är bas och vill öva på tenorstämman. Av = du måste ligga i exakt rätt läge.</dd>
+          <dt>Nybörjare → Svår</dt>
+          <dd>Hur nära noten du måste ligga för att det ska bli grönt. <em>Lätt</em> är bra att börja med. Tryck på <em>?</em> för detaljer.</dd>
           <dt>🎧 Hörlurar – nästan ett krav</dt>
-          <dd><b class="g-strong">Sjung alltid med hörlurar.</b> Mikrofonen hör allt i rummet. Spelar ljudet i högtalaren tror den att musiken är du, och då blir det grönt eller rött fast du inte sjunger. Med hörlurar hör den bara din röst. Vanliga hörlurar med sladd eller trådlösa fungerar båda.</dd>
+          <dd><b class="g-strong">Sjung alltid med hörlurar.</b> Annars hör mikrofonen musiken i högtalaren och tror att den är du.</dd>
+        </dl>
+      </section>
+      <section class="g-set">
+        <h4>Fler inställningar</h4>
+        <p class="g-what">Under <b>⚙ Fler inställningar</b> finns det som de flesta inte behöver.</p>
+        <dl>
+          <dt>Spela med</dt>
+          <dd>Lyssna på övriga stämmor samtidigt.</dd>
+          <dt>Anpassa höjden / Slå ihop noter</dt>
+          <dd>Hur notbanan ritas.</dd>
+          <dt>Godkänn annan oktav</dt>
+          <dd>På = det räknas rätt även om du sjunger en eller två oktaver högre eller lägre.</dd>
         </dl>
       </section>
     </div>
+    <p class="g-p">Sångtexten visas automatiskt över notbanan när låten har synkad text.</p>
 
     <h3 class="g-h">Rutorna med resultat</h3>
     <p class="g-p">Visas när mikrofonen är på. <b>Du sjunger</b> = tonen du tar just nu och hur många cent du ligger fel. <b>Träff</b> = hur stor del av tiden du legat rätt när det finns en not att sjunga. <b>Noter klara</b> = hur många noter du har klarat, där du legat rätt minst 60 % av notens längd. Allt nollställs när du startar om från början.</p>
@@ -257,6 +262,18 @@
     <select id="songSelect"><option value="">Laddar låtar…</option></select>
     <div id="stemArea" hidden>
       <div id="stemRows"></div>
+      <div class="practice-controls">
+        <label><input type="checkbox" id="optStem" checked> <span id="optStemLabel">Din stämma</span></label>
+        <span class="opt"><label><input type="checkbox" id="optTone" checked> Referenston</label><button type="button" class="help" data-help="tone" aria-label="Vad är referenston?">?</button></span>
+        <label id="optWithBackWrap"><input type="checkbox" id="optWithBackMember"> Backtrack</label>
+        <span class="opt diff"><label for="optTol">Svårighetsgrad</label>
+          <select id="optTol">
+            <option value="100">Nybörjare</option>
+            <option value="75" selected>Lätt</option>
+            <option value="50">Normal</option>
+            <option value="30">Svår</option>
+          </select><button type="button" class="help" data-help="tol" aria-label="Vad är svårighetsgrad?">?</button></span>
+      </div>
       <div class="bulk">
         <button id="analyzeAllBtn">Analysera alla sångstämmor</button>
         <span class="hint" style="margin:0;">Backtracket hoppas över. Tar några sekunder per stämma.</span>
@@ -266,7 +283,7 @@
   </div>
 
   <div class="card static" id="viewer" hidden>
-    <div class="viewer-head"><button type="button" class="play-mini" id="playMini" title="Spela/pausa (mellanslag)" aria-label="Spela/pausa">▶&#xFE0E;</button><h2 id="viewerTitle"></h2></div>
+    <div class="viewer-head"><h2 id="viewerTitle"></h2></div>
     <div class="stats" id="stats"></div>
     <div class="canvas-wrap">
       <canvas id="overview" title="Hela låten – klicka för att hoppa"></canvas>
@@ -317,15 +334,11 @@
       <span class="time" id="curTime">0:00.0</span>
       <input type="range" id="scrubber" min="0" max="1" step="0.01" value="0">
       <span class="time" id="durTime">0:00</span>
-      <button class="btn-outline mic-btn" id="micBtn" title="Sjung med i mikrofonen">🎤 Sjung med</button>
     </div>
     <span id="micNote" hidden></span><span id="micCents" hidden></span>
-
-    <!-- Enkla inställningar för medlemmar -->
-    <div class="member-controls member-only">
-      <label><input type="checkbox" id="optStemMember" checked> <span id="optStemLabelMember">Din stämma</span></label>
-      <label><input type="checkbox" id="optToneMember" checked> Referenston</label>
-      <label><input type="checkbox" id="optWithBackMember"> Backtrack</label>
+    <div class="mic-cta">
+      <button type="button" class="mic-btn" id="micBtn" title="Sjung med i mikrofonen">🎤 Sjung med</button>
+      <p class="set-warn">🎧 <b>Hörlurar är nästan ett krav.</b> Utan hörlurar hör mikrofonen musiken i högtalaren och räknar den som din sång.</p>
     </div>
 
     <!-- Advanced settings (dolt för medlemmar per default) -->
@@ -335,28 +348,17 @@
 
     <div class="settings adv-settings" id="advSettings">
       <fieldset class="set">
-        <legend>Lyssna</legend>
-        <label><input type="checkbox" id="optStem" checked> <span id="optStemLabel">Stämljud</span> <small>vald stämma</small></label>
-        <label><input type="checkbox" id="optTone" checked> Referenston <small>pip på noterna</small></label>
-        <div id="withWrap" hidden><div class="set-sub">Spela med</div><div class="chips" id="withRow"></div></div>
+        <legend>Spela med</legend>
+        <div id="withWrap" hidden><div class="set-sub">Övriga spår</div><div class="chips" id="withRow"></div></div>
       </fieldset>
       <fieldset class="set">
         <legend>Visa</legend>
-        <label id="optKaraokeWrap" hidden><input type="checkbox" id="optKaraoke" checked> Karaoke-text</label>
         <label><input type="checkbox" id="optFit"> Anpassa höjden efter tonerna</label>
         <label><input type="checkbox" id="optMerge" checked> Slå ihop noter <small>per textrad</small></label>
       </fieldset>
       <fieldset class="set">
         <legend>Sjung med</legend>
-        <label class="row">Träffmarginal <select id="optTol">
-          <option value="100">Väldigt snäll ±100 cent</option>
-          <option value="75" selected>Snäll ±75 cent</option>
-          <option value="50">Normal ±50 cent</option>
-          <option value="30">Strikt ±30 cent</option>
-        </select></label>
-        <p class="set-sub" style="margin:0;">Hur nära tonen du måste ligga för att det ska räknas som träff. 100 cent = en halvton. Notrutans höjd visar marginalen.</p>
         <label><input type="checkbox" id="optOctave" checked> Godkänn annan oktav</label>
-        <p class="set-warn">🎧 <b>Hörlurar är nästan ett krav.</b> Utan hörlurar hör mikrofonen musiken i högtalaren och räknar den som din sång.</p>
       </fieldset>
     </div>
 
@@ -433,6 +435,8 @@ function applyPartMeta(items, meta, keyOf) {
   const pos = it => { const i = order.indexOf(keyOf(it)); return i === -1 ? 1e6 : i; };
   return items.map((it, i) => ({ it, i })).sort((a, b) => (pos(a.it) - pos(b.it)) || (a.i - b.i)).map(x => x.it);
 }
+// admin kan stänga av backtrack i röstövningen per låt (songs.practice_backtrack)
+const btBlocked = st => !isAdmin && st.key === 'stem_backtrack_path' && song && song.practice_backtrack === false;
 function stemListFor(s) {
   const list = FIXED_STEMS.filter(f => s[f.col]).map(f => ({ key: f.col, label: f.label, path: s[f.col] }));
   (s.extra_stems || []).forEach(ex => list.push({ key: ex.id, label: ex.label, path: ex.path }));
@@ -1074,8 +1078,7 @@ function setupKaraoke() {
   kLines = parseLrc(lrc).filter((x, i, a) => i === 0 || x.time !== a[i - 1].time || x.text);
   kIdx = -2;
   const has = kLines.some(x => x.text);
-  document.getElementById('optKaraokeWrap').hidden = !has;
-  document.getElementById('karaoke').hidden = !(has && document.getElementById('optKaraoke').checked);
+  document.getElementById('karaoke').hidden = !has;
 }
 function renderKaraoke(pos) {
   const box = document.getElementById('karaoke');
@@ -1107,7 +1110,7 @@ function loop() { tick(); if (playing) raf = requestAnimationFrame(loop); }
 async function play() {
   if (!current) return;
   await ensureCtx();
-  const extra = stems.filter(st => st !== current && playWith.has(st.key));
+  const extra = stems.filter(st => st !== current && playWith.has(st.key) && !btBlocked(st));
   try { await Promise.all([current, ...extra].map(loadBuffer)); } catch (e) { toast('Kunde inte ladda ljudet: ' + (e.message || e)); return; }
   startAt(pausedPos >= durationOf() ? 0 : pausedPos);
 }
@@ -1128,7 +1131,7 @@ function startAt(pos) {
   const offs = song.stem_offsets || {};
   const offCur = (Number(offs[current.key]) || 0) / 1000;
   stems.forEach(st => {
-    if (st === current || !playWith.has(st.key) || !st.buffer) return;
+    if (st === current || !playWith.has(st.key) || !st.buffer || btBlocked(st)) return;
     const inFile = pos + offCur - (Number(offs[st.key]) || 0) / 1000;
     if (inFile >= st.buffer.duration) return;
     const src = audioCtx.createBufferSource();
@@ -1140,7 +1143,7 @@ function startAt(pos) {
   });
   if (document.getElementById('optTone').checked) scheduleTones(when, pos);
   playing = true;
-  document.getElementById('playBtn').textContent = '⏸\uFE0E'; document.getElementById('playMini').textContent = '⏸\uFE0E';
+  document.getElementById('playBtn').textContent = '⏸\uFE0E';
   cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
 }
 
@@ -1183,7 +1186,7 @@ function stop(keepPos) {
   stopNodes();
   playing = false;
   cancelAnimationFrame(raf);
-  document.getElementById('playBtn').textContent = '▶\uFE0E'; document.getElementById('playMini').textContent = '▶\uFE0E';
+  document.getElementById('playBtn').textContent = '▶\uFE0E';
   if (current) tick();
 }
 
@@ -1196,10 +1199,9 @@ function seek(pos) {
 function renderWithRow() {
   const row = document.getElementById('withRow');
   document.getElementById('optStemLabel').textContent = current.label;
-  const _ml = document.getElementById('optStemLabelMember'); if (_ml) _ml.textContent = current.label;
-  const others = stems.filter(st => st !== current);
+  const others = stems.filter(st => st !== current && !btBlocked(st));
   const _mb = document.getElementById('optWithBackMember');
-  if (_mb) { _mb.checked = playWith.has('stem_backtrack_path'); _mb.closest('label').hidden = !stems.some(st => st.key === 'stem_backtrack_path' && st !== current); }
+  if (_mb) { _mb.checked = playWith.has('stem_backtrack_path'); document.getElementById('optWithBackWrap').hidden = !others.some(st => st.key === 'stem_backtrack_path'); }
   document.getElementById('withWrap').hidden = !others.length;
   row.innerHTML = others.map(st =>
     `<label><input type="checkbox" data-key="${esc(st.key)}" ${playWith.has(st.key) ? 'checked' : ''}> ${esc(st.label)}</label>`).join('');
@@ -1457,14 +1459,9 @@ document.querySelectorAll('.prog-tabs button').forEach(b => b.addEventListener('
   if (!seen) { try { localStorage.setItem('hv-tonkurva-guide', '1'); } catch (e) {} }
   b.addEventListener('click', () => { const open = g.hidden; set(open); try { localStorage.setItem('hv-tonkurva-guide', '1'); } catch (e) {} });
 })();
-document.getElementById('optKaraoke').addEventListener('change', e => {
-  document.getElementById('karaoke').hidden = !e.target.checked || !kLines.some(x => x.text);
-  kIdx = -2; tick();
-});
 document.getElementById('songSelect').addEventListener('change', e => loadSong(e.target.value));
 document.getElementById('analyzeAllBtn').addEventListener('click', analyzeAll);
 document.getElementById('playBtn').addEventListener('click', () => playing ? pause() : play());
-document.getElementById('playMini').addEventListener('click', () => playing ? pause() : play());
 document.getElementById('backBtn').addEventListener('click', () => seek(position() - 5));
 document.getElementById('scrubber').addEventListener('change', e => seek(Number(e.target.value)));
 document.getElementById('scrubber').addEventListener('input', e => { if (!playing) { pausedPos = Number(e.target.value); tick(); } });
@@ -1500,7 +1497,31 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
   try { f.checked = localStorage.getItem('hv-fit') === '1'; } catch (e) {}
   f.addEventListener('change', () => { try { localStorage.setItem('hv-fit', f.checked ? '1' : '0'); } catch (e) {} viewLo = null; if (current) tick(); });
 })();
-// Member controls: advanced settings toggle + sync
+// ?-hjälp: en delad ruta som visas vid knappen
+(() => {
+  const TEXTS = {
+    tone: '<p><b>Referenston</b></p><p>Ett enkelt pip som spelar exakt de noter du ska sjunga. Bra för att höra tonerna tydligt, utan text och utan andra röster. Stäng av när du kan stämman.</p>',
+    tol: '<p><b>Svårighetsgrad</b></p><p>Hur nära noten du måste ligga för att det ska bli grönt. 100 cent = en halvton.</p><p><b>Nybörjare</b> ±100 cent – mycket förlåtande.<br><b>Lätt</b> ±75 cent – bra att börja med.<br><b>Normal</b> ±50 cent – en kvarts ton fel går bra.<br><b>Svår</b> ±30 cent – för dig som vill finslipa.</p>',
+  };
+  const pop = document.createElement('div'); pop.id = 'helpPop'; pop.hidden = true; pop.setAttribute('role', 'dialog');
+  document.body.appendChild(pop);
+  let openBtn = null;
+  const close = () => { pop.hidden = true; if (openBtn) openBtn.setAttribute('aria-expanded', 'false'); openBtn = null; };
+  document.addEventListener('click', e => {
+    const b = e.target.closest('.help');
+    if (!b) { if (!e.target.closest('#helpPop')) close(); return; }
+    if (openBtn === b) { close(); return; }
+    close();
+    pop.innerHTML = TEXTS[b.dataset.help] || '';
+    pop.hidden = false; openBtn = b; b.setAttribute('aria-expanded', 'true');
+    const r = b.getBoundingClientRect(), w = pop.offsetWidth;
+    pop.style.top = (window.scrollY + r.bottom + 8) + 'px';
+    pop.style.left = Math.max(12, Math.min(window.scrollX + r.left - 8, window.scrollX + document.documentElement.clientWidth - w - 12)) + 'px';
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+})();
+
+// Member controls: advanced settings toggle + backtrack
 (() => {
   const toggle = document.getElementById('advToggle');
   const settings = document.getElementById('advSettings');
@@ -1511,22 +1532,7 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
     });
   }
 
-  // Sync member controls with advanced settings
-  const memberStem = document.getElementById('optStemMember');
-  const memberTone = document.getElementById('optToneMember');
   const memberWithBack = document.getElementById('optWithBackMember');
-  const advStem = document.getElementById('optStem');
-  const advTone = document.getElementById('optTone');
-
-  if (memberStem && advStem) {
-    memberStem.addEventListener('change', () => { advStem.checked = memberStem.checked; advStem.dispatchEvent(new Event('change')); });
-    advStem.addEventListener('change', () => { memberStem.checked = advStem.checked; });
-  }
-  if (memberTone && advTone) {
-    memberTone.addEventListener('change', () => { advTone.checked = memberTone.checked; advTone.dispatchEvent(new Event('change')); });
-    advTone.addEventListener('change', () => { memberTone.checked = advTone.checked; });
-  }
-
   // Backtrack sync: add/remove from playWith Set
   if (memberWithBack) {
     memberWithBack.addEventListener('change', async () => {
@@ -1643,7 +1649,6 @@ window.addEventListener('resize', () => { if (current) { sizeCanvases(); tick();
   try { savedWith = JSON.parse(localStorage.getItem('hv-play-with') || 'null'); } catch (e) {}
   if (Array.isArray(savedWith)) savedWith.forEach(k => playWith.add(k));
   else if (!isAdmin) playWith.add('stem_backtrack_path');
-  // Sync member control checkbox with playWith set
   const memberWithBack = document.getElementById('optWithBackMember');
   if (memberWithBack) memberWithBack.checked = playWith.has('stem_backtrack_path');
   // admin-delar (analys) visas bara för admin

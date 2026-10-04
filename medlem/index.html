@@ -15,20 +15,35 @@
   .checkin-info span { font-size: 0.85rem; color: var(--text-muted); }
   .checkin-btn { padding: 0.6rem 1.2rem; font-size: 0.95rem; }
   .checked-in { color: #4ade80; font-weight: 600; font-size: 0.95rem; white-space: nowrap; }
+  /* Rubrik och rollmärke på samma rad */
+  .title-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .title-row h1 { margin: 0; }
+  #welcome { margin: 0.2rem 0 0; }
+  /* Mobil: hela sidan ska rymmas utan att scrolla */
+  @media (max-width: 600px) {
+    .site-header--logo { padding-top: 0.6rem; }
+    .site-logo-img { height: 56px; }
+    .container { padding-top: 0.6rem; padding-bottom: 0.8rem; }
+    .title-row h1 { font-size: 1.75rem; }
+    .card { padding: 0.35rem 0.9rem; margin-top: 0.8rem !important; }
+    #checkinCard { padding: 0.8rem 0.9rem; }
+    .nav-item { padding: 0.5rem 0.1rem; gap: 0.8rem; }
+    .nav-item .card-icon-box { width: 2.5rem; height: 2.5rem; border-radius: 0.7rem; }
+    .nav-item-text h3 { font-size: 1rem; margin: 0; }
+    .nav-item-text p { font-size: 0.82rem; margin: 0.1rem 0 0; }
+    .page-footer { margin-top: 0.8rem; }
+  }
 </style>
 </head>
 <body>
 
 <header class="site-header site-header--logo"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo.webp" type="image/webp"><img src="/icons/logo.png" alt="Heavy Voices" class="site-logo-img" width="640" height="493"></picture></a></header>
 <div class="container">
-  <div class="page-header">
-   
-    <div>
-      <h1>Mitt konto</h1>
-      <p id="welcome" class="text-muted">Laddar...</p>
-    </div>
+  <div class="title-row">
+    <h1>Mitt konto</h1>
     <span id="roleBadge" class="badge"></span>
   </div>
+  <p id="welcome" class="text-muted">Laddar...</p>
 
   <div class="card" id="checkinCard" hidden>
     <h3>Idag</h3>

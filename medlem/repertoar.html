@@ -266,12 +266,17 @@
   <h1>Repertoar</h1>
 
   <div class="tabs">
-    <button class="tab-btn active" id="tabRepertoarBtn">Repertoar</button>
+    <button class="tab-btn active" id="tabRepertoarBtn">Låtar</button>
+    <button class="tab-btn" id="tabTexterBtn">Texter</button>
     <button class="tab-btn" id="tabSpellistorBtn">Spellistor</button>
   </div>
 
   <div class="tab-panel active" id="tabRepertoar">
     <div id="repertoarList">Laddar...</div>
+  </div>
+
+  <div class="tab-panel" id="tabTexter">
+    <div id="texterList">Laddar...</div>
   </div>
 
   <div class="tab-panel" id="tabSpellistor">
@@ -400,13 +405,16 @@ let currentMember = null;
 // =========================================================
 document.getElementById('tabSpellistorBtn').addEventListener('click', () => switchTab('spellistor'));
 document.getElementById('tabRepertoarBtn').addEventListener('click', () => switchTab('repertoar'));
+document.getElementById('tabTexterBtn').addEventListener('click', () => switchTab('texter'));
 
 function switchTab(name) {
-  document.getElementById('tabSpellistorBtn').classList.toggle('active', name === 'spellistor');
-  document.getElementById('tabRepertoarBtn').classList.toggle('active', name === 'repertoar');
-  document.getElementById('tabSpellistor').classList.toggle('active', name === 'spellistor');
-  document.getElementById('tabRepertoar').classList.toggle('active', name === 'repertoar');
+  const cap = { repertoar: 'Repertoar', texter: 'Texter', spellistor: 'Spellistor' };
+  Object.keys(cap).forEach(k => {
+    document.getElementById('tab' + cap[k] + 'Btn').classList.toggle('active', name === k);
+    document.getElementById('tab' + cap[k]).classList.toggle('active', name === k);
+  });
 }
+{ const t = new URLSearchParams(location.search).get('tab'); if (t === 'texter' || t === 'spellistor') switchTab(t); }
 
 // =========================================================
 // Init
@@ -728,6 +736,36 @@ async function loadRepertoar() {
   const isAdmin = currentMember && currentMember.role === 'admin';
   repertoarCache = (data || []).filter(s => s.published !== false || isAdmin);
   renderRepertoar();
+  renderTexter();
+}
+
+// Texter: uppladdade textdokument (gemensam sångtext + stämtexter) per låt, utan noter
+function renderTexter() {
+  const container = document.getElementById('texterList');
+  container.innerHTML = '';
+  let any = false;
+  repertoarCache.forEach(s => {
+    const docs = songDocs(s).filter(d => d.kind !== 'noter');
+    if (!docs.length) return;
+    any = true;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.marginBottom = '1rem';
+    card.innerHTML = `<h3 style="margin:0;">${escapeHtml(s.title)}${s.published === false ? ' <span class="hidden-tag" title="Dold för medlemmar – syns bara för admin">Dold</span>' : ''}</h3>`;
+    const links = document.createElement('div');
+    links.className = 'doc-links';
+    docs.forEach(doc => {
+      const chip = document.createElement('span');
+      chip.className = 'doc-chip';
+      chip.innerHTML = `<a href="#">${escapeHtml(doc.label)}</a><button type="button" title="Ladda ner ${escapeHtml(doc.label)}" aria-label="Ladda ner ${escapeHtml(doc.label)}">${DL_SVG}</button>`;
+      chip.querySelector('a').addEventListener('click', e => { e.preventDefault(); openDoc(doc.path); });
+      chip.querySelector('button').addEventListener('click', () => downloadDoc(doc.path));
+      links.appendChild(chip);
+    });
+    card.appendChild(links);
+    container.appendChild(card);
+  });
+  if (!any) container.innerHTML = '<p class="text-muted">Inga textdokument uppladdade än.</p>';
 }
 
 function renderRepertoar() {

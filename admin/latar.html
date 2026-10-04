@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Låtar — Heavy Voices Admin</title>
+<title>Repertoar — Heavy Voices Admin</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
 <style>
   .back-link { display: inline-block; margin-bottom: 1rem; color: var(--text-muted); }
   .success { color: #4ade80; font-size: 0.9rem; }
-  .song-item { border-bottom: 1px solid var(--border); padding: 1rem 0; }
-  .song-item:last-child { border-bottom: none; }
+  .song-item { margin-bottom: 1rem; }
+  .song-item:hover { transform: none; }
   .song-title { font-family: 'Roboto Condensed', sans-serif; font-size: 1.3rem; }
   .song-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
   .song-item.is-hidden .song-title { color: var(--text-muted); }
@@ -60,6 +60,9 @@
   .stem-filename, .lyric-filename { flex: 1; min-width: 140px; font-size: 0.8rem; color: var(--text-muted); word-break: break-all; }
   .stem-actions, .lyric-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
   .stem-add-row, .lyric-add-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.6rem; flex-wrap: wrap; }
+  .stem-add-row > select, .lyric-add-row > select { width: auto; flex: 0 0 auto; margin: 0; }
+  .stem-add-row > input[type=file], .lyric-add-row > input[type=file] { width: auto; flex: 1 1 200px; min-width: 0; margin: 0; }
+  .stem-add-row > .customLabelInput, .lyric-add-row > .customLabelInput { width: auto; flex: 1 1 160px; margin: 0; }
   select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.6rem; }
   audio.stem-preview { width: 100%; margin-top: 0.4rem; display: none; }
   .customLabelInput { display: none; min-width: 160px; }
@@ -73,7 +76,7 @@
   <a href="/admin/" class="back-btn">&larr; Tillbaka till admin</a>
   
   <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
-    <h1 style="margin: 0.5rem 0;">Låtar</h1>
+    <h1 style="margin: 0.5rem 0;">Repertoar</h1>
     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
       <a href="/admin/stam-synk.html" class="btn btn-outline">&#8644; Stämsynk</a>
       <a href="/admin/text-synk.html" class="btn btn-outline">&#127908; Textsynk (karaoke)</a>
@@ -90,10 +93,8 @@
     </form>
   </div>
 
-  <div class="card" style="margin-top: 1.5rem;">
-    <h3>Repertoar</h3>
-    <div id="songList"><p class="text-muted">Laddar...</p></div>
-  </div>
+  <h3 style="margin: 1.5rem 0 0.75rem;">Låtar</h3>
+  <div id="songList"><p class="text-muted">Laddar...</p></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -707,7 +708,7 @@ async function loadSongs() {
 
   const hiddenCount = songs.filter(x => x.published === false).length;
   listEl.innerHTML = `<p class="pub-summary">${songs.length - hiddenCount} synliga för medlemmarna${hiddenCount ? ` · ${hiddenCount} dolda` : ''}</p>` + songs.map(s => `
-    <div class="song-item ${s.published === false ? 'is-hidden' : ''}">
+    <div class="card song-item ${s.published === false ? 'is-hidden' : ''}">
       <div class="song-head">
         <div class="song-title">${esc(s.title)}</div>
         <button type="button" class="pubBtn ${s.published === false ? 'off' : 'on'}" data-id="${s.id}"

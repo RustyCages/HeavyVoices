@@ -669,7 +669,11 @@ function updatePlaying() {
   const list = $('lineList');
   list.querySelectorAll('.line.playing').forEach(el => el.classList.remove('playing'));
   const li = list.children[idx];
-  if (li) li.classList.add('playing');
+  if (li) {
+    li.classList.add('playing');
+    // Under uppspelning: följa med markerad rad (för synkning)
+    if (!audio.paused) setCursor(idx, true);
+  }
 
   const cur = idx >= 0 ? rows[idx] : null;
   const prev = idx >= 0 ? neighbour(idx, -1) : null;

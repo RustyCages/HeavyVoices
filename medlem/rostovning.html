@@ -344,7 +344,7 @@
         <button type="button" data-op="save">💾 Spara noter</button>
         <span class="edit-status" id="editStatus"></span>
       </div>
-      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av), och noter som ligger kant i kant <b>följer med</b> när du drar ut en kant. <b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter; <b>Ctrl+C / Ctrl+V</b> kopierar och klistrar in vid spelhuvudet (praktiskt för upprepade refränger). Shift+↑↓ flyttar en oktav. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. <b>Mellanslag</b> spelar/pausar, dra i tom yta för att spola. Medlemmarna får de sparade noterna precis som de är.</p>
+      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av), och noter som ligger kant i kant, och noter över/under i tonhöjd som delar samma kant, <b>följer med</b> när du drar ut en kant. <b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter; <b>Ctrl+C / Ctrl+V</b> kopierar och klistrar in vid spelhuvudet (praktiskt för upprepade refränger). Shift+↑↓ flyttar en oktav. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. <b>Mellanslag</b> spelar/pausar, dra i tom yta för att spola. Medlemmarna får de sparade noterna precis som de är.</p>
     </div>
     <div class="karaoke" id="karaoke" hidden aria-live="off">
       <div class="k-now" id="kNow">&nbsp;</div>
@@ -1636,7 +1636,10 @@ document.getElementById('overview').addEventListener('click', e => {
         // grannar som ligger kant i kant följer med när kanten dras
         const nb = h.zone === 'end' ? ns.filter(x => x !== n && Math.abs(x.t - (n.t + n.d)) <= 0.03).map(snap)
           : h.zone === 'start' ? ns.filter(x => x !== n && Math.abs(x.t + x.d - n.t) <= 0.03).map(snap) : [];
-        drag = { n, zone: h.zone, x: e.clientX, y: e.clientY, o: { ...n }, moved: false, grp, nb };
+        // block över/under i tonhöjd som delar samma kant (staplade toner) följer också med
+        const al = h.zone === 'end' ? ns.filter(x => x !== n && Math.abs(x.t + x.d - (n.t + n.d)) <= 0.03).map(snap)
+          : h.zone === 'start' ? ns.filter(x => x !== n && Math.abs(x.t - n.t) <= 0.03).map(snap) : [];
+        drag = { n, zone: h.zone, x: e.clientX, y: e.clientY, o: { ...n }, moved: false, grp, nb, al };
         c.setPointerCapture(e.pointerId); tick(); return;
       }
       if (e.shiftKey && rollGeom) {   // Shift+dra i tom yta: markera en tidsrad av noter
@@ -1657,10 +1660,10 @@ document.getElementById('overview').addEventListener('click', e => {
       const g = rollGeom, d = window.devicePixelRatio || 1;
       const dt = (e.clientX - drag.x) * d / g.pxs, dn = Math.round(-(e.clientY - drag.y) * d / g.rowH);
       if (!drag.moved) { if (Math.abs(e.clientX - drag.x) < 3 && Math.abs(e.clientY - drag.y) < 3) return; snapshot(); drag.moved = true; }
-      const n = drag.n, o = drag.o, nb = drag.nb || [];
+      const n = drag.n, o = drag.o, nb = drag.nb || [], al = drag.al || [];
       // snappning: kanterna drar sig mot andra notblocks kanter (håll Alt för att stänga av)
       const tol = Math.max(0.02, 10 * d / g.pxs);
-      const pts = e.altKey ? [] : eNotes().filter(x => x !== n && !nb.some(b => b.m === x) && !(drag.grp && multi.has(x))).flatMap(x => [x.t, x.t + x.d]);
+      const pts = e.altKey ? [] : eNotes().filter(x => x !== n && !nb.some(b => b.m === x) && !al.some(b => b.m === x) && !(drag.grp && multi.has(x))).flatMap(x => [x.t, x.t + x.d]);
       const snapTo = v => { let best = v, bd = tol + 1; pts.forEach(q => { const dd = Math.abs(q - v); if (dd <= tol && dd < bd) { best = q; bd = dd; } }); return best; };
       if (drag.zone === 'move') {
         let t = o.t + dt;
@@ -1674,14 +1677,18 @@ document.getElementById('overview').addEventListener('click', e => {
         let t = snapTo(o.t + dt);
         nb.forEach(b => { t = Math.max(t, b.o.t + 0.05); });
         t = Math.max(0, Math.min(t, o.t + o.d - 0.05));
+        al.forEach(b => { t = Math.min(t, b.o.t + b.o.d - 0.05); });
         n.t = t; n.d = o.t + o.d - t;
         nb.forEach(b => { b.m.d = Math.max(0.05, t - b.o.t); });
+        al.forEach(b => { b.m.t = t; b.m.d = b.o.t + b.o.d - t; });
       } else {
         let e2 = snapTo(o.t + o.d + dt);
         nb.forEach(b => { e2 = Math.min(e2, b.o.t + b.o.d - 0.05); });
         e2 = Math.max(e2, o.t + 0.05);
+        al.forEach(b => { e2 = Math.max(e2, b.o.t + 0.05); });
         n.d = e2 - o.t;
         nb.forEach(b => { b.m.t = e2; b.m.d = Math.max(0.05, b.o.t + b.o.d - e2); });
+        al.forEach(b => { b.m.d = e2 - b.o.t; });
       }
       tick(); return;
     }

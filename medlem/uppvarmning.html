@@ -32,6 +32,18 @@
   .admin-bar { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
   .admin-bar button { font-size: 0.75rem; padding: 0.3rem 0.55rem; }
   .empty { color: var(--text-muted); }
+  .guide { margin-bottom: 1.25rem; }
+  .guide h2 { margin: 0 0 0.25rem; font-size: 1.15rem; }
+  .guide .g-p { margin: 0; font-size: 0.88rem; color: var(--text-muted); }
+  .guide ol { list-style: none; padding: 0; margin: 0.9rem 0 0; display: grid; gap: 0.85rem; counter-reset: g; }
+  .guide li { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 0.75rem; counter-increment: g; }
+  .guide li::before { content: counter(g); width: 2rem; height: 2rem; border-radius: 50%; display: grid; place-items: center; background: rgba(229,169,104,0.15); color: var(--accent); font-weight: 700; font-family: 'Roboto Condensed', sans-serif; }
+  .guide li b { display: block; color: var(--text); margin-bottom: 0.1rem; }
+  .guide li p { margin: 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; }
+  .guide li p b, .guide .tips b { display: inline; color: var(--text); }
+  .guide code { font-size: 0.8rem; background: rgba(0,0,0,0.3); padding: 0.05rem 0.3rem; border-radius: 0.3rem; }
+  .guide .tips { margin: 1rem 0 0; padding: 0.7rem 0.9rem; border-radius: 0.6rem; background: rgba(0,0,0,0.2); font-size: 0.84rem; color: var(--text-muted); line-height: 1.6; }
+  #guideBtn[aria-expanded="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
 
   .add-form { display: grid; gap: 0.6rem; }
   .add-form .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
@@ -49,9 +61,29 @@
   <a href="/medlem/rostovning.html" class="back-btn">&larr; Röstövning</a>
   <div class="title-row">
     <h1>Uppvärmning</h1>
-    <a href="/medlem/rostovning.html" class="btn btn-outline">🎤 Till Röstövning</a>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <button type="button" class="btn-outline" id="guideBtn" aria-expanded="false" aria-controls="guide" hidden>❔ Adminguide</button>
+      <a href="/medlem/rostovning.html" class="btn btn-outline">🎤 Till Röstövning</a>
+    </div>
   </div>
   <p class="hint">Videor för andning, uppvärmning och skalövningar. Tryck på en video för att spela den. Börja gärna med andning och uppvärmning innan du sjunger låtarna.</p>
+
+  <div class="card static guide" id="guide" hidden>
+    <h2>Så uppdaterar du videorna</h2>
+    <p class="g-p">Bara admin ser formuläret och knapparna nedan. Medlemmarna ser videorna direkt när du sparat.</p>
+    <ol>
+      <li><div><b>Kopiera länken på YouTube</b><p>Öppna videon på YouTube och kopiera adressen, eller tryck <em>Dela → Kopiera</em>. Alla vanliga format fungerar: <code>youtube.com/watch?v=…</code>, <code>youtu.be/…</code> och <code>youtube.com/shorts/…</code>.</p></div></li>
+      <li><div><b>Klistra in och fyll i</b><p>Klistra in länken i <em>YouTube-länk</em>. <em>Titel</em> kan lämnas tom – då hämtas videons namn från YouTube. Välj <em>Kategori</em> (eller skriv en egen, t.ex. "Andning") och <em>För stämma</em> om videon bara gäller en stämma. Skriv gärna en kort instruktion i <em>Beskrivning</em>. Tryck <b>Lägg till</b>.</p></div></li>
+      <li><div><b>Starta mitt i en video (valfritt)</b><p>Vill du att videon ska börja vid t.ex. 1:30? Högerklicka i YouTube-videon vid rätt ställe och välj <em>Kopiera videons webbadress vid aktuell tid</em>, eller lägg till <code>&amp;t=90s</code> i slutet av länken.</p></div></li>
+      <li><div><b>Ändra eller ta bort</b><p>Under varje video finns <b>✎ Ändra</b> (formuläret fylls i – ändra och tryck <em>Spara ändringar</em>, eller <em>Avbryt</em>) och <b>🗑 Ta bort</b>.</p></div></li>
+      <li><div><b>Ändra ordningen</b><p>▲ och ▼ flyttar videon upp eller ner inom sin kategori. Kategorierna visas i ordningen Andning, Uppvärmning, Skalövningar, Stämspecifikt, Övrigt – egna kategorier hamnar sist.</p></div></li>
+    </ol>
+    <div class="tips">
+      <b>Vem ser vad?</b> Medlemmar ser videor för <em>Alla stämmor</em> plus sin egen stämma. Du som admin ser alla.<br>
+      <b>"Videon är inte tillgänglig"?</b> Då har den som laddat upp videon stängt av inbäddning, eller så är den privat. Olistade videor fungerar, privata gör det inte – välj en annan video eller länka till den i beskrivningen.<br>
+      <b>Egen video?</b> Ladda upp den som olistad på körens YouTube-konto och lägg in länken här.
+    </div>
+  </div>
 
   <div class="card static admin-only" id="adminCard" hidden>
     <h2 style="margin:0 0 0.6rem; font-size:1.1rem;" id="formTitle">Lägg till video</h2>
@@ -254,6 +286,15 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   if (!member) return;
   isAdmin = member.role === 'admin';
   document.getElementById('adminCard').hidden = !isAdmin;
+  if (isAdmin) {
+    const g = document.getElementById('guide'), b = document.getElementById('guideBtn');
+    b.hidden = false;
+    const set = (open) => { g.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? '✕ Stäng guiden' : '❔ Adminguide'; };
+    let seen = null; try { seen = localStorage.getItem('hv-uppv-guide'); } catch (e) {}
+    set(!seen);   // visas automatiskt första gången
+    if (!seen) { try { localStorage.setItem('hv-uppv-guide', '1'); } catch (e) {} }
+    b.addEventListener('click', () => set(g.hidden));
+  }
   const { data: me } = await supabaseClient.from('members').select('stamma').eq('id', member.id).single();
   const st = String((me && me.stamma) || '').toLowerCase();
   myVoice = Object.keys(VOICES).find(k => st.startsWith(k)) || '';

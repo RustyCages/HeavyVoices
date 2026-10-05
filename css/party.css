@@ -74,6 +74,7 @@ body.party-page::after { right: 8vw; animation: party-sweep 11s ease-in-out infi
   background: radial-gradient(circle at 50% 60%, rgba(30, 14, 26, 0.85), rgba(5, 5, 8, 0.97));
   animation: intro-out 0.7s ease 3.6s forwards;
 }
+.party-intro.hold { animation: none; }   /* väntar på en tryckning (för ljudet) */
 .party-intro.gone { animation: intro-out 0.35s ease forwards; }
 @keyframes intro-out { to { opacity: 0; visibility: hidden; } }
 .party-intro .logo { width: min(46vw, 260px); height: auto; filter: drop-shadow(0 0 30px rgba(229, 169, 104, 0.6)); animation: intro-pop 0.9s cubic-bezier(.2, 1.6, .4, 1) both; }

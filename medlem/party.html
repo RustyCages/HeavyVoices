@@ -250,8 +250,11 @@ function fmt(sec) { sec = Math.max(0, sec || 0); return Math.floor(sec / 60) + '
   setTimeout(() => PartyFX.confetti(220, true), 500);
   el.addEventListener('click', () => {
     PartyFX.unlockAudio();
+    const held = el.classList.contains('hold');
     el.classList.add('gone');
     const iv = el.querySelector('video'); if (iv) setTimeout(() => iv.pause(), 400);
+    // ljudet fick inte starta av sig självt → tryckningen drar igång riktiga fyrverkerier med ljud
+    if (held && !fwVid) playFwVideo();
     PartyFX.confetti(140, false);
   });
   el.addEventListener('animationend', e => { if (e.animationName === 'intro-out') el.hidden = true; });
@@ -343,6 +346,13 @@ function maybeIntroVideo() {
   const v = document.createElement('video');
   v.className = 'intro-vid'; v.src = url; v.muted = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.autoplay = true;
   el.prepend(v); v.play().catch(() => {});
+  // smällar direkt när man kommer in – webbläsare tillåter oftast inte ljud innan man tryckt,
+  // då väntar introt på en tryckning och startar fyrverkerierna med ljud då
+  const surl = PartyFX.sound ? pickFw('sound') : null;
+  if (!surl) return;
+  const a = new Audio(surl); a.volume = 0.9;
+  a.play().then(() => { setTimeout(() => fadeOut(a), 9000); el.addEventListener('click', () => fadeOut(a), { once: true }); })
+    .catch(() => { if (!el.classList.contains('gone')) { el.classList.add('hold'); el.querySelector('p').textContent = '🔊 Tryck för att köra igång'; } });
 }
 function fmtMB(b) { return b ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : ''; }
 let fwOpen = false;

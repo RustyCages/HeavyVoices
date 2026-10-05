@@ -89,6 +89,24 @@
   .edit-bar > button { justify-self: start; }
   .edit-tools { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
   .edit-tools button { font-size: 0.82rem; padding: 0.35rem 0.65rem; }
+  .xfer-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .xfer-col { display: grid; gap: 0.5rem; align-content: start; min-width: 0; }
+  .xfer-row { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.85rem; }
+  .xfer-row label { display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; }
+  .xfer-row input[type=radio] { width: auto; margin: 0; accent-color: var(--accent); }
+  .xfer-row input[type=number] { width: 4.6rem; margin: 0; padding: 0.25rem 0.4rem; }
+  .xfer-note { font-size: 0.75rem; color: var(--text-muted); line-height: 1.45; }
+  .xfer-name { display: grid; gap: 0.25rem; font-size: 0.8rem; color: var(--text-muted); margin: 0; }
+  .xfer-name input { margin: 0; padding: 0.35rem 0.5rem; }
+  .xfer-midi { display: grid; gap: 0.35rem; padding: 0.5rem 0.6rem; border: 1px dashed var(--border); border-radius: 0.5rem; font-size: 0.82rem; }
+  .xfer-midi button { justify-self: start; text-align: left; font-size: 0.8rem; padding: 0.3rem 0.6rem; }
+  .xlib { display: grid; gap: 0.3rem; max-height: 15rem; overflow-y: auto; }
+  .xlib-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.4rem; align-items: center; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.82rem; }
+  .xlib-row b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .xlib-row small { color: var(--text-muted); }
+  .xlib-row.same { border-color: rgba(229,169,104,0.45); }
+  .xlib-row button { font-size: 0.78rem; padding: 0.3rem 0.55rem; }
+  @media (max-width: 760px) { .xfer-cols { grid-template-columns: 1fr; } }
   .copy-panel { padding: 0.8rem 1rem; border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(0,0,0,0.2); display: grid; gap: 0.6rem; }
   .copy-panel .chips { margin: 0; }
   .copy-panel .chips label { display: flex; align-items: center; gap: 0.3rem; margin: 0; cursor: pointer; font-size: 0.85rem; width: auto; }
@@ -325,6 +343,38 @@
     <div class="edit-bar admin-only">
       <button type="button" class="btn-outline" id="editToggle">✎ Redigera noter</button>
       <button type="button" class="btn-outline" id="copyAnalysisBtn" title="Lägg samma noter på andra stämmor">⎘ Kopiera analys till andra stämmor</button>
+      <button type="button" class="btn-outline" id="xferBtn" title="Spara noterna som fil eller i biblioteket, eller hämta in noter">⇅ Exportera / importera noter</button>
+      <div class="copy-panel" id="xferPanel" hidden>
+        <div class="xfer-cols">
+          <section class="xfer-col">
+            <b>Exportera – <span id="xferSrc"></span></b>
+            <div class="xfer-row">
+              <label><input type="radio" name="xfmt" value="json" checked> Heavy Voices (.json)</label>
+              <label><input type="radio" name="xfmt" value="mid"> MIDI (.mid)</label>
+            </div>
+            <small class="xfer-note">JSON läses in här igen exakt som den är. MIDI kan öppnas i MuseScore, Logic, Cubase m.fl.</small>
+            <div class="edit-tools"><button type="button" id="xSaveDevice">⬇ Spara på enheten</button></div>
+            <label class="xfer-name">Namn i biblioteket <input type="text" id="xLibName" maxlength="120"></label>
+            <div class="edit-tools"><button type="button" class="btn-outline" id="xSaveLib">📚 Spara i biblioteket</button></div>
+          </section>
+          <section class="xfer-col">
+            <b>Importera till – <span id="xferDst"></span></b>
+            <div class="xfer-row">
+              <label>Förskjut <input type="number" id="xShift" value="0" step="0.05"> s</label>
+              <label>Transponera <input type="number" id="xTrans" value="0" step="1" min="-36" max="36"> halvtoner</label>
+            </div>
+            <small class="xfer-note">Noterna läggs in i redigeringen. Kontrollera och tryck <b>💾 Spara noter</b> för att medlemmarna ska se dem.</small>
+            <div class="edit-tools">
+              <button type="button" class="btn-outline" id="xFromFile">📂 Från fil… (.json / .mid)</button>
+              <input type="file" id="xFile" accept=".json,.mid,.midi,application/json,audio/midi,audio/x-midi" hidden>
+            </div>
+            <div id="xMidiPick" class="xfer-midi" hidden></div>
+            <div class="set-sub">Från biblioteket</div>
+            <div id="xLib" class="xlib"><span class="xfer-note">Laddar…</span></div>
+          </section>
+        </div>
+        <div class="edit-tools"><button type="button" class="btn-outline" id="xClose">Stäng</button><span class="edit-status" id="xStatus"></span></div>
+      </div>
       <div class="copy-panel" id="copyPanel" hidden>
         <b>Kopiera noterna från <span id="copySrc"></span> till:</b>
         <div class="chips" id="copyTargets"></div>
@@ -406,6 +456,7 @@
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/pitch-analyze.js"></script>
+<script src="/js/note-io.js"></script>
 <script>
 const STEMS_BUCKET = 'heavy-voices-stems';
 const FIXED_STEMS = [
@@ -637,6 +688,7 @@ async function analyzeAll() {
 
 // ---------- visning ----------
 function showStem(st) {
+  { const xp = document.getElementById('xferPanel'); if (xp) xp.hidden = true; }
   if (editMode) { if (dirty && !confirm('Du har osparade ändringar i noterna. Släppa dem?')) return; dirty = false; setEditMode(false); }
   flushSession();
   document.getElementById('loadingNote').hidden = true;
@@ -1726,7 +1778,131 @@ document.getElementById('overview').addEventListener('click', e => {
 document.getElementById('editToggle')?.addEventListener('click', () => setEditMode(!editMode));
 // Kopiera noterna (analysen) från den visade stämman till andra stämmor, med valfri transponering.
 // Tiderna räknas om med stämsynkens förskjutningar så att noterna hamnar rätt i respektive ljudfil.
+// ---------- admin: exportera / importera noter ----------
+const xStatus = (m) => { document.getElementById('xStatus').textContent = m || ''; };
+function fileBase() {
+  // ASCII-filnamn (å→a osv) – vissa webbläsare tappar annars filnamnet vid nedladdning
+  return `${song.title} - ${current.label}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim() || 'noter';
+}
+function openXfer() {
+  if (!current) return;
+  document.getElementById('copyPanel').hidden = true;
+  document.getElementById('xferSrc').textContent = `${song.title}, ${current.label}` + (dirty ? ' (inkl. osparade ändringar)' : '');
+  document.getElementById('xferDst').textContent = current.label;
+  document.getElementById('xLibName').value = `${song.title} – ${current.label}`;
+  document.getElementById('xShift').value = 0; document.getElementById('xTrans').value = 0;
+  document.getElementById('xMidiPick').hidden = true;
+  xStatus('');
+  document.getElementById('xferPanel').hidden = false;
+  loadLibrary();
+}
+async function loadLibrary() {
+  const box = document.getElementById('xLib');
+  box.innerHTML = '<span class="xfer-note">Laddar…</span>';
+  const { data, error } = await supabaseClient.from('note_library')
+    .select('id, name, song_id, song_title, stem_label, note_count, created_at').order('created_at', { ascending: false });
+  if (error) {
+    box.innerHTML = `<span class="xfer-note">${/note_library/.test(error.message)
+      ? 'Biblioteket är inte aktiverat än – kör <b>supabase/migrations/2026-10-05_note_library.sql</b> i Supabase SQL Editor.'
+      : 'Kunde inte hämta biblioteket: ' + esc(error.message)}</span>`;
+    return;
+  }
+  const rows = (data || []).sort((a, b) => (String(b.song_id) === String(song.id)) - (String(a.song_id) === String(song.id)));
+  if (!rows.length) { box.innerHTML = '<span class="xfer-note">Biblioteket är tomt. Spara noter dit med 📚 till vänster.</span>'; return; }
+  box.innerHTML = rows.map(r => `<div class="xlib-row${String(r.song_id) === String(song.id) ? ' same' : ''}" data-id="${r.id}">
+      <div><b title="${esc(r.name)}">${esc(r.name)}</b><small>${esc(r.stem_label || '')}${r.song_title && String(r.song_id) !== String(song.id) ? ' · ' + esc(r.song_title) : ''} · ${r.note_count} noter · ${fmtDate(r.created_at)}</small></div>
+      <button type="button" class="btn-outline" data-act="get">Hämta</button>
+      <button type="button" class="btn-outline" data-act="del" title="Ta bort ur biblioteket">🗑</button>
+    </div>`).join('');
+  box.querySelectorAll('.xlib-row').forEach(row => {
+    const id = row.dataset.id, r = rows.find(x => x.id === id);
+    row.querySelector('[data-act=get]').addEventListener('click', async () => {
+      xStatus('Hämtar…');
+      const { data: d, error: e } = await supabaseClient.from('note_library').select('notes').eq('id', id).single();
+      if (e) { xStatus('Kunde inte hämta: ' + e.message); return; }
+      applyImported(d.notes, `biblioteket (${r.name})`);
+    });
+    row.querySelector('[data-act=del]').addEventListener('click', async () => {
+      if (!confirm(`Ta bort "${r.name}" ur biblioteket?`)) return;
+      const { error: e } = await supabaseClient.from('note_library').delete().eq('id', id);
+      if (e) { xStatus('Kunde inte ta bort: ' + e.message); return; }
+      loadLibrary(); xStatus('Borttagen ur biblioteket');
+    });
+  });
+}
+function applyImported(list, from) {
+  const sh = Number(document.getElementById('xShift').value) || 0;
+  const tr = Math.round(Number(document.getElementById('xTrans').value) || 0);
+  const notes = [];
+  (list || []).forEach(x => {
+    let t = Math.round((Number(x.t) + sh) * 100) / 100, d = Number(x.d);
+    if (t < 0) { d += t; t = 0; }
+    if (d >= 0.05 && isFinite(t) && isFinite(Number(x.n))) notes.push({ t, d: Math.round(d * 100) / 100, n: Math.round(Number(x.n)) + tr });
+  });
+  if (!notes.length) { xStatus('Inga noter att importera (kolla förskjutningen)'); return; }
+  if (eNotes().length && !confirm(`Ersätt de ${eNotes().length} noterna i ${current.label} med ${notes.length} importerade noter?\n\n(Inget sparas förrän du trycker Spara noter – Ångra fungerar också.)`)) return;
+  if (!editMode) setEditMode(true);
+  snapshot();
+  current.pitch.notes = notes;
+  afterEdit(null);
+  pausedPos = Math.max(0, notes[0].t - 1); if (!playing) tick();
+  editStatus(`Importerat från ${from} – kontrollera och tryck 💾 Spara noter`);
+  xStatus(`${notes.length} noter importerade`);
+  toast(`${notes.length} noter importerade – tryck 💾 Spara noter när det ser rätt ut`, 5000);
+}
+document.getElementById('xferBtn')?.addEventListener('click', () => {
+  const pnl = document.getElementById('xferPanel');
+  if (!pnl.hidden) { pnl.hidden = true; return; }
+  openXfer();
+});
+document.getElementById('xClose')?.addEventListener('click', () => { document.getElementById('xferPanel').hidden = true; });
+document.getElementById('xSaveDevice')?.addEventListener('click', async () => {
+  const notes = eNotes();
+  if (!notes.length) { xStatus('Det finns inga noter att exportera'); return; }
+  const fmt = document.querySelector('input[name=xfmt]:checked').value, meta = { song: song.title, stem: current.label };
+  const res = fmt === 'mid'
+    ? await NoteIO.saveFile(NoteIO.toMidi(notes, meta), fileBase() + '.mid', 'audio/midi')
+    : await NoteIO.saveFile(NoteIO.toJson(notes, meta), fileBase() + '.hvnotes.json', 'application/json');
+  xStatus(res === 'saved' ? 'Sparad' : res === 'downloaded' ? 'Filen laddas ner' : '');
+});
+document.getElementById('xSaveLib')?.addEventListener('click', async () => {
+  const notes = eNotes().map(x => ({ t: x.t, d: x.d, n: x.n }));
+  if (!notes.length) { xStatus('Det finns inga noter att spara'); return; }
+  const name = document.getElementById('xLibName').value.trim() || `${song.title} – ${current.label}`;
+  xStatus('Sparar i biblioteket…');
+  const { error } = await supabaseClient.from('note_library').insert({
+    name, song_id: song.id, song_title: song.title, stem_label: current.label, notes, note_count: notes.length,
+  });
+  if (error) {
+    xStatus(/note_library/.test(error.message) ? 'Biblioteket är inte aktiverat – kör migrationen 2026-10-05_note_library.sql' : 'Kunde inte spara: ' + error.message);
+    return;
+  }
+  xStatus(`"${name}" sparad i biblioteket`);
+  loadLibrary();
+});
+document.getElementById('xFromFile')?.addEventListener('click', () => document.getElementById('xFile').click());
+document.getElementById('xFile')?.addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  const pick = document.getElementById('xMidiPick'); pick.hidden = true;
+  try {
+    if (/\.midi?$/i.test(f.name)) {
+      const tracks = NoteIO.fromMidi(await f.arrayBuffer());
+      const use = (tr) => applyImported(tr.chords ? NoteIO.topLine(tr.notes) : tr.notes, `${f.name} – ${tr.name}`);
+      if (tracks.length === 1) { use(tracks[0]); return; }
+      pick.innerHTML = '<b>Filen har flera spår – vilket är stämman?</b>' + tracks.map((tr, i) =>
+        `<button type="button" class="btn-outline" data-i="${i}">${esc(tr.name)} · ${tr.notes.length} noter · ${nm(Math.min(...tr.notes.map(x => x.n)))}–${nm(Math.max(...tr.notes.map(x => x.n)))}${tr.chords ? ' · ackord (översta tonen används)' : ''}</button>`).join('');
+      pick.hidden = false;
+      pick.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { use(tracks[Number(b.dataset.i)]); pick.hidden = true; }));
+    } else {
+      const { notes } = NoteIO.fromJson(await f.text());
+      applyImported(notes, f.name);
+    }
+  } catch (err) { xStatus('Kunde inte läsa filen: ' + (err.message || err)); }
+});
+
 document.getElementById('copyAnalysisBtn')?.addEventListener('click', () => {
+  document.getElementById('xferPanel').hidden = true;
   if (!current) return;
   document.getElementById('copySrc').textContent = current.label;
   const targets = stems.filter(st => st !== current && st.key !== 'stem_backtrack_path');

@@ -366,7 +366,7 @@ function finish() {
     ? `<div>${scores[0] / questions.length >= 0.8 ? 'Rocklegend 🤘' : scores[0] / questions.length >= 0.5 ? 'Rockkännare 🎸' : 'Dags att lyssna mer på rock 😅'}<b>${Math.round(100 * scores[0] / questions.length)}%</b></div>`
     : order.map((x, k) => `<div><span>${['🥇', '🥈', '🥉', '🎸'][k]} ${esc(x.t)}</span><b>${x.s}</b></div>`).join('');
   show('result');
-  PartyFX.fireworks(6000); PartyFX.confetti(260, true);
+  PartyFX.confetti(300, true);
 }
 function start() {
   teams = teams.map((t, i) => (t || '').trim() || 'Lag ' + (i + 1));

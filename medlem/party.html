@@ -116,7 +116,7 @@
       <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
       <div class="actions">
         <button type="button" class="icon-btn" id="soundBtn" title="Ljud för fyrverkerier av/på">🔊 Ljud</button>
-        <button type="button" class="icon-btn" id="fwBtn" title="Mer fyrverkerier!">🎆 Fyrverkeri</button>
+        <button type="button" class="icon-btn" id="fwBtn" title="Mer fyrverkerier!" hidden>🎆 Fyrverkeri</button>
       </div>
     </div>
     <h1 class="party-title">Party <span class="hot">Mode</span></h1>
@@ -243,13 +243,11 @@ function fmt(sec) { sec = Math.max(0, sec || 0); return Math.floor(sec / 60) + '
   if (fromParty || location.hash) return;
   const el = document.getElementById('intro');
   el.hidden = false;
-  PartyFX.fireworks(4200);
   setTimeout(() => PartyFX.confetti(220, true), 500);
   el.addEventListener('click', () => {
     PartyFX.unlockAudio();
     el.classList.add('gone');
     const iv = el.querySelector('video'); if (iv) setTimeout(() => iv.pause(), 400);
-    PartyFX.fireworks(2500);
     PartyFX.confetti(140, false);
   });
   el.addEventListener('animationend', e => { if (e.animationName === 'intro-out') el.hidden = true; });
@@ -266,6 +264,7 @@ async function loadFireworks() {
     (urls || []).forEach(u => { if (u.signedUrl) fwUrls[u.path] = u.signedUrl; });
   }
   renderFwAdmin();
+  document.getElementById('fwBtn').hidden = !fwFiles.length && !isAdmin;
   maybeIntroVideo();
 }
 function pickFw() {
@@ -302,7 +301,7 @@ document.getElementById('fwBtn').addEventListener('click', () => {
   PartyFX.unlockAudio();
   if (fwVid) { stopFwVideo(); return; }
   if (playFwVideo()) PartyFX.confetti(160, false);
-  else { PartyFX.fireworks(5000); PartyFX.confetti(180, false); }
+  else { PartyFX.confetti(180, false); if (isAdmin) toast('Ladda upp en fyrverkerivideo i adminrutan längre ner 🎆', 4500); }
 });
 // introt: en tyst fyrverkerifilm bakom loggan om det finns någon uppladdad
 function maybeIntroVideo() {
@@ -318,7 +317,7 @@ function renderFwAdmin() {
   const box = document.getElementById('fwAdmin');
   if (!box) return;
   box.innerHTML = `<b>🎆 Fyrverkerivideor</b> <span class="text-muted">– spelas i bakgrunden när någon trycker Fyrverkeri (slumpvis om flera)</span>
-    <div class="fw-list">${fwFiles.length ? fwFiles.map((f, i) => `<span>${esc(f.name.replace(/^\d+-/, ''))} <small class="text-muted">${fmtMB(f.size)}</small><button type="button" data-del="${i}" title="Ta bort">✕</button></span>`).join('') : '<span class="text-muted">Inga uppladdade än – fyrverkerierna ritas då i webbläsaren.</span>'}</div>
+    <div class="fw-list">${fwFiles.length ? fwFiles.map((f, i) => `<span>${esc(f.name.replace(/^\d+-/, ''))} <small class="text-muted">${fmtMB(f.size)}</small><button type="button" data-del="${i}" title="Ta bort">✕</button></span>`).join('') : '<span class="text-muted">Inga uppladdade än – då visas bara konfetti.</span>'}</div>
     <label class="btn btn-outline" style="cursor:pointer">⬆ Ladda upp video<input type="file" id="fwFile" accept="video/mp4,video/webm,video/quicktime" multiple hidden></label>
     <span id="fwStatus" class="text-muted" style="font-size:0.85rem; margin-left:0.5rem"></span>`;
   box.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
@@ -379,7 +378,7 @@ function renderAdminPanel() {
     const { error } = await supabaseClient.from('party_settings').upsert({ id: 1, members_enabled: want, updated_at: new Date().toISOString() });
     if (error) { toast('Kunde inte spara: ' + error.message, 5000); t.checked = !want; return; }
     access.enabled = want; show();
-    if (want) { PartyFX.fireworks(2500); toast('🎉 Party Mode är öppnat för alla medlemmar'); } else toast('Party Mode är dolt igen');
+    if (want) { PartyFX.confetti(160, false); toast('🎉 Party Mode är öppnat för alla medlemmar'); } else toast('Party Mode är dolt igen');
   });
 }
 
@@ -566,7 +565,7 @@ function flash(txt) {
 }
 audio.addEventListener('play', () => document.getElementById('stPlay').textContent = '⏸︎');
 audio.addEventListener('pause', () => document.getElementById('stPlay').textContent = '▶︎');
-audio.addEventListener('ended', () => { if (stage.hidden) return; flash('🤘 Rock on!'); PartyFX.fireworks(4000); PartyFX.confetti(220, false); });
+audio.addEventListener('ended', () => { if (stage.hidden) return; flash('🤘 Rock on!'); PartyFX.confetti(220, false); });
 document.getElementById('stPlay').addEventListener('click', togglePlay);
 document.getElementById('lyrics').addEventListener('click', togglePlay);
 document.getElementById('stBack').addEventListener('click', () => { audio.currentTime = Math.max(0, audio.currentTime - 5); });

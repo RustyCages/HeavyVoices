@@ -63,6 +63,27 @@
   .fact { margin-top: 1rem; color: var(--text-muted); }
   .credit { margin-top: 2rem; font-size: 0.75rem; color: var(--text-muted); opacity: 0.7; }
 
+  /* mobilläge: lobby, svar, topplista */
+  .lobby { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2rem; align-items: start; margin-top: 1rem; }
+  @media (max-width: 760px) { .lobby { grid-template-columns: 1fr; } }
+  .qr { background: #fff; border-radius: 1rem; padding: 0.8rem; line-height: 0; width: min(78vw, 340px); }
+  .qr svg { width: 100%; height: auto; }
+  .join-how { font-size: 1.1rem; color: var(--text-muted); margin: 0 0 0.4rem; }
+  .join-url { font-size: clamp(1.1rem, 2.6vw, 1.6rem); font-weight: 700; color: #fff; word-break: break-all; }
+  .join-code { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(3.5rem, 11vw, 6.5rem); letter-spacing: 0.12em; line-height: 1; color: var(--accent); text-shadow: var(--party-glow); margin: 0.3rem 0 1rem; }
+  .players { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.8rem 0 1.4rem; min-height: 2.5rem; }
+  .players span { padding: 0.4rem 0.9rem; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid var(--border); font-weight: 600; animation: intro-pop 0.5s cubic-bezier(.2,1.6,.4,1) both; }
+  .players span.off { opacity: 0.4; }
+  .opt .cnt { margin-left: auto; min-width: 2rem; padding: 0.1rem 0.55rem; border-radius: 999px; background: rgba(0,0,0,0.35); font-family: 'Roboto Condensed', sans-serif; text-align: center; }
+  .board { margin-top: 1.4rem; display: grid; gap: 0.4rem; max-width: 640px; }
+  .board h3 { margin: 0 0 0.3rem; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); }
+  .board div { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr) auto auto; gap: 0.6rem; align-items: center; padding: 0.5rem 0.8rem; border-radius: 0.6rem; background: rgba(255,255,255,0.05); font-weight: 600; }
+  .board div:first-of-type { background: rgba(229,169,104,0.14); border: 1px solid rgba(229,169,104,0.4); }
+  .board .gain { color: #4ade80; font-size: 0.85rem; }
+  .board b { color: var(--accent); font-variant-numeric: tabular-nums; }
+  html.mobile-mode .opts .opt { cursor: default; }
+  .mode-help { margin: 0.6rem 0 0; font-size: 0.82rem; }
+
   /* resultat */
   .podium { display: grid; gap: 0.6rem; max-width: 560px; margin: 1rem 0 1.5rem; }
   .podium div { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 1.1rem; border-radius: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); font-size: 1.15rem; font-weight: 600; }
@@ -79,7 +100,7 @@
   <section id="setup">
     <a href="/medlem/party.html" class="back-btn">&larr; Party</a>
     <h1 class="party-title">Rock<span class="hot">quiz</span></h1>
-    <p class="party-sub">Visa på en storbildsskärm eller kör på mobilen. Spelar ni i lag trycker frågeledaren i vilka lag som hade rätt.</p>
+    <p class="party-sub">Visa quizet på en storbildsskärm. Alla svarar med sina mobiler – eller så räknar frågeledaren poängen för lagen.</p>
     <div class="q-setup">
       <div class="q-box">
         <h3>Omgångar</h3>
@@ -91,6 +112,11 @@
         </div>
       </div>
       <div class="q-box">
+        <h3>Hur svarar ni?</h3>
+        <div class="seg" id="segMode"><button type="button" data-v="mobile" aria-pressed="true">📱 Med mobilen</button><button type="button" data-v="host" aria-pressed="false">🗣 Frågeledaren räknar</button></div>
+        <p class="text-muted mode-help" id="modeHelp"></p>
+      </div>
+      <div class="q-box" id="teamBox">
         <h3>Lag / spelare</h3>
         <div class="teams" id="teams"></div>
         <button type="button" class="btn-outline" id="addTeam" style="margin-top:0.6rem">+ Lägg till lag</button>
@@ -104,6 +130,23 @@
         </div>
       </div>
       <button type="button" class="start-btn" id="startBtn">🤘 Kör!</button>
+    </div>
+  </section>
+
+  <!-- lobby (mobilläge) -->
+  <section id="lobby" hidden>
+    <div class="party-top"><button type="button" class="btn-outline" id="lobbyCancel">✕ Avbryt</button></div>
+    <div class="lobby">
+      <div class="qr" id="qr"></div>
+      <div>
+        <p class="join-how">Skanna QR-koden eller gå till</p>
+        <div class="join-url" id="joinUrl"></div>
+        <p class="join-how" style="margin-top:1rem">och skriv in koden</p>
+        <div class="join-code" id="joinCode"></div>
+        <h3 style="margin:0">👥 <span id="playerCount">0</span> spelare</h3>
+        <div class="players" id="players"><span class="text-muted" style="background:none;border:0;animation:none;font-weight:400">Väntar på spelare…</span></div>
+        <button type="button" class="start-btn" id="goBtn" disabled>🤘 Starta quizet</button>
+      </div>
     </div>
   </section>
 
@@ -122,6 +165,7 @@
     <div class="timer" id="timerWrap"><div id="timer"></div></div>
     <div class="opts" id="opts"></div>
     <p class="fact" id="fact" hidden></p>
+    <div class="board" id="board" hidden></div>
     <div class="who" id="who" hidden><p>Vilka hade rätt?</p><div class="chips" id="whoChips"></div></div>
     <div class="q-actions">
       <button type="button" id="revealBtn">👀 Visa svaret</button>
@@ -146,6 +190,7 @@
 <script src="/js/auth.js"></script>
 <script src="/js/party.js"></script>
 <script src="/js/party-quiz-questions.js"></script>
+<script src="/js/vendor/qrcode.js"></script>
 <script>
 const STEMS_BUCKET = 'heavy-voices-stems';
 const TEAM_COLORS = ['#E5A968', '#ff3d5a', '#60a5fa', '#4ade80'];
@@ -158,7 +203,7 @@ let clipStop = null;
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 function toast(msg, ms = 3000) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-const show = id => ['setup', 'play', 'result'].forEach(s => document.getElementById(s).hidden = s !== id);
+const show = id => ['setup', 'lobby', 'play', 'result'].forEach(s => document.getElementById(s).hidden = s !== id);
 
 // ---------- lag ----------
 function renderTeams() {
@@ -171,6 +216,19 @@ function renderTeams() {
   document.getElementById('addTeam').hidden = teams.length >= 4;
 }
 document.getElementById('addTeam').addEventListener('click', () => { teams.push('Lag ' + (teams.length + 1)); renderTeams(); });
+// ---------- svarsläge ----------
+let mode = 'mobile';
+function renderMode() {
+  document.getElementById('teamBox').hidden = mode === 'mobile';
+  document.documentElement.classList.toggle('mobile-mode', mode === 'mobile');
+  document.getElementById('modeHelp').textContent = mode === 'mobile'
+    ? 'Alla skannar en QR-kod och svarar på sin egen mobil – även gäster utan konto, de skriver bara sitt namn. Poäng för rätt svar och bonus för snabbhet.'
+    : 'Lagen ropar eller skriver ner sina svar. Frågeledaren trycker i vilka lag som hade rätt. Ett enda lag = spela själv.';
+}
+document.getElementById('segMode').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+  document.getElementById('segMode').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  mode = b.dataset.v; renderMode();
+}));
 ['segCount', 'segTime'].forEach(id => document.getElementById(id).querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
   b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
   if (id === 'segCount') qCount = +b.dataset.v; else qTime = +b.dataset.v;
@@ -290,6 +348,13 @@ async function buildQuiz() {
 
 // ---------- spelet ----------
 function renderScore() {
+  if (mode === 'mobile') {
+    const online = onlineCount();
+    document.getElementById('qScore').innerHTML = `<span>👥 ${online} spelare</span>` +
+      (phase === 'question' ? `<span>🙋 <b>${answers.size}</b>/${online} har svarat</span>` : '') +
+      `<span>🔑 Kod <b>${esc(code)}</b></span>`;
+    return;
+  }
   document.getElementById('qScore').innerHTML = teams.length > 1
     ? teams.map((t, i) => `<span><i class="dot" style="display:inline-block;width:0.6rem;height:0.6rem;border-radius:50%;background:${TEAM_COLORS[i]}"></i>${esc(t)} <b>${scores[i]}</b></span>`).join('')
     : `<span>Poäng <b>${scores[0]}</b></span>`;
@@ -341,16 +406,19 @@ function showQuestion() {
   const box = document.getElementById('opts');
   box.className = 'opts';
   box.innerHTML = q.options.map((o, i) => `<button type="button" class="opt" data-i="${i}"><span class="letter">${'ABCD'[i]}</span><span>${esc(o)}</span></button>`).join('');
-  box.querySelectorAll('.opt').forEach(b => b.addEventListener('click', () => {
+  if (mode !== 'mobile') box.querySelectorAll('.opt').forEach(b => b.addEventListener('click', () => {
     if (teams.length === 1) reveal(+b.dataset.i);       // en spelare: klicket är svaret
     else { box.querySelectorAll('.opt').forEach(x => x.classList.toggle('dim', x !== b)); } // lag: bara markering
   }));
   document.getElementById('fact').hidden = true;
   document.getElementById('who').hidden = true;
+  document.getElementById('board').hidden = true;
+  if (mode === 'mobile') { phase = 'question'; answers = new Map(); qStart = performance.now(); }
   document.getElementById('revealBtn').hidden = false;
   document.getElementById('nextBtn').hidden = true;
   renderScore();
   startTimer();
+  if (mode === 'mobile') sendState();
   if (q.kind === 'guess') playClip(q);
 }
 function reveal(pick) {
@@ -367,7 +435,9 @@ function reveal(pick) {
     if (!ok) b.classList.add(pick === i ? 'wrong' : 'dim');
   });
   if (q.fact) { const f = document.getElementById('fact'); f.textContent = q.fact; f.hidden = false; }
-  if (teams.length === 1) {
+  if (mode === 'mobile') {
+    mobileReveal(q, box);
+  } else if (teams.length === 1) {
     if (pick != null && q.options[pick] === q.correct) { scores[0]++; PartyFX.confetti(90, false); }
     renderScore();
   } else {
@@ -381,7 +451,7 @@ function reveal(pick) {
   nb.hidden = false; nb.textContent = qi + 1 < questions.length ? 'Nästa →' : '🏆 Se resultatet';
 }
 function next() {
-  if (teams.length > 1) {
+  if (mode !== 'mobile' && teams.length > 1) {
     let any = false;
     document.querySelectorAll('#whoChips button').forEach(b => { if (b.getAttribute('aria-pressed') === 'true') { scores[+b.dataset.i]++; any = true; } });
     if (any) PartyFX.confetti(70, false);
@@ -391,6 +461,7 @@ function next() {
 }
 function finish() {
   stopClip(); cancelAnimationFrame(timerRaf);
+  if (mode === 'mobile') { mobileFinish(); return; }
   const order = teams.map((t, i) => ({ t, s: scores[i] })).sort((a, b) => b.s - a.s);
   const tie = order.length > 1 && order[0].s === order[1].s;
   document.getElementById('winner').textContent = teams.length === 1
@@ -402,6 +473,127 @@ function finish() {
   show('result');
   PartyFX.confetti(300, true);
 }
+// ---------- mobilläge: Supabase Realtime (broadcast + presence, inga tabeller) ----------
+// Storbilden är "värd": den håller frågor och poäng och skickar läget till mobilerna (/spela.html).
+let rt = null, code = '', phase = 'idle', players = new Map(), answers = new Map(), qStart = 0, beat = null, lastBoard = [];
+const onlineCount = () => [...players.values()].filter(p => p.online).length;
+function joinUrl() { return location.origin + '/spela.html?kod=' + code; }
+function renderQr() {
+  const box = document.getElementById('qr');
+  try {
+    const qr = window.qrcode(0, 'M'); qr.addData(joinUrl()); qr.make();
+    box.innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
+  } catch (e) { box.hidden = true; }
+  document.getElementById('joinUrl').textContent = location.host + '/spela.html';
+  document.getElementById('joinCode').textContent = code;
+}
+function renderPlayers() {
+  const list = [...players.values()];
+  document.getElementById('playerCount').textContent = onlineCount();
+  document.getElementById('players').innerHTML = list.length
+    ? list.map(p => `<span class="${p.online ? '' : 'off'}">${esc(p.name)}</span>`).join('')
+    : '<span class="text-muted" style="background:none;border:0;animation:none;font-weight:400">Väntar på spelare…</span>';
+  document.getElementById('goBtn').disabled = !onlineCount();
+  if (phase === 'question') renderScore();
+}
+function closeRoom() {
+  clearInterval(beat); beat = null;
+  if (rt) { try { rt.send({ type: 'broadcast', event: 'state', payload: { phase: 'closed' } }); } catch (e) {} supabaseClient.removeChannel(rt); }
+  rt = null; phase = 'idle';
+}
+function openRoom() {
+  closeRoom();
+  code = String(Math.floor(1000 + Math.random() * 9000));
+  players = new Map(); answers = new Map(); phase = 'lobby'; lastBoard = [];
+  rt = supabaseClient.channel('hvquiz-' + code, { config: { broadcast: { self: false }, presence: { key: 'host' } } });
+  rt.on('presence', { event: 'sync' }, () => {
+    const st = rt.presenceState();
+    players.forEach(p => p.online = false);
+    Object.entries(st).forEach(([pid, metas]) => {
+      if (pid === 'host' || !metas.length) return;
+      const name = String(metas[0].name || 'Spelare').slice(0, 24);
+      const p = players.get(pid) || { pid, name, score: 0, gain: 0 };
+      p.name = name; p.online = true; players.set(pid, p);
+    });
+    renderPlayers();
+  });
+  rt.on('broadcast', { event: 'answer' }, ({ payload }) => handleAnswer(payload || {}));
+  rt.on('broadcast', { event: 'hello' }, () => sendState());
+  rt.subscribe(status => {
+    if (status === 'SUBSCRIBED') { sendState(); }
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') toast('Kunde inte ansluta till realtid – kontrollera nätet', 5000);
+  });
+  clearInterval(beat); beat = setInterval(sendState, 2500);
+  renderQr(); renderPlayers();
+  show('lobby');
+}
+function questionPayload(q) {
+  return { qi, total: questions.length, label: q.label, kind: q.kind, text: q.kind === 'line' ? '' : q.text, lyric: q.lyric || '', options: q.options };
+}
+function sendState() {
+  if (!rt) return;
+  const p = { phase, code, players: onlineCount() };
+  if (phase === 'question' || phase === 'reveal') {
+    const q = questions[qi];
+    Object.assign(p, questionPayload(q));
+    p.answered = answers.size;
+    if (phase === 'question') { p.remainMs = qTime ? Math.max(0, tEnd - performance.now()) : null; p.timeMs = qTime * 1000; }
+  }
+  if (phase === 'reveal' || phase === 'end') {
+    const q = questions[qi] || questions[questions.length - 1];
+    if (phase === 'reveal') p.correct = q.options.indexOf(q.correct);
+    const ranked = rankPlayers();
+    p.board = ranked.slice(0, 5).map(x => ({ name: x.name, score: x.score }));
+    p.res = {};
+    ranked.forEach((x, i) => { const a = answers.get(x.pid); p.res[x.pid] = { rank: i + 1, score: x.score, gain: phase === 'reveal' ? x.gain : 0, c: a ? a.c : null }; });
+    p.of = ranked.length;
+  }
+  rt.send({ type: 'broadcast', event: 'state', payload: p });
+}
+function rankPlayers() { return [...players.values()].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'sv')); }
+function handleAnswer(m) {
+  if (phase !== 'question' || m.qi !== qi || !m.pid || answers.has(m.pid)) return;
+  const c = Number(m.c); if (!(c >= 0 && c < questions[qi].options.length)) return;
+  if (qTime && performance.now() > tEnd + 400) return;              // för sent
+  if (!players.has(m.pid)) players.set(m.pid, { pid: m.pid, name: String(m.name || 'Spelare').slice(0, 24), score: 0, gain: 0, online: true });
+  answers.set(m.pid, { c, ms: performance.now() - qStart });
+  renderScore();
+  if (answers.size >= onlineCount()) setTimeout(() => reveal(null), 600);   // alla har svarat
+}
+function mobileReveal(q, box) {
+  phase = 'reveal';
+  const ci = q.options.indexOf(q.correct), counts = q.options.map(() => 0);
+  players.forEach(p => p.gain = 0);
+  answers.forEach((a, pid) => {
+    counts[a.c]++;
+    if (a.c !== ci) return;
+    const p = players.get(pid); if (!p) return;
+    p.gain = qTime ? Math.round(500 + 500 * Math.max(0, 1 - a.ms / (qTime * 1000))) : 1000;
+    p.score += p.gain;
+  });
+  box.querySelectorAll('.opt').forEach((b, i) => b.insertAdjacentHTML('beforeend', `<span class="cnt">${counts[i]}</span>`));
+  const ranked = rankPlayers();
+  const board = document.getElementById('board');
+  board.innerHTML = '<h3>🏆 Topplista</h3>' + ranked.slice(0, 8).map((p, i) =>
+    `<div><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'}</span><span>${esc(p.name)}</span><span class="gain">${p.gain ? '+' + p.gain : ''}</span><b>${p.score}</b></div>`).join('');
+  board.hidden = !ranked.length;
+  if (counts[ci]) PartyFX.confetti(90, false);
+  renderScore();
+  sendState();
+}
+function mobileFinish() {
+  phase = 'end';
+  const ranked = rankPlayers();
+  document.getElementById('winner').textContent = ranked.length ? `🏆 ${ranked[0].name} vinner!` : 'Ingen spelade 😅';
+  document.getElementById('podium').innerHTML = ranked.slice(0, 10).map((x, k) => `<div><span>${['🥇', '🥈', '🥉'][k] || (k + 1) + '.'} ${esc(x.name)}</span><b>${x.score}</b></div>`).join('');
+  show('result');
+  PartyFX.confetti(300, true);
+  sendState();
+}
+document.getElementById('goBtn').addEventListener('click', () => { PartyFX.unlockAudio(); show('play'); showQuestion(); });
+document.getElementById('lobbyCancel').addEventListener('click', () => { closeRoom(); show('setup'); });
+window.addEventListener('beforeunload', closeRoom);
+
 let starting = false;
 async function start() {
   if (starting) return;
@@ -418,6 +610,10 @@ async function start() {
   if (!qs.length) { toast('Hittade inga frågor'); return; }
   PartyFX.unlockAudio();
   questions = qs; qi = 0; scores = teams.map(() => 0);
+  if (mode === 'mobile') {
+    if (rt && phase === 'end') { players.forEach(p => { p.score = 0; p.gain = 0; }); answers = new Map(); phase = 'lobby'; renderPlayers(); renderQr(); show('lobby'); sendState(); return; }
+    openRoom(); return;
+  }
   show('play'); showQuestion();
 }
 document.getElementById('startBtn').addEventListener('click', start);
@@ -430,11 +626,12 @@ document.getElementById('revealBtn').addEventListener('click', () => {
 });
 document.getElementById('nextBtn').addEventListener('click', next);
 document.getElementById('clipBtn').addEventListener('click', () => playClip(questions[qi]));
-document.getElementById('quitBtn').addEventListener('click', () => { if (confirm('Avsluta quizet?')) { stopClip(); cancelAnimationFrame(timerRaf); show('setup'); renderTeams(); } });
+document.getElementById('quitBtn').addEventListener('click', () => { if (confirm('Avsluta quizet?')) { stopClip(); cancelAnimationFrame(timerRaf); closeRoom(); show('setup'); renderTeams(); } });
+document.getElementById('setupBtn').addEventListener('click', closeRoom);
 document.addEventListener('keydown', e => {
   if (document.getElementById('play').hidden || e.target.matches('input, textarea')) return;
   const k = e.key.toUpperCase();
-  if ('ABCD'.includes(k) && k.length === 1 && !answered) { const b = document.querySelectorAll('#opts .opt')['ABCD'.indexOf(k)]; if (b) b.click(); }
+  if ('ABCD'.includes(k) && k.length === 1 && !answered && mode !== 'mobile') { const b = document.querySelectorAll('#opts .opt')['ABCD'.indexOf(k)]; if (b) b.click(); }
   else if (e.key === 'Enter' || e.code === 'Space') { e.preventDefault(); answered ? next() : document.getElementById('revealBtn').click(); }
 });
 
@@ -443,7 +640,7 @@ document.addEventListener('keydown', e => {
   if (!acc) return;
   isAdmin = acc.isAdmin;
   teams = ['Lag 1', 'Lag 2'];
-  renderTeams();
+  renderTeams(); renderMode();
   loadRepertoire();
 })();
 </script>

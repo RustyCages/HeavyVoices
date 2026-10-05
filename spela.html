@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c10">
+<title>Rockquiz — Heavy Voices</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/party.css">
+<style>
+  /* Mobilsidan för Rockquiz: gå med med kod + namn och svara A–D. Kräver inget konto. */
+  body.party-page { min-height: 100dvh; }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 1rem 1rem calc(1.2rem + env(safe-area-inset-bottom)); min-height: 100dvh; display: grid; grid-template-rows: auto 1fr; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+  .top img { height: 30px; width: auto; }
+  .me { font-size: 0.85rem; color: var(--text-muted); text-align: right; }
+  .me b { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .screen { display: grid; align-content: center; gap: 1rem; text-align: center; padding: 1rem 0; }
+  .screen h1 { margin: 0; font-size: clamp(2rem, 9vw, 3rem); text-transform: uppercase; letter-spacing: 0.03em; text-shadow: var(--party-glow); }
+  .screen p { margin: 0; color: var(--text-muted); }
+  .join input { font-size: 1.2rem; padding: 0.9rem 1rem; text-align: center; margin: 0; }
+  .join input#code { font-family: 'Roboto Condensed', sans-serif; font-size: 2rem; letter-spacing: 0.3em; }
+  .join button { font-size: 1.2rem; padding: 0.95rem; border-radius: 0.8rem; }
+  .join { display: grid; gap: 0.8rem; }
+  .meta { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  .qtext { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(1.25rem, 5.5vw, 1.7rem); line-height: 1.2; text-align: left; }
+  .qtext .lyric { font-style: italic; } .qtext .lyric::before { content: '“'; color: var(--accent); } .qtext .lyric::after { content: ' …”'; color: var(--accent); }
+  .timer { height: 7px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  .timer > div { height: 100%; width: 100%; background: linear-gradient(90deg, var(--party-hot), var(--accent)); transform-origin: left; }
+  .answers { display: grid; gap: 0.7rem; }
+  .ans { display: grid; grid-template-columns: 2.6rem minmax(0, 1fr); align-items: center; gap: 0.8rem; text-align: left; min-height: 4.4rem; padding: 0.7rem 0.9rem; border-radius: 0.9rem; font-size: 1.05rem; font-weight: 600; color: #fff; border: 0; justify-content: stretch; }
+  .ans .l { width: 2.6rem; height: 2.6rem; border-radius: 0.6rem; display: grid; place-items: center; font-family: 'Roboto Condensed', sans-serif; font-size: 1.4rem; background: rgba(0,0,0,0.25); }
+  .ans:nth-child(1) { background: #c2334a; } .ans:nth-child(2) { background: #2f6fd1; } .ans:nth-child(3) { background: #b7832f; } .ans:nth-child(4) { background: #2f9a5b; }
+  .ans:hover { filter: brightness(1.1); transform: none; box-shadow: none; }
+  .ans:active { transform: scale(0.98); }
+  .big { font-size: clamp(3rem, 16vw, 5rem); line-height: 1; }
+  .verdict { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(2rem, 10vw, 3rem); text-transform: uppercase; }
+  .verdict.ok { color: #4ade80; } .verdict.bad { color: #f87171; }
+  .gain { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+  .pill { display: inline-block; padding: 0.4rem 1rem; border-radius: 999px; background: rgba(255,255,255,0.08); font-weight: 600; }
+  .rightans { padding: 0.8rem 1rem; border-radius: 0.8rem; background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.4); color: #fff; }
+  .spin { width: 2.4rem; height: 2.4rem; border-radius: 50%; border: 4px solid rgba(255,255,255,0.12); border-top-color: var(--accent); margin: 0 auto; animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .err { color: #f87171 !important; }
+</style>
+</head>
+<body class="party-page">
+<div class="wrap">
+  <div class="top">
+    <picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" width="480" height="220"></picture>
+    <div class="me" id="me"></div>
+  </div>
+  <main class="screen" id="screen"></main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/party.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+let pid = store.get('hv-quiz-pid');
+if (!pid) { pid = 'p' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); store.set('hv-quiz-pid', pid); }
+let name = store.get('hv-quiz-name') || '';
+let code = (new URLSearchParams(location.search).get('kod') || '').replace(/\D/g, '').slice(0, 4);
+let ch = null, last = null, myAns = {}, deadline = {}, lastSeen = 0, raf = null, endShown = false;
+const LETTERS = 'ABCD';
+
+function render(html) { $('screen').innerHTML = html; }
+function renderMe() { $('me').innerHTML = name && ch ? `${esc(name)}${last && last.res && last.res[pid] ? ` · <b>${last.res[pid].score}</b> p` : ''}` : ''; }
+
+// ---------- gå med ----------
+function joinForm(msg) {
+  render(`<h1>Rock<span style="color:var(--accent)">quiz</span></h1>
+    <p>Skriv koden som syns på storbildsskärmen.</p>
+    <form class="join" id="jf">
+      <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Kod" value="${esc(code)}" autocomplete="off" aria-label="Kod">
+      <input id="nm" maxlength="24" placeholder="Ditt namn" value="${esc(name)}" autocomplete="nickname" aria-label="Ditt namn">
+      <button type="submit">🤘 Gå med</button>
+      ${msg ? `<p class="err">${esc(msg)}</p>` : ''}
+    </form>`);
+  if (code && !name) $('nm').focus(); else if (!code) $('code').focus();
+  $('jf').addEventListener('submit', e => {
+    e.preventDefault();
+    const c = $('code').value.replace(/\D/g, ''), n = $('nm').value.trim();
+    if (c.length !== 4) { joinForm('Koden har fyra siffror.'); return; }
+    if (!n) { joinForm('Skriv ditt namn.'); return; }
+    code = c; name = n.slice(0, 24); store.set('hv-quiz-name', name);
+    history.replaceState(null, '', '?kod=' + code);
+    connect();
+  });
+}
+function connect() {
+  if (ch) supabaseClient.removeChannel(ch);
+  last = null; endShown = false; lastSeen = 0;
+  render('<div class="spin"></div><p>Ansluter…</p>');
+  ch = supabaseClient.channel('hvquiz-' + code, { config: { broadcast: { self: false }, presence: { key: pid } } });
+  ch.on('broadcast', { event: 'state' }, ({ payload }) => onState(payload || {}));
+  ch.subscribe(async status => {
+    if (status === 'SUBSCRIBED') {
+      await ch.track({ name });
+      ch.send({ type: 'broadcast', event: 'hello', payload: { pid } });
+      renderMe();
+      // hörs ingen värd inom några sekunder är koden troligen fel
+      setTimeout(() => { if (!lastSeen) joinForm(`Hittar inget quiz med koden ${code}. Kolla koden på skärmen.`); }, 6000);
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      joinForm('Kunde inte ansluta. Kolla nätet och försök igen.');
+    }
+  });
+}
+
+// ---------- läget från storbilden ----------
+function onState(s) {
+  lastSeen = Date.now();
+  if (s.phase === 'closed') { render('<div class="big">👋</div><h1>Quizet är avslutat</h1><p>Tack för att du var med!</p>'); return; }
+  const prev = last; last = s; renderMe();
+  if (s.phase === 'lobby') {
+    myAns = {}; deadline = {}; endShown = false;
+    render(`<div class="big">🤘</div><h1>Du är med!</h1><p>Hej ${esc(name)} – vänta tills frågeledaren startar.</p><span class="pill">👥 ${s.players} spelare</span><p><a href="#" id="rename">Byt namn</a></p>`);
+    $('rename').addEventListener('click', e => { e.preventDefault(); if (ch) supabaseClient.removeChannel(ch); ch = null; renderMe(); joinForm(); });
+    return;
+  }
+  if (s.phase === 'question') {
+    if (deadline[s.qi] == null && s.remainMs != null) deadline[s.qi] = performance.now() + s.remainMs;
+    const same = prev && prev.phase === 'question' && prev.qi === s.qi;
+    if (same && (myAns[s.qi] != null || document.querySelector('.answers'))) return;   // inget nytt – rita inte om knapparna
+    if (myAns[s.qi] != null) { waitScreen(s); return; }
+    if (deadline[s.qi] != null && performance.now() > deadline[s.qi]) { render('<div class="big">⏰</div><h1>Tiden är ute</h1><p>Väntar på svaret…</p>'); return; }
+    questionScreen(s);
+    return;
+  }
+  if (s.phase === 'reveal') {
+    if (prev && prev.phase === 'reveal' && prev.qi === s.qi) return;
+    cancelAnimationFrame(raf);
+    const r = (s.res || {})[pid], mine = myAns[s.qi] != null ? myAns[s.qi] : (r ? r.c : null);
+    const ok = mine != null && mine === s.correct;
+    if (ok) PartyFX.confetti(120, false);
+    if (navigator.vibrate) navigator.vibrate(ok ? [60, 40, 60] : 200);
+    render(`<div class="verdict ${ok ? 'ok' : 'bad'}">${ok ? '✅ Rätt!' : mine == null ? '⏰ Inget svar' : '❌ Fel'}</div>
+      ${ok && r ? `<div class="gain">+${r.gain} poäng</div>` : ''}
+      ${!ok ? `<div class="rightans">Rätt svar: <b>${LETTERS[s.correct]}</b> – ${esc(s.options[s.correct])}</div>` : ''}
+      ${r ? `<span class="pill">Plats ${r.rank} av ${s.of} · ${r.score} p</span>` : ''}
+      <p>Nästa fråga kommer strax…</p>`);
+    return;
+  }
+  if (s.phase === 'end') {
+    if (endShown) return; endShown = true;
+    cancelAnimationFrame(raf);
+    const r = (s.res || {})[pid];
+    const medal = r ? (['🥇', '🥈', '🥉'][r.rank - 1] || '🎸') : '🎸';
+    if (r && r.rank <= 3) PartyFX.confetti(260, true);
+    render(`<div class="big">${medal}</div><h1>${r ? (r.rank === 1 ? 'Du vann!' : 'Plats ' + r.rank) : 'Slut!'}</h1>
+      ${r ? `<span class="pill">${r.score} poäng · ${s.of} spelare</span>` : ''}
+      <p>${s.board && s.board[0] ? `Vinnare: <b style="color:var(--accent)">${esc(s.board[0].name)}</b>` : ''}</p>`);
+  }
+}
+function questionScreen(s) {
+  const q = s.kind === 'line' ? `<span class="lyric">${esc(s.lyric)}</span>` : s.kind === 'guess' ? '🎧 Lyssna på klippet – vilken låt är det?' : esc(s.text);
+  render(`<div class="meta">Fråga ${s.qi + 1}/${s.total} · ${esc(s.label)}</div>
+    <div class="qtext">${q}</div>
+    ${s.remainMs != null ? '<div class="timer"><div id="tbar"></div></div>' : ''}
+    <div class="answers">${s.options.map((o, i) => `<button type="button" class="ans" data-i="${i}"><span class="l">${LETTERS[i]}</span><span>${esc(o)}</span></button>`).join('')}</div>`);
+  document.querySelectorAll('.ans').forEach(b => b.addEventListener('click', () => answer(s, +b.dataset.i)));
+  tick(s);
+}
+function tick(s) {
+  cancelAnimationFrame(raf);
+  const bar = $('tbar'); if (!bar || deadline[s.qi] == null) return;
+  const step = () => {
+    const left = Math.max(0, deadline[s.qi] - performance.now()) / (s.timeMs || 1);
+    if (bar.isConnected) bar.style.transform = `scaleX(${left})`;
+    if (left <= 0) { if (myAns[s.qi] == null && document.querySelector('.answers')) render('<div class="big">⏰</div><h1>Tiden är ute</h1><p>Väntar på svaret…</p>'); return; }
+    raf = requestAnimationFrame(step);
+  };
+  raf = requestAnimationFrame(step);
+}
+function answer(s, i) {
+  if (myAns[s.qi] != null) return;
+  myAns[s.qi] = i;
+  if (navigator.vibrate) navigator.vibrate(30);
+  ch.send({ type: 'broadcast', event: 'answer', payload: { pid, name, qi: s.qi, c: i } });
+  waitScreen(s);
+}
+function waitScreen(s) {
+  const i = myAns[s.qi];
+  render(`<div class="big">${LETTERS[i]}</div><h1>Svar skickat</h1><p>${esc(s.options[i])}</p><div class="spin"></div><p>Väntar på de andra…</p>`);
+}
+
+// tappar vi kontakten med storbilden en stund
+setInterval(() => {
+  if (ch && lastSeen && Date.now() - lastSeen > 9000 && last && last.phase !== 'end') {
+    lastSeen = Date.now();
+    ch.send({ type: 'broadcast', event: 'hello', payload: { pid } });
+  }
+}, 3000);
+
+(async () => {
+  // inloggad medlem? då föreslås namnet från kontot
+  if (!name) { try { const m = await getCurrentMember(); if (m && m.name) name = m.name.split(' ')[0]; } catch (e) {} }
+  if (code && name) connect(); else joinForm();
+})();
+</script>
+</body>
+</html>

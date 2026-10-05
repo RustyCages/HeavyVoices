@@ -91,6 +91,10 @@
   .fw-list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
   .fw-list span { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.4rem 0.25rem 0.7rem; border-radius: 999px; background: rgba(255,255,255,0.06); font-size: 0.8rem; }
   .fw-list button { padding: 0.1rem 0.45rem; font-size: 0.75rem; background: transparent; color: var(--text-muted); border: 0; }
+  .fw-list span.bad { background: rgba(250,204,21,0.12); color: #facc15; }
+  .fw-admin summary { cursor: pointer; list-style: revert; }
+  .fw-help { font-size: 0.82rem; margin: 0.5rem 0; }
+  .fw-sub { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-top: 0.7rem; }
   .fw-list button:hover { color: #f87171; background: transparent; box-shadow: none; }
   #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 2100; display: none; max-width: calc(100vw - 3rem); }
 </style>
@@ -252,27 +256,44 @@ function fmt(sec) { sec = Math.max(0, sec || 0); return Math.floor(sec / 60) + '
   });
   el.addEventListener('animationend', e => { if (e.animationName === 'intro-out') el.hidden = true; });
 })();
-// ---------- fyrverkerivideor (Storage: heavy-voices-stems/party/fireworks/) ----------
-const FW_DIR = 'party/fireworks';
-let fwFiles = [], fwUrls = {}, fwVid = null, fwLast = -1;
+// ---------- fyrverkerier: videor + ljud (Storage: heavy-voices-stems/party/fireworks[-sound]/) ----------
+// Gratis stockvideor (Pixabay/Pexels) saknar nästan alltid ljudspår, så smällarna kommer
+// från separata ljudfiler som spelas ihop med videon (hoppas över om videon har eget ljud).
+const FW = {
+  video: { dir: 'party/fireworks',       re: /\.(mp4|webm|mov|m4v)$/i, files: [], last: -1 },
+  sound: { dir: 'party/fireworks-sound', re: /\.(mp3|m4a|aac|ogg|wav|webm)$/i, files: [], last: -1 },
+};
+let fwUrls = {}, fwVid = null, fwAud = null;
+async function listFw(kind) {
+  const k = FW[kind];
+  const { data, error } = await supabaseClient.storage.from(STEMS_BUCKET).list(k.dir, { limit: 100, sortBy: { column: 'name', order: 'asc' } });
+  k.files = error ? [] : (data || []).filter(f => f.id && k.re.test(f.name))
+    .map(f => ({ name: f.name, path: k.dir + '/' + f.name, size: Number((f.metadata && f.metadata.size) || 0) }));
+}
 async function loadFireworks() {
-  const { data, error } = await supabaseClient.storage.from(STEMS_BUCKET).list(FW_DIR, { limit: 100, sortBy: { column: 'name', order: 'asc' } });
-  if (error) return;
-  fwFiles = (data || []).filter(f => f.id && /\.(mp4|webm|mov|m4v)$/i.test(f.name)).map(f => ({ name: f.name, path: FW_DIR + '/' + f.name, size: (f.metadata && f.metadata.size) || 0 }));
-  if (fwFiles.length) {
-    const { data: urls } = await supabaseClient.storage.from(STEMS_BUCKET).createSignedUrls(fwFiles.map(f => f.path), 3600 * 6);
+  await Promise.all([listFw('video'), listFw('sound')]);
+  const ok = [...FW.video.files, ...FW.sound.files].filter(f => f.size > 0 && !fwUrls[f.path]);
+  if (ok.length) {
+    const { data: urls } = await supabaseClient.storage.from(STEMS_BUCKET).createSignedUrls(ok.map(f => f.path), 3600 * 6);
     (urls || []).forEach(u => { if (u.signedUrl) fwUrls[u.path] = u.signedUrl; });
   }
   renderFwAdmin();
-  document.getElementById('fwBtn').hidden = !fwFiles.length && !isAdmin;
+  document.getElementById('fwBtn').hidden = !FW.video.files.some(f => f.size > 0) && !isAdmin;
   maybeIntroVideo();
 }
-function pickFw() {
-  if (!fwFiles.length) return null;
-  let i = Math.floor(Math.random() * fwFiles.length);
-  if (fwFiles.length > 1 && i === fwLast) i = (i + 1) % fwFiles.length;
-  fwLast = i;
-  return fwUrls[fwFiles[i].path] || null;
+function pickFw(kind) {
+  const k = FW[kind], list = k.files.filter(f => f.size > 0 && fwUrls[f.path]);
+  if (!list.length) return null;
+  let i = Math.floor(Math.random() * list.length);
+  if (list.length > 1 && i === k.last) i = (i + 1) % list.length;
+  k.last = i;
+  return fwUrls[list[i].path];
+}
+function fadeOut(a) {
+  if (!a) return;
+  const t0 = performance.now(), v0 = a.volume;
+  const step = () => { const k = 1 - (performance.now() - t0) / 700; if (k <= 0) { a.pause(); return; } a.volume = Math.max(0, v0 * k); requestAnimationFrame(step); };
+  step();
 }
 function stopFwVideo() {
   const bg = document.getElementById('fwBg');
@@ -280,9 +301,11 @@ function stopFwVideo() {
   document.getElementById('fwBtn').textContent = '🎆 Fyrverkeri';
   const v = fwVid; fwVid = null;
   if (v) setTimeout(() => { v.pause(); v.remove(); }, 800);
+  fadeOut(fwAud); fwAud = null;
 }
+const hasOwnAudio = v => (v.audioTracks && v.audioTracks.length > 0) || v.mozHasAudio === true || (v.webkitAudioDecodedByteCount || 0) > 0;
 function playFwVideo() {
-  const url = pickFw();
+  const url = pickFw('video');
   if (!url) return false;
   if (fwVid) stopFwVideo();
   const v = document.createElement('video');
@@ -291,6 +314,15 @@ function playFwVideo() {
   v.addEventListener('ended', stopFwVideo);
   document.getElementById('fwBg').replaceChildren(v);
   fwVid = v;
+  // ljud: startas i samma klick (krävs av webbläsarna), loopas tills videon tar slut
+  const surl = PartyFX.sound ? pickFw('sound') : null;
+  if (surl) {
+    const a = new Audio(surl); a.loop = true; a.volume = 0.9;
+    a.play().catch(() => {});
+    fwAud = a;
+    // har videon eget ljud? då tystnar ljudfilen
+    setTimeout(() => { if (fwAud === a && fwVid === v && hasOwnAudio(v)) fadeOut(a); }, 1200);
+  }
   v.play().then(() => {
     document.getElementById('fwBg').classList.add('on'); document.body.classList.add('fw-playing');
     document.getElementById('fwBtn').textContent = '⏹ Stoppa';
@@ -301,52 +333,67 @@ document.getElementById('fwBtn').addEventListener('click', () => {
   PartyFX.unlockAudio();
   if (fwVid) { stopFwVideo(); return; }
   if (playFwVideo()) PartyFX.confetti(160, false);
-  else { PartyFX.confetti(180, false); if (isAdmin) toast('Ladda upp en fyrverkerivideo i adminrutan längre ner 🎆', 4500); }
+  else { PartyFX.confetti(180, false); if (isAdmin) toast('Ladda upp en fyrverkerivideo under 🎆 Fyrverkerier i adminrutan', 4500); }
 });
 // introt: en tyst fyrverkerifilm bakom loggan om det finns någon uppladdad
 function maybeIntroVideo() {
   const el = document.getElementById('intro');
   if (el.hidden || el.classList.contains('gone') || el.querySelector('video')) return;
-  const url = pickFw(); if (!url) return;
+  const url = pickFw('video'); if (!url) return;
   const v = document.createElement('video');
   v.className = 'intro-vid'; v.src = url; v.muted = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.autoplay = true;
   el.prepend(v); v.play().catch(() => {});
 }
 function fmtMB(b) { return b ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : ''; }
+let fwOpen = false;
 function renderFwAdmin() {
   const box = document.getElementById('fwAdmin');
   if (!box) return;
-  box.innerHTML = `<b>🎆 Fyrverkerivideor</b> <span class="text-muted">– spelas i bakgrunden när någon trycker Fyrverkeri (slumpvis om flera)</span>
-    <div class="fw-list">${fwFiles.length ? fwFiles.map((f, i) => `<span>${esc(f.name.replace(/^\d+-/, ''))} <small class="text-muted">${fmtMB(f.size)}</small><button type="button" data-del="${i}" title="Ta bort">✕</button></span>`).join('') : '<span class="text-muted">Inga uppladdade än – då visas bara konfetti.</span>'}</div>
-    <label class="btn btn-outline" style="cursor:pointer">⬆ Ladda upp video<input type="file" id="fwFile" accept="video/mp4,video/webm,video/quicktime" multiple hidden></label>
-    <span id="fwStatus" class="text-muted" style="font-size:0.85rem; margin-left:0.5rem"></span>`;
+  const chips = (kind, empty) => {
+    const fs = FW[kind].files;
+    return fs.length ? fs.map((f, i) => `<span${f.size ? '' : ' class="bad" title="Filen är tom – uppladdningen misslyckades. Ta bort den och prova en mindre fil."'}>${f.size ? '' : '⚠ '}${esc(f.name.replace(/^\d+-/, ''))} <small class="text-muted">${f.size ? fmtMB(f.size) : 'tom fil'}</small><button type="button" data-del="${kind}:${i}" title="Ta bort">✕</button></span>`).join('')
+      : `<span class="text-muted">${empty}</span>`;
+  };
+  const nV = FW.video.files.filter(f => f.size).length, nS = FW.sound.files.filter(f => f.size).length;
+  box.innerHTML = `<details id="fwDetails"${fwOpen ? ' open' : ''}><summary><b>🎆 Fyrverkerier</b> <span class="text-muted">– ${nV} video${nV === 1 ? '' : 'r'}, ${nS} ljud</span></summary>
+    <p class="text-muted fw-help">Spelas slumpvis i bakgrunden när någon trycker <b>Fyrverkeri</b>. Videor från Pixabay/Pexels är oftast helt utan ljud – lägg därför till ljudfiler med smällar (t.ex. pixabay.com/sound-effects, sök "fireworks"). Ljudet spelas tillsammans med videon.</p>
+    <div class="fw-sub">Videor</div>
+    <div class="fw-list">${chips('video', 'Inga videor än – då visas bara konfetti.')}</div>
+    <label class="btn btn-outline" style="cursor:pointer">⬆ Ladda upp video<input type="file" data-kind="video" accept="video/mp4,video/webm,video/quicktime" multiple hidden></label>
+    <div class="fw-sub">Ljud</div>
+    <div class="fw-list">${chips('sound', 'Inga ljudfiler än.')}</div>
+    <label class="btn btn-outline" style="cursor:pointer">⬆ Ladda upp ljud<input type="file" data-kind="sound" accept="audio/*" multiple hidden></label>
+    <span id="fwStatus" class="text-muted" style="font-size:0.85rem; margin-left:0.5rem"></span></details>`;
+  document.getElementById('fwDetails').addEventListener('toggle', e => { fwOpen = e.target.open; });
   box.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
-    const f = fwFiles[+b.dataset.del];
+    const [kind, i] = b.dataset.del.split(':'), f = FW[kind].files[+i];
     if (!confirm(`Ta bort ${f.name.replace(/^\d+-/, '')}?`)) return;
     const { error } = await supabaseClient.storage.from(STEMS_BUCKET).remove([f.path]);
     if (error) { toast('Kunde inte ta bort: ' + error.message, 5000); return; }
     loadFireworks();
   }));
-  document.getElementById('fwFile').addEventListener('change', async e => {
-    const files = [...e.target.files]; if (!files.length) return;
+  box.querySelectorAll('input[type=file]').forEach(inp => inp.addEventListener('change', async e => {
+    const kind = inp.dataset.kind, files = [...e.target.files]; if (!files.length) return;
     const st = document.getElementById('fwStatus');
+    let okCount = 0;
     for (const [k, file] of files.entries()) {
-      if (file.size > 50 * 1048576) { toast(`${file.name} är större än 50 MB – välj en mindre version (720p räcker gott)`, 6000); continue; }
+      if (!file.size) { toast(`${file.name} är tom`, 5000); continue; }
+      if (file.size > 50 * 1048576) { toast(`${file.name} är större än 50 MB – välj en mindre version (720p/HD räcker gott)`, 6000); continue; }
       st.textContent = `Laddar upp ${k + 1}/${files.length}…`;
-      const safe = file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.-]+/g, '_');
-      const { error } = await supabaseClient.storage.from(STEMS_BUCKET).upload(`${FW_DIR}/${Date.now()}-${safe}`, file, { contentType: file.type || 'video/mp4', upsert: false });
-      if (error) { toast('Uppladdningen misslyckades: ' + error.message, 6000); }
+      const safe = file.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '_');
+      const { error } = await supabaseClient.storage.from(STEMS_BUCKET).upload(`${FW[kind].dir}/${Date.now()}-${safe}`, file, { contentType: file.type || (kind === 'video' ? 'video/mp4' : 'audio/mpeg'), upsert: false });
+      if (error) toast('Uppladdningen misslyckades: ' + error.message, 6000); else okCount++;
     }
     st.textContent = '';
     await loadFireworks();
-    toast('🎆 Klart! Tryck på Fyrverkeri för att testa');
-  });
+    if (okCount) toast('🎆 Klart! Tryck på Fyrverkeri för att testa');
+  }));
 }
 const soundBtn = document.getElementById('soundBtn');
 function renderSound() { soundBtn.textContent = PartyFX.sound ? '🔊 Ljud' : '🔇 Ljud'; }
 try { PartyFX.setSound(localStorage.getItem('hv-party-sound') !== '0'); } catch (e) {}
 renderSound();
-soundBtn.addEventListener('click', () => { PartyFX.setSound(!PartyFX.sound); try { localStorage.setItem('hv-party-sound', PartyFX.sound ? '1' : '0'); } catch (e) {} renderSound(); if (fwVid) fwVid.muted = !PartyFX.sound; });
+soundBtn.addEventListener('click', () => { PartyFX.setSound(!PartyFX.sound); try { localStorage.setItem('hv-party-sound', PartyFX.sound ? '1' : '0'); } catch (e) {} renderSound(); if (fwVid) fwVid.muted = !PartyFX.sound; if (fwAud) fwAud.muted = !PartyFX.sound; });
 
 // ---------- vyer (hash) ----------
 function route() {

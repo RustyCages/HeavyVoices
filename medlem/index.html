@@ -87,13 +87,6 @@
           <p>Körinfo, kontakter, filer och dokument</p>
         </span>
       </a></li>
-      <li id="partyItem" hidden><a href="/medlem/party.html" class="nav-item">
-        <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l5-14 9 9-14 5z"></path><path d="M14 4v2"></path><path d="M20 10h-2"></path><path d="M17.5 6.5l1.5-1.5"></path><path d="M10 10l4 4"></path></svg></span>
-        <span class="nav-item-text">
-          <h3>Party Mode</h3>
-          <p>Karaoke, sjung &amp; tävla och rockquiz</p>
-        </span>
-      </a></li>
       <li><a href="/guide.html?guide=medlem" class="nav-item">
         <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></span>
         <span class="nav-item-text">
@@ -137,12 +130,12 @@
 
 document.getElementById('logoutBtn').addEventListener('click', signOut);
 
-// ---------- Party Mode: admin ser den alltid, medlemmar när admin öppnat den ----------
+// ---------- Party Mode: ingen menyknapp – 10 tryck på rollskylten (admin alltid, medlemmar när admin öppnat) ----------
+let partyAllowed = false;
 async function showParty(member) {
+  if (member.role === 'admin') { partyAllowed = true; return; }
   const { data } = await supabaseClient.from('party_settings').select('members_enabled').eq('id', 1).maybeSingle();
-  const open = !!(data && data.members_enabled);
-  if (member.role === 'admin' || !open) return;   // admin når Party Mode via 10 tryck på rollskylten
-  document.getElementById('partyItem').hidden = false;
+  partyAllowed = !!(data && data.members_enabled);
 }
 
 // ---------- Närvarocheck ----------
@@ -211,6 +204,7 @@ async function loadCheckin(member) {
   let n = 0, t = null;
   b.style.cursor = 'default'; b.style.userSelect = 'none'; b.style.webkitUserSelect = 'none'; b.style.transition = 'transform 0.12s';
   b.addEventListener('click', () => {
+    if (!partyAllowed) return;   // Party Mode är stängt för medlemmar
     clearTimeout(t); t = setTimeout(() => { n = 0; }, 2000);
     n++;
     if (n >= 6) { b.style.transform = `scale(${1 + (n - 5) * 0.06})`; setTimeout(() => { b.style.transform = ''; }, 120); }

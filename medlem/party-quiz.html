@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/party.css">
+<style>html.gate body { visibility: hidden; }</style>
+<script>document.documentElement.classList.add('gate');</script>
 <style>
   .q-setup { display: grid; gap: 1.2rem; max-width: 760px; }
   .q-box { padding: 1rem 1.1rem; border-radius: 0.9rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
@@ -702,6 +704,7 @@ document.addEventListener('keydown', e => {
 (async () => {
   const acc = await requirePartyAccess();
   if (!acc) return;
+  document.documentElement.classList.remove('gate');
   isAdmin = acc.isAdmin;
   teams = ['Lag 1', 'Lag 2'];
   renderTeams(); renderMode();

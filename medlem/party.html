@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/party.css">
+<style>html.gate body { visibility: hidden; }</style>
+<script>document.documentElement.classList.add('gate');</script>
 <style>
   /* ---------- karaokescenen ---------- */
   .stage { position: fixed; inset: 0; z-index: 1500; display: grid; grid-template-rows: auto 1fr auto; background: #050507; overflow: hidden; }
@@ -428,7 +430,7 @@ function renderAdminPanel() {
     <label class="switch"><input type="checkbox" id="visToggle"><span class="knob"></span><span>Öppen för alla medlemmar</span></label></div>
     <div class="fw-admin" id="fwAdmin"></div>`;
   const t = document.getElementById('visToggle'), txt = document.getElementById('visTxt');
-  const show = () => { t.checked = access.enabled; txt.textContent = access.enabled ? 'Medlemmarna ser Party Mode i menyn.' : 'Dold – bara admin kommer åt sidan.'; };
+  const show = () => { t.checked = access.enabled; txt.textContent = access.enabled ? 'Medlemmarna kan öppna Party Mode genom att trycka 10 gånger på sin rollskylt (MEDLEM).' : 'Dold – bara admin kommer åt sidan.'; };
   show();
   t.addEventListener('change', async () => {
     const want = t.checked;
@@ -768,6 +770,7 @@ document.getElementById('ytPasteSave').addEventListener('click', async () => { c
 (async () => {
   access = await requirePartyAccess();
   if (!access) return;
+  document.documentElement.classList.remove('gate');
   isAdmin = access.isAdmin;
   if (isAdmin && access.tableOk) document.getElementById('ytPasteSave').hidden = false;
   renderAdminPanel();

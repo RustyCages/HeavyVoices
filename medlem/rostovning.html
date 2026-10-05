@@ -397,6 +397,7 @@
           <button type="button" class="btn-outline" data-vd="1">+1 s</button>
           <button type="button" id="vidSaveOffset">Spara</button>
         </div>
+        <label class="vid-row" id="vidLoopRow" hidden style="margin:0; cursor:pointer;"><input type="checkbox" id="vidLoop" style="width:auto; margin:0; accent-color: var(--accent);"> 🔁 Loopa videon – börjar om från början när den tar slut (bra för korta klipp)</label>
         <small class="xfer-note" id="vidOffsetHelp" hidden>Spela låten och justera tills bild och ljud stämmer. Positivt värde = videon ligger längre fram (hoppar över videons början).</small>
         <span class="edit-status" id="vidStatus"></span>
       </div>
@@ -1103,10 +1104,14 @@ async function setupBgVideo() {
 }
 function syncBgVideo(p) {
   if (!bgVid || bgVid.readyState < 1) return;
-  const tgt = p + (Number(song && song.bg_video_offset) || 0);
+  let tgt = p + (Number(song && song.bg_video_offset) || 0);
   const dur = bgVid.duration || 0;
-  if (tgt < 0 || (dur && tgt > dur)) { if (!bgVid.paused) bgVid.pause(); return; }
-  const diff = bgVid.currentTime - tgt;
+  const loop = !!(song && song.bg_video_loop) && dur > 0.5;
+  bgVid.loop = loop;
+  if (loop) tgt = ((tgt % dur) + dur) % dur;   // börja om när videon tar slut
+  else if (tgt < 0 || (dur && tgt > dur)) { if (!bgVid.paused) bgVid.pause(); return; }
+  let diff = bgVid.currentTime - tgt;
+  if (loop && Math.abs(diff) > dur / 2) diff -= Math.sign(diff) * dur;   // precis vid omstarten: räkna kortaste vägen
   if (playing) {
     if (bgVid.paused) bgVid.play().catch(() => {});
     if (Math.abs(diff) > 0.35) { if (!bgVid.seeking) bgVid.currentTime = tgt; }
@@ -1127,7 +1132,16 @@ function renderVidPanel() {
   document.getElementById('vidOffsetRow').hidden = !has;
   document.getElementById('vidOffsetHelp').hidden = !has;
   document.getElementById('vidOffset').value = Number(song && song.bg_video_offset) || 0;
+  document.getElementById('vidLoopRow').hidden = !has;
+  document.getElementById('vidLoop').checked = !!(song && song.bg_video_loop);
 }
+document.getElementById('vidLoop')?.addEventListener('change', async (e) => {
+  if (!song) return;
+  song.bg_video_loop = e.target.checked;
+  syncBgVideo(position());
+  const { error } = await supabaseClient.from('songs').update({ bg_video_loop: song.bg_video_loop }).eq('id', song.id);
+  document.getElementById('vidStatus').textContent = error ? 'Kunde inte spara: ' + error.message : (song.bg_video_loop ? 'Videon loopar ✓' : 'Videon spelas en gång ✓');
+});
 document.getElementById('vidBtn')?.addEventListener('click', () => {
   const p = document.getElementById('vidPanel'), b = document.getElementById('vidBtn');
   p.hidden = !p.hidden; b.setAttribute('aria-expanded', String(!p.hidden));

@@ -21,3 +21,6 @@ create policy "warmup_videos_admin_all" on public.warmup_videos for all to authe
 alter table public.songs
   add column if not exists bg_video_path   text,
   add column if not exists bg_video_offset real not null default 0;   -- sekunder: videotid = låttid + offset
+
+-- Loopa bakgrundsvideon (korta klipp börjar om)
+alter table public.songs add column if not exists bg_video_loop boolean not null default false;

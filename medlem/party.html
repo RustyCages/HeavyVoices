@@ -80,7 +80,17 @@
   .yt-player { position: fixed; inset: 0; z-index: 1600; background: rgba(0,0,0,0.92); display: grid; grid-template-rows: auto 1fr; }
   .yt-player .stage-top h2 { text-shadow: none; }
   .yt-player .frame { display: grid; place-items: center; padding: 0 1rem 1rem; min-height: 0; }
-  .yt-player iframe { width: min(100%, calc((100vh - 6rem) * 16 / 9)); aspect-ratio: 16/9; border: 0; border-radius: 0.6rem; background: #000; }
+  .yt-player { background: #000; height: 100dvh; }
+  .yt-player iframe { width: min(100%, calc((100dvh - 6rem) * 16 / 9)); aspect-ratio: 16/9; border: 0; border-radius: 0.6rem; background: #000; }
+  /* mobil i liggande läge: videon fyller hela skärmen, stängknappen svävar i hörnet */
+  @media (orientation: landscape) and (max-height: 560px) {
+    .yt-player { grid-template-rows: 1fr; }
+    .yt-player .stage-top { position: absolute; top: 0; right: 0; z-index: 2; padding: max(0.4rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right)) 0 0; background: none; }
+    .yt-player .stage-top h2 { display: none; }
+    .yt-player #ytpClose { padding: 0.3rem 0.6rem; font-size: 0.8rem; background: rgba(0,0,0,0.55); }
+    .yt-player .frame { padding: 0; height: 100dvh; }
+    .yt-player iframe { width: min(100vw, calc(100dvh * 16 / 9)); height: auto; max-height: 100dvh; border-radius: 0; }
+  }
 
   /* ---------- fyrverkerivideo i bakgrunden ---------- */
   .fw-bg { position: fixed; inset: 0; z-index: -2; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; background: #000; }

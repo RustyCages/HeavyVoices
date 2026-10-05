@@ -204,7 +204,7 @@
   /* mörkläggning som eget lager (billigare än filter på videon) */
   .k-frame.has-bg-video::after { content:''; position:absolute; inset:0; background:rgba(8,10,14,0.62); z-index:0; pointer-events:none; }
   /* Körens logga nedtonad bakom texten (ovanpå bakgrundsvideon om en sådan finns) */
-  .k-frame::before { content:''; position:absolute; inset:8% 0; background:url('/icons/logo.png') center / contain no-repeat; background-image:image-set(url('/icons/logo.webp') type('image/webp'), url('/icons/logo.png') type('image/png')); opacity:0.16; z-index:1; pointer-events:none; }
+  .k-frame::before { content:''; position:absolute; left:0; right:0; top:0.6rem; height:min(clamp(80px, 13vw, 120px), calc(100% - 1.2rem)); background:url('/icons/logo.png') center top / contain no-repeat; background-image:image-set(url('/icons/logo.webp') type('image/webp'), url('/icons/logo.png') type('image/png')); background-position:center top; background-size:contain; background-repeat:no-repeat; opacity:0.16; z-index:1; pointer-events:none; }
   .k-frame.has-bg-video .k-line { text-shadow:0 2px 10px rgba(0,0,0,0.85); }
   .k-frame.has-bg-video .k-line.k-active { text-shadow:0 2px 10px rgba(0,0,0,0.85), 0 0 18px rgba(229,169,104,0.35); }
   #karaoke {

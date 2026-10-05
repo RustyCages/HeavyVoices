@@ -253,6 +253,7 @@
   #playerBar.expanded #expandBtn { top:calc(0.75rem + env(safe-area-inset-top, 0px)); right:0.9rem; width:2.6rem; height:2.6rem; font-size:1.2rem; }
   #playerBar.expanded .k-frame { flex:1; display:flex; flex-direction:column; margin-bottom:0.5rem; min-height:0; }
   #playerBar.expanded .k-frame:has(#karaoke.hidden) { display:none; }
+  #playerBar.expanded .k-frame::before { height:min(clamp(160px, 26vw, 240px), calc(100% - 1.2rem)); }
   #playerBar.expanded #karaoke {
     flex:1; height:auto;
     -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 18%, #000 82%, transparent 100%);

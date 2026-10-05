@@ -80,11 +80,24 @@
   .yt-player .frame { display: grid; place-items: center; padding: 0 1rem 1rem; min-height: 0; }
   .yt-player iframe { width: min(100%, calc((100vh - 6rem) * 16 / 9)); aspect-ratio: 16/9; border: 0; border-radius: 0.6rem; background: #000; }
 
+  /* ---------- fyrverkerivideo i bakgrunden ---------- */
+  .fw-bg { position: fixed; inset: 0; z-index: -2; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; background: #000; }
+  .fw-bg.on { opacity: 1; }
+  .fw-bg video { width: 100%; height: 100%; object-fit: cover; }
+  body.fw-playing .party-tile, body.fw-playing .party-panel { background: rgba(14, 12, 20, 0.62); backdrop-filter: blur(3px); }
+  .party-intro .intro-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.75; z-index: -1; }
+  .party-intro { isolation: isolate; }
+  .fw-admin { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px dashed rgba(229,169,104,0.25); }
+  .fw-list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+  .fw-list span { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.4rem 0.25rem 0.7rem; border-radius: 999px; background: rgba(255,255,255,0.06); font-size: 0.8rem; }
+  .fw-list button { padding: 0.1rem 0.45rem; font-size: 0.75rem; background: transparent; color: var(--text-muted); border: 0; }
+  .fw-list button:hover { color: #f87171; background: transparent; box-shadow: none; }
   #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 2100; display: none; max-width: calc(100vw - 3rem); }
 </style>
 </head>
 <body class="party-page">
 
+<div class="fw-bg" id="fwBg" aria-hidden="true"></div>
 <div class="party-intro" id="intro" hidden>
   <div>
     <picture><source srcset="/icons/logo.webp" type="image/webp"><img src="/icons/logo.png" alt="" class="logo" width="640" height="493"></picture>
@@ -235,17 +248,106 @@ function fmt(sec) { sec = Math.max(0, sec || 0); return Math.floor(sec / 60) + '
   el.addEventListener('click', () => {
     PartyFX.unlockAudio();
     el.classList.add('gone');
+    const iv = el.querySelector('video'); if (iv) setTimeout(() => iv.pause(), 400);
     PartyFX.fireworks(2500);
     PartyFX.confetti(140, false);
   });
   el.addEventListener('animationend', e => { if (e.animationName === 'intro-out') el.hidden = true; });
 })();
-document.getElementById('fwBtn').addEventListener('click', () => { PartyFX.unlockAudio(); PartyFX.fireworks(5000); PartyFX.confetti(180, false); });
+// ---------- fyrverkerivideor (Storage: heavy-voices-stems/party/fireworks/) ----------
+const FW_DIR = 'party/fireworks';
+let fwFiles = [], fwUrls = {}, fwVid = null, fwLast = -1;
+async function loadFireworks() {
+  const { data, error } = await supabaseClient.storage.from(STEMS_BUCKET).list(FW_DIR, { limit: 100, sortBy: { column: 'name', order: 'asc' } });
+  if (error) return;
+  fwFiles = (data || []).filter(f => f.id && /\.(mp4|webm|mov|m4v)$/i.test(f.name)).map(f => ({ name: f.name, path: FW_DIR + '/' + f.name, size: (f.metadata && f.metadata.size) || 0 }));
+  if (fwFiles.length) {
+    const { data: urls } = await supabaseClient.storage.from(STEMS_BUCKET).createSignedUrls(fwFiles.map(f => f.path), 3600 * 6);
+    (urls || []).forEach(u => { if (u.signedUrl) fwUrls[u.path] = u.signedUrl; });
+  }
+  renderFwAdmin();
+  maybeIntroVideo();
+}
+function pickFw() {
+  if (!fwFiles.length) return null;
+  let i = Math.floor(Math.random() * fwFiles.length);
+  if (fwFiles.length > 1 && i === fwLast) i = (i + 1) % fwFiles.length;
+  fwLast = i;
+  return fwUrls[fwFiles[i].path] || null;
+}
+function stopFwVideo() {
+  const bg = document.getElementById('fwBg');
+  bg.classList.remove('on'); document.body.classList.remove('fw-playing');
+  document.getElementById('fwBtn').textContent = '🎆 Fyrverkeri';
+  const v = fwVid; fwVid = null;
+  if (v) setTimeout(() => { v.pause(); v.remove(); }, 800);
+}
+function playFwVideo() {
+  const url = pickFw();
+  if (!url) return false;
+  if (fwVid) stopFwVideo();
+  const v = document.createElement('video');
+  v.src = url; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto';
+  v.muted = !PartyFX.sound;
+  v.addEventListener('ended', stopFwVideo);
+  document.getElementById('fwBg').replaceChildren(v);
+  fwVid = v;
+  v.play().then(() => {
+    document.getElementById('fwBg').classList.add('on'); document.body.classList.add('fw-playing');
+    document.getElementById('fwBtn').textContent = '⏹ Stoppa';
+  }).catch(() => { v.muted = true; v.play().catch(() => stopFwVideo()); document.getElementById('fwBg').classList.add('on'); });
+  return true;
+}
+document.getElementById('fwBtn').addEventListener('click', () => {
+  PartyFX.unlockAudio();
+  if (fwVid) { stopFwVideo(); return; }
+  if (playFwVideo()) PartyFX.confetti(160, false);
+  else { PartyFX.fireworks(5000); PartyFX.confetti(180, false); }
+});
+// introt: en tyst fyrverkerifilm bakom loggan om det finns någon uppladdad
+function maybeIntroVideo() {
+  const el = document.getElementById('intro');
+  if (el.hidden || el.classList.contains('gone') || el.querySelector('video')) return;
+  const url = pickFw(); if (!url) return;
+  const v = document.createElement('video');
+  v.className = 'intro-vid'; v.src = url; v.muted = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.autoplay = true;
+  el.prepend(v); v.play().catch(() => {});
+}
+function fmtMB(b) { return b ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : ''; }
+function renderFwAdmin() {
+  const box = document.getElementById('fwAdmin');
+  if (!box) return;
+  box.innerHTML = `<b>🎆 Fyrverkerivideor</b> <span class="text-muted">– spelas i bakgrunden när någon trycker Fyrverkeri (slumpvis om flera)</span>
+    <div class="fw-list">${fwFiles.length ? fwFiles.map((f, i) => `<span>${esc(f.name.replace(/^\d+-/, ''))} <small class="text-muted">${fmtMB(f.size)}</small><button type="button" data-del="${i}" title="Ta bort">✕</button></span>`).join('') : '<span class="text-muted">Inga uppladdade än – fyrverkerierna ritas då i webbläsaren.</span>'}</div>
+    <label class="btn btn-outline" style="cursor:pointer">⬆ Ladda upp video<input type="file" id="fwFile" accept="video/mp4,video/webm,video/quicktime" multiple hidden></label>
+    <span id="fwStatus" class="text-muted" style="font-size:0.85rem; margin-left:0.5rem"></span>`;
+  box.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+    const f = fwFiles[+b.dataset.del];
+    if (!confirm(`Ta bort ${f.name.replace(/^\d+-/, '')}?`)) return;
+    const { error } = await supabaseClient.storage.from(STEMS_BUCKET).remove([f.path]);
+    if (error) { toast('Kunde inte ta bort: ' + error.message, 5000); return; }
+    loadFireworks();
+  }));
+  document.getElementById('fwFile').addEventListener('change', async e => {
+    const files = [...e.target.files]; if (!files.length) return;
+    const st = document.getElementById('fwStatus');
+    for (const [k, file] of files.entries()) {
+      if (file.size > 50 * 1048576) { toast(`${file.name} är större än 50 MB – välj en mindre version (720p räcker gott)`, 6000); continue; }
+      st.textContent = `Laddar upp ${k + 1}/${files.length}…`;
+      const safe = file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.-]+/g, '_');
+      const { error } = await supabaseClient.storage.from(STEMS_BUCKET).upload(`${FW_DIR}/${Date.now()}-${safe}`, file, { contentType: file.type || 'video/mp4', upsert: false });
+      if (error) { toast('Uppladdningen misslyckades: ' + error.message, 6000); }
+    }
+    st.textContent = '';
+    await loadFireworks();
+    toast('🎆 Klart! Tryck på Fyrverkeri för att testa');
+  });
+}
 const soundBtn = document.getElementById('soundBtn');
 function renderSound() { soundBtn.textContent = PartyFX.sound ? '🔊 Ljud' : '🔇 Ljud'; }
 try { PartyFX.setSound(localStorage.getItem('hv-party-sound') !== '0'); } catch (e) {}
 renderSound();
-soundBtn.addEventListener('click', () => { PartyFX.setSound(!PartyFX.sound); try { localStorage.setItem('hv-party-sound', PartyFX.sound ? '1' : '0'); } catch (e) {} renderSound(); });
+soundBtn.addEventListener('click', () => { PartyFX.setSound(!PartyFX.sound); try { localStorage.setItem('hv-party-sound', PartyFX.sound ? '1' : '0'); } catch (e) {} renderSound(); if (fwVid) fwVid.muted = !PartyFX.sound; });
 
 // ---------- vyer (hash) ----------
 function route() {
@@ -267,7 +369,8 @@ function renderAdminPanel() {
     return;
   }
   p.innerHTML = `<div class="row"><div><b>Synlighet</b><br><span id="visTxt"></span></div>
-    <label class="switch"><input type="checkbox" id="visToggle"><span class="knob"></span><span>Öppen för alla medlemmar</span></label></div>`;
+    <label class="switch"><input type="checkbox" id="visToggle"><span class="knob"></span><span>Öppen för alla medlemmar</span></label></div>
+    <div class="fw-admin" id="fwAdmin"></div>`;
   const t = document.getElementById('visToggle'), txt = document.getElementById('visTxt');
   const show = () => { t.checked = access.enabled; txt.textContent = access.enabled ? 'Medlemmarna ser Party Mode i menyn.' : 'Dold – bara admin kommer åt sidan.'; };
   show();
@@ -612,6 +715,7 @@ document.getElementById('ytPasteSave').addEventListener('click', async () => { c
   isAdmin = access.isAdmin;
   if (isAdmin && access.tableOk) document.getElementById('ytPasteSave').hidden = false;
   renderAdminPanel();
+  loadFireworks();
   route();
   loadSongs();
 })();

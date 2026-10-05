@@ -119,6 +119,18 @@
   #textCard summary { cursor: pointer; font-family: 'Roboto Condensed', sans-serif; font-size: 1.1rem; color: #fff; }
   #textCard summary .muted { font-family: 'DM Sans', sans-serif; font-size: 0.85rem; margin-left: 0.4rem; }
   #lyricsText { min-height: 260px; margin-top: 0.75rem; font-size: 0.9rem; line-height: 1.5; }
+  /* Sök .lrc online (LRCLIB) */
+  .lrc-search { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
+  .lrc-results { list-style: none; padding: 0; margin: 0.6rem 0 0; display: flex; flex-direction: column; gap: 0.45rem; max-height: 420px; overflow-y: auto; }
+  .lrc-results li { border: 1px solid var(--border); border-radius: 0.6rem; padding: 0.55rem 0.7rem; }
+  .lrc-results .meta { display: flex; gap: 0.5rem; align-items: baseline; flex-wrap: wrap; }
+  .lrc-results .meta strong { font-family: 'Roboto Condensed', sans-serif; }
+  .lrc-badge { font-size: 0.7rem; font-weight: 700; padding: 0.05rem 0.45rem; border-radius: 0.6rem; border: 1px solid currentColor; }
+  .lrc-badge.synced { color: #4ade80; }
+  .lrc-badge.plain { color: var(--muted, #999); }
+  .lrc-badge.dur-ok { color: var(--accent); }
+  .lrc-results pre { white-space: pre-wrap; font-size: 0.8rem; max-height: 180px; overflow-y: auto; margin: 0.5rem 0 0; opacity: 0.85; }
+  .lrc-results .acts { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.45rem; }
   #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 999; display: none; }
 
   @media (max-width: 560px) {
@@ -321,10 +333,24 @@
             Importera .lrc
             <input type="file" id="importInput" accept=".lrc,.txt" style="display: none;">
           </label>
+          <button type="button" class="btn-outline btn-small" id="lrcSearchToggle">&#128269; Sök .lrc online</button>
         </div>
         <button type="button" class="btn-danger btn-small" id="clearBtn">Ta bort synk</button>
       </div>
       <p class="muted" id="saveInfo" style="margin: 0.6rem 0 0;"></p>
+      <div class="lrc-search" id="lrcSearchPanel" hidden>
+        <p class="muted" style="margin: 0 0 0.5rem;">Söker i <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a> – en fri, öppen databas med synkade sångtexter. Tiderna gäller originalinspelningen, så om vår version har annat tempo eller intro får tiderna justeras efteråt.</p>
+        <form class="row-flex" id="lrcSearchForm">
+          <input type="text" id="lrcTitle" placeholder="Låttitel" style="flex: 2; min-width: 160px;">
+          <input type="text" id="lrcArtist" placeholder="Artist (valfritt)" style="flex: 1; min-width: 130px;">
+          <button type="submit" class="btn-small">Sök</button>
+        </form>
+        <label class="muted" style="display: inline-flex; gap: 0.3rem; align-items: center; margin-top: 0.4rem; font-size: 0.85rem; cursor: pointer;">
+          <input type="checkbox" id="lrcSyncedOnly" checked style="width: auto; margin: 0; accent-color: var(--accent);"> Visa bara synkade texter
+        </label>
+        <p class="muted" id="lrcStatus" style="margin: 0.4rem 0 0;"></p>
+        <ul class="lrc-results" id="lrcResults"></ul>
+      </div>
     </div>
   </div>
 </div>
@@ -972,20 +998,127 @@ function exportLrc() {
 }
 
 async function importLrc(file) {
-  const text = await file.text();
+  return importLrcText(await file.text());
+}
+
+function importLrcText(text) {
   const parsed = parseLrc(text);
-  if (!parsed.length) { toast('Hittade inga tidsstämplar i filen'); return; }
-  if (rows.some(r => r.time != null) && !confirm('Ersätta nuvarande rader och tider med filens innehåll?')) return;
+  if (!parsed.length) { toast('Hittade inga tidsstämplar i filen'); return false; }
+  if (rows.some(r => r.time != null) && !confirm('Ersätta nuvarande rader och tider med filens innehåll?')) return false;
   rows = parsed;
   undoStack.length = 0;
   setDirty(true);
   renderLines();
   setCursor(rows.length, false);
   toast(`Importerade ${parsed.length} rader`);
+  return true;
+}
+
+// ---------- Sök .lrc online (LRCLIB, https://lrclib.net – fritt API, CORS öppet) ----------
+let lrcHits = [];
+function downloadText(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function safeName(s) { return (s || 'text').replace(/[\\/:*?"<>|]+/g, '').trim() || 'text'; }
+function lrcFileFor(h) {
+  const head = `[ti:${h.trackName || ''}]\n[ar:${h.artistName || ''}]\n` + (h.albumName ? `[al:${h.albumName}]\n` : '');
+  return head + (h.syncedLyrics || '');
+}
+async function searchLrc() {
+  const title = $('lrcTitle').value.trim(), artist = $('lrcArtist').value.trim();
+  if (!title && !artist) { $('lrcStatus').textContent = 'Skriv en titel att söka på.'; return; }
+  const qs = new URLSearchParams();
+  if (title && artist) { qs.set('track_name', title); qs.set('artist_name', artist); }
+  else qs.set('q', title || artist);
+  $('lrcStatus').textContent = 'Söker...';
+  $('lrcResults').innerHTML = '';
+  try {
+    const res = await fetch('https://lrclib.net/api/search?' + qs);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    lrcHits = await res.json();
+  } catch (err) {
+    lrcHits = [];
+    $('lrcStatus').textContent = 'Sökningen misslyckades: ' + err.message;
+    return;
+  }
+  renderLrcHits();
+}
+function renderLrcHits() {
+  const syncedOnly = $('lrcSyncedOnly').checked;
+  const dur = audio.duration || 0;
+  const list = lrcHits
+    .map((h, i) => ({ h, i }))
+    .filter(({ h }) => !syncedOnly || h.syncedLyrics)
+    // Synkade först, sedan närmast i längd mot vald ljudfil
+    .sort((a, b) => (!!b.h.syncedLyrics - !!a.h.syncedLyrics) || (dur ? Math.abs(a.h.duration - dur) - Math.abs(b.h.duration - dur) : 0));
+  const total = lrcHits.length;
+  $('lrcStatus').textContent = !total ? 'Inga träffar. Prova med artist, eller kortare titel.'
+    : `${list.length} av ${total} träffar` + (syncedOnly && list.length < total ? ' (osynkade dolda)' : '');
+  $('lrcResults').innerHTML = list.map(({ h, i }) => {
+    const durOk = dur && h.duration && Math.abs(h.duration - dur) <= 3;
+    const badge = h.instrumental ? '<span class="lrc-badge plain">instrumental</span>'
+      : h.syncedLyrics ? '<span class="lrc-badge synced">synkad</span>' : '<span class="lrc-badge plain">bara text</span>';
+    return `<li>
+      <div class="meta"><strong>${esc(h.trackName)}</strong> <span>${esc(h.artistName)}</span>
+        <span class="muted">${esc(h.albumName || '')}</span>
+        <span class="muted">${h.duration ? fmt(h.duration, false) : ''}</span>
+        ${badge}${durOk ? '<span class="lrc-badge dur-ok" title="Samma längd som vald ljudfil (±3 s)">längd matchar</span>' : ''}</div>
+      <div class="acts">
+        <button type="button" class="btn-outline btn-small" data-lrc="preview" data-i="${i}">Förhandsvisa</button>
+        ${h.syncedLyrics ? `<button type="button" class="btn-small" data-lrc="use" data-i="${i}">Använd synken</button>
+        <button type="button" class="btn-outline btn-small" data-lrc="dl" data-i="${i}">Ladda ner .lrc</button>` : ''}
+        ${h.plainLyrics ? `<button type="button" class="btn-outline btn-small" data-lrc="plain" data-i="${i}">Använd som sångtext</button>` : ''}
+      </div>
+      <pre hidden>${esc(h.syncedLyrics || h.plainLyrics || '')}</pre>
+    </li>`;
+  }).join('');
+}
+function useLrcPlain(h) {
+  const ta = $('lyricsText');
+  if (ta.value.trim() && !confirm('Ersätta texten i sångtextrutan?')) return false;
+  ta.value = normalizeLyrics(h.plainLyrics || '');
+  $('textCard').open = true;
+  toast('Sångtext ifylld – klicka "Spara text" för att spara');
+  return true;
+}
+function wireLrcSearch() {
+  $('lrcSearchToggle').addEventListener('click', () => {
+    const p = $('lrcSearchPanel');
+    p.hidden = !p.hidden;
+    if (!p.hidden) {
+      if (!$('lrcTitle').value && song) $('lrcTitle').value = song.title || '';
+      $('lrcTitle').focus();
+    }
+  });
+  $('lrcSearchForm').addEventListener('submit', e => { e.preventDefault(); searchLrc(); });
+  $('lrcSyncedOnly').addEventListener('change', renderLrcHits);
+  $('lrcResults').addEventListener('click', e => {
+    const b = e.target.closest('button[data-lrc]');
+    if (!b) return;
+    const h = lrcHits[+b.dataset.i];
+    if (!h) return;
+    const act = b.dataset.lrc;
+    if (act === 'preview') {
+      const pre = b.closest('li').querySelector('pre');
+      pre.hidden = !pre.hidden;
+      b.textContent = pre.hidden ? 'Förhandsvisa' : 'Dölj';
+    } else if (act === 'dl') {
+      downloadText(`${safeName(h.artistName)} - ${safeName(h.trackName)}.lrc`, lrcFileFor(h));
+    } else if (act === 'use') {
+      if (importLrcText(h.syncedLyrics) && !$('lyricsText').value.trim() && h.plainLyrics) useLrcPlain(h);
+    } else if (act === 'plain') {
+      useLrcPlain(h);
+    }
+  });
 }
 
 // ---------- Händelser ----------
 function wireEvents() {
+  wireLrcSearch();
   $('playBtn').addEventListener('click', togglePlay);
   $('backBtn').addEventListener('click', () => seek(audio.currentTime - 3));
   $('fwdBtn').addEventListener('click', () => seek(audio.currentTime + 3));
@@ -1289,6 +1422,7 @@ function resetEditorState() {
 }
 
 async function loadSong(id) {
+  lrcHits = []; $('lrcTitle').value = ''; $('lrcResults').innerHTML = ''; $('lrcStatus').textContent = '';
   resetEditorState();
   if (!id) {
     song = null;

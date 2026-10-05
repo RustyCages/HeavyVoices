@@ -120,6 +120,7 @@
   #textCard summary .muted { font-family: 'DM Sans', sans-serif; font-size: 0.85rem; margin-left: 0.4rem; }
   #lyricsText { min-height: 260px; margin-top: 0.75rem; font-size: 0.9rem; line-height: 1.5; }
   /* Sök .lrc online (LRCLIB) */
+  .lrc-row { margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid var(--border); }
   .lrc-search { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
   .lrc-results { list-style: none; padding: 0; margin: 0.6rem 0 0; display: flex; flex-direction: column; gap: 0.45rem; max-height: 420px; overflow-y: auto; }
   .lrc-results li { border: 1px solid var(--border); border-radius: 0.6rem; padding: 0.55rem 0.7rem; }
@@ -202,7 +203,7 @@
 
   <details class="card static" id="textCard" style="display: none; margin-bottom: 1rem;">
     <summary>Sångtext <span class="muted" id="textSummaryInfo"></span></summary>
-    <p class="muted" style="margin: 0.6rem 0 0;">Klistra in eller skriv texten, eller läs in en fil (.docx, .txt, .pdf). Tom rad mellan stycken är bara för läsbarhet, och rubriker som "Vers 1" / "Refräng" hoppas över automatiskt.</p>
+    <p class="muted" style="margin: 0.6rem 0 0;">Klistra in eller skriv texten, eller läs in en fil (.docx, .txt, .pdf). Tom rad mellan stycken är bara för läsbarhet, och rubriker som "Vers 1" / "Refräng" hoppas över automatiskt. Importerar du en .lrc hamnar texten här utan tidsstämplar – redigera den (stämmor, pilar, stavning) och tryck Spara text, så behålls tiderna för raderna.</p>
     <textarea id="lyricsText" placeholder="Sångtext, en rad per textrad..."></textarea>
     <div class="seg-tools" data-for="lyricsText" title="Markera text först, välj stämmor och riktning">
         <span class="muted">Stämmor går:</span>
@@ -221,6 +222,28 @@
       <button type="button" class="btn-small" id="saveTextBtn">Spara text</button>
       <span class="muted" id="textStatus"></span>
     </div>
+    <div class="row-flex lrc-row">
+      <span class="muted">Synkad text (.lrc):</span>
+      <label class="btn btn-outline btn-small" style="margin: 0;">
+        Importera .lrc
+        <input type="file" id="importInput" accept=".lrc,.txt" style="display: none;">
+      </label>
+      <button type="button" class="btn-outline btn-small" id="lrcSearchToggle">&#128269; Sök .lrc online</button>
+      <button type="button" class="btn-outline btn-small" id="exportBtn">Exportera .lrc</button>
+    </div>
+    <div class="lrc-search" id="lrcSearchPanel" hidden>
+        <p class="muted" style="margin: 0 0 0.5rem;">Söker i <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a> – en fri, öppen databas med synkade sångtexter. Tiderna gäller originalinspelningen, så om vår version har annat tempo eller intro får tiderna justeras efteråt.</p>
+        <form class="row-flex" id="lrcSearchForm">
+          <input type="text" id="lrcTitle" placeholder="Låttitel" style="flex: 2; min-width: 160px;">
+          <input type="text" id="lrcArtist" placeholder="Artist (valfritt)" style="flex: 1; min-width: 130px;">
+          <button type="submit" class="btn-small">Sök</button>
+        </form>
+        <label class="muted" style="display: inline-flex; gap: 0.3rem; align-items: center; margin-top: 0.4rem; font-size: 0.85rem; cursor: pointer;">
+          <input type="checkbox" id="lrcSyncedOnly" checked style="width: auto; margin: 0; accent-color: var(--accent);"> Visa bara synkade texter
+        </label>
+        <p class="muted" id="lrcStatus" style="margin: 0.4rem 0 0;"></p>
+        <ul class="lrc-results" id="lrcResults"></ul>
+      </div>
   </details>
 
   <p class="error" id="loadError"></p>
@@ -328,29 +351,10 @@
       <div class="row-flex" style="justify-content: space-between;">
         <div class="row-flex">
           <button type="button" id="saveBtn"><span id="dirtyDot"></span>Spara synk</button>
-          <button type="button" class="btn-outline btn-small" id="exportBtn">Exportera .lrc</button>
-          <label class="btn btn-outline btn-small" style="margin: 0;">
-            Importera .lrc
-            <input type="file" id="importInput" accept=".lrc,.txt" style="display: none;">
-          </label>
-          <button type="button" class="btn-outline btn-small" id="lrcSearchToggle">&#128269; Sök .lrc online</button>
         </div>
         <button type="button" class="btn-danger btn-small" id="clearBtn">Ta bort synk</button>
       </div>
       <p class="muted" id="saveInfo" style="margin: 0.6rem 0 0;"></p>
-      <div class="lrc-search" id="lrcSearchPanel" hidden>
-        <p class="muted" style="margin: 0 0 0.5rem;">Söker i <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a> – en fri, öppen databas med synkade sångtexter. Tiderna gäller originalinspelningen, så om vår version har annat tempo eller intro får tiderna justeras efteråt.</p>
-        <form class="row-flex" id="lrcSearchForm">
-          <input type="text" id="lrcTitle" placeholder="Låttitel" style="flex: 2; min-width: 160px;">
-          <input type="text" id="lrcArtist" placeholder="Artist (valfritt)" style="flex: 1; min-width: 130px;">
-          <button type="submit" class="btn-small">Sök</button>
-        </form>
-        <label class="muted" style="display: inline-flex; gap: 0.3rem; align-items: center; margin-top: 0.4rem; font-size: 0.85rem; cursor: pointer;">
-          <input type="checkbox" id="lrcSyncedOnly" checked style="width: auto; margin: 0; accent-color: var(--accent);"> Visa bara synkade texter
-        </label>
-        <p class="muted" id="lrcStatus" style="margin: 0.4rem 0 0;"></p>
-        <ul class="lrc-results" id="lrcResults"></ul>
-      </div>
     </div>
   </div>
 </div>
@@ -1010,8 +1014,21 @@ function importLrcText(text) {
   setDirty(true);
   renderLines();
   setCursor(rows.length, false);
+  fillTextFromRows();
   toast(`Importerade ${parsed.length} rader`);
   return true;
+}
+
+// Sångtextrutan = synkradernas text utan tidsstämplar (pausrader utelämnas)
+function fillTextFromRows() {
+  const text = rows.filter(r => !isPause(r)).map(r => r.text).join('\n');
+  const ta = $('lyricsText');
+  if (!text || normalizeLyrics(ta.value) === normalizeLyrics(text)) return;
+  if (ta.value.trim() && !confirm('Ersätta texten i Sångtext-rutan med texten från .lrc-filen?\n(Tidsstämplarna visas inte där – redigera texten och tryck Spara text, tiderna behålls.)')) return;
+  ta.value = text;
+  $('textCard').open = true;
+  $('textStatus').textContent = 'Text från .lrc – inte sparad än';
+  $('textChangedBanner').hidden = true;
 }
 
 // ---------- Sök .lrc online (LRCLIB, https://lrclib.net – fritt API, CORS öppet) ----------
@@ -1109,7 +1126,7 @@ function wireLrcSearch() {
     } else if (act === 'dl') {
       downloadText(`${safeName(h.artistName)} - ${safeName(h.trackName)}.lrc`, lrcFileFor(h));
     } else if (act === 'use') {
-      if (importLrcText(h.syncedLyrics) && !$('lyricsText').value.trim() && h.plainLyrics) useLrcPlain(h);
+      importLrcText(h.syncedLyrics);
     } else if (act === 'plain') {
       useLrcPlain(h);
     }
@@ -1324,12 +1341,25 @@ function showTextCard() {
 function mergeRows(newRows) {
   const old = rows.slice();
   let from = 0;
-  return newRows.map(nr => {
-    for (let k = from; k < old.length; k++) {
-      if (bareText(old[k].text) === bareText(nr.text)) { from = k + 1; return { ...old[k], text: nr.text }; }
+  const out = [];
+  newRows.forEach(nr => {
+    if (isPause(nr)) {
+      // Slutmarkör/paus från texten – hoppa över om en tajmad paus redan ligger sist
+      if (!(out.length && isPause(out[out.length - 1]))) out.push(nr);
+      return;
     }
-    return nr;
+    for (let k = from; k < old.length; k++) {
+      if (!isPause(old[k]) && bareText(old[k].text) === bareText(nr.text)) {
+        out.push({ ...old[k], text: nr.text });
+        from = k + 1;
+        // Tajmade pausrader direkt efter raden (= radens sluttid) följer med
+        while (from < old.length && isPause(old[from]) && old[from].time != null) out.push(old[from++]);
+        return;
+      }
+    }
+    out.push(nr);
   });
+  return out;
 }
 
 async function saveLyricsText() {

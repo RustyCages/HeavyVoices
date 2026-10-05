@@ -16,8 +16,6 @@ window.ROCK_QUESTIONS = [
   { q: 'Vad heter gitarristen Slash egentligen?', a: 'Saul Hudson', w: ['Steven Adler', 'Jeffrey Isbell', 'Michael McKagan'] },
   { q: 'Vilket band låg bakom "Livin\' on a Prayer"?', a: 'Bon Jovi', w: ['Def Leppard', 'Whitesnake', 'Poison'] },
   { q: 'Vem är sångare i Aerosmith?', a: 'Steven Tyler', w: ['Joe Perry', 'David Lee Roth', 'Vince Neil'] },
-  { q: 'Från vilket land kommer Accept ("Metal Heart", "Balls to the Wall")?', a: 'Tyskland', w: ['Nederländerna', 'Danmark', 'Österrike'] },
-  { q: 'På vilket System of a Down-album finns "Aerials"?', a: 'Toxicity', w: ['Mezmerize', 'Steal This Album!', 'Hypnotize'] },
   { q: 'Vem var Motörheads frontfigur med basen?', a: 'Lemmy Kilmister', w: ['Ozzy Osbourne', 'Phil Taylor', 'Fast Eddie Clarke'] },
   { q: 'Vilket svenskt band sjunger nästan bara om krig och militärhistoria?', a: 'Sabaton', w: ['In Flames', 'Opeth', 'Amon Amarth'] },
   { q: 'Från vilken stad kommer In Flames och Hammerfall?', a: 'Göteborg', w: ['Stockholm', 'Malmö', 'Uppsala'] },
@@ -43,14 +41,23 @@ window.ROCK_QUESTIONS = [
   { q: 'Från vilket land kommer Nightwish?', a: 'Finland', w: ['Norge', 'Nederländerna', 'Sverige'] },
   { q: 'Vem sjöng "Sweet Child O\' Mine"?', a: 'Axl Rose', w: ['Sebastian Bach', 'Jon Bon Jovi', 'Vince Neil'] },
   { q: 'Vilket Van Halen-album innehåller "Jump"?', a: '1984', w: ['Fair Warning', '5150', 'Diver Down'] },
-  { q: 'Vad heter Aerosmiths debutalbum där "Dream On" finns med?', a: 'Aerosmith', w: ['Toys in the Attic', 'Get Your Wings', 'Rocks'] },
 ];
 
-// Lockbeten till "Gissa låten" när repertoaren har färre än fyra låtar
-window.ROCK_DECOY_TITLES = [
-  "Livin' on a Prayer - Bon Jovi", 'The Final Countdown - Europe', 'Highway to Hell - AC/DC',
-  'Paranoid - Black Sabbath', 'Smoke on the Water - Deep Purple', 'Sweet Child O\' Mine - Guns N\' Roses',
-  'Enter Sandman - Metallica', 'Run to the Hills - Iron Maiden', 'Eye of the Tiger - Survivor',
-  'Wind of Change - Scorpions', 'Balls to the Wall - Accept', 'Chop Suey! - System Of A Down',
-  'Walk This Way - Aerosmith', 'Breaking the Law - Judas Priest', 'Ace of Spades - Motörhead',
+// Artister för de online-baserade omgångarna "Gissa låten" (iTunes-klipp) och "Fortsätt raden"
+// (texter från LRCLIB). Varje quiz slumpar några av dem. Lägg gärna till fler.
+window.ROCK_ARTISTS = [
+  'AC/DC', 'Aerosmith', 'Alice Cooper', 'Alice In Chains', 'Avenged Sevenfold', 'Black Sabbath', 'Blue Öyster Cult',
+  'Bon Jovi', 'Bruce Springsteen', 'Bryan Adams', 'Def Leppard', 'Deep Purple', 'Dio', 'Dire Straits', 'Disturbed',
+  'Europe', 'Evanescence', 'Extreme', 'Foo Fighters', 'Foreigner', 'Ghost', 'Green Day', "Guns N' Roses",
+  'Hammerfall', 'Heart', 'Iron Maiden', 'Joan Jett & The Blackhearts', 'Journey', 'Judas Priest', 'Kiss', 'Kent',
+  'Led Zeppelin', 'Linkin Park', 'Lynyrd Skynyrd', 'Meat Loaf', 'Megadeth', 'Metallica', 'Motörhead', 'Mötley Crüe',
+  'Muse', 'Nickelback', 'Nightwish', 'Nirvana', 'Ozzy Osbourne', 'Pearl Jam', 'Pink Floyd', 'Poison', 'Queen',
+  'Rainbow', 'Rammstein', 'Red Hot Chili Peppers', 'R.E.M.', 'Rush', 'Sabaton', 'Scorpions', 'Skid Row', 'Slayer',
+  'Soundgarden', 'Status Quo', 'Steppenwolf', 'Survivor', 'System Of A Down', 'The Cult', 'The Darkness', 'The Doors',
+  'The Hellacopters', 'The Hives', 'The Killers', 'The Rolling Stones', 'The Who', 'Thin Lizzy', 'Toto', 'Twisted Sister',
+  'U2', 'Van Halen', 'Volbeat', 'W.A.S.P.', 'Whitesnake', 'ZZ Top', 'Billy Idol', 'Billy Squier', 'Boston',
+  'Creedence Clearwater Revival', 'Cheap Trick', 'Free', 'Gary Moore', 'Living Colour', 'Mr. Big', 'Ratt', 'Saxon',
+  'Smashing Pumpkins', 'Stone Temple Pilots', 'Styx', 'Ted Nugent', 'Tesla', 'The Offspring', 'The Clash', 'Def Leppard',
+  'Wolfmother', 'Rage Against The Machine', 'Queens Of The Stone Age', 'Thunder', 'Airbourne', 'Dio', 'Uriah Heep',
 ];
+window.ROCK_ARTISTS = [...new Set(window.ROCK_ARTISTS)];

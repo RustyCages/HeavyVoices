@@ -160,7 +160,7 @@ function onState(s) {
   }
 }
 function questionScreen(s) {
-  const q = s.kind === 'line' ? `<span class="lyric">${esc(s.lyric)}</span>` : s.kind === 'guess' ? '🎧 Lyssna på klippet – vilken låt är det?' : esc(s.text);
+  const q = s.kind === 'line' ? `<small style="display:block;font-family:'DM Sans',sans-serif;font-weight:500;font-size:0.85rem;color:var(--text-muted);margin-bottom:0.3rem">🎵 ${esc(s.text)}</small><span class="lyric">${esc(s.lyric)}</span>` : s.kind === 'guess' ? '🎧 Lyssna på klippet – vilken låt är det?' : esc(s.text);
   render(`<div class="meta">Fråga ${s.qi + 1}/${s.total} · ${esc(s.label)}</div>
     <div class="qtext">${q}</div>
     ${s.remainMs != null ? '<div class="timer"><div id="tbar"></div></div>' : ''}

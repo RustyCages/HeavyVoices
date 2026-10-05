@@ -34,6 +34,7 @@
   .q-meta { color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.06em; }
   .q-text { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(1.6rem, 4.6vw, 3rem); line-height: 1.15; margin: 0.4rem 0 1rem; text-wrap: balance; }
   .q-lyric { font-style: italic; color: #fff; }
+  .q-song { display: block; font-family: 'DM Sans', sans-serif; font-weight: 500; font-size: 1rem; color: var(--text-muted); margin-bottom: 0.4rem; font-style: normal; }
   .q-lyric::before { content: '“'; color: var(--accent); } .q-lyric::after { content: ' …”'; color: var(--accent); }
   .timer { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; margin-bottom: 1.2rem; }
   .timer > div { height: 100%; width: 100%; background: linear-gradient(90deg, var(--party-hot), var(--accent)); transform-origin: left; }
@@ -105,10 +106,10 @@
       <div class="q-box">
         <h3>Omgångar</h3>
         <div class="round-pick">
-          <label><input type="checkbox" name="round" value="rock" checked><span><b>🎸 Rockfrågor</b><small>Klassisk rock- och metalltrivia på svenska (42 frågor).</small></span></label>
+          <label><input type="checkbox" name="round" value="rock" checked><span><b>🎸 Rockfrågor</b><small>Klassisk rock- och metalltrivia på svenska (39 frågor).</small></span></label>
           <label><input type="checkbox" name="round" value="online" checked><span><b>🌍 Rockfrågor online</b><small>Nya slumpade rockfrågor varje gång, på engelska. Hämtas från the-trivia-api.com.</small></span></label>
-          <label id="rGuess"><input type="checkbox" name="round" value="guess" checked><span><b>🎧 Gissa låten</b><small>Ett klipp ur vår repertoar spelas – vilken låt är det?</small></span></label>
-          <label id="rLine"><input type="checkbox" name="round" value="line" checked><span><b>📝 Fortsätt raden</b><small>En textrad ur våra låtar – hur fortsätter den?</small></span></label>
+          <label id="rGuess"><input type="checkbox" name="round" value="guess" checked><span><b>🎧 Gissa låten</b><small>Ett klipp ur en slumpad rocklåt spelas – vilken låt är det? Hämtas från iTunes.</small></span></label>
+          <label id="rLine"><input type="checkbox" name="round" value="line" checked><span><b>📝 Fortsätt raden</b><small>En rad ur en känd rocklåt – hur fortsätter den? Texter från lrclib.net (engelska).</small></span></label>
         </div>
       </div>
       <div class="q-box">
@@ -171,7 +172,7 @@
       <button type="button" id="revealBtn">👀 Visa svaret</button>
       <button type="button" id="nextBtn" hidden>Nästa →</button>
     </div>
-    <p class="credit" id="credit" hidden>Frågor märkta 🌍 kommer från <a href="https://the-trivia-api.com" target="_blank" rel="noopener">The Trivia API</a> (CC BY-NC 4.0).</p>
+    <p class="credit" id="credit" hidden>Källor: frågor från <a href="https://the-trivia-api.com" target="_blank" rel="noopener">The Trivia API</a> (CC BY-NC 4.0), låtklipp från iTunes/Apple Music, sångtexter från <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a>.</p>
   </section>
 
   <!-- resultat -->
@@ -192,10 +193,9 @@
 <script src="/js/party-quiz-questions.js"></script>
 <script src="/js/vendor/qrcode.js"></script>
 <script>
-const STEMS_BUCKET = 'heavy-voices-stems';
 const TEAM_COLORS = ['#E5A968', '#ff3d5a', '#60a5fa', '#4ade80'];
 const CLIP_SEC = 10;
-let isAdmin = false, songs = [], lineSongs = [];
+let isAdmin = false;
 let teams = [], qCount = 10, qTime = 25, questions = [], qi = 0, scores = [], answered = false, timerRaf = null, tEnd = 0;
 const clip = new Audio(); clip.preload = 'auto';
 let clipStop = null;
@@ -234,72 +234,110 @@ document.getElementById('segMode').querySelectorAll('button').forEach(b => b.add
   if (id === 'segCount') qCount = +b.dataset.v; else qTime = +b.dataset.v;
 })));
 
-// ---------- data ur repertoaren ----------
-function parseLrc(lrc) {
-  const out = [];
-  (lrc || '').split(/\r?\n/).forEach(line => {
-    let rest = line, m, has = false;
-    while ((m = rest.match(/^\s*\[(\d+):(\d+(?:[.:]\d+)?)\]/))) { has = true; rest = rest.slice(m[0].length); }
-    if (!has) return;
-    const text = rest.replace(/<\d+:\d+(?:\.\d+)?>/g, '').replace(/\[[SATB]{1,4}[↑↓]\]|\[\/\]/g, '').trim();
-    if (text && text !== '♪' && text.length >= 6) out.push(text);
+// ---------- låtar online: iTunes (30 s-klipp) + LRCLIB (sångtexter) ----------
+// Inget från körens repertoar – slumpade rocklåtar från artistlistan i party-quiz-questions.js.
+function jsonp(url, ms = 8000) {
+  return new Promise((resolve, reject) => {
+    const cb = '__hvjp' + Math.random().toString(36).slice(2);
+    const sc = document.createElement('script');
+    const done = () => { delete window[cb]; sc.remove(); clearTimeout(t); };
+    const t = setTimeout(() => { done(); reject(new Error('timeout')); }, ms);
+    window[cb] = data => { done(); resolve(data); };
+    sc.onerror = () => { done(); reject(new Error('load')); };
+    sc.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cb;
+    document.head.appendChild(sc);
   });
+}
+const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+const SKIP_TRACK = /\b(live|demo|instrumental|karaoke|remix|acoustic|unplugged|commentary|interview|edit|mono|rehearsal|session)\b/i;
+function cleanTitle(t) {
+  return String(t || '').replace(/\s*[\(\[][^\)\]]*(remaster|version|mix|edit|deluxe|bonus|feat\.?|explicit)[^\)\]]*[\)\]]/ig, '')
+    .replace(/\s+-\s+.*(remaster|version|mix|edit|live).*$/i, '').trim();
+}
+const songCache = new Map();
+async function artistSongs(artist) {
+  if (songCache.has(artist)) return songCache.get(artist);
+  const url = 'https://itunes.apple.com/search?' + new URLSearchParams({ term: artist, entity: 'song', attribute: 'artistTerm', limit: '40', country: 'se' });
+  const data = await jsonp(url);
+  const want = norm(artist), seen = new Set(), out = [];
+  (data.results || []).forEach(r => {
+    if (r.kind !== 'song' || !r.previewUrl || !r.trackName || !r.artistName) return;
+    const an = norm(r.artistName);
+    if (!(an === want || an.startsWith(want + ' ') || an.startsWith(want))) return;   // inte samarbeten/covers
+    if (SKIP_TRACK.test(r.trackName) || SKIP_TRACK.test(r.collectionName || '')) return;
+    const title = cleanTitle(r.trackName), key = norm(title);
+    if (!title || seen.has(key)) return;
+    seen.add(key);
+    out.push({ id: 'it' + r.trackId, title, artist: r.artistName.split(/\s+(feat\.?|&)\s+/i)[0], url: r.previewUrl, dur: (r.trackTimeMillis || 0) / 1000 });
+  });
+  songCache.set(artist, out);
   return out;
 }
-function clipTrack(s) {
-  const extra = (s.extra_stems || []);
-  const full = extra.find(x => /full|mix|original/i.test(x.label || ''));
-  if (full) return full.path;
-  if (s.stem_backtrack_path) return s.stem_backtrack_path;
-  const inst = extra.find(x => /instrument|karaoke|playback|komp|backing/i.test(x.label || ''));
-  return inst ? inst.path : (extra[0] && extra[0].path) || s.stem_sopran_path || s.stem_alt_path || s.stem_tenor_path || s.stem_bas_path || null;
-}
-async function loadRepertoire() {
-  const { data } = await supabaseClient.from('songs').select('*').order('title');
-  songs = (data || []).filter(s => (s.published !== false || isAdmin) && clipTrack(s));
-  lineSongs = (data || []).filter(s => s.published !== false || isAdmin).map(s => {
-    const v = s.lyrics_lrc_voices || {};
-    const lines = parseLrc(s.lyrics_lrc || Object.values(v).find(Boolean) || '');
-    // ta bort direkta upprepningar (refränger) så att "nästa rad" blir entydig
-    return { title: s.title, lines: lines.filter((l, i) => i === 0 || l !== lines[i - 1]) };
-  }).filter(x => x.lines.length >= 4);
-  const off = (id, why) => { const l = document.getElementById(id); l.classList.add('off'); const i = l.querySelector('input'); i.checked = false; i.disabled = true; l.querySelector('small').textContent = why; };
-  if (!songs.length) off('rGuess', 'Kräver minst en låt med ljudfil i repertoaren.');
-  if (!lineSongs.length) off('rLine', 'Kräver låtar med synkad text (Admin → Låtar → Text-synk).');
+async function songPool(nArtists) {
+  const picks = shuffle(window.ROCK_ARTISTS).slice(0, nArtists);
+  const res = await Promise.allSettled(picks.map(artistSongs));
+  return res.map((r, i) => ({ artist: picks[i], songs: r.status === 'fulfilled' ? r.value.slice(0, 15) : [] })).filter(x => x.songs.length >= 2);
 }
 
 // ---------- frågor ----------
 function makeRock(n) {
   return shuffle(window.ROCK_QUESTIONS).slice(0, n).map(x => ({ kind: 'rock', label: '🎸 Rockfrågor', text: x.q, correct: x.a, options: shuffle([x.a, ...x.w]) }));
 }
-function makeGuess(n) {
+// 🎧 Gissa låten: 30 s-klipp från iTunes. Alternativen är låtar av olika artister.
+async function makeGuessOnline(n) {
+  const seen = new Set(getSeen());
+  const pool = await songPool(Math.min(12, n + 4));
+  if (pool.length < 4) throw new Error('för få artister');
   const out = [];
-  const pool = shuffle(songs);
-  for (let k = 0; k < n; k++) {
-    const s = pool[k % pool.length];
-    const others = shuffle(songs.filter(x => x !== s).map(x => x.title));
-    const decoys = shuffle(window.ROCK_DECOY_TITLES.filter(t => t.toLowerCase() !== s.title.toLowerCase() && !others.includes(t)));
-    const opts = [s.title, ...others.slice(0, 3)];
-    while (opts.length < 4 && decoys.length) opts.push(decoys.shift());
-    out.push({ kind: 'guess', label: '🎧 Gissa låten', text: 'Vilken låt är det här?', correct: s.title, options: shuffle(opts), path: clipTrack(s), fact: '' });
+  for (let k = 0; k < n && k < pool.length; k++) {
+    const A = pool[k];
+    const fresh = A.songs.filter(x => !seen.has(x.id));
+    const s = (fresh.length ? fresh : A.songs)[Math.floor(Math.random() * Math.min(8, (fresh.length ? fresh : A.songs).length))];
+    const others = shuffle(pool.filter(x => x !== A)).slice(0, 3).map(B => B.songs[Math.floor(Math.random() * Math.min(8, B.songs.length))]);
+    const lab = x => `${x.title} – ${x.artist}`;
+    out.push({ kind: 'guess', id: s.id, label: '🎧 Gissa låten', text: 'Vilken låt är det här?', correct: lab(s), options: shuffle([lab(s), ...others.map(lab)]), url: s.url, fact: '' });
   }
   return out;
 }
-function makeLine(n) {
-  const out = [], used = new Set();
-  const allLines = [...new Set(lineSongs.flatMap(x => x.lines))];
-  for (let tries = 0; out.length < n && tries < n * 20; tries++) {
-    const s = lineSongs[Math.floor(Math.random() * lineSongs.length)];
-    const i = Math.floor(Math.random() * (s.lines.length - 1));
-    const key = s.title + '|' + i;
-    if (used.has(key)) continue;
-    const cur = s.lines[i], next = s.lines[i + 1];
-    if (cur === next) continue;
-    const wrong = shuffle(allLines.filter(l => l !== next && l !== cur)).slice(0, 3);
-    if (wrong.length < 2) continue;
-    used.add(key);
-    out.push({ kind: 'line', label: '📝 Fortsätt raden', lyric: cur, text: '', correct: next, options: shuffle([next, ...wrong]), fact: '🎵 ' + s.title });
-  }
+// 📝 Fortsätt raden: sångtext från LRCLIB för en populär låt. Felalternativen är andra rader ur samma låt.
+async function lyricsFor(song) {
+  const q = new URLSearchParams({ track_name: song.title, artist_name: song.artist });
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const res = await fetch('https://lrclib.net/api/search?' + q, { signal: ctl.signal });
+    if (!res.ok) return null;
+    const list = await res.json();
+    const hit = (list || []).find(x => x && x.plainLyrics && !x.instrumental && norm(x.artistName).includes(norm(song.artist).split(' ')[0]));
+    return hit ? hit.plainLyrics : null;
+  } catch (e) { return null; } finally { clearTimeout(t); }
+}
+function lyricLines(txt) {
+  const lines = String(txt || '').split(/\r?\n/).map(l => l.trim())
+    .filter(l => l && !/^[\[\(].*[\]\)]$/.test(l) && l.length >= 8 && l.length <= 90);
+  return lines.filter((l, i) => i === 0 || l !== lines[i - 1]);
+}
+async function makeLineOnline(n) {
+  const seen = new Set(getSeen());
+  const pool = await songPool(Math.min(14, n * 2 + 2));
+  const cands = pool.map(A => { const top = A.songs.slice(0, 6).filter(x => !seen.has('ly' + x.id)); return (top.length ? top : A.songs.slice(0, 6))[Math.floor(Math.random() * Math.min(6, top.length || A.songs.length))]; }).filter(Boolean);
+  const lyr = await Promise.all(cands.map(lyricsFor));
+  const out = [];
+  cands.forEach((song, k) => {
+    if (out.length >= n || !lyr[k]) return;
+    const L = lyricLines(lyr[k]);
+    if (L.length < 8) return;
+    for (let tries = 0; tries < 15; tries++) {
+      const i = 1 + Math.floor(Math.random() * (L.length - 3));
+      const cur = L[i], next = L[i + 1];
+      if (norm(cur) === norm(next)) continue;
+      // inga felalternativ som är identiska med rätt svar eller med frågeraden
+      const wrong = shuffle([...new Set(L.filter(l => norm(l) !== norm(next) && norm(l) !== norm(cur)))]).slice(0, 3);
+      if (wrong.length < 3) continue;
+      out.push({ kind: 'line', id: 'ly' + song.id, label: '📝 Fortsätt raden', lyric: cur, text: `${song.title} – ${song.artist}`, correct: next, options: shuffle([next, ...wrong]), fact: '' });
+      break;
+    }
+  });
+  if (!out.length) throw new Error('inga texter');
   return out;
 }
 // ---------- rockfrågor online (The Trivia API, tagg rock_music) ----------
@@ -333,12 +371,14 @@ async function buildQuiz() {
   if (!rounds.length) { toast('Välj minst en omgång'); return null; }
   const per = Math.ceil(qCount / rounds.length);
   let qs = [];
-  for (const r of rounds) {
-    if (r === 'online') {
-      try { qs = qs.concat(await fetchOnline(per)); }
-      catch (e) { toast('Kunde inte hämta frågor online – kör med de inbyggda rockfrågorna i stället', 5000); }
-    } else qs = qs.concat(r === 'rock' ? makeRock(per) : r === 'guess' ? makeGuess(Math.min(per, Math.max(3, songs.length * 2))) : makeLine(per));
-  }
+  const NAMES = { online: 'rockfrågorna', guess: 'låtklippen', line: 'sångtexterna' };
+  const MAKE = { online: fetchOnline, guess: makeGuessOnline, line: makeLineOnline };
+  const got = await Promise.all(rounds.map(async r => {
+    if (r === 'rock') return makeRock(per);
+    try { return await MAKE[r](per); }
+    catch (e) { toast(`Kunde inte hämta ${NAMES[r]} online – fyller på med inbyggda rockfrågor`, 5000); return []; }
+  }));
+  got.forEach(list => { qs = qs.concat(list); });
   // fyll på med rockfrågor om någon omgång gav för få
   if (qs.length < qCount) qs = qs.concat(makeRock(window.ROCK_QUESTIONS.length).filter(q => !qs.some(x => x.text === q.text)).slice(0, qCount - qs.length));
   // blanda men undvik två "Gissa låten" med samma låt i rad
@@ -360,21 +400,15 @@ function renderScore() {
     : `<span>Poäng <b>${scores[0]}</b></span>`;
 }
 function stopClip() { clip.pause(); clearTimeout(clipStop); document.getElementById('eq').classList.add('paused'); document.getElementById('clipBtn').textContent = '▶ Spela klippet'; }
-const urlCache = {};
 async function playClip(q) {
   PartyFX.unlockAudio();
   if (!clip.paused) { stopClip(); return; }
   try {
-    if (!urlCache[q.path]) {
-      const { data, error } = await supabaseClient.storage.from(STEMS_BUCKET).createSignedUrl(q.path, 3600);
-      if (error) throw error;
-      urlCache[q.path] = data.signedUrl;
-    }
-    if (clip.dataset.path !== q.path) {
-      clip.src = urlCache[q.path]; clip.dataset.path = q.path;
+    if (clip.dataset.path !== q.url) {
+      clip.src = q.url; clip.dataset.path = q.url;
       await new Promise((res, rej) => { clip.addEventListener('loadedmetadata', res, { once: true }); clip.addEventListener('error', rej, { once: true }); });
     }
-    if (q.start == null) { const d = clip.duration || 120; q.start = d * (0.15 + Math.random() * 0.5); }
+    if (q.start == null) { const d = clip.duration || 30; q.start = Math.max(0, Math.random() * Math.min(15, d - CLIP_SEC - 1)); }
     clip.currentTime = q.start;
     await clip.play();
     document.getElementById('eq').classList.remove('paused');
@@ -401,7 +435,7 @@ function showQuestion() {
   answered = false;
   stopClip();
   document.getElementById('qMeta').textContent = `Fråga ${qi + 1}/${questions.length} · ${q.label}`;
-  document.getElementById('qText').innerHTML = q.kind === 'line' ? `<span class="q-lyric">${esc(q.lyric)}</span>` : esc(q.text);
+  document.getElementById('qText').innerHTML = q.kind === 'line' ? `<small class="q-song">🎵 ${esc(q.text)}</small><span class="q-lyric">${esc(q.lyric)}</span>` : esc(q.text);
   document.getElementById('clipRow').hidden = q.kind !== 'guess';
   const box = document.getElementById('opts');
   box.className = 'opts';
@@ -528,7 +562,7 @@ function openRoom() {
   show('lobby');
 }
 function questionPayload(q) {
-  return { qi, total: questions.length, label: q.label, kind: q.kind, text: q.kind === 'line' ? '' : q.text, lyric: q.lyric || '', options: q.options };
+  return { qi, total: questions.length, label: q.label, kind: q.kind, text: q.text, lyric: q.lyric || '', options: q.options };
 }
 function sendState() {
   if (!rt) return;
@@ -605,8 +639,8 @@ async function start() {
   let qs;
   try { qs = await buildQuiz(); } finally { starting = false; sb.textContent = labels[0]; ab.textContent = labels[1]; sb.disabled = ab.disabled = false; }
   if (!qs) return;
-  addSeen(qs.filter(q => q.kind === 'online').map(q => q.id));
-  document.getElementById('credit').hidden = !qs.some(q => q.kind === 'online');
+  addSeen(qs.filter(q => q.id).map(q => q.id));
+  document.getElementById('credit').hidden = !qs.some(q => q.id);
   if (!qs.length) { toast('Hittade inga frågor'); return; }
   PartyFX.unlockAudio();
   questions = qs; qi = 0; scores = teams.map(() => 0);
@@ -641,7 +675,6 @@ document.addEventListener('keydown', e => {
   isAdmin = acc.isAdmin;
   teams = ['Lag 1', 'Lag 2'];
   renderTeams(); renderMode();
-  loadRepertoire();
 })();
 </script>
 </body>

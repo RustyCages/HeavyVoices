@@ -273,7 +273,7 @@ function fmt(sec) { sec = Math.max(0, sec || 0); return Math.floor(sec / 60) + '
     }
     PartyFX.confetti(140, false);
   });
-  el.addEventListener('animationend', e => { if (e.animationName === 'intro-out') el.hidden = true; });
+  el.addEventListener('animationend', e => { if (e.animationName === 'intro-out') { el.hidden = true; duckMusic(1500); } });
 })();
 // ---------- fyrverkerier: videor + ljud (Storage: heavy-voices-stems/party/fireworks[-sound]/) ----------
 // Gratis stockvideor (Pixabay/Pexels) saknar nästan alltid ljudspår, så smällarna kommer
@@ -358,11 +358,30 @@ document.getElementById('fwBtn').addEventListener('click', () => {
 // introt: en tyst fyrverkerifilm bakom loggan om det finns någon uppladdad
 // introt: tyst fyrverkerifilm bakom loggan + intromusik (eller smällar) om sådant är uppladdat.
 // Webbläsare tillåter oftast inte ljud innan man tryckt – då väntar introt på en tryckning.
-let introMusic = null;
+// Musiken går för fullt under introt och tonas sedan ner till bakgrundsnivå (loopas).
+const MUSIC_FULL = 0.85, MUSIC_BG = 0.18;
+let introMusic = null, duckTimer = null;
+function rampVol(a, to, ms) {
+  if (!a) return;
+  const from = a.volume, t0 = performance.now();
+  const step = () => {
+    if (introMusic !== a) return;
+    const k = Math.min(1, (performance.now() - t0) / ms);
+    a.volume = Math.max(0, Math.min(1, from + (to - from) * k));
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function duckMusic(delay = 0) {
+  clearTimeout(duckTimer);
+  duckTimer = setTimeout(() => rampVol(introMusic, MUSIC_BG, 2500), delay);
+}
 function startIntroMusic(u) {
-  const a = new Audio(u); a.volume = 0.85; introMusic = a;
-  a.addEventListener('ended', () => { if (introMusic === a) introMusic = null; });
-  return a.play();
+  const a = new Audio(u); a.volume = MUSIC_FULL; a.loop = true; introMusic = a;
+  const p = a.play();
+  // är introt redan borta (musiken startade på tryckningen) – tona ner efter en stund
+  p.then(() => { const el = document.getElementById('intro'); if (el.hidden || el.classList.contains('gone')) duckMusic(3000); }).catch(() => {});
+  return p;
 }
 function stopIntroMusic() { if (introMusic) { fadeOut(introMusic); introMusic = null; } }
 function maybeIntroVideo() {

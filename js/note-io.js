@@ -27,34 +27,59 @@
   }
 
   // ---------- MIDI-export (format 0, 120 bpm, 480 ticks/fjärdedel → 960 ticks/s) ----------
-  function toMidi(notes, meta = {}) {
-    const TPS = 960;
-    const ev = [];
-    notes.forEach(x => {
-      const on = Math.round(x.t * TPS), off = Math.max(on + 1, Math.round((x.t + x.d) * TPS));
-      const n = Math.max(0, Math.min(127, Math.round(x.n)));
-      ev.push({ tick: on, ord: 1, bytes: [0x90, n, 90] });
-      ev.push({ tick: off, ord: 0, bytes: [0x80, n, 0] });   // av före på vid samma tick
+  // opts.tracks = [{ name, notes }] ger en MIDI med ett spår per röst (format 1).
+  // opts.bpm sätter tempot i filen (tiderna i sekunder bevaras ändå exakt) – med låtens riktiga
+  // tempo hamnar noterna rätt i takterna när filen öppnas i ett notprogram.
+  // Noter med .syl får sångtext (lyric-händelser) som MuseScore m.fl. visar under noterna.
+  function toMidi(notes, meta = {}, opts = {}) {
+    const PPQ = 480;
+    let bpm = Number(opts.bpm) || 120;
+    while (bpm > 200) bpm /= 2;
+    while (bpm < 50) bpm *= 2;
+    const uspq = Math.round(60e6 / bpm), TPS = PPQ * 1e6 / uspq;
+    const label = meta.stem ? `${meta.song || ''} – ${meta.stem}`.trim() : (meta.song || 'Heavy Voices');
+    const tracks = opts.tracks && opts.tracks.length ? opts.tracks : [{ name: label, notes }];
+    const multi = tracks.length > 1;
+    const tempoEv = [0, 0xFF, 0x51, 0x03, (uspq >> 16) & 255, (uspq >> 8) & 255, uspq & 255, 0, 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08];
+    const chunk = (bytes) => [0x4D, 0x54, 0x72, 0x6B, (bytes.length >>> 24) & 255, (bytes.length >>> 16) & 255, (bytes.length >>> 8) & 255, bytes.length & 255, ...bytes];
+    const body = [];
+    if (multi) {
+      const nm = latin1(meta.song || 'Heavy Voices');
+      body.push(...chunk([0, 0xFF, 0x03, ...vlq(nm.length), ...nm, ...tempoEv, 0, 0xFF, 0x2F, 0x00]));
+    }
+    tracks.forEach((tr, ti) => {
+      const ch = Math.min(15, ti >= 9 ? ti + 1 : ti);   // hoppa över trumkanalen 10
+      const ev = [];
+      tr.notes.forEach(x => {
+        const on = Math.round(x.t * TPS), off = Math.max(on + 1, Math.round((x.t + x.d) * TPS));
+        const n = Math.max(0, Math.min(127, Math.round(x.n)));
+        if (x.syl != null && String(x.syl).trim()) {
+          const ly = latin1(String(x.syl).replace(/^ /, '').replace(/~/g, ''));
+          ev.push({ tick: on, ord: 1, bytes: [0xFF, 0x05, ...vlq(ly.length), ...ly] });
+        }
+        ev.push({ tick: on, ord: 2, bytes: [0x90 | ch, n, 90] });
+        ev.push({ tick: off, ord: 0, bytes: [0x80 | ch, n, 0] });   // av före på vid samma tick
+      });
+      ev.sort((a, b) => a.tick - b.tick || a.ord - b.ord);
+      const trk = [];
+      const name = latin1(tr.name || label);
+      trk.push(0, 0xFF, 0x03, ...vlq(name.length), ...name);
+      if (!multi) trk.push(...tempoEv);
+      trk.push(0, 0xC0 | ch, 52);                                     // ljud: kör "aah"
+      let last = 0;
+      ev.forEach(e => { trk.push(...vlq(e.tick - last), ...e.bytes); last = e.tick; });
+      trk.push(0, 0xFF, 0x2F, 0x00);
+      body.push(...chunk(trk));
     });
-    ev.sort((a, b) => a.tick - b.tick || a.ord - b.ord);
-    const trk = [];
-    const name = utf8(meta.stem ? `${meta.song || ''} – ${meta.stem}`.trim() : (meta.song || 'Heavy Voices'));
-    trk.push(0, 0xFF, 0x03, ...vlq(name.length), ...name);              // spårnamn
-    trk.push(0, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20);                   // tempo 120 bpm
-    trk.push(0, 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08);             // 4/4
-    trk.push(0, 0xC0, 52);                                             // ljud: kör "aah"
-    let last = 0;
-    ev.forEach(e => { trk.push(...vlq(e.tick - last), ...e.bytes); last = e.tick; });
-    trk.push(0, 0xFF, 0x2F, 0x00);
-    const head = [0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0];  // MThd, format 0, 1 spår, 480 ppq
-    const tlen = trk.length;
-    return new Uint8Array([...head, 0x4D, 0x54, 0x72, 0x6B, (tlen >>> 24) & 255, (tlen >>> 16) & 255, (tlen >>> 8) & 255, tlen & 255, ...trk]);
+    const ntrk = tracks.length + (multi ? 1 : 0);
+    const head = [0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, multi ? 1 : 0, (ntrk >> 8) & 255, ntrk & 255, (PPQ >> 8) & 255, PPQ & 255];
+    return new Uint8Array([...head, ...body]);
   }
 
   // ---------- MIDI-import ----------
   // Returnerar [{ name, channel, notes }] – ett spår per MIDI-spår/kanal som har noter (trummor hoppas över)
   function fromMidi(buf) {
-    const b = new Uint8Array(buf);
+    const b = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
     let p = 0;
     const str = n => { let s = ''; for (let i = 0; i < n; i++) s += String.fromCharCode(b[p + i]); return s; };
     const u32 = () => { const v = (b[p] << 24 | b[p + 1] << 16 | b[p + 2] << 8 | b[p + 3]) >>> 0; p += 4; return v; };
@@ -80,7 +105,7 @@
         if (st === 0xFF) {
           const mt = b[p++]; let l = 0; do { c = b[p++]; l = (l << 7) | (c & 0x7F); } while (c & 0x80);
           if (mt === 0x51) tempos.push({ tick, uspq: b[p] << 16 | b[p + 1] << 8 | b[p + 2] });
-          if (mt === 0x03 && !names[t]) names[t] = new TextDecoder().decode(b.slice(p, p + l));
+          if (mt === 0x03 && !names[t]) { const raw = b.slice(p, p + l); try { names[t] = new TextDecoder('utf-8', { fatal: true }).decode(raw); } catch (e) { names[t] = new TextDecoder('windows-1252').decode(raw); } }
           p += l;
         } else if (st === 0xF0 || st === 0xF7) {
           let l = 0; do { c = b[p++]; l = (l << 7) | (c & 0x7F); } while (c & 0x80); p += l;
@@ -120,7 +145,7 @@
   // ---------- hjälpare ----------
   function r2(v) { return Math.round(v * 100) / 100; }
   function clean(notes) {
-    return notes.map(x => ({ t: Math.max(0, r2(x.t)), d: Math.max(0.05, r2(x.d)), n: Math.round(x.n) }))
+    return notes.map(x => ({ t: Math.max(0, r2(x.t)), d: Math.max(0.05, r2(x.d)), n: Math.round(x.n), ...(x.syl != null ? { syl: x.syl } : {}) }))
       .sort((a, b) => a.t - b.t || b.n - a.n);
   }
   // Ackord i en stämma (flera toner samtidigt): behåll översta tonen
@@ -138,6 +163,8 @@
   }
   function vlq(v) { const out = [v & 0x7F]; while ((v >>= 7)) out.unshift((v & 0x7F) | 0x80); return out; }
   function utf8(s) { return [...new TextEncoder().encode(s)]; }
+  // MIDI-text skrivs som Latin-1 (å, ä, ö fungerar så i MuseScore m.fl.)
+  function latin1(s) { return [...String(s).normalize('NFC').replace(/[–—]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"')].map(c => { const k = c.codePointAt(0); return k < 256 ? k : 63; }); }
 
   // Spara en fil: "Spara som…"-dialog där webbläsaren stöder det (Chrome/Edge på dator), annars vanlig nedladdning
   async function saveFile(data, filename, mime) {
@@ -202,7 +229,7 @@
     const beat = 15 / bpm;
     const out = tracks.filter(t => t.notes.length).map(t => ({
       name: t.name,
-      notes: clean(t.notes.map(x => ({ t: gap + x.beat * beat, d: Math.max(0.05, x.len * beat), n: 60 + x.pitch }))),
+      notes: clean(t.notes.map(x => ({ t: gap + x.beat * beat, d: Math.max(0.05, x.len * beat), n: 60 + x.pitch, syl: x.syl }))),
       syllables: t.notes.map(x => x.syl),
     }));
     if (!out.length) throw new Error('UltraStar-filen innehåller inga noter');

@@ -1992,6 +1992,7 @@ document.getElementById('usForm')?.addEventListener('submit', async (e) => {
         <button type="button" data-us="use" data-i="${i}">Importera</button>
         <button type="button" class="btn-outline" data-us="preview" data-i="${i}">Förhandsvisa</button>
         <button type="button" class="btn-outline" data-us="dl" data-i="${i}">⬇ .txt</button>
+        <button type="button" class="btn-outline" data-us="mid" data-i="${i}" title="Spara som MIDI med sångtext – öppnas i MuseScore m.fl.">⬇ .mid</button>
       </div>
       <pre hidden></pre>
     </li>`).join('');
@@ -2010,9 +2011,15 @@ document.getElementById('usResults')?.addEventListener('click', async (e) => {
       pre.textContent = head + `\n\n${us.tracks.map(t => `${t.name}: ${t.notes.length} noter, ${nm(Math.min(...t.notes.map(x => x.n)))}–${nm(Math.max(...t.notes.map(x => x.n)))}`).join('\n')}`;
       pre.hidden = false; b.textContent = 'Dölj'; b.disabled = false; return;
     }
-    if (act === 'dl') {
+    if (act === 'dl' || act === 'mid') {
       const name = `${h.artist} - ${h.title}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, '').replace(/[\\/:*?"<>|]+/g, '').trim() || 'ultrastar';
-      await NoteIO.saveFile(txt, name + '.txt', 'text/plain');
+      if (act === 'dl') await NoteIO.saveFile(txt, name + '.txt', 'text/plain');
+      else {
+        const us = NoteIO.fromUltraStar(txt);
+        const mid = NoteIO.toMidi(us.tracks[0].notes, { song: [h.artist, h.title].filter(Boolean).join(' – ') },
+          { bpm: us.bpm, tracks: us.tracks.map(t => ({ name: us.tracks.length > 1 ? t.name : `${h.title} – sång`, notes: t.notes })) });
+        await NoteIO.saveFile(mid, name + '.mid', 'audio/midi');
+      }
     } else {
       importUltraStarText(txt, `${h.artist} – ${h.title}`);
     }

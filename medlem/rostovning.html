@@ -34,6 +34,10 @@
   .vid-row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.85rem; }
   .vid-row input[type=number] { width: 5.5rem; margin: 0; padding: 0.3rem 0.45rem; }
   .vid-row button { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
+  .karaoke { position: relative; overflow: hidden; }
+  .karaoke > :not(video) { position: relative; z-index: 1; }
+  .karaoke .k-bg-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(0.38) saturate(0.85); z-index: 0; pointer-events: none; }
+  .karaoke.has-bg-video .k-now, .karaoke.has-bg-video .k-next { text-shadow: 0 2px 8px rgba(0,0,0,0.85); }
   .canvas-wrap { position: relative; border: 1px solid var(--border); border-radius: 0.6rem; overflow: hidden; background: rgba(0,0,0,0.25); touch-action: none; }
   #overview { display: block; width: 100%; height: 56px; cursor: pointer; border-bottom: 1px solid var(--border); }
   #roll { display: block; width: 100%; height: 420px; cursor: grab; }
@@ -530,7 +534,7 @@
         <legend>Visa <button type="button" class="help" data-help="visa" aria-label="Vad gör Visa-inställningarna?">?</button></legend>
         <label><input type="checkbox" id="optFit"> Anpassa höjden efter tonerna</label>
         <label><input type="checkbox" id="optMerge" checked> Slå ihop noter <small>per textrad</small></label>
-        <label id="optVideoWrap" hidden><input type="checkbox" id="optVideo" checked> Video bakom notbanan</label>
+        <label id="optVideoWrap" hidden><input type="checkbox" id="optVideo" checked> Video bakom notbanan och texten</label>
       </fieldset>
       <fieldset class="set">
         <legend>Sjung med</legend>
@@ -560,6 +564,7 @@
 <script src="/js/auth.js"></script>
 <script src="/js/pitch-analyze.js"></script>
 <script src="/js/note-io.js"></script>
+<script src="/js/bg-video.js"></script>
 <script>
 const STEMS_BUCKET = 'heavy-voices-stems';
 const FIXED_STEMS = [
@@ -1086,6 +1091,7 @@ function placeBgVideo() {
 }
 async function setupBgVideo() {
   const want = song && song.bg_video_path && document.getElementById('optVideo').checked ? song.bg_video_path : null;
+  kVid.setSong(want ? song : null, supabaseClient, STEMS_BUCKET);
   document.getElementById('optVideoWrap').hidden = !(song && song.bg_video_path);
   if (want === bgVidPath && bgVid) { placeBgVideo(); return; }
   if (bgVid) { bgVid.pause(); bgVid.remove(); bgVid = null; }
@@ -1102,9 +1108,13 @@ async function setupBgVideo() {
   placeBgVideo();
   v.addEventListener('loadedmetadata', () => { placeBgVideo(); syncBgVideo(position()); });
 }
+// stämfilens tid → låtens gemensamma tidslinje (samma som karaoke och spelaren)
+function stemOffSec() { return current && song ? (Number((song.stem_offsets || {})[current.key]) || 0) / 1000 : 0; }
+const kVid = BgVideo.create(document.getElementById('karaoke'), { className: 'k-bg-video' });
 function syncBgVideo(p) {
+  kVid.sync(p + stemOffSec(), playing);
   if (!bgVid || bgVid.readyState < 1) return;
-  let tgt = p + (Number(song && song.bg_video_offset) || 0);
+  let tgt = p + stemOffSec() + (Number(song && song.bg_video_offset) || 0);
   const dur = bgVid.duration || 0;
   const loop = !!(song && song.bg_video_loop) && dur > 0.5;
   bgVid.loop = loop;

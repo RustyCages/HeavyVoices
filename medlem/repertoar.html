@@ -197,8 +197,13 @@
   /* Egen ram runt texten (ramen ligger utanför masken så den inte tonas bort) */
   .k-frame { border:1px solid var(--border); border-radius:0.75rem; background:rgba(0,0,0,0.22); margin-bottom:0.25rem; padding:0.15rem 0; }
   .k-frame:has(#karaoke.hidden) { display:none; }
+  /* Bakgrundsvideo bakom texten (songs.bg_video_path) */
+  .k-frame { position:relative; overflow:hidden; }
+  .k-bg-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:brightness(0.38) saturate(0.85); z-index:0; pointer-events:none; }
+  .k-frame.has-bg-video .k-line { text-shadow:0 2px 10px rgba(0,0,0,0.85); }
+  .k-frame.has-bg-video .k-line.k-active { text-shadow:0 2px 10px rgba(0,0,0,0.85), 0 0 18px rgba(229,169,104,0.35); }
   #karaoke {
-    position:relative; height:6.4rem; overflow:hidden; text-align:center;
+    position:relative; z-index:1; height:6.4rem; overflow:hidden; text-align:center;
     -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 28%, #000 72%, transparent 100%);
             mask-image:linear-gradient(to bottom, transparent 0, #000 28%, #000 72%, transparent 100%);
   }
@@ -315,6 +320,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
+<script src="/js/bg-video.js"></script>
 <script>
 const NOTER_BUCKET = 'heavy-voices-noter';
 const STEMS_BUCKET = 'heavy-voices-stems';
@@ -1466,8 +1472,10 @@ function currentElapsed() {
   return pausedOffset || 0;
 }
 
+const kVideo = BgVideo.create(document.querySelector('.k-frame'), { className: 'k-bg-video' });
 function setPlayerSong(song) {
   playerSong = song;
+  kVideo.setSong(song, supabaseClient, STEMS_BUCKET);
   karaokeLines = parseLrc(lrcForSong(song));
   karaokeIdx = -2;
   pausedOffset = 0;
@@ -1542,6 +1550,7 @@ function renderKaraoke(force) {
 
 (function karaokeLoop() {
   renderKaraoke(false);
+  kVideo.sync(currentElapsed(), isPlaying);
   requestAnimationFrame(karaokeLoop);
 })();
 

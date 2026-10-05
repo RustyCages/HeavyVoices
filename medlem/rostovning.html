@@ -186,6 +186,9 @@
 
   /* guide */
   .title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+  .title-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-left: auto; }
+  .title-actions .btn, .title-actions button { padding: 0.5rem 0.9rem; font-size: 0.9rem; }
+  @media (max-width: 560px) { .title-actions { margin-left: 0; } }
   .title-row h1 { margin: 0.5rem 0; }
   .guide { margin-bottom: 1.5rem; }
   .guide h2 { margin: 0 0 0.25rem; font-size: 1.15rem; }
@@ -245,8 +248,10 @@
   <a href="/medlem/" class="back-btn" id="backLink">&larr; Tillbaka</a>
   <div class="title-row">
     <h1>Röstövning</h1>
-    <a href="/medlem/uppvarmning.html" class="btn btn-outline" title="Videor för andning, uppvärmning och skalövningar">🔥 Uppvärmning</a>
-    <button class="btn-outline" id="guideBtn" aria-expanded="false" aria-controls="guide">❔ Så funkar det</button>
+    <div class="title-actions">
+      <a href="/medlem/uppvarmning.html" class="btn btn-outline" title="Videor för andning, uppvärmning och skalövningar">🔥 Uppvärmning</a>
+      <button class="btn-outline" id="guideBtn" aria-expanded="false" aria-controls="guide">❔ Så funkar det</button>
+    </div>
   </div>
   <p class="hint">Sjung din stämma mot notbanan och se direkt om du träffar tonen.<span class="admin-only"> Som admin räknar du också fram noterna (tonkurvorna) ur stämfilerna här.</span></p>
 

@@ -231,6 +231,7 @@
       name: t.name,
       notes: clean(t.notes.map(x => ({ t: gap + x.beat * beat, d: Math.max(0.05, x.len * beat), n: 60 + x.pitch, syl: x.syl }))),
       syllables: t.notes.map(x => x.syl),
+      breaks: t.lines.map(b => Math.round((gap + b * beat) * 100) / 100),
     }));
     if (!out.length) throw new Error('UltraStar-filen innehåller inga noter');
     return { title: head.TITLE || '', artist: head.ARTIST || '', bpm, gap, tracks: out };
@@ -328,7 +329,35 @@
     })).filter(x => x.t + x.d > 0).map(x => (x.t < 0 ? { ...x, d: Math.round((x.d + x.t) * 100) / 100, t: 0 } : x)).filter(x => x.d >= 0.05);
   }
 
-  const api = { toJson, fromJson, toMidi, fromMidi, fromUltraStar, decodeText, autoSync, applySync, topLine, saveFile, FORMAT };
+  // UltraStar → synkad text (.lrc): en rad per sångrad, tiden = radens första not.
+  // Tom tidsstämpel efter raden om det är en längre paus innan nästa.
+  function ultraStarToLrc(us, trackIndex = 0) {
+    const tr = us.tracks[trackIndex];
+    const lines = [];
+    let cur = null, bi = 0;
+    const br = (tr.breaks || []).slice().sort((a, b) => a - b);
+    tr.notes.forEach(x => {
+      while (bi < br.length && br[bi] <= x.t + 0.005) { cur = null; bi++; }
+      if (!cur) { cur = { t: x.t, end: x.t + x.d, text: '' }; lines.push(cur); }
+      cur.text += String(x.syl || '').replace(/~/g, '');
+      cur.end = Math.max(cur.end, x.t + x.d);
+    });
+    const ts = sec => { const m = Math.floor(sec / 60), s = sec - m * 60; return `[${String(m).padStart(2, '0')}:${s.toFixed(2).padStart(5, '0')}]`; };
+    const out = [];
+    if (us.title) out.push(`[ti:${us.title}]`);
+    if (us.artist) out.push(`[ar:${us.artist}]`);
+    lines.forEach((l, i) => {
+      const text = l.text.replace(/\s+/g, ' ').trim();
+      if (!text) return;
+      out.push(ts(l.t) + text);
+      const next = lines[i + 1];
+      if (!next || next.t - l.end > 2) out.push(ts(l.end + 0.3));
+    });
+    return out.join('\n') + '\n';
+  }
+  const isUltraStar = (text) => /^#BPM\s*:/mi.test(text) && /^[:*RG]\s*-?\d+\s+\d+\s+-?\d+/m.test(text);
+
+  const api = { ultraStarToLrc, isUltraStar, toJson, fromJson, toMidi, fromMidi, fromUltraStar, decodeText, autoSync, applySync, topLine, saveFile, FORMAT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.NoteIO = api;
 })(typeof window !== 'undefined' ? window : globalThis);

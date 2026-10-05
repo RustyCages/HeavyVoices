@@ -225,8 +225,8 @@
     <div class="row-flex lrc-row">
       <span class="muted">Synkad text (.lrc):</span>
       <label class="btn btn-outline btn-small" style="margin: 0;">
-        Importera .lrc
-        <input type="file" id="importInput" accept=".lrc,.txt" style="display: none;">
+        Importera .lrc / UltraStar .txt
+        <input type="file" id="importInput" accept=".lrc,.txt,text/plain" style="display: none;">
       </label>
       <button type="button" class="btn-outline btn-small" id="lrcSearchToggle">&#128269; Sök .lrc online</button>
       <button type="button" class="btn-outline btn-small" id="exportBtn">Exportera .lrc</button>
@@ -367,6 +367,7 @@
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
+<script src="/js/note-io.js"></script>
 <script>
 const STEM_BUCKET = 'heavy-voices-stems';
 const STEM_FIELDS = [
@@ -1002,7 +1003,22 @@ function exportLrc() {
 }
 
 async function importLrc(file) {
-  return importLrcText(await file.text());
+  const text = NoteIO.decodeText(await file.arrayBuffer());
+  // UltraStar-fil (#BPM + notrader) → gör om till synkad text, en rad per sångrad
+  if (NoteIO.isUltraStar(text)) {
+    let us;
+    try { us = NoteIO.fromUltraStar(text); } catch (e) { toast('Kunde inte läsa UltraStar-filen: ' + e.message); return false; }
+    let ti = 0;
+    if (us.tracks.length > 1) {
+      const ans = prompt(`Duett – vilken röst ska användas?\n${us.tracks.map((t, i) => `${i + 1} = ${t.name}`).join('\n')}`, '1');
+      if (ans == null) return false;
+      ti = Math.max(0, Math.min(us.tracks.length - 1, (parseInt(ans, 10) || 1) - 1));
+    }
+    const ok = importLrcText(NoteIO.ultraStarToLrc(us, ti));
+    if (ok !== false) toast('UltraStar-filen inläst som synkad text – tiderna gäller originalinspelningen, justera vid behov');
+    return ok;
+  }
+  return importLrcText(text);
 }
 
 function importLrcText(text) {

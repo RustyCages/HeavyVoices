@@ -28,6 +28,12 @@
   #viewer h2 { margin: 0 0 0.25rem; font-size: 1.2rem; }
   .stats { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem; font-variant-numeric: tabular-nums; }
   .stats b { color: var(--text); font-weight: 600; }
+  .bg-video { position: absolute; left: 0; width: 100%; object-fit: cover; pointer-events: none; z-index: 0; filter: brightness(0.36) saturate(0.8); background: #000; }
+  #overview, #roll { position: relative; z-index: 1; }
+  .vid-panel { display: grid; gap: 0.55rem; }
+  .vid-row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.85rem; }
+  .vid-row input[type=number] { width: 5.5rem; margin: 0; padding: 0.3rem 0.45rem; }
+  .vid-row button { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
   .canvas-wrap { position: relative; border: 1px solid var(--border); border-radius: 0.6rem; overflow: hidden; background: rgba(0,0,0,0.25); touch-action: none; }
   #overview { display: block; width: 100%; height: 56px; cursor: pointer; border-bottom: 1px solid var(--border); }
   #roll { display: block; width: 100%; height: 420px; cursor: grab; }
@@ -239,6 +245,7 @@
   <a href="/medlem/" class="back-btn" id="backLink">&larr; Tillbaka</a>
   <div class="title-row">
     <h1>Röstövning</h1>
+    <a href="/medlem/uppvarmning.html" class="btn btn-outline" title="Videor för andning, uppvärmning och skalövningar">🔥 Uppvärmning</a>
     <button class="btn-outline" id="guideBtn" aria-expanded="false" aria-controls="guide">❔ Så funkar det</button>
   </div>
   <p class="hint">Sjung din stämma mot notbanan och se direkt om du träffar tonen.<span class="admin-only"> Som admin räknar du också fram noterna (tonkurvorna) ur stämfilerna här.</span></p>
@@ -366,6 +373,28 @@
     <div class="edit-bar admin-only">
       <button type="button" class="btn-outline" id="editToggle">✎ Redigera noter</button>
       <button type="button" class="btn-outline" id="copyAnalysisBtn" title="Lägg samma noter på andra stämmor">⎘ Kopiera analys till andra stämmor</button>
+      <button type="button" class="btn-outline toggle-btn" id="vidBtn" aria-expanded="false" aria-controls="vidPanel" title="Lägg en egen videofil bakom notbanan för den här låten">🎬 Bakgrundsvideo</button>
+      <div class="copy-panel vid-panel" id="vidPanel" hidden>
+        <b>Bakgrundsvideo för låten</b>
+        <small class="xfer-note">En egen videofil (t.ex. en inspelning från en konsert eller ett rep) som visas nedtonad bakom notbanan och följer med uppspelningen – för alla stämmor och alla medlemmar. Videons eget ljud spelas inte; ljudet kommer från stämfilerna. Håll filen liten (helst under 50 MB, t.ex. 720p).</small>
+        <div class="vid-row">
+          <button type="button" class="btn-outline" id="vidPick">📂 Välj videofil…</button>
+          <input type="file" id="vidFile" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v" hidden>
+          <span class="edit-status" id="vidName"></span>
+          <button type="button" class="btn-outline" id="vidRemove" hidden>🗑 Ta bort videon</button>
+        </div>
+        <div class="vid-row" id="vidOffsetRow" hidden>
+          Förskjutning
+          <button type="button" class="btn-outline" data-vd="-1">−1 s</button>
+          <button type="button" class="btn-outline" data-vd="-0.1">−0,1</button>
+          <input type="number" id="vidOffset" step="0.05" value="0"> s
+          <button type="button" class="btn-outline" data-vd="0.1">+0,1</button>
+          <button type="button" class="btn-outline" data-vd="1">+1 s</button>
+          <button type="button" id="vidSaveOffset">Spara</button>
+        </div>
+        <small class="xfer-note" id="vidOffsetHelp" hidden>Spela låten och justera tills bild och ljud stämmer. Positivt värde = videon ligger längre fram (hoppar över videons början).</small>
+        <span class="edit-status" id="vidStatus"></span>
+      </div>
       <button type="button" class="btn-outline toggle-btn" id="xferBtn" aria-expanded="false" aria-controls="xferPanel" title="Spara noterna som fil eller i biblioteket, eller hämta in noter">⇅ Exportera / importera noter</button>
       <div class="copy-panel" id="xferPanel" hidden>
         <div class="xfer-cols">
@@ -495,6 +524,7 @@
         <legend>Visa <button type="button" class="help" data-help="visa" aria-label="Vad gör Visa-inställningarna?">?</button></legend>
         <label><input type="checkbox" id="optFit"> Anpassa höjden efter tonerna</label>
         <label><input type="checkbox" id="optMerge" checked> Slå ihop noter <small>per textrad</small></label>
+        <label id="optVideoWrap" hidden><input type="checkbox" id="optVideo" checked> Video bakom notbanan</label>
       </fieldset>
       <fieldset class="set">
         <legend>Sjung med</legend>
@@ -655,6 +685,8 @@ async function loadSong(id) {
   document.getElementById('viewer').hidden = true;
   if (!song) return;
   if (isAdmin) history.replaceState(null, '', '?song=' + encodeURIComponent(id));
+  setupBgVideo();
+  { const vp = document.getElementById('vidPanel'); if (vp && !vp.hidden) renderVidPanel(); }
 
   const note = document.getElementById('loadingNote');
   note.hidden = false; note.textContent = 'Hämtar sparade tonkurvor…';
@@ -764,6 +796,7 @@ function showStem(st) {
   voice = []; noteStats = []; if (mic) updateScore();
   renderWithRow();
   setupKaraoke();
+  setTimeout(placeBgVideo, 0);
   applyMerge(st);
   pausedPos = 0;
   document.querySelectorAll('.pitch-row').forEach(r => r.classList.toggle('active', !!st.rowEl && r === st.rowEl));
@@ -1034,7 +1067,109 @@ function tick() {
   drawRoll();
   drawOverview();
   renderKaraoke(p);
+  syncBgVideo(p);
 }
+
+// ---------- bakgrundsvideo (egen fil, songs.bg_video_path) ----------
+let bgVid = null, bgVidPath = null;
+function placeBgVideo() {
+  if (!bgVid) return;
+  const roll = document.getElementById('roll');
+  bgVid.style.top = roll.offsetTop + 'px';
+  bgVid.style.height = roll.offsetHeight + 'px';
+}
+async function setupBgVideo() {
+  const want = song && song.bg_video_path && document.getElementById('optVideo').checked ? song.bg_video_path : null;
+  document.getElementById('optVideoWrap').hidden = !(song && song.bg_video_path);
+  if (want === bgVidPath && bgVid) { placeBgVideo(); return; }
+  if (bgVid) { bgVid.pause(); bgVid.remove(); bgVid = null; }
+  bgVidPath = want;
+  if (!want) return;
+  const { data, error } = await supabaseClient.storage.from(STEMS_BUCKET).createSignedUrl(want, 3600 * 6);
+  if (error || bgVidPath !== want) return;
+  const v = document.createElement('video');
+  v.className = 'bg-video'; v.muted = true; v.playsInline = true; v.preload = 'auto';
+  v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
+  v.src = data.signedUrl;
+  document.querySelector('.canvas-wrap').prepend(v);
+  bgVid = v;
+  placeBgVideo();
+  v.addEventListener('loadedmetadata', () => { placeBgVideo(); syncBgVideo(position()); });
+}
+function syncBgVideo(p) {
+  if (!bgVid || bgVid.readyState < 1) return;
+  const tgt = p + (Number(song && song.bg_video_offset) || 0);
+  const dur = bgVid.duration || 0;
+  if (tgt < 0 || (dur && tgt > dur)) { if (!bgVid.paused) bgVid.pause(); return; }
+  const diff = bgVid.currentTime - tgt;
+  if (playing) {
+    if (bgVid.paused) bgVid.play().catch(() => {});
+    if (Math.abs(diff) > 0.35) { if (!bgVid.seeking) bgVid.currentTime = tgt; }
+    else bgVid.playbackRate = Math.abs(diff) > 0.04 ? (diff > 0 ? 0.96 : 1.04) : 1;   // mjuk eftersläpningskorrigering
+  } else {
+    if (!bgVid.paused) bgVid.pause();
+    if (Math.abs(diff) > 0.06 && !bgVid.seeking) bgVid.currentTime = tgt;
+  }
+}
+window.addEventListener('resize', placeBgVideo);
+document.getElementById('optVideo')?.addEventListener('change', () => setupBgVideo());
+
+// admin: ladda upp / justera / ta bort
+function renderVidPanel() {
+  const has = !!(song && song.bg_video_path);
+  document.getElementById('vidName').textContent = has ? '✓ ' + decodeURIComponent(song.bg_video_path.split('/').pop().replace(/^video__/, '')) : 'Ingen video vald';
+  document.getElementById('vidRemove').hidden = !has;
+  document.getElementById('vidOffsetRow').hidden = !has;
+  document.getElementById('vidOffsetHelp').hidden = !has;
+  document.getElementById('vidOffset').value = Number(song && song.bg_video_offset) || 0;
+}
+document.getElementById('vidBtn')?.addEventListener('click', () => {
+  const p = document.getElementById('vidPanel'), b = document.getElementById('vidBtn');
+  p.hidden = !p.hidden; b.setAttribute('aria-expanded', String(!p.hidden));
+  if (!p.hidden) renderVidPanel();
+});
+document.getElementById('vidPick')?.addEventListener('click', () => document.getElementById('vidFile').click());
+document.getElementById('vidFile')?.addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f || !song) return;
+  const st = document.getElementById('vidStatus');
+  if (f.size > 50 * 1024 * 1024 && !confirm(`Filen är ${Math.round(f.size / 1048576)} MB. Stora filer tar lång tid att ladda för medlemmarna (och kan stoppas av lagringsgränsen). Ladda upp ändå?`)) return;
+  const clean = f.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.\-]+/g, '_');
+  const path = `${song.id}/video__${clean}`;
+  st.textContent = `Laddar upp ${f.name} (${Math.round(f.size / 1048576)} MB)…`;
+  const { error } = await supabaseClient.storage.from(STEMS_BUCKET).upload(path, f, { upsert: true, contentType: f.type || 'video/mp4' });
+  if (error) { st.textContent = 'Kunde inte ladda upp: ' + error.message; return; }
+  const old = song.bg_video_path;
+  const { error: e2 } = await supabaseClient.from('songs').update({ bg_video_path: path }).eq('id', song.id);
+  if (e2) { st.textContent = 'Kunde inte spara: ' + e2.message; return; }
+  if (old && old !== path) supabaseClient.storage.from(STEMS_BUCKET).remove([old]);
+  song.bg_video_path = path;
+  st.textContent = 'Videon uppladdad ✓ – spela låten och justera förskjutningen vid behov';
+  document.getElementById('optVideo').checked = true;
+  renderVidPanel(); setupBgVideo();
+});
+document.getElementById('vidRemove')?.addEventListener('click', async () => {
+  if (!song || !song.bg_video_path || !confirm('Ta bort bakgrundsvideon för den här låten?')) return;
+  const path = song.bg_video_path;
+  const { error } = await supabaseClient.from('songs').update({ bg_video_path: null, bg_video_offset: 0 }).eq('id', song.id);
+  if (error) { document.getElementById('vidStatus').textContent = 'Kunde inte ta bort: ' + error.message; return; }
+  supabaseClient.storage.from(STEMS_BUCKET).remove([path]);
+  song.bg_video_path = null; song.bg_video_offset = 0;
+  document.getElementById('vidStatus').textContent = 'Videon borttagen';
+  renderVidPanel(); setupBgVideo();
+});
+function setVidOffset(v) {
+  song.bg_video_offset = Math.round(v * 100) / 100;
+  document.getElementById('vidOffset').value = song.bg_video_offset;
+  document.getElementById('vidStatus').textContent = 'Inte sparat';
+  syncBgVideo(position());
+}
+document.querySelectorAll('[data-vd]').forEach(b => b.addEventListener('click', () => setVidOffset((Number(song.bg_video_offset) || 0) + Number(b.dataset.vd))));
+document.getElementById('vidOffset')?.addEventListener('change', e => setVidOffset(Number(e.target.value) || 0));
+document.getElementById('vidSaveOffset')?.addEventListener('click', async () => {
+  const { error } = await supabaseClient.from('songs').update({ bg_video_offset: Number(song.bg_video_offset) || 0 }).eq('id', song.id);
+  document.getElementById('vidStatus').textContent = error ? 'Kunde inte spara: ' + error.message : 'Förskjutningen sparad ✓';
+});
 
 // ---------- slå ihop noter per textrad (färre småklipp) ----------
 function lyricSpans() {

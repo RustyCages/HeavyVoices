@@ -95,6 +95,9 @@
   .xfer-row label { display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; }
   .xfer-row input[type=radio] { width: auto; margin: 0; accent-color: var(--accent); }
   .xfer-row input[type=number] { width: 4.6rem; margin: 0; padding: 0.25rem 0.4rem; }
+  .xfer-check { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.5rem; align-items: start; margin: 0; font-size: 0.85rem; cursor: pointer; }
+  .xfer-check input { width: auto; margin: 0.2rem 0 0; accent-color: var(--accent); }
+  .xfer-check small { color: var(--text-muted); font-size: 0.75rem; }
   .xfer-note { font-size: 0.75rem; color: var(--text-muted); line-height: 1.45; }
   .xfer-name { display: grid; gap: 0.25rem; font-size: 0.8rem; color: var(--text-muted); margin: 0; }
   .xfer-name input { margin: 0; padding: 0.35rem 0.5rem; }
@@ -363,10 +366,12 @@
               <label>Förskjut <input type="number" id="xShift" value="0" step="0.05"> s</label>
               <label>Transponera <input type="number" id="xTrans" value="0" step="1" min="-36" max="36"> halvtoner</label>
             </div>
+            <label class="xfer-check"><input type="checkbox" id="xAutoSync" checked> <span><b>🎯 Synka automatiskt mot ljudet</b><br><small>Letar upp rätt starttid, tempo och tonart genom att jämföra noterna med stämmans tonkurva. Förskjut/Transponera ovan läggs på efteråt som finjustering.</small></span></label>
             <small class="xfer-note">Noterna läggs in i redigeringen. Kontrollera och tryck <b>💾 Spara noter</b> för att medlemmarna ska se dem.</small>
             <div class="edit-tools">
-              <button type="button" class="btn-outline" id="xFromFile">📂 Från fil… (.json / .mid)</button>
-              <input type="file" id="xFile" accept=".json,.mid,.midi,application/json,audio/midi,audio/x-midi" hidden>
+              <button type="button" class="btn-outline" id="xFromFile">📂 Från fil… (.json / .mid / UltraStar .txt)</button>
+              <input type="file" id="xFile" accept=".json,.mid,.midi,.txt,application/json,audio/midi,audio/x-midi,text/plain" hidden>
+              <button type="button" class="btn-outline" id="xSyncNow" title="Synka noterna som finns i notbanan just nu mot ljudet">🎯 Synka nuvarande noter</button>
             </div>
             <div id="xMidiPick" class="xfer-midi" hidden></div>
             <div class="set-sub">Från biblioteket</div>
@@ -1820,7 +1825,7 @@ async function loadLibrary() {
       xStatus('Hämtar…');
       const { data: d, error: e } = await supabaseClient.from('note_library').select('notes').eq('id', id).single();
       if (e) { xStatus('Kunde inte hämta: ' + e.message); return; }
-      applyImported(d.notes, `biblioteket (${r.name})`);
+      syncAndImport(d.notes, `biblioteket (${r.name})`);
     });
     row.querySelector('[data-act=del]').addEventListener('click', async () => {
       if (!confirm(`Ta bort "${r.name}" ur biblioteket?`)) return;
@@ -1830,7 +1835,7 @@ async function loadLibrary() {
     });
   });
 }
-function applyImported(list, from) {
+function applyImported(list, from, syncText) {
   const sh = Number(document.getElementById('xShift').value) || 0;
   const tr = Math.round(Number(document.getElementById('xTrans').value) || 0);
   const notes = [];
@@ -1847,9 +1852,30 @@ function applyImported(list, from) {
   afterEdit(null);
   pausedPos = Math.max(0, notes[0].t - 1); if (!playing) tick();
   editStatus(`Importerat från ${from} – kontrollera och tryck 💾 Spara noter`);
-  xStatus(`${notes.length} noter importerade`);
+  xStatus(`${notes.length} noter importerade` + (syncText ? ' · ' + syncText : ''));
   toast(`${notes.length} noter importerade – tryck 💾 Spara noter när det ser rätt ut`, 5000);
 }
+// Synka noter mot stämmans tonkurva (analysen) och lägg sedan in dem
+async function syncAndImport(list, from) {
+  const midi = current.raw && current.raw.midi;
+  if (!document.getElementById('xAutoSync').checked) { applyImported(list, from); return; }
+  if (!midi || !midi.some(v => v > 0)) { applyImported(list, from, 'ingen tonkurva att synka mot – analysera stämman först'); return; }
+  const btns = document.querySelectorAll('#xferPanel button'); btns.forEach(b => b.disabled = true);
+  try {
+    xStatus('Synkar mot ljudet… 0 %');
+    const r = await NoteIO.autoSync(list, midi, current.raw.hop || 0.02,
+      { onProgress: p => xStatus(`Synkar mot ljudet… ${Math.round(p * 100)} %`) });
+    const sure = r.confidence >= 1.35 && r.match >= 0.3;
+    const txt = `synkat: start ${r.offset >= 0 ? '+' : ''}${r.offset.toFixed(2).replace('.', ',')} s · tempo ${Math.round(r.scale * 1000) / 10} %`
+      + (r.transpose ? ` · ${r.transpose > 0 ? '+' : ''}${r.transpose} halvtoner` : '')
+      + ` · överensstämmelse ${Math.round(r.match * 100)} %` + (sure ? ' ✓' : ' – osäker, kontrollera noga');
+    applyImported(NoteIO.applySync(list, r), from, txt);
+    if (!sure) toast('Synken är osäker – lyssna med referenstonen och justera vid behov', 6000);
+  } catch (e) {
+    applyImported(list, from, 'kunde inte synka: ' + (e.message || e));
+  } finally { btns.forEach(b => b.disabled = false); }
+}
+
 document.getElementById('xferBtn')?.addEventListener('click', () => {
   const pnl = document.getElementById('xferPanel');
   if (!pnl.hidden) { pnl.hidden = true; return; }
@@ -1881,6 +1907,16 @@ document.getElementById('xSaveLib')?.addEventListener('click', async () => {
   loadLibrary();
 });
 document.getElementById('xFromFile')?.addEventListener('click', () => document.getElementById('xFile').click());
+document.getElementById('xSyncNow')?.addEventListener('click', () => {
+  const ns = eNotes();
+  if (!ns.length) { xStatus('Det finns inga noter att synka'); return; }
+  const was = document.getElementById('xAutoSync').checked;
+  document.getElementById('xAutoSync').checked = true;
+  // nuvarande noter in igen, utan extra förskjutning/transponering
+  const sh = document.getElementById('xShift'), trn = document.getElementById('xTrans'); const keep = [sh.value, trn.value];
+  sh.value = 0; trn.value = 0;
+  syncAndImport(ns.map(x => ({ t: x.t, d: x.d, n: x.n })), 'notbanan').finally(() => { document.getElementById('xAutoSync').checked = was; sh.value = keep[0]; trn.value = keep[1]; });
+});
 document.getElementById('xFile')?.addEventListener('change', async (e) => {
   const f = e.target.files[0]; e.target.value = '';
   if (!f) return;
@@ -1888,15 +1924,23 @@ document.getElementById('xFile')?.addEventListener('change', async (e) => {
   try {
     if (/\.midi?$/i.test(f.name)) {
       const tracks = NoteIO.fromMidi(await f.arrayBuffer());
-      const use = (tr) => applyImported(tr.chords ? NoteIO.topLine(tr.notes) : tr.notes, `${f.name} – ${tr.name}`);
+      const use = (tr) => syncAndImport(tr.chords ? NoteIO.topLine(tr.notes) : tr.notes, `${f.name} – ${tr.name}`);
       if (tracks.length === 1) { use(tracks[0]); return; }
       pick.innerHTML = '<b>Filen har flera spår – vilket är stämman?</b>' + tracks.map((tr, i) =>
         `<button type="button" class="btn-outline" data-i="${i}">${esc(tr.name)} · ${tr.notes.length} noter · ${nm(Math.min(...tr.notes.map(x => x.n)))}–${nm(Math.max(...tr.notes.map(x => x.n)))}${tr.chords ? ' · ackord (översta tonen används)' : ''}</button>`).join('');
       pick.hidden = false;
       pick.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { use(tracks[Number(b.dataset.i)]); pick.hidden = true; }));
+    } else if (/\.txt$/i.test(f.name)) {
+      const us = NoteIO.fromUltraStar(NoteIO.decodeText(await f.arrayBuffer()));
+      const label = [us.artist, us.title].filter(Boolean).join(' – ') || f.name;
+      if (us.tracks.length === 1) { syncAndImport(us.tracks[0].notes, `UltraStar: ${label}`); return; }
+      pick.innerHTML = '<b>Duett – vilken röst ska användas?</b>' + us.tracks.map((tr, i) =>
+        `<button type="button" class="btn-outline" data-i="${i}">${esc(tr.name)} · ${tr.notes.length} noter</button>`).join('');
+      pick.hidden = false;
+      pick.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { syncAndImport(us.tracks[Number(b.dataset.i)].notes, `UltraStar: ${label} (${us.tracks[Number(b.dataset.i)].name})`); pick.hidden = true; }));
     } else {
       const { notes } = NoteIO.fromJson(await f.text());
-      applyImported(notes, f.name);
+      syncAndImport(notes, f.name);
     }
   } catch (err) { xStatus('Kunde inte läsa filen: ' + (err.message || err)); }
 });

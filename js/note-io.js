@@ -157,7 +157,151 @@
     return 'downloaded';
   }
 
-  const api = { toJson, fromJson, toMidi, fromMidi, topLine, saveFile, FORMAT };
+  // ---------- UltraStar (.txt) ----------
+  // Rader: ": start längd ton stavelse" (även * golden, R/G rap; F = fristil utan ton hoppas över),
+  // "- start" = radbrytning, "E" = slut, "P1"/"P2" = duettröster. Tid: GAP (ms) + slag × 15/BPM s.
+  // Ton 0 = C4 (MIDI 60).
+  function decodeText(buf) {
+    const u8 = new Uint8Array(buf);
+    let t = new TextDecoder('utf-8').decode(u8);
+    if (t.includes('�')) { try { t = new TextDecoder('windows-1252').decode(u8); } catch (e) {} }
+    return t.replace(/^﻿/, '');
+  }
+  function fromUltraStar(text) {
+    const head = {};
+    const tracks = [];
+    let cur = null, rel = false, relBase = 0;
+    const newTrack = (name) => { cur = { name, notes: [], lines: [] }; tracks.push(cur); relBase = 0; };
+    const num = v => parseFloat(String(v).trim().replace(',', '.'));
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.replace(/\s+$/, '');
+      if (!line) continue;
+      if (line[0] === '#') {
+        const i = line.indexOf(':'); if (i < 0) continue;
+        head[line.slice(1, i).trim().toUpperCase()] = line.slice(i + 1).trim();
+        if (/^#RELATIVE:\s*yes/i.test(line)) rel = true;
+        continue;
+      }
+      if (/^P\s*\d/i.test(line)) { newTrack(head['DUETSINGERP' + line.replace(/\D/g, '')] || head['P' + line.replace(/\D/g, '')] || 'Röst ' + line.replace(/\D/g, '')); continue; }
+      if (line[0] === 'E') break;
+      if (!cur) newTrack('Sång');
+      const m = line.match(/^([:*FRG])\s*(-?\d+)\s+(\d+)\s+(-?\d+)\s?(.*)$/);
+      if (m) {
+        if (m[1] === 'F') continue;
+        cur.notes.push({ beat: relBase + parseInt(m[2], 10), len: parseInt(m[3], 10), pitch: parseInt(m[4], 10), syl: m[5] || '' });
+        continue;
+      }
+      const lb = line.match(/^-\s*(-?\d+)(?:\s+(-?\d+))?/);
+      if (lb) {
+        cur.lines.push(relBase + parseInt(lb[1], 10));
+        if (rel) relBase += parseInt(lb[2] != null ? lb[2] : lb[1], 10);
+      }
+    }
+    const bpm = num(head.BPM), gap = (num(head.GAP) || 0) / 1000;
+    if (!(bpm > 0)) throw new Error('UltraStar-filen saknar #BPM');
+    const beat = 15 / bpm;
+    const out = tracks.filter(t => t.notes.length).map(t => ({
+      name: t.name,
+      notes: clean(t.notes.map(x => ({ t: gap + x.beat * beat, d: Math.max(0.05, x.len * beat), n: 60 + x.pitch }))),
+      syllables: t.notes.map(x => x.syl),
+    }));
+    if (!out.length) throw new Error('UltraStar-filen innehåller inga noter');
+    return { title: head.TITLE || '', artist: head.ARTIST || '', bpm, gap, tracks: out };
+  }
+
+  // ---------- Autosynk mot tonkurvan ----------
+  // Letar upp förskjutning, tempo och transponering så att noterna bäst överensstämmer med
+  // analysens tonkurva (midi[] med hop sekunder, 0 = tyst). Jämför tonklass (oktav spelar ingen
+  // roll), så det fungerar även om stämfilen har backvocals eller går i en annan tonart.
+  // Ljudtid = offset + notTid × scale.
+  async function autoSync(notes, midi, hop, opts = {}) {
+    const minScale = opts.minScale ?? 0.85, maxScale = opts.maxScale ?? 1.15;
+    const tick = opts.onProgress || (() => {});
+    const audioDur = midi.length * hop;
+    const nEnd = Math.max(...notes.map(x => x.t + x.d));
+    const nStart = Math.min(...notes.map(x => x.t));
+    // notgaller (0 = ingen not)
+    const grid = (res) => {
+      const g = new Float32Array(Math.ceil(nEnd / res) + 2);
+      notes.forEach(x => { for (let k = Math.floor(x.t / res); k < Math.ceil((x.t + x.d) / res); k++) g[k] = x.n; });
+      return g;
+    };
+    // analysramar (röstade) med jämnt avstånd
+    const frames = (step) => {
+      const st = Math.max(1, Math.round(step / hop)), out = [];
+      for (let i = 0; i < midi.length; i += st) if (midi[i] > 0) out.push([i * hop, midi[i]]);
+      return out;
+    };
+    function score(fr, g, res, off, sc) {
+      const h = new Float32Array(12);
+      for (let k = 0; k < fr.length; k++) {
+        const u = (fr[k][0] - off) / sc;
+        if (u < 0) continue;
+        const gi = (u / res) | 0;
+        if (gi >= g.length) continue;
+        const n = g[gi];
+        if (!n) continue;
+        let dd = (fr[k][1] - n) % 12; if (dd < 0) dd += 12;
+        const b = Math.round(dd) % 12, w = 1 - Math.min(1, Math.abs(dd - Math.round(dd)) * 1.6);
+        h[b] += w;
+      }
+      let best = 0, bi = 0; for (let b = 0; b < 12; b++) if (h[b] > best) { best = h[b]; bi = b; }
+      return [best, bi];
+    }
+    // grov sökning
+    const RC = 0.1, gC = grid(RC), fC = frames(0.1);
+    if (fC.length < 20) throw new Error('Tonkurvan har för lite sång att synka mot');
+    let best = { s: -1 }, second = -1;
+    const scales = [];
+    for (let sc = minScale; sc <= maxScale + 1e-9; sc += 0.01) scales.push(Math.round(sc * 1000) / 1000);
+    let done = 0, last = Date.now();
+    const cands = [];
+    for (const sc of scales) {
+      const oMin = -nEnd * sc + 2, oMax = audioDur - nStart * sc - 2;
+      for (let off = oMin; off <= oMax; off += 0.1) {
+        const [s, b] = score(fC, gC, RC, off, sc);
+        cands.push([s, off, sc, b]);
+        if (s > best.s) best = { s, off, sc, b };
+      }
+      done++;
+      if (Date.now() - last > 40) { tick(0.8 * done / scales.length); await new Promise(r => setTimeout(r, 0)); last = Date.now(); }
+    }
+    // näst bästa kandidat långt från den bästa (för säkerhetsmått)
+    for (const c of cands) if (Math.abs(c[1] - best.off) > 2 && c[0] > second) second = c[0];
+    // finjustering
+    const RF = 0.02, gF = grid(RF), fF = frames(0.02);
+    let fine = { s: -1 };
+    for (let sc = best.sc - 0.012; sc <= best.sc + 0.012 + 1e-9; sc += 0.002) {
+      for (let off = best.off - 0.3; off <= best.off + 0.3 + 1e-9; off += 0.02) {
+        const [s, b] = score(fF, gF, RF, off, sc);
+        if (s > fine.s) fine = { s, off, sc, b };
+      }
+    }
+    tick(1);
+    // transponering: tonklass-skillnad + den oktav som ligger närmast stämmans läge
+    const med = a => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
+    const audioMed = med(fF.map(f => f[1])), noteMed = med(notes.map(x => x.n));
+    let tr = fine.b > 6 ? fine.b - 12 : fine.b;
+    tr += 12 * Math.round((audioMed - (noteMed + tr)) / 12);
+    // träffgrad bland röstade ramar inom notområdet
+    const covered = fF.filter(f => { const u = (f[0] - fine.off) / fine.sc; return u >= nStart && u <= nEnd; }).length || 1;
+    return {
+      offset: Math.round(fine.off * 100) / 100,
+      scale: Math.round(fine.sc * 1000) / 1000,
+      transpose: tr,
+      match: Math.min(1, fine.s / covered),
+      confidence: second > 0 ? best.s / second : 9,
+    };
+  }
+  function applySync(notes, r) {
+    return notes.map(x => ({
+      t: Math.round((r.offset + x.t * r.scale) * 100) / 100,
+      d: Math.max(0.05, Math.round(x.d * r.scale * 100) / 100),
+      n: x.n + r.transpose,
+    })).filter(x => x.t + x.d > 0).map(x => (x.t < 0 ? { ...x, d: Math.round((x.d + x.t) * 100) / 100, t: 0 } : x)).filter(x => x.d >= 0.05);
+  }
+
+  const api = { toJson, fromJson, toMidi, fromMidi, fromUltraStar, decodeText, autoSync, applySync, topLine, saveFile, FORMAT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.NoteIO = api;
 })(typeof window !== 'undefined' ? window : globalThis);

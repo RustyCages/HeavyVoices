@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
 <title>Rockquiz — Party Mode</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
@@ -106,8 +107,7 @@
       <div class="q-box">
         <h3>Omgångar</h3>
         <div class="round-pick">
-          <label><input type="checkbox" name="round" value="rock" checked><span><b>🎸 Rockfrågor</b><small>Klassisk rock- och metalltrivia på svenska (39 frågor).</small></span></label>
-          <label><input type="checkbox" name="round" value="online" checked><span><b>🌍 Rockfrågor online</b><small>Nya slumpade rockfrågor varje gång, på engelska. Hämtas från the-trivia-api.com.</small></span></label>
+          <label><input type="checkbox" name="round" value="online" checked><span><b>🎸 Rockfrågor</b><small>Nya slumpade rockfrågor varje gång, på engelska. Hämtas från the-trivia-api.com.</small></span></label>
           <label id="rGuess"><input type="checkbox" name="round" value="guess" checked><span><b>🎧 Gissa låten</b><small>Ett klipp ur en slumpad rocklåt spelas – vilken låt är det? Hämtas från iTunes.</small></span></label>
           <label id="rLine"><input type="checkbox" name="round" value="line" checked><span><b>📝 Fortsätt raden</b><small>En rad ur en känd rocklåt – hur fortsätter den? Texter från lrclib.net (engelska).</small></span></label>
         </div>
@@ -172,7 +172,7 @@
       <button type="button" id="revealBtn">👀 Visa svaret</button>
       <button type="button" id="nextBtn" hidden>Nästa →</button>
     </div>
-    <p class="credit" id="credit" hidden>Källor: frågor från <a href="https://the-trivia-api.com" target="_blank" rel="noopener">The Trivia API</a> (CC BY-NC 4.0), låtklipp från iTunes/Apple Music, sångtexter från <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a>.</p>
+    <p class="credit" id="credit" hidden>Källor: frågor från <a href="https://the-trivia-api.com" target="_blank" rel="noopener">The Trivia API</a> (CC BY-NC 4.0), låtklipp från iTunes/Apple Music och Deezer, sångtexter från <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a>.</p>
   </section>
 
   <!-- resultat -->
@@ -280,10 +280,33 @@ async function songPool(nArtists) {
 }
 
 // ---------- frågor ----------
-function makeRock(n) {
-  return shuffle(window.ROCK_QUESTIONS).slice(0, n).map(x => ({ kind: 'rock', label: '🎸 Rockfrågor', text: x.q, correct: x.a, options: shuffle([x.a, ...x.w]) }));
+// Kan webbläsaren spela klippet? (laddar bara metadata)
+function canPlay(url, ms = 7000) {
+  return new Promise(res => {
+    if (!url) return res(false);
+    const a = new Audio(); a.preload = 'metadata';
+    const done = ok => { clearTimeout(t); a.removeAttribute('src'); try { a.load(); } catch (e) {} res(ok); };
+    const t = setTimeout(() => done(false), ms);
+    a.addEventListener('loadedmetadata', () => done(true), { once: true });
+    a.addEventListener('error', () => done(false), { once: true });
+    a.src = url;
+  });
 }
-// 🎧 Gissa låten: 30 s-klipp från iTunes. Alternativen är låtar av olika artister.
+// Reservkälla: Deezers 30 s-klipp (mp3) för samma låt
+async function deezerPreview(song) {
+  try {
+    const q = `artist:"${song.artist}" track:"${song.title}"`;
+    const d = await jsonp('https://api.deezer.com/search?' + new URLSearchParams({ q, limit: '5', output: 'jsonp' }), 6000);
+    const hit = (d.data || []).find(x => x.preview);
+    return hit ? hit.preview : null;
+  } catch (e) { return null; }
+}
+async function playableUrl(song) {
+  if (await canPlay(song.url)) return song.url;
+  const dz = await deezerPreview(song);
+  return dz && await canPlay(dz) ? dz : null;
+}
+// 🎧 Gissa låten: 30 s-klipp från iTunes (reserv: Deezer). Alternativen är låtar av olika artister.
 async function makeGuessOnline(n) {
   const seen = new Set(getSeen());
   const pool = await songPool(Math.min(12, n + 4));
@@ -295,9 +318,13 @@ async function makeGuessOnline(n) {
     const s = (fresh.length ? fresh : A.songs)[Math.floor(Math.random() * Math.min(8, (fresh.length ? fresh : A.songs).length))];
     const others = shuffle(pool.filter(x => x !== A)).slice(0, 3).map(B => B.songs[Math.floor(Math.random() * Math.min(8, B.songs.length))]);
     const lab = x => `${x.title} – ${x.artist}`;
-    out.push({ kind: 'guess', id: s.id, label: '🎧 Gissa låten', text: 'Vilken låt är det här?', correct: lab(s), options: shuffle([lab(s), ...others.map(lab)]), url: s.url, fact: '' });
+    out.push({ kind: 'guess', id: s.id, label: '🎧 Gissa låten', text: 'Vilken låt är det här?', correct: lab(s), options: shuffle([lab(s), ...others.map(lab)]), song: s, fact: '' });
   }
-  return out;
+  // bara klipp som faktiskt går att spela i den här webbläsaren
+  const urls = await Promise.all(out.map(q => playableUrl(q.song)));
+  const playable = out.filter((q, i) => { q.url = urls[i]; return !!q.url; });
+  if (!playable.length) throw new Error('inga spelbara klipp');
+  return playable;
 }
 // 📝 Fortsätt raden: sångtext från LRCLIB för en populär låt. Felalternativen är andra rader ur samma låt.
 async function lyricsFor(song) {
@@ -360,7 +387,7 @@ async function fetchOnline(n) {
       const correct = decodeHtml(it.correctAnswer), wrong = (it.incorrectAnswers || []).map(decodeHtml);
       if (!text || !correct || wrong.length < 1) return;
       got.add(it.id);
-      out.push({ kind: 'online', id: it.id, label: '🌍 Rockfrågor online', text, correct, options: shuffle([correct, ...wrong.slice(0, 3)]) });
+      out.push({ kind: 'online', id: it.id, label: '🎸 Rockfrågor', text, correct, options: shuffle([correct, ...wrong.slice(0, 3)]) });
     });
   }
   return out;
@@ -373,14 +400,17 @@ async function buildQuiz() {
   let qs = [];
   const NAMES = { online: 'rockfrågorna', guess: 'låtklippen', line: 'sångtexterna' };
   const MAKE = { online: fetchOnline, guess: makeGuessOnline, line: makeLineOnline };
-  const got = await Promise.all(rounds.map(async r => {
-    if (r === 'rock') return makeRock(per);
-    try { return await MAKE[r](per); }
-    catch (e) { toast(`Kunde inte hämta ${NAMES[r]} online – fyller på med inbyggda rockfrågor`, 5000); return []; }
-  }));
-  got.forEach(list => { qs = qs.concat(list); });
-  // fyll på med rockfrågor om någon omgång gav för få
-  if (qs.length < qCount) qs = qs.concat(makeRock(window.ROCK_QUESTIONS.length).filter(q => !qs.some(x => x.text === q.text)).slice(0, qCount - qs.length));
+  const failed = [];
+  const run = async (r, n) => { try { return await MAKE[r](n); } catch (e) { failed.push(r); return []; } };
+  (await Promise.all(rounds.map(r => run(r, per)))).forEach(list => { qs = qs.concat(list); });
+  // fyll på från de källor som fungerade om någon gav för få
+  const ok = rounds.filter(r => !failed.includes(r));
+  for (let k = 0; qs.length < qCount && ok.length && k < 2; k++) {
+    const more = await run(ok[k % ok.length], qCount - qs.length);
+    qs = qs.concat(more.filter(q => !qs.some(x => x.correct === q.correct && x.text === q.text)));
+  }
+  if (failed.length) toast(`Kunde inte hämta ${[...new Set(failed)].map(r => NAMES[r]).join(' och ')} just nu${qs.length ? ' – kör med det som gick att hämta' : ''}`, 6000);
+  if (!qs.length) return null;
   // blanda men undvik två "Gissa låten" med samma låt i rad
   qs = shuffle(qs).slice(0, qCount);
   return qs;
@@ -406,7 +436,7 @@ async function playClip(q) {
   try {
     if (clip.dataset.path !== q.url) {
       clip.src = q.url; clip.dataset.path = q.url;
-      await new Promise((res, rej) => { clip.addEventListener('loadedmetadata', res, { once: true }); clip.addEventListener('error', rej, { once: true }); });
+      await new Promise((res, rej) => { clip.addEventListener('loadedmetadata', res, { once: true }); clip.addEventListener('error', () => rej(new Error('ljudfilen gick inte att ladda')), { once: true }); });
     }
     if (q.start == null) { const d = clip.duration || 30; q.start = Math.max(0, Math.random() * Math.min(15, d - CLIP_SEC - 1)); }
     clip.currentTime = q.start;
@@ -414,7 +444,7 @@ async function playClip(q) {
     document.getElementById('eq').classList.remove('paused');
     document.getElementById('clipBtn').textContent = '⏸ Pausa';
     clearTimeout(clipStop); clipStop = setTimeout(stopClip, CLIP_SEC * 1000);
-  } catch (e) { toast('Kunde inte spela klippet: ' + (e.message || e)); }
+  } catch (e) { clip.dataset.path = ''; toast('Kunde inte spela klippet: ' + (e.message || e)); }
 }
 function startTimer() {
   cancelAnimationFrame(timerRaf);

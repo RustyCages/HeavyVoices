@@ -50,19 +50,28 @@ async function usdb(params: Record<string, string>, form?: Record<string, string
   if (!res.ok) throw new Error(`USDB svarade ${res.status}`);
   return await res.text();
 }
-async function login() {
-  const user = Deno.env.get("USDB_USER"), pass = Deno.env.get("USDB_PASS");
-  if (!user || !pass) throw new Error("USDB-konto saknas: lägg in USDB_USER och USDB_PASS som secrets i Supabase");
+async function tryLogin(url: string, user: string, pass: string) {
   cookieJar = {};
-  const res = await fetch(BASE, {
+  const res = await fetch(url, {
     method: "POST",
-    headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded" },
+    headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded", Referer: BASE },
     body: new URLSearchParams({ user, pass, login: "Login" }),
     redirect: "manual",
   });
   keepCookies(res);
   const text = res.status < 300 ? await res.text() : "";
-  if (text.includes(LOGIN_INVALID)) throw new Error("USDB-inloggningen misslyckades – kontrollera USDB_USER/USDB_PASS");
+  const invalid = text.includes(LOGIN_INVALID);
+  // diagnostik i funktionsloggen (utan lösenord)
+  const snip = text.replace(/\s+/g, " ").match(/.{0,120}(Login or Password|not activated|aktiv|activate|banned|gesperrt).{0,120}/i)?.[0] ?? "";
+  console.log(`USDB-login ${url}: status ${res.status}, cookies [${Object.keys(cookieJar).join(", ")}], invalid=${invalid}, len=${text.length}${snip ? ", text: " + snip : ""}`);
+  return !invalid && Object.keys(cookieJar).length > 0;
+}
+async function login() {
+  const user = (Deno.env.get("USDB_USER") ?? "").trim(), pass = (Deno.env.get("USDB_PASS") ?? "").replace(/[\r\n]+$/, "");
+  if (!user || !pass) throw new Error("USDB-konto saknas: lägg in USDB_USER och USDB_PASS som secrets i Supabase");
+  if (await tryLogin(BASE, user, pass)) return;
+  if (await tryLogin(BASE + "index.php?link=login", user, pass)) return;
+  throw new Error(`USDB godkände inte inloggningen för användaren "${user}". Kontrollera att du kan logga in med samma uppgifter på usdb.animux.de (kontot kan behöva aktiveras via mejl först).`);
 }
 async function usdbAuthed(params: Record<string, string>, form?: Record<string, string>) {
   if (!Object.keys(cookieJar).length) await login();

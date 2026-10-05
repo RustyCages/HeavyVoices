@@ -6,6 +6,10 @@
 <title>Röstövning — Heavy Voices</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/party.css">
+<script>/* Party Mode: ?party=1 ger en avskalad karaoke + notbana (se medlem/party.html) */
+const PARTY = new URLSearchParams(location.search).has('party');
+if (PARTY) document.documentElement.classList.add('party-mode');</script>
 <style>
   .card.static:hover { transform: none; border-color: var(--border); box-shadow: var(--card-shadow); }
   .hint { font-size: 0.85rem; color: var(--text-muted); margin: 0.25rem 0 1rem; }
@@ -247,6 +251,25 @@
   .prog-tabs { display: flex; gap: 0.4rem; margin-top: 0.8rem; }
   .prog-tabs button { font-size: 0.82rem; padding: 0.3rem 0.7rem; }
   .prog-tabs button[aria-pressed="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
+  /* ---------- Party Mode (?party=1): avskalat, stor text ---------- */
+  html:not(.party-mode) .party-only { display: none !important; }
+  html.party-mode .title-actions, html.party-mode #guide, html.party-mode #progressCard,
+  html.party-mode #stats, html.party-mode #advToggle, html.party-mode #advSettings,
+  html.party-mode .title-row + .hint, html.party-mode .set-warn, html.party-mode #withWrap,
+  html.party-mode .practice-controls .help { display: none !important; }
+  html.party-mode .title-row h1 { font-size: clamp(1.8rem, 5vw, 2.8rem); text-transform: uppercase; letter-spacing: 0.04em; text-shadow: var(--party-glow); }
+  html.party-mode #roll { height: 300px; }
+  @media (max-width: 640px) { html.party-mode #roll { height: 240px; } }
+  html.party-mode .karaoke { min-height: 8.5rem; padding: 1rem; }
+  html.party-mode .k-now { font-size: clamp(1.8rem, 4.6vw, 3.4rem); }
+  html.party-mode .k-next { font-size: clamp(1rem, 2.4vw, 1.6rem); }
+  html.party-mode .score-overlay b { font-size: 1.6rem; }
+  .party-result { position: fixed; inset: 0; z-index: 1800; display: grid; place-items: center; background: rgba(5,5,8,0.82); text-align: center; padding: 1rem; }
+  .party-result .box { display: grid; gap: 0.5rem; justify-items: center; animation: intro-pop 0.8s cubic-bezier(.2,1.6,.4,1) both; }
+  .party-result .pct { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(4rem, 18vw, 9rem); line-height: 1; color: var(--accent); text-shadow: var(--party-glow); }
+  .party-result .rank { font-family: 'Roboto Condensed', sans-serif; font-size: clamp(1.6rem, 5vw, 2.6rem); text-transform: uppercase; color: #fff; }
+  .party-result p { color: var(--text-muted); margin: 0; }
+  .party-result .btns { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; margin-top: 0.8rem; }
 </style>
 </head>
 <body>
@@ -539,6 +562,14 @@
   </div>
 </div>
 
+<div class="party-result" id="partyResult" hidden>
+  <div class="box">
+    <div class="rank" id="prRank"></div>
+    <div class="pct" id="prPct"></div>
+    <p id="prInfo"></p>
+    <div class="btns"><button type="button" id="prAgain">🔁 Sjung igen</button><a class="btn btn-outline" href="/medlem/party.html#tavla">🎉 Välj ny låt</a></div>
+  </div>
+</div>
 <div id="toast" style="position:fixed; bottom:1.5rem; right:1.5rem; background:var(--accent); color:#111317; padding:0.7rem 1.2rem; border-radius:0.6rem; font-weight:600; box-shadow:var(--card-shadow); z-index:999; display:none;"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -548,6 +579,7 @@
 <script src="/js/note-io.js"></script>
 <script src="/js/bg-video.js"></script>
 <script src="/js/bg-video-admin.js"></script>
+<script src="/js/party.js"></script>
 <script>
 const STEMS_BUCKET = 'heavy-voices-stems';
 const FIXED_STEMS = [
@@ -708,7 +740,8 @@ async function loadSong(id) {
   const vocal = ready.find(st => isVoice(st) && /vocal|vokal|sång|lead|melodi|stämma/i.test(st.label || ''));
   const named = ready.find(st => isVoice(st) && /sopran|alt|tenor|bas|baryton|stämma|röst|voice/i.test(st.label || ''));
   const first = mine || vocal || named;
-  if (first && isAdmin) showStem(first);
+  if (PARTY) partySetupSong(first || ready[0]);
+  else if (first && isAdmin) showStem(first);
   else if (ready.length) { const n = document.getElementById('loadingNote'); n.hidden = false; n.textContent = 'Välj stämma ovan för att börja.'; }
   if (!isAdmin) renderRows();
 }
@@ -1054,7 +1087,7 @@ function tick() {
   if (editMode && !document.getElementById('harmPanel').hidden) harmInfo();
   const d = durationOf();
   let p = position();
-  if (playing && p >= d) { stop(); flushSession(); pausedPos = 0; p = 0; }
+  if (playing && p >= d) { stop(); if (PARTY) partyFinale(); flushSession(); pausedPos = 0; p = 0; }
   document.getElementById('curTime').textContent = fmt(p, true);
   const sc = document.getElementById('scrubber');
   if (!sc.matches(':active')) sc.value = Math.min(p, d);
@@ -1486,7 +1519,7 @@ function renderWithRow() {
     const st = stems.find(x => x.key === inp.dataset.key);
     if (inp.checked) playWith.add(st.key); else playWith.delete(st.key);
     if (st.key === 'stem_backtrack_path') { const m = document.getElementById('optWithBackMember'); if (m) m.checked = inp.checked; }
-    try { localStorage.setItem('hv-play-with', JSON.stringify([...playWith])); } catch (e) {}
+    if (!PARTY) try { localStorage.setItem('hv-play-with', JSON.stringify([...playWith])); } catch (e) {}
     if (inp.checked && !st.buffer) {
       const lbl = inp.parentElement, txt = lbl.lastChild;
       txt.textContent = ' ' + st.label + ' (laddar…)';
@@ -1538,6 +1571,7 @@ let meId = null, songTitles = {};
 async function flushSession() {
   if (!unsaved || !song || !current) return;
   unsaved = false;
+  if (PARTY) return; // partysjungande sparas inte i "Min utveckling"
   let hit = 0, tot = 0, done = 0, ok = 0;
   noteStats.forEach(st => {
     if (!st) return;
@@ -1825,7 +1859,7 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
       }
       const chip = document.querySelector('#withRow input[data-key="stem_backtrack_path"]'); if (chip) chip.checked = memberWithBack.checked;
       // Persist choice
-      try { localStorage.setItem('hv-play-with', JSON.stringify(Array.from(playWith))); } catch (e) {}
+      if (!PARTY) try { localStorage.setItem('hv-play-with', JSON.stringify(Array.from(playWith))); } catch (e) {}
       // Restart playback with new stems
       if (playing) startAt(position());
     });
@@ -2382,15 +2416,64 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('resize', () => { if (current) { sizeCanvases(); tick(); renderProgress(); } });
 
+// ---------- Party Mode (?party=1) ----------
+function partyInitUi() {
+  document.body.classList.add('party-page');
+  document.querySelector('.title-row h1').textContent = '🎯 Sjung & tävla';
+  document.title = 'Sjung & tävla — Party Mode';
+  const b = document.getElementById('backLink'); b.href = '/medlem/party.html#tavla'; b.innerHTML = '&larr; Party';
+  document.getElementById('optTone').checked = false;
+  document.getElementById('prAgain').addEventListener('click', () => {
+    document.getElementById('partyResult').hidden = true;
+    voice = []; noteStats = []; if (mic) updateScore();
+    seek(0); play();
+  });
+}
+// väljer stämma automatiskt och lägger kompet (backtrack eller "Instrumental") under
+function partySetupSong(st) {
+  if (!st) return;
+  if (!stems.some(x => x.key === 'stem_backtrack_path')) {
+    const inst = stems.find(x => x !== st && /instrument|karaoke|playback|komp|backing/i.test(x.label || ''));
+    if (inst) playWith.add(inst.key);
+  }
+  showStem(st);
+}
+function partyFinale() {
+  let hit = 0, tot = 0, done = 0, ok = 0;
+  noteStats.forEach(x => { if (!x) return; hit += x.hit; tot += x.tot; if (x.tot >= 3) { done++; if (x.hit / x.tot >= 0.6) ok++; } });
+  const scored = mic && tot && done >= 3;
+  const pct = scored ? Math.round(100 * hit / tot) : null;
+  const rank = pct == null ? 'Rock on! 🤘' : pct >= 85 ? 'Rockgud! 🤘' : pct >= 70 ? 'Rockstjärna! ⭐' : pct >= 50 ? 'Stadig rockare 🎸' : pct >= 30 ? 'Garagebandet 🔧' : 'Övning ger färdighet 😅';
+  document.getElementById('prRank').textContent = rank;
+  document.getElementById('prPct').textContent = pct == null ? '🎉' : pct + '%';
+  document.getElementById('prInfo').textContent = pct == null
+    ? 'Tryck på 🎤 Sjung med nästa gång så räknar mikrofonen dina poäng.'
+    : `${song.title} – ${current.label} · ${ok}/${done} noter träffade`;
+  document.getElementById('partyResult').hidden = false;
+  PartyFX.fireworks(pct != null && pct >= 70 ? 6000 : 3500);
+  PartyFX.confetti(pct != null && pct >= 50 ? 260 : 140, false);
+}
+document.getElementById('partyResult').addEventListener('click', e => { if (e.target.id === 'partyResult') e.currentTarget.hidden = true; });
+
 (async () => {
-  const member = await requireAuth();
-  if (!member) return;
-  isAdmin = member.role === 'admin';
+  let member;
+  if (PARTY) {
+    const acc = await requirePartyAccess();
+    if (!acc) return;
+    member = acc.member;
+    isAdmin = false; // party visar alltid den enkla medlemsvyn, även för admin
+    partyInitUi();
+  } else {
+    member = await requireAuth();
+    if (!member) return;
+    isAdmin = member.role === 'admin';
+  }
   meId = member.id;
   // "Spela med": senaste valet sparas; första gången är Backtrack påslaget för medlemmar
   let savedWith = null;
   try { savedWith = JSON.parse(localStorage.getItem('hv-play-with') || 'null'); } catch (e) {}
-  if (Array.isArray(savedWith)) savedWith.forEach(k => playWith.add(k));
+  if (PARTY) playWith.add('stem_backtrack_path');
+  else if (Array.isArray(savedWith)) savedWith.forEach(k => playWith.add(k));
   else if (!isAdmin) playWith.add('stem_backtrack_path');
   const memberWithBack = document.getElementById('optWithBackMember');
   if (memberWithBack) memberWithBack.checked = playWith.has('stem_backtrack_path');
@@ -2410,7 +2493,7 @@ window.addEventListener('resize', () => { if (current) { sizeCanvases(); tick();
   if (error) { sel.innerHTML = `<option>Fel: ${esc(error.message)}</option>`; return; }
   (data || []).forEach(s => { songTitles[s.id] = s.title; });
   loadSessions();
-  songs = (data || []).filter(s => (s.published !== false || isAdmin) && stemListFor(s).some(st => st.key !== 'stem_backtrack_path'));
+  songs = (data || []).filter(s => (s.published !== false || isAdmin || (PARTY && member.role === 'admin')) && stemListFor(s).some(st => st.key !== 'stem_backtrack_path'));
   if (!isAdmin) {
     // medlemmar ser bara låtar där minst en stämma har tonkurva
     const { data: pr } = await supabaseClient.from('song_pitch').select('song_id');

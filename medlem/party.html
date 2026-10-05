@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Party Mode — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/party.css">
+<style>
+  /* ---------- karaokescenen ---------- */
+  .stage { position: fixed; inset: 0; z-index: 1500; display: grid; grid-template-rows: auto 1fr auto; background: #050507; overflow: hidden; }
+  .stage-bg { position: absolute; inset: 0; z-index: 0; }
+  .stage-bg .stage-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.5; pointer-events: none; }
+  .stage-bg::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 55%, rgba(5,5,7,0.35), rgba(5,5,7,0.9)); }
+  .stage-bg:not(.has-bg-video) { background: radial-gradient(60vw 50vh at 20% 10%, rgba(255,61,90,0.25), transparent 70%), radial-gradient(60vw 50vh at 85% 15%, rgba(168,85,247,0.22), transparent 70%), radial-gradient(70vw 50vh at 50% 110%, rgba(229,169,104,0.22), transparent 70%); }
+  .stage > :not(.stage-bg) { position: relative; z-index: 1; }
+  .stage-top { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.8rem 1rem; }
+  .stage-top h2 { margin: 0; font-size: clamp(1.1rem, 2.6vw, 1.6rem); text-transform: uppercase; letter-spacing: 0.03em; flex: 1; min-width: 10rem; text-shadow: 0 2px 10px #000; }
+  .chips { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+  .chips button { font-size: 0.8rem; padding: 0.35rem 0.75rem; }
+  .chips button[aria-pressed="false"] { background: rgba(255,255,255,0.08); color: #d1d5db; border: 1px solid var(--border); }
+  .icon-btn { background: rgba(255,255,255,0.08); color: #e5e7eb; border: 1px solid var(--border); padding: 0.4rem 0.7rem; }
+  .icon-btn:hover { background: rgba(255,255,255,0.16); color: #fff; }
+
+  .lyrics { display: grid; align-content: center; justify-items: center; gap: 0.6rem; padding: 1rem clamp(1rem, 4vw, 3rem); text-align: center; cursor: pointer; user-select: none; }
+  .lyrics > div { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; line-height: 1.15; max-width: 22ch; text-wrap: balance; text-shadow: 0 3px 14px rgba(0,0,0,0.9); }
+  .lyrics > div { max-width: min(95vw, 1400px); }
+  .l-prev { font-size: clamp(1rem, 2.6vw, 1.8rem); color: rgba(255,255,255,0.35); }
+  .l-now { font-size: clamp(2rem, 6.4vw, 5rem); color: #fff;
+    background-image: linear-gradient(to right, var(--accent) var(--k, 0%), #fff var(--k, 0%));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 3px 10px rgba(0,0,0,0.85)); text-shadow: none; }
+  .l-now.count { -webkit-text-fill-color: var(--accent); font-size: clamp(3rem, 10vw, 7rem); }
+  .l-next { font-size: clamp(1.2rem, 3.4vw, 2.4rem); color: rgba(255,255,255,0.8); }
+  .l-next2 { font-size: clamp(1rem, 2.6vw, 1.8rem); color: rgba(255,255,255,0.45); }
+  .l-hint { font-size: 1rem !important; color: var(--text-muted); font-family: 'DM Sans', sans-serif !important; font-weight: 400 !important; }
+
+  .stage-bottom { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.8rem 1rem 1.1rem; background: linear-gradient(to top, rgba(0,0,0,0.7), transparent); }
+  .stage-bottom input[type=range] { flex: 1; min-width: 140px; margin: 0; padding: 0; }
+  .stage-bottom .time { font-variant-numeric: tabular-nums; font-size: 0.85rem; color: #d1d5db; min-width: 3rem; text-align: center; }
+  .big-play { width: 3.4rem; height: 3.4rem; border-radius: 50%; font-size: 1.3rem; padding: 0; }
+  @media (max-width: 640px) {
+    .stage-top { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; }
+    .stage-top h2 { grid-area: 1 / 1; min-width: 0; }
+    #stFull { grid-area: 1 / 2; } #stClose { grid-area: 1 / 3; }
+    .stage-top .chips { grid-area: 2 / 1; }
+    #stCompete { grid-area: 2 / 2 / 3 / 4; }
+    .stage-bottom { flex-wrap: nowrap; gap: 0.45rem; }
+    .stage-bottom input[type=range] { min-width: 60px; }
+    .stage-bottom .time { min-width: 2.4rem; font-size: 0.78rem; }
+  }
+  .stage-msg { position: absolute; inset: 0; display: grid; place-items: center; z-index: 3; pointer-events: none; }
+  .stage-msg div { font-family: 'Roboto Condensed', sans-serif; font-size: clamp(2.4rem, 9vw, 6rem); font-weight: 700; text-transform: uppercase; color: #fff; text-shadow: var(--party-glow); animation: intro-pop 0.8s cubic-bezier(.2,1.6,.4,1) both; }
+
+  /* ---------- YouTube ---------- */
+  .yt-search { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .yt-search input { flex: 1; min-width: 200px; margin: 0; font-size: 1.05rem; padding: 0.8rem 1rem; }
+  .yt-search button { padding: 0.8rem 1.3rem; font-size: 1rem; }
+  .yt-quick { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.8rem 0 0; align-items: center; font-size: 0.82rem; color: var(--text-muted); }
+  .yt-quick button { font-size: 0.78rem; padding: 0.25rem 0.65rem; background: rgba(255,255,255,0.06); color: #d1d5db; border: 1px solid var(--border); }
+  .yt-quick button:hover { color: #111317; background: var(--accent); }
+  .yt-status { font-size: 0.88rem; color: var(--text-muted); margin: 0.8rem 0; }
+  .yt-status a { font-weight: 600; }
+  .yt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.9rem; }
+  .yt-card { display: grid; grid-template-rows: auto 1fr auto; border-radius: 0.8rem; overflow: hidden; background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
+  .yt-thumb { position: relative; aspect-ratio: 16/9; background: #000 center/cover no-repeat; border: 0; padding: 0; border-radius: 0; cursor: pointer; width: 100%; }
+  .yt-thumb::after { content: '▶'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 2rem; color: #fff; background: rgba(0,0,0,0.25); opacity: 0; transition: opacity 0.15s; }
+  .yt-thumb:hover { transform: none; box-shadow: none; }
+  .yt-thumb:hover::after { opacity: 1; }
+  .yt-info { padding: 0.6rem 0.75rem 0.2rem; font-size: 0.88rem; }
+  .yt-info b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .yt-info small { color: var(--text-muted); }
+  .yt-acts { display: flex; gap: 0.4rem; padding: 0.5rem 0.75rem 0.75rem; flex-wrap: wrap; }
+  .yt-acts button { font-size: 0.78rem; padding: 0.3rem 0.65rem; }
+  .yt-paste { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.8rem; }
+  .yt-paste input { flex: 1; min-width: 200px; margin: 0; }
+  .section-h { margin: 2rem 0 0.8rem; font-size: 1.15rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); }
+  .yt-player { position: fixed; inset: 0; z-index: 1600; background: rgba(0,0,0,0.92); display: grid; grid-template-rows: auto 1fr; }
+  .yt-player .stage-top h2 { text-shadow: none; }
+  .yt-player .frame { display: grid; place-items: center; padding: 0 1rem 1rem; min-height: 0; }
+  .yt-player iframe { width: min(100%, calc((100vh - 6rem) * 16 / 9)); aspect-ratio: 16/9; border: 0; border-radius: 0.6rem; background: #000; }
+
+  #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 2100; display: none; max-width: calc(100vw - 3rem); }
+</style>
+</head>
+<body class="party-page">
+
+<div class="party-intro" id="intro" hidden>
+  <div>
+    <picture><source srcset="/icons/logo.webp" type="image/webp"><img src="/icons/logo.png" alt="" class="logo" width="640" height="493"></picture>
+    <h1>Party<span>Mode</span></h1>
+    <p>🤘 Tryck för att köra igång</p>
+  </div>
+</div>
+
+<header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+
+<div class="container">
+
+  <!-- ===== HUB ===== -->
+  <section id="v-hub" data-view>
+    <div class="party-top">
+      <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
+      <div class="actions">
+        <button type="button" class="icon-btn" id="soundBtn" title="Ljud för fyrverkerier av/på">🔊 Ljud</button>
+        <button type="button" class="icon-btn" id="fwBtn" title="Mer fyrverkerier!">🎆 Fyrverkeri</button>
+      </div>
+    </div>
+    <h1 class="party-title">Party <span class="hot">Mode</span></h1>
+    <p class="party-sub">Ställ fram micken, dra upp volymen – välj vad ni vill göra.</p>
+
+    <div class="party-tiles">
+      <a class="party-tile" href="#karaoke">
+        <span class="emo">🎤</span><h3>Karaoke</h3>
+        <p>Våra låtar med stor text, komp och video – sjung som på scenen.</p>
+      </a>
+      <a class="party-tile" href="#tavla">
+        <span class="emo">🎯</span><h3>Sjung &amp; tävla</h3>
+        <p>Karaoke + notbana. Mikrofonen räknar hur bra du träffar tonerna.</p>
+      </a>
+      <a class="party-tile" href="#youtube">
+        <span class="emo">📺</span><h3>YouTube-karaoke</h3>
+        <p>Sök bland tusentals färdiga karaokevideor eller välj från vår lista.</p>
+      </a>
+      <a class="party-tile" href="/medlem/party-quiz.html">
+        <span class="emo">🧠</span><h3>Rockquiz</h3>
+        <p>Rockfrågor, gissa låten och fortsätt raden – spela i lag.</p>
+      </a>
+    </div>
+
+    <div class="party-panel" id="adminPanel" hidden></div>
+  </section>
+
+  <!-- ===== KARAOKE ===== -->
+  <section id="v-karaoke" data-view hidden>
+    <div class="view-head"><a href="#" class="back-btn" style="margin:0">&larr; Party</a><h2>🎤 Karaoke</h2></div>
+    <div class="party-list" id="karaokeList"><p class="empty">Laddar låtar…</p></div>
+  </section>
+
+  <!-- ===== SJUNG & TÄVLA ===== -->
+  <section id="v-tavla" data-view hidden>
+    <div class="view-head"><a href="#" class="back-btn" style="margin:0">&larr; Party</a><h2>🎯 Sjung &amp; tävla</h2></div>
+    <p class="party-sub">Karaoketext och notbana samtidigt. Tryck på <b>🎤 Sjung med</b> – efter låten får du din träffprocent. 🎧 Hörlurar rekommenderas.</p>
+    <div class="party-list" id="tavlaList"><p class="empty">Laddar låtar…</p></div>
+  </section>
+
+  <!-- ===== YOUTUBE ===== -->
+  <section id="v-youtube" data-view hidden>
+    <div class="view-head"><a href="#" class="back-btn" style="margin:0">&larr; Party</a><h2>📺 YouTube-karaoke</h2></div>
+    <form class="yt-search" id="ytForm">
+      <input type="search" id="ytQ" placeholder="Sök låt eller artist, t.ex. Bon Jovi Livin' on a prayer" autocomplete="off">
+      <button type="submit">🔎 Sök</button>
+    </form>
+    <div class="yt-quick" id="ytQuick"></div>
+    <p class="yt-status" id="ytStatus"></p>
+    <div class="yt-grid" id="ytResults"></div>
+
+    <h3 class="section-h">⭐ Vår karaokelista</h3>
+    <div class="yt-grid" id="ytFavs"><p class="empty">Laddar…</p></div>
+
+    <h3 class="section-h">🔗 Har du en länk?</h3>
+    <form class="yt-paste" id="ytPaste">
+      <input type="url" id="ytUrl" placeholder="Klistra in en YouTube-länk">
+      <button type="submit">▶ Spela</button>
+      <button type="button" class="btn-outline admin-only" id="ytPasteSave" hidden>⭐ Spara i listan</button>
+    </form>
+  </section>
+</div>
+
+<!-- karaokescen -->
+<div class="stage" id="stage" hidden>
+  <div class="stage-bg" id="stageBg"></div>
+  <div class="stage-top">
+    <h2 id="stTitle"></h2>
+    <div class="chips" id="stTracks"></div>
+    <a class="btn btn-outline icon-btn" id="stCompete" hidden>🎯 Tävla</a>
+    <button type="button" class="icon-btn" id="stFull" title="Helskärm">⛶</button>
+    <button type="button" class="icon-btn" id="stClose" title="Stäng (Esc)">✕</button>
+  </div>
+  <div class="lyrics" id="lyrics" title="Tryck för att spela/pausa">
+    <div class="l-prev" id="lPrev"></div>
+    <div class="l-now" id="lNow"></div>
+    <div class="l-next" id="lNext"></div>
+    <div class="l-next2" id="lNext2"></div>
+  </div>
+  <div class="stage-bottom">
+    <button type="button" class="big-play" id="stPlay" title="Spela/pausa (mellanslag)">▶&#xFE0E;</button>
+    <button type="button" class="icon-btn" id="stBack" title="5 s bakåt (←)">−5 s</button>
+    <span class="time" id="stCur">0:00</span>
+    <input type="range" id="stScrub" min="0" max="1" step="0.1" value="0" aria-label="Position i låten">
+    <span class="time" id="stDur">0:00</span>
+  </div>
+  <div class="stage-msg" id="stMsg" hidden><div></div></div>
+</div>
+
+<!-- YouTube-spelare -->
+<div class="yt-player" id="ytPlayer" hidden>
+  <div class="stage-top">
+    <h2 id="ytpTitle"></h2>
+    <button type="button" class="icon-btn" id="ytpClose" title="Stäng (Esc)">✕ Stäng</button>
+  </div>
+  <div class="frame" id="ytpFrame"></div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/bg-video.js"></script>
+<script src="/js/party.js"></script>
+<script>
+const STEMS_BUCKET = 'heavy-voices-stems';
+const FIXED_STEMS = [
+  { col: 'stem_backtrack_path', label: 'Backtrack' },
+  { col: 'stem_sopran_path',    label: 'Sopran' },
+  { col: 'stem_alt_path',       label: 'Alt' },
+  { col: 'stem_tenor_path',     label: 'Tenor' },
+  { col: 'stem_bas_path',       label: 'Bas' },
+];
+let access = null, isAdmin = false, songs = [], pitchIds = new Set();
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function toast(msg, ms = 3200) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
+function fmt(sec) { sec = Math.max(0, sec || 0); return Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0'); }
+
+// ---------- intro ----------
+(function intro() {
+  const fromParty = /\/medlem\/(party|rostovning)/.test(document.referrer) && !location.hash;
+  if (fromParty || location.hash) return;
+  const el = document.getElementById('intro');
+  el.hidden = false;
+  PartyFX.fireworks(4200);
+  setTimeout(() => PartyFX.confetti(220, true), 500);
+  el.addEventListener('click', () => {
+    PartyFX.unlockAudio();
+    el.classList.add('gone');
+    PartyFX.fireworks(2500);
+    PartyFX.confetti(140, false);
+  });
+  el.addEventListener('animationend', e => { if (e.animationName === 'intro-out') el.hidden = true; });
+})();
+document.getElementById('fwBtn').addEventListener('click', () => { PartyFX.unlockAudio(); PartyFX.fireworks(5000); PartyFX.confetti(180, false); });
+const soundBtn = document.getElementById('soundBtn');
+function renderSound() { soundBtn.textContent = PartyFX.sound ? '🔊 Ljud' : '🔇 Ljud'; }
+try { PartyFX.setSound(localStorage.getItem('hv-party-sound') !== '0'); } catch (e) {}
+renderSound();
+soundBtn.addEventListener('click', () => { PartyFX.setSound(!PartyFX.sound); try { localStorage.setItem('hv-party-sound', PartyFX.sound ? '1' : '0'); } catch (e) {} renderSound(); });
+
+// ---------- vyer (hash) ----------
+function route() {
+  const v = (location.hash || '').slice(1) || 'hub';
+  document.querySelectorAll('[data-view]').forEach(s => s.hidden = s.id !== 'v-' + v);
+  if (!document.getElementById('v-' + v)) document.getElementById('v-hub').hidden = false;
+  window.scrollTo(0, 0);
+  if (v === 'youtube') loadFavs();
+}
+window.addEventListener('hashchange', route);
+
+// ---------- adminpanel: öppna för medlemmar ----------
+function renderAdminPanel() {
+  const p = document.getElementById('adminPanel');
+  if (!isAdmin) return;
+  p.hidden = false;
+  if (!access.tableOk) {
+    p.innerHTML = `<b>Bara admin ser Party Mode just nu.</b><br>Kör <code>supabase/migrations/2026-10-05_party_mode.sql</code> i Supabase SQL Editor för att kunna öppna den för medlemmarna och spara en egen karaokelista.`;
+    return;
+  }
+  p.innerHTML = `<div class="row"><div><b>Synlighet</b><br><span id="visTxt"></span></div>
+    <label class="switch"><input type="checkbox" id="visToggle"><span class="knob"></span><span>Öppen för alla medlemmar</span></label></div>`;
+  const t = document.getElementById('visToggle'), txt = document.getElementById('visTxt');
+  const show = () => { t.checked = access.enabled; txt.textContent = access.enabled ? 'Medlemmarna ser Party Mode i menyn.' : 'Dold – bara admin kommer åt sidan.'; };
+  show();
+  t.addEventListener('change', async () => {
+    const want = t.checked;
+    const { error } = await supabaseClient.from('party_settings').upsert({ id: 1, members_enabled: want, updated_at: new Date().toISOString() });
+    if (error) { toast('Kunde inte spara: ' + error.message, 5000); t.checked = !want; return; }
+    access.enabled = want; show();
+    if (want) { PartyFX.fireworks(2500); toast('🎉 Party Mode är öppnat för alla medlemmar'); } else toast('Party Mode är dolt igen');
+  });
+}
+
+// ---------- låtar ----------
+function applyPartMeta(items, meta, keyOf) {
+  const m = meta || {}, labels = m.labels || {}, order = m.order || [];
+  items.forEach(it => { const k = keyOf(it); if (labels[k]) it.label = labels[k]; });
+  const pos = it => { const i = order.indexOf(keyOf(it)); return i === -1 ? 1e6 : i; };
+  return items.map((it, i) => ({ it, i })).sort((a, b) => (pos(a.it) - pos(b.it)) || (a.i - b.i)).map(x => x.it);
+}
+function stemList(s) {
+  const list = FIXED_STEMS.filter(f => s[f.col]).map(f => ({ key: f.col, label: f.label, path: s[f.col] }));
+  (s.extra_stems || []).forEach(ex => list.push({ key: ex.id, label: ex.label, path: ex.path }));
+  return applyPartMeta(list, s.stem_meta, it => it.key);
+}
+// Ljudspår för karaoke: "Utan sång" (backtrack/instrumental) och "Med sång" (hela låten)
+function karaokeTracks(s) {
+  const all = stemList(s).filter(st => !(st.key === 'stem_backtrack_path' && !isAdmin && s.practice_backtrack === false));
+  const inst = all.find(st => st.key === 'stem_backtrack_path') || all.find(st => /instrument|karaoke|playback|komp|backing|backtrack/i.test(st.label || ''));
+  const full = all.find(st => st !== inst && /full|mix|original|hela/i.test(st.label || ''));
+  const out = [];
+  if (inst) out.push({ ...inst, name: '🎸 Utan sång' });
+  if (full) out.push({ ...full, name: '🎤 Med sång' });
+  if (!out.length && all.length) out.push({ ...all[0], name: all[0].label });
+  return out;
+}
+function lrcOf(s) {
+  const v = s.lyrics_lrc_voices || {};
+  return s.lyrics_lrc || Object.values(v).find(Boolean) || '';
+}
+function parseLrc(lrc) {
+  const out = [];
+  (lrc || '').split(/\r?\n/).forEach(line => {
+    const tags = []; let rest = line, m;
+    while ((m = rest.match(/^\s*\[(\d+):(\d+(?:[.:]\d+)?)\]/))) {
+      tags.push(parseInt(m[1], 10) * 60 + parseFloat(m[2].replace(':', '.')));
+      rest = rest.slice(m[0].length);
+    }
+    if (!tags.length) return;
+    const text = rest.replace(/<\d+:\d+(?:\.\d+)?>/g, '').replace(/\[[SATB]{1,4}[↑↓]\]|\[\/\]/g, '').trim();
+    tags.forEach(t => out.push({ time: t, text }));
+  });
+  return out.sort((a, b) => a.time - b.time).filter((x, i, a) => i === 0 || x.time !== a[i - 1].time || x.text);
+}
+
+async function loadSongs() {
+  const [{ data, error }, { data: pr }] = await Promise.all([
+    supabaseClient.from('songs').select('*').order('title'),
+    supabaseClient.from('song_pitch').select('song_id'),
+  ]);
+  if (error) { document.getElementById('karaokeList').innerHTML = `<p class="empty">Fel: ${esc(error.message)}</p>`; return; }
+  pitchIds = new Set((pr || []).map(r => String(r.song_id)));
+  songs = (data || []).filter(s => s.published !== false || isAdmin);
+  renderKaraokeList(); renderTavlaList(); renderQuick();
+}
+function metaTags(s, extra) {
+  const t = [];
+  if (s.published === false) t.push('<span class="hidden-tag">dold för medlemmar</span>');
+  return t.concat(extra).join('');
+}
+function renderKaraokeList() {
+  const box = document.getElementById('karaokeList');
+  const list = songs.filter(s => parseLrc(lrcOf(s)).some(l => l.text) && karaokeTracks(s).length);
+  if (!list.length) { box.innerHTML = '<p class="empty">Inga låtar har synkad text än. Lägg till den under Admin → Låtar → Text-synk.</p>'; return; }
+  box.innerHTML = list.map(s => {
+    const tr = karaokeTracks(s);
+    const tags = [tr.some(x => /Utan/.test(x.name)) ? '<span>🎸 komp</span>' : '<span>🎤 med sång</span>'];
+    if (s.bg_video_path) tags.push('<span>🎬 video</span>');
+    if (pitchIds.has(String(s.id))) tags.push('<span>🎯 notbana</span>');
+    return `<button type="button" class="song-card" data-id="${s.id}"><strong>${esc(s.title)}</strong><span class="meta">${metaTags(s, tags)}</span></button>`;
+  }).join('');
+  box.querySelectorAll('.song-card').forEach(b => b.addEventListener('click', () => openStage(songs.find(s => String(s.id) === b.dataset.id))));
+}
+function renderTavlaList() {
+  const box = document.getElementById('tavlaList');
+  const list = songs.filter(s => pitchIds.has(String(s.id)));
+  if (!list.length) { box.innerHTML = '<p class="empty">Inga låtar har notbana än.</p>'; return; }
+  box.innerHTML = list.map(s => `<a class="song-card" href="/medlem/rostovning.html?party=1&song=${encodeURIComponent(s.id)}"><strong>${esc(s.title)}</strong><span class="meta">${metaTags(s, [s.bg_video_path ? '<span>🎬 video</span>' : '', parseLrc(lrcOf(s)).length ? '<span>📝 text</span>' : ''])}</span></a>`).join('');
+}
+
+// ---------- karaokescen ----------
+const stage = document.getElementById('stage');
+const audio = new Audio(); audio.preload = 'auto';
+const bgv = BgVideo.create(document.getElementById('stageBg'), { className: 'stage-video' });
+let stSong = null, stTracks = [], stTrack = null, stLines = [], stRaf = null, lastIdx = -99, urlCache = {};
+
+async function signed(path) {
+  if (urlCache[path]) return urlCache[path];
+  const { data, error } = await supabaseClient.storage.from(STEMS_BUCKET).createSignedUrl(path, 3600 * 6);
+  if (error) throw error;
+  return (urlCache[path] = data.signedUrl);
+}
+const offOf = st => (Number(((stSong && stSong.stem_offsets) || {})[st.key]) || 0) / 1000;
+const songTime = () => audio.currentTime + (stTrack ? offOf(stTrack) : 0);
+
+async function openStage(s) {
+  if (!s) return;
+  PartyFX.unlockAudio();
+  stSong = s; stTracks = karaokeTracks(s); stLines = parseLrc(lrcOf(s));
+  document.getElementById('stTitle').textContent = s.title;
+  const comp = document.getElementById('stCompete');
+  comp.hidden = !pitchIds.has(String(s.id));
+  comp.href = '/medlem/rostovning.html?party=1&song=' + encodeURIComponent(s.id);
+  stage.hidden = false; document.body.style.overflow = 'hidden';
+  lastIdx = -99; setLine('lNow', 'Laddar…'); setLine('lPrev', ''); setLine('lNext', ''); setLine('lNext2', '');
+  bgv.setSong(s, supabaseClient, STEMS_BUCKET);
+  await pickTrack(stTracks[0], 0);
+  setLine('lNow', ''); lastIdx = -99;
+  renderStage();
+  cancelAnimationFrame(stRaf); stRaf = requestAnimationFrame(stageLoop);
+}
+function renderTrackChips() {
+  const box = document.getElementById('stTracks');
+  box.innerHTML = stTracks.length > 1 ? stTracks.map((t, i) => `<button type="button" data-i="${i}" aria-pressed="${t.key === (stTrack && stTrack.key)}">${esc(t.name)}</button>`).join('') : '';
+  box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => pickTrack(stTracks[+b.dataset.i], songTime())));
+}
+async function pickTrack(t, atSongTime) {
+  if (!t) return;
+  const wasPlaying = !audio.paused;
+  audio.pause();
+  stTrack = t; renderTrackChips();
+  try { audio.src = await signed(t.path); } catch (e) { toast('Kunde inte ladda ljudet: ' + (e.message || e)); return; }
+  await new Promise(res => { if (audio.readyState >= 1) res(); else audio.addEventListener('loadedmetadata', res, { once: true }); });
+  audio.currentTime = Math.max(0, (atSongTime || 0) - offOf(t));
+  document.getElementById('stScrub').max = audio.duration || 1;
+  document.getElementById('stDur').textContent = fmt(audio.duration);
+  if (wasPlaying) audio.play().catch(() => {});
+}
+function closeStage() {
+  audio.pause(); audio.removeAttribute('src'); audio.load();
+  cancelAnimationFrame(stRaf); stRaf = null;
+  bgv.sync(0, false);
+  stage.hidden = true; document.body.style.overflow = '';
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+function togglePlay() { if (!stTrack) return; if (audio.paused) audio.play().catch(e => toast('Kunde inte spela: ' + e.message)); else audio.pause(); }
+function setLine(id, txt) { const el = document.getElementById(id); if (el.textContent !== txt) el.textContent = txt; }
+function renderStage() {
+  const t = songTime(), L = stLines;
+  let i = -1;
+  for (let k = 0; k < L.length; k++) { if (L[k].time <= t) i = k; else break; }
+  const texts = [];
+  for (let k = i + 1; k < L.length && texts.length < 2; k++) if (L[k].text && L[k].text !== '♪') texts.push(L[k]);
+  const now = i >= 0 ? L[i] : null;
+  const nowEl = document.getElementById('lNow');
+  const singing = now && now.text && now.text !== '♪';
+  // nedräkning in till första raden efter en paus
+  const until = texts[0] ? texts[0].time - t : Infinity;
+  const counting = !singing && !audio.paused && until <= 3.2 && until > 0;
+  if (counting) {
+    const n = String(Math.ceil(until));
+    nowEl.classList.add('count'); setLine('lNow', n); nowEl.style.setProperty('--k', '0%');
+    setLine('lNext', texts[0].text); setLine('lNext2', texts[1] ? texts[1].text : '');
+    lastIdx = -50; return;
+  }
+  nowEl.classList.remove('count');
+  if (i !== lastIdx) {
+    lastIdx = i;
+    let prev = '';
+    for (let k = i - 1; k >= 0; k--) if (L[k].text && L[k].text !== '♪') { prev = L[k].text; break; }
+    setLine('lPrev', singing ? prev : '');
+    setLine('lNow', singing ? now.text : (audio.paused && t < 0.2 ? '▶ Tryck för att starta' : (texts[0] ? '♪' : '🤘')));
+    setLine('lNext', texts[0] ? texts[0].text : ''); setLine('lNext2', texts[1] ? texts[1].text : '');
+  }
+  let pct = 0;
+  if (singing) {
+    const end = i + 1 < L.length ? Math.min(L[i + 1].time, now.time + 6) : now.time + 4;
+    pct = Math.max(0, Math.min(100, (t - now.time) / Math.max(0.3, end - now.time) * 100));
+  }
+  nowEl.style.setProperty('--k', pct.toFixed(1) + '%');
+}
+function stageLoop() {
+  renderStage();
+  bgv.sync(songTime(), !audio.paused);
+  document.getElementById('stCur').textContent = fmt(audio.currentTime);
+  const sc = document.getElementById('stScrub'); if (!sc.matches(':active')) sc.value = audio.currentTime;
+  stRaf = requestAnimationFrame(stageLoop);
+}
+function flash(txt) {
+  const m = document.getElementById('stMsg');
+  m.firstElementChild.textContent = txt; m.hidden = false;
+  m.firstElementChild.style.animation = 'none'; void m.offsetWidth; m.firstElementChild.style.animation = '';
+  clearTimeout(flash._t); flash._t = setTimeout(() => m.hidden = true, 3500);
+}
+audio.addEventListener('play', () => document.getElementById('stPlay').textContent = '⏸︎');
+audio.addEventListener('pause', () => document.getElementById('stPlay').textContent = '▶︎');
+audio.addEventListener('ended', () => { if (stage.hidden) return; flash('🤘 Rock on!'); PartyFX.fireworks(4000); PartyFX.confetti(220, false); });
+document.getElementById('stPlay').addEventListener('click', togglePlay);
+document.getElementById('lyrics').addEventListener('click', togglePlay);
+document.getElementById('stBack').addEventListener('click', () => { audio.currentTime = Math.max(0, audio.currentTime - 5); });
+document.getElementById('stScrub').addEventListener('input', e => { audio.currentTime = +e.target.value; lastIdx = -99; });
+document.getElementById('stClose').addEventListener('click', closeStage);
+document.getElementById('stFull').addEventListener('click', () => {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else if (stage.requestFullscreen) stage.requestFullscreen().catch(() => {});
+  else toast('Helskärm stöds inte här – lägg telefonen ner på sidan 📱');
+});
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, select, textarea')) return;
+  if (!document.getElementById('ytPlayer').hidden && e.key === 'Escape') { closeYt(); return; }
+  if (stage.hidden) return;
+  if (e.code === 'Space') { e.preventDefault(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); togglePlay(); }
+  else if (e.key === 'Escape' && !document.fullscreenElement) closeStage();
+  else if (e.key === 'ArrowLeft') audio.currentTime = Math.max(0, audio.currentTime - 5);
+  else if (e.key === 'ArrowRight') audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5);
+});
+
+// ---------- YouTube ----------
+function ytId(url) {
+  const s = String(url || '').trim();
+  if (/^[\w-]{11}$/.test(s)) return s;
+  const m = s.match(/(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+async function ytTitle(id) {
+  try {
+    const r = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id));
+    if (r.ok) { const j = await r.json(); return { title: j.title || '', channel: j.author_name || '' }; }
+  } catch (e) {}
+  return { title: '', channel: '' };
+}
+let favs = [], favsLoaded = false, lastHits = [];
+function openYt(v) {
+  document.getElementById('ytpTitle').textContent = v.title || 'YouTube';
+  const f = document.createElement('iframe');
+  f.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&playsinline=1&fs=1`;
+  f.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture';
+  f.allowFullscreen = true; f.title = v.title || 'YouTube-video';
+  document.getElementById('ytpFrame').replaceChildren(f);
+  document.getElementById('ytPlayer').hidden = false; document.body.style.overflow = 'hidden';
+}
+function closeYt() { document.getElementById('ytpFrame').replaceChildren(); document.getElementById('ytPlayer').hidden = true; document.body.style.overflow = ''; }
+document.getElementById('ytpClose').addEventListener('click', closeYt);
+
+function ytCard(v, isFav) {
+  const saved = favs.some(f => f.youtube_id === v.id);
+  const acts = [`<button type="button" data-act="play">▶ Spela</button>`];
+  if (isAdmin && access.tableOk) acts.push(isFav ? `<button type="button" class="btn-outline" data-act="del">🗑 Ta bort</button>`
+    : `<button type="button" class="btn-outline" data-act="save" ${saved ? 'disabled' : ''}>${saved ? '✓ I listan' : '⭐ Spara'}</button>`);
+  return `<div class="yt-card" data-id="${esc(v.id)}">
+    <button type="button" class="yt-thumb" data-act="play" style="background-image:url('https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg')" aria-label="Spela ${esc(v.title)}"></button>
+    <div class="yt-info"><b>${esc(v.title)}</b>${v.channel ? `<small>${esc(v.channel)}</small>` : ''}</div>
+    <div class="yt-acts">${acts.join('')}</div></div>`;
+}
+function wireCards(box, list, isFav) {
+  box.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', async () => {
+    const v = list.find(x => x.id === b.closest('.yt-card').dataset.id);
+    if (!v) return;
+    if (b.dataset.act === 'play') openYt(v);
+    else if (b.dataset.act === 'save') saveFav(v);
+    else if (b.dataset.act === 'del') delFav(v);
+  }));
+}
+function renderResults() {
+  const box = document.getElementById('ytResults');
+  box.innerHTML = lastHits.map(v => ytCard(v, false)).join('');
+  wireCards(box, lastHits, false);
+}
+async function loadFavs() {
+  if (favsLoaded) return;
+  const box = document.getElementById('ytFavs');
+  if (!access.tableOk) { box.innerHTML = '<p class="empty">Listan kräver databastabellen party_videos (se adminrutan på Party-startsidan).</p>'; return; }
+  const { data, error } = await supabaseClient.from('party_videos').select('*').order('title');
+  if (error) { box.innerHTML = `<p class="empty">Kunde inte hämta listan: ${esc(error.message)}</p>`; return; }
+  favs = data || []; favsLoaded = true; renderFavs();
+}
+function renderFavs() {
+  const box = document.getElementById('ytFavs');
+  const list = favs.map(f => ({ id: f.youtube_id, title: f.title, channel: f.channel }));
+  box.innerHTML = list.length ? list.map(v => ytCard(v, true)).join('') : `<p class="empty">${isAdmin ? 'Tom än – sök och tryck ⭐ Spara för att bygga körens karaokelista.' : 'Körledningen har inte lagt in några videor än.'}</p>`;
+  wireCards(box, list, true);
+  if (lastHits.length) renderResults();
+}
+async function saveFav(v) {
+  const row = { youtube_id: v.id, title: v.title || v.id, channel: v.channel || null, added_by: access.member.id };
+  const { data, error } = await supabaseClient.from('party_videos').upsert(row, { onConflict: 'youtube_id' }).select().single();
+  if (error) { toast('Kunde inte spara: ' + error.message, 5000); return; }
+  favs = favs.filter(f => f.youtube_id !== v.id).concat(data).sort((a, b) => a.title.localeCompare(b.title, 'sv'));
+  renderFavs(); toast('⭐ Sparad i karaokelistan');
+}
+async function delFav(v) {
+  if (!confirm(`Ta bort "${v.title}" från listan?`)) return;
+  const { error } = await supabaseClient.from('party_videos').delete().eq('youtube_id', v.id);
+  if (error) { toast('Kunde inte ta bort: ' + error.message, 5000); return; }
+  favs = favs.filter(f => f.youtube_id !== v.id); renderFavs();
+}
+function ytFallback(q, why) {
+  const url = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(/karaoke/i.test(q) ? q : q + ' karaoke');
+  document.getElementById('ytStatus').innerHTML = `${esc(why)} <a href="${url}" target="_blank" rel="noopener">Sök "${esc(q)}" på YouTube ↗</a> och klistra in länken längre ner.`;
+}
+async function ytSearch(q) {
+  q = q.trim(); if (!q) return;
+  const st = document.getElementById('ytStatus');
+  st.textContent = 'Söker…'; document.getElementById('ytResults').innerHTML = '';
+  let out;
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/youtube-search`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q }),
+    });
+    out = await res.json().catch(() => ({}));
+    if (res.status === 404) { ytFallback(q, isAdmin ? 'Sökfunktionen är inte driftsatt än (Edge Function youtube-search).' : 'Sökningen är inte igång än.'); return; }
+    if (!res.ok && !out.error) out.error = `fel ${res.status}`;
+  } catch (e) { ytFallback(q, 'Sökningen svarade inte.'); return; }
+  if (out.code === 'no_key') { ytFallback(q, isAdmin ? 'YouTube-nyckeln saknas (secret YOUTUBE_API_KEY).' : 'Sökningen är inte igång än.'); return; }
+  if (out.error) { ytFallback(q, out.error + '.'); return; }
+  lastHits = out.items || [];
+  st.textContent = lastHits.length ? `${lastHits.length} träffar för "${q}"` : `Inga träffar för "${q}".`;
+  renderResults();
+}
+document.getElementById('ytForm').addEventListener('submit', e => { e.preventDefault(); ytSearch(document.getElementById('ytQ').value); });
+function renderQuick() {
+  const box = document.getElementById('ytQuick');
+  if (!songs.length) { box.innerHTML = ''; return; }
+  box.innerHTML = 'Från repertoaren: ' + songs.map(s => `<button type="button" data-q="${esc(s.title)}">${esc(s.title)}</button>`).join('');
+  box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { document.getElementById('ytQ').value = b.dataset.q; ytSearch(b.dataset.q); }));
+}
+async function pastedVideo() {
+  const id = ytId(document.getElementById('ytUrl').value);
+  if (!id) { toast('Känner inte igen länken – klistra in en YouTube-länk'); return null; }
+  const meta = await ytTitle(id);
+  return { id, title: meta.title || 'YouTube-video', channel: meta.channel };
+}
+document.getElementById('ytPaste').addEventListener('submit', async e => { e.preventDefault(); const v = await pastedVideo(); if (v) openYt(v); });
+document.getElementById('ytPasteSave').addEventListener('click', async () => { const v = await pastedVideo(); if (v) { await saveFav(v); document.getElementById('ytUrl').value = ''; } });
+
+// ---------- start ----------
+(async () => {
+  access = await requirePartyAccess();
+  if (!access) return;
+  isAdmin = access.isAdmin;
+  if (isAdmin && access.tableOk) document.getElementById('ytPasteSave').hidden = false;
+  renderAdminPanel();
+  route();
+  loadSongs();
+})();
+</script>
+</body>
+</html>

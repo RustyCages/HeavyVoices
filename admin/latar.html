@@ -103,6 +103,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
+<script src="/js/bg-video-admin.js"></script>
 <script>
 const DOC_FIELDS = [
   { kind: 'sheet_music_path', label: 'Noter (PDF)', accept: 'application/pdf' },
@@ -574,7 +575,9 @@ function renderStemsArea(s) {
       ${(uploaded.length + s.extra_stems.length) >= 2 ? `<a href="/admin/stam-synk.html?song=${encodeURIComponent(s.id)}" class="btn btn-outline btn-small">&#8644; Synka stämmorna</a>` : ''}
       ${(uploaded.length + s.extra_stems.length) >= 1 ? `<a href="/medlem/rostovning.html?song=${encodeURIComponent(s.id)}" class="btn btn-outline btn-small">&#127929; Tonkurvor</a>` : ''}
       ${(uploaded.length + s.extra_stems.length) >= 1 ? `<button type="button" class="btn-small zipStemsBtn" style="background: transparent; border: 1px solid var(--border); color: var(--text);">&#11015; Ladda ner alla (.zip)</button>` : ''}
+      <button type="button" class="btn btn-outline btn-small bgVidBtn" aria-expanded="false">&#127916; Bakgrundsvideo${s.bg_video_path ? ' ✓' : ''}</button>
     </div>
+    <div class="bgVidPanel" hidden style="margin-top: 0.6rem; padding: 0.8rem 1rem; border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(0,0,0,0.2);"></div>
     <audio class="stem-preview" id="preview-${s.id}" controls></audio>
   `;
 }
@@ -618,6 +621,20 @@ function wireStemsArea(s) {
   area.querySelectorAll('.dlStemBtn').forEach(btn => {
     btn.addEventListener('click', () => downloadStem(btn.dataset.path));
   });
+  // Bakgrundsvideo – gemensam panel (js/bg-video-admin.js), samma som i Textsynk och Röstövning
+  const bvBtn = area.querySelector('.bgVidBtn'), bvPanel = area.querySelector('.bgVidPanel');
+  if (bvBtn && bvPanel && window.BgVideoAdmin) {
+    let mounted = null;
+    bvBtn.addEventListener('click', () => {
+      bvPanel.hidden = !bvPanel.hidden;
+      bvBtn.setAttribute('aria-expanded', String(!bvPanel.hidden));
+      if (!bvPanel.hidden && !mounted) mounted = BgVideoAdmin.mount(bvPanel, {
+        client: supabaseClient, bucket: 'heavy-voices-stems', getSong: () => s,
+        onChange: (song, what) => { if (what === 'path') bvBtn.innerHTML = '&#127916; Bakgrundsvideo' + (song.bg_video_path ? ' ✓' : ''); },
+      });
+      else if (mounted) mounted.refresh();
+    });
+  }
   const zipBtn = area.querySelector('.zipStemsBtn');
   if (zipBtn) zipBtn.addEventListener('click', () => downloadAllStems(s, zipBtn));
 

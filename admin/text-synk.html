@@ -50,7 +50,12 @@
   #tapBtn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
   /* Karaoke-förhandsvisning */
-  .preview { text-align: center; padding: 0.8rem 0.5rem 0.2rem; min-height: 5.8rem; }
+  .preview { text-align: center; padding: 0.8rem 0.5rem 0.2rem; min-height: 5.8rem; position: relative; overflow: hidden; border-radius: 0.6rem; contain: paint; }
+  .preview > div { position: relative; z-index: 2; }
+  .preview .k-bg-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; pointer-events: none; transform: translateZ(0); }
+  .preview.has-bg-video::after { content: ''; position: absolute; inset: 0; background: rgba(8,10,14,0.62); z-index: 0; pointer-events: none; }
+  .preview.has-bg-video .p-cur, .preview.has-bg-video .p-prev, .preview.has-bg-video .p-next { text-shadow: 0 2px 8px rgba(0,0,0,0.85); }
+  #bgVidBtn[aria-expanded="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
   .preview div { transition: all 0.2s ease; line-height: 1.35; min-height: 1.35em; }
   .preview .p-prev, .preview .p-next { color: var(--text-muted); font-size: 0.95rem; opacity: 0.6; }
   .preview .p-cur { color: var(--accent); font-size: 1.35rem; font-weight: 700; font-family: 'Roboto Condensed', sans-serif; }
@@ -199,6 +204,11 @@
       <button type="button" class="btn-outline btn-small" id="copyCommonBtn" hidden title="Börja från den gemensamma synken och justera tiderna för stämman">Kopiera gemensam synk</button>
     </div>
     <p class="muted" id="voiceHint" style="margin: 0.4rem 0 0; display: none;"></p>
+    <div class="row-flex" id="bgVidRow" style="margin-top: 0.6rem; display: none;">
+      <button type="button" class="btn-outline btn-small" id="bgVidBtn" aria-expanded="false" aria-controls="bgVidPanel">&#127916; Bakgrundsvideo</button>
+      <span class="muted" style="font-size: 0.82rem;">Visas bakom förhandsvisningen nedan – justera förskjutningen medan låten spelar.</span>
+    </div>
+    <div id="bgVidPanel" hidden style="margin-top: 0.6rem; padding: 0.8rem 1rem; border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(0,0,0,0.2);"></div>
   </div>
 
   <details class="card static" id="textCard" style="display: none; margin-bottom: 1rem;">
@@ -368,6 +378,8 @@
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/note-io.js"></script>
+<script src="/js/bg-video.js"></script>
+<script src="/js/bg-video-admin.js"></script>
 <script>
 const STEM_BUCKET = 'heavy-voices-stems';
 const STEM_FIELDS = [
@@ -718,7 +730,33 @@ function updatePlaying() {
   if (li && !audio.paused && cursor >= rows.length) li.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
+// ---------- Bakgrundsvideo (gemensam med spelaren och Röstövning) ----------
+const kvPreview = window.BgVideo ? BgVideo.create($('preview'), { className: 'k-bg-video' }) : null;
+// valt spårs tid → låtens gemensamma tidslinje (stämsynkens förskjutning)
+function trackOffSec() {
+  if (!song) return 0;
+  const t = trackOptions().find(o => o.path === $('trackSelect').value);
+  return t ? (Number((song.stem_offsets || {})[t.key]) || 0) / 1000 : 0;
+}
+let bgVidAdmin = null;
+function setupBgVid() {
+  $('bgVidRow').style.display = song ? '' : 'none';
+  $('bgVidBtn').innerHTML = '&#127916; Bakgrundsvideo' + (song && song.bg_video_path ? ' ✓' : '');
+  if (kvPreview) kvPreview.setSong(song, supabaseClient, STEM_BUCKET);
+  if (bgVidAdmin) bgVidAdmin.refresh();
+}
+$('bgVidBtn').addEventListener('click', () => {
+  const p = $('bgVidPanel');
+  p.hidden = !p.hidden; $('bgVidBtn').setAttribute('aria-expanded', String(!p.hidden));
+  if (!p.hidden && !bgVidAdmin && window.BgVideoAdmin) bgVidAdmin = BgVideoAdmin.mount(p, {
+    client: supabaseClient, bucket: STEM_BUCKET, getSong: () => song,
+    onChange: (s, what) => { if (what === 'path') setupBgVid(); if (kvPreview) kvPreview.sync((audio.currentTime || 0) + trackOffSec(), !audio.paused); },
+  });
+  else if (bgVidAdmin) bgVidAdmin.refresh();
+});
+
 function tick() {
+  if (kvPreview) kvPreview.sync((audio.currentTime || 0) + trackOffSec(), !audio.paused);
   if (!isScrubbing) $('scrubber').value = audio.currentTime || 0;
   $('timeReadout').textContent = `${fmt(audio.currentTime || 0)} / ${fmt(audio.duration || 0, false)}`;
   updatePlaying();
@@ -1472,6 +1510,7 @@ async function loadSong(id) {
   resetEditorState();
   if (!id) {
     song = null;
+    setupBgVid();
     $('editor').style.display = 'none';
     $('textCard').style.display = 'none';
     $('voiceRow').style.display = 'none';
@@ -1489,6 +1528,7 @@ async function loadSong(id) {
     return;
   }
   song = data;
+  setupBgVid();
   if (!song.lyrics_lrc_voices) song.lyrics_lrc_voices = {};
   if (!song.lyrics_plain_voices) song.lyrics_plain_voices = {};
   const urlVoice = new URLSearchParams(location.search).get('voice') || '';

@@ -386,28 +386,7 @@
       <button type="button" class="btn-outline" id="editToggle">✎ Redigera noter</button>
       <button type="button" class="btn-outline" id="copyAnalysisBtn" title="Lägg samma noter på andra stämmor">⎘ Kopiera analys till andra stämmor</button>
       <button type="button" class="btn-outline toggle-btn" id="vidBtn" aria-expanded="false" aria-controls="vidPanel" title="Lägg en egen videofil bakom notbanan för den här låten">🎬 Bakgrundsvideo</button>
-      <div class="copy-panel vid-panel" id="vidPanel" hidden>
-        <b>Bakgrundsvideo för låten</b>
-        <small class="xfer-note">En egen videofil (t.ex. en inspelning från en konsert eller ett rep) som visas nedtonad bakom notbanan och följer med uppspelningen – för alla stämmor och alla medlemmar. Videons eget ljud spelas inte; ljudet kommer från stämfilerna. Håll filen liten (helst under 50 MB, t.ex. 720p).</small>
-        <div class="vid-row">
-          <button type="button" class="btn-outline" id="vidPick">📂 Välj videofil…</button>
-          <input type="file" id="vidFile" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v" hidden>
-          <span class="edit-status" id="vidName"></span>
-          <button type="button" class="btn-outline" id="vidRemove" hidden>🗑 Ta bort videon</button>
-        </div>
-        <div class="vid-row" id="vidOffsetRow" hidden>
-          Förskjutning
-          <button type="button" class="btn-outline" data-vd="-1">−1 s</button>
-          <button type="button" class="btn-outline" data-vd="-0.1">−0,1</button>
-          <input type="number" id="vidOffset" step="0.05" value="0"> s
-          <button type="button" class="btn-outline" data-vd="0.1">+0,1</button>
-          <button type="button" class="btn-outline" data-vd="1">+1 s</button>
-          <button type="button" id="vidSaveOffset">Spara</button>
-        </div>
-        <label class="vid-row" id="vidLoopRow" hidden style="margin:0; cursor:pointer;"><input type="checkbox" id="vidLoop" style="width:auto; margin:0; accent-color: var(--accent);"> 🔁 Loopa videon – börjar om från början när den tar slut (bra för korta klipp)</label>
-        <small class="xfer-note" id="vidOffsetHelp" hidden>Spela låten och justera tills bild och ljud stämmer. Positivt värde = videon ligger längre fram (hoppar över videons början).</small>
-        <span class="edit-status" id="vidStatus"></span>
-      </div>
+      <div class="copy-panel" id="vidPanel" hidden></div>
       <button type="button" class="btn-outline toggle-btn" id="xferBtn" aria-expanded="false" aria-controls="xferPanel" title="Spara noterna som fil eller i biblioteket, eller hämta in noter">⇅ Exportera / importera noter</button>
       <div class="copy-panel" id="xferPanel" hidden>
         <div class="xfer-cols">
@@ -568,6 +547,7 @@
 <script src="/js/pitch-analyze.js"></script>
 <script src="/js/note-io.js"></script>
 <script src="/js/bg-video.js"></script>
+<script src="/js/bg-video-admin.js"></script>
 <script>
 const STEMS_BUCKET = 'heavy-voices-stems';
 const FIXED_STEMS = [
@@ -1142,70 +1122,16 @@ function syncBgVideo(p) {
 window.addEventListener('resize', placeBgVideo);
 document.getElementById('optVideo')?.addEventListener('change', () => setupBgVideo());
 
-// admin: ladda upp / justera / ta bort
-function renderVidPanel() {
-  const has = !!(song && song.bg_video_path);
-  document.getElementById('vidName').textContent = has ? '✓ ' + decodeURIComponent(song.bg_video_path.split('/').pop().replace(/^video__/, '')) : 'Ingen video vald';
-  document.getElementById('vidRemove').hidden = !has;
-  document.getElementById('vidOffsetRow').hidden = !has;
-  document.getElementById('vidOffsetHelp').hidden = !has;
-  document.getElementById('vidOffset').value = Number(song && song.bg_video_offset) || 0;
-  document.getElementById('vidLoopRow').hidden = !has;
-  document.getElementById('vidLoop').checked = !!(song && song.bg_video_loop);
-}
-document.getElementById('vidLoop')?.addEventListener('change', async (e) => {
-  if (!song) return;
-  song.bg_video_loop = e.target.checked;
-  syncBgVideo(position());
-  const { error } = await supabaseClient.from('songs').update({ bg_video_loop: song.bg_video_loop }).eq('id', song.id);
-  document.getElementById('vidStatus').textContent = error ? 'Kunde inte spara: ' + error.message : (song.bg_video_loop ? 'Videon loopar ✓' : 'Videon spelas en gång ✓');
-});
+// admin: ladda upp / justera / ta bort – gemensam panel (js/bg-video-admin.js)
+const vidAdmin = window.BgVideoAdmin ? BgVideoAdmin.mount(document.getElementById('vidPanel'), {
+  client: supabaseClient, bucket: STEMS_BUCKET, getSong: () => song,
+  onChange: (s, what) => { if (what === 'path') { document.getElementById('optVideo').checked = true; setupBgVideo(); } syncBgVideo._lc = 0; syncBgVideo(position()); },
+}) : null;
+function renderVidPanel() { if (vidAdmin) vidAdmin.refresh(); }
 document.getElementById('vidBtn')?.addEventListener('click', () => {
   const p = document.getElementById('vidPanel'), b = document.getElementById('vidBtn');
   p.hidden = !p.hidden; b.setAttribute('aria-expanded', String(!p.hidden));
   if (!p.hidden) renderVidPanel();
-});
-document.getElementById('vidPick')?.addEventListener('click', () => document.getElementById('vidFile').click());
-document.getElementById('vidFile')?.addEventListener('change', async (e) => {
-  const f = e.target.files[0]; e.target.value = '';
-  if (!f || !song) return;
-  const st = document.getElementById('vidStatus');
-  if (f.size > 50 * 1024 * 1024 && !confirm(`Filen är ${Math.round(f.size / 1048576)} MB. Stora filer tar lång tid att ladda för medlemmarna (och kan stoppas av lagringsgränsen). Ladda upp ändå?`)) return;
-  const clean = f.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.\-]+/g, '_');
-  const path = `${song.id}/video__${clean}`;
-  st.textContent = `Laddar upp ${f.name} (${Math.round(f.size / 1048576)} MB)…`;
-  const { error } = await supabaseClient.storage.from(STEMS_BUCKET).upload(path, f, { upsert: true, contentType: f.type || 'video/mp4' });
-  if (error) { st.textContent = 'Kunde inte ladda upp: ' + error.message; return; }
-  const old = song.bg_video_path;
-  const { error: e2 } = await supabaseClient.from('songs').update({ bg_video_path: path }).eq('id', song.id);
-  if (e2) { st.textContent = 'Kunde inte spara: ' + e2.message; return; }
-  if (old && old !== path) supabaseClient.storage.from(STEMS_BUCKET).remove([old]);
-  song.bg_video_path = path;
-  st.textContent = 'Videon uppladdad ✓ – spela låten och justera förskjutningen vid behov';
-  document.getElementById('optVideo').checked = true;
-  renderVidPanel(); setupBgVideo();
-});
-document.getElementById('vidRemove')?.addEventListener('click', async () => {
-  if (!song || !song.bg_video_path || !confirm('Ta bort bakgrundsvideon för den här låten?')) return;
-  const path = song.bg_video_path;
-  const { error } = await supabaseClient.from('songs').update({ bg_video_path: null, bg_video_offset: 0 }).eq('id', song.id);
-  if (error) { document.getElementById('vidStatus').textContent = 'Kunde inte ta bort: ' + error.message; return; }
-  supabaseClient.storage.from(STEMS_BUCKET).remove([path]);
-  song.bg_video_path = null; song.bg_video_offset = 0;
-  document.getElementById('vidStatus').textContent = 'Videon borttagen';
-  renderVidPanel(); setupBgVideo();
-});
-function setVidOffset(v) {
-  song.bg_video_offset = Math.round(v * 100) / 100;
-  document.getElementById('vidOffset').value = song.bg_video_offset;
-  document.getElementById('vidStatus').textContent = 'Inte sparat';
-  syncBgVideo(position());
-}
-document.querySelectorAll('[data-vd]').forEach(b => b.addEventListener('click', () => setVidOffset((Number(song.bg_video_offset) || 0) + Number(b.dataset.vd))));
-document.getElementById('vidOffset')?.addEventListener('change', e => setVidOffset(Number(e.target.value) || 0));
-document.getElementById('vidSaveOffset')?.addEventListener('click', async () => {
-  const { error } = await supabaseClient.from('songs').update({ bg_video_offset: Number(song.bg_video_offset) || 0 }).eq('id', song.id);
-  document.getElementById('vidStatus').textContent = error ? 'Kunde inte spara: ' + error.message : 'Förskjutningen sparad ✓';
 });
 
 // ---------- slå ihop noter per textrad (färre småklipp) ----------

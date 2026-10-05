@@ -90,7 +90,7 @@
       <li id="partyItem" hidden><a href="/medlem/party.html" class="nav-item">
         <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l5-14 9 9-14 5z"></path><path d="M14 4v2"></path><path d="M20 10h-2"></path><path d="M17.5 6.5l1.5-1.5"></path><path d="M10 10l4 4"></path></svg></span>
         <span class="nav-item-text">
-          <h3>Party Mode <span id="partyTag" class="badge" hidden>dold</span></h3>
+          <h3>Party Mode</h3>
           <p>Karaoke, sjung &amp; tävla och rockquiz</p>
         </span>
       </a></li>
@@ -141,9 +141,8 @@ document.getElementById('logoutBtn').addEventListener('click', signOut);
 async function showParty(member) {
   const { data } = await supabaseClient.from('party_settings').select('members_enabled').eq('id', 1).maybeSingle();
   const open = !!(data && data.members_enabled);
-  if (member.role !== 'admin' && !open) return;
+  if (member.role === 'admin' || !open) return;   // admin når Party Mode via 10 tryck på rollskylten
   document.getElementById('partyItem').hidden = false;
-  document.getElementById('partyTag').hidden = open;
 }
 
 // ---------- Närvarocheck ----------
@@ -205,6 +204,19 @@ async function loadCheckin(member) {
   });
   document.getElementById('checkinCard').hidden = false;
 }
+
+// Dold ingång till Party Mode: tryck 10 gånger på rollskylten (högst 2 s mellan trycken)
+(function () {
+  const b = document.getElementById('roleBadge'); if (!b) return;
+  let n = 0, t = null;
+  b.style.cursor = 'default'; b.style.userSelect = 'none'; b.style.webkitUserSelect = 'none'; b.style.transition = 'transform 0.12s';
+  b.addEventListener('click', () => {
+    clearTimeout(t); t = setTimeout(() => { n = 0; }, 2000);
+    n++;
+    if (n >= 6) { b.style.transform = `scale(${1 + (n - 5) * 0.06})`; setTimeout(() => { b.style.transform = ''; }, 120); }
+    if (n >= 10) { n = 0; location.href = '/medlem/party.html'; }
+  });
+})();
 </script>
 
 </body>

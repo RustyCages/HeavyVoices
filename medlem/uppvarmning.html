@@ -24,6 +24,10 @@
   .player button.poster::after { content: '▶'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 3.4rem; height: 3.4rem; border-radius: 50%; background: rgba(229,169,104,0.92); color: #111317; display: grid; place-items: center; font-size: 1.3rem; padding-left: 0.2rem; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
   .player button.poster:hover::after, .player button.poster:focus-visible::after { background: var(--accent-hover); }
   .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .vid.playing { grid-column: 1 / -1; border-color: rgba(229,169,104,0.5); }
+  .play-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.6rem 0.9rem 0; }
+  .play-bar button { padding: 0.55rem 1.1rem; font-size: 0.95rem; }
+  .player:fullscreen, .player:-webkit-full-screen { aspect-ratio: auto; width: 100%; height: 100%; }
   .meta { padding: 0.75rem 0.9rem 0.85rem; display: grid; gap: 0.3rem; align-content: start; }
   .meta h3 { margin: 0; font-size: 1rem; line-height: 1.3; }
   .meta p { margin: 0; font-size: 0.84rem; color: var(--text-muted); white-space: pre-wrap; }
@@ -186,20 +190,42 @@ function card(v, items) {
 }
 
 // YouTube laddas först när man trycker play (inga kakor/spårning innan dess)
-function play(btn) {
-  document.querySelectorAll('.player iframe').forEach(f => {   // stoppa andra videor
-    const p = f.parentElement; const id = f.dataset.yt;
+function stopAll() {
+  document.querySelectorAll('.vid.playing').forEach(card => {
+    card.classList.remove('playing');
+    const p = card.querySelector('.player'), f = p.querySelector('iframe');
+    if (!f) return;
+    const id = f.dataset.yt;
     p.innerHTML = `<button type="button" class="poster" data-yt="${id}" data-start="${f.dataset.start}" style="background-image:url('https://i.ytimg.com/vi/${id}/hqdefault.jpg')"></button>`;
     p.querySelector('button').addEventListener('click', e => play(e.currentTarget));
+    card.querySelector('.play-bar')?.remove();
   });
+}
+function play(btn) {
+  stopAll();   // bara en video åt gången
+  const card = btn.closest('.vid');
   const id = btn.dataset.yt, start = +btn.dataset.start || 0;
   const f = document.createElement('iframe');
-  f.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1${start ? '&start=' + start : ''}`;
-  f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+  f.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1&fs=1${start ? '&start=' + start : ''}`;
+  f.allow = 'autoplay; encrypted-media; fullscreen';
   f.allowFullscreen = true;
   f.title = 'YouTube-video';
   f.dataset.yt = id; f.dataset.start = start;
   btn.parentElement.replaceChildren(f);
+  // spelande video blir stor (hela raden) och får egna, tydliga knappar
+  card.classList.add('playing');
+  const bar = document.createElement('div');
+  bar.className = 'play-bar';
+  bar.innerHTML = `<button type="button" class="full">⛶ Helskärm</button><button type="button" class="btn-outline stop">✕ Stäng videon</button>`;
+  card.querySelector('.player').after(bar);
+  bar.querySelector('.full').addEventListener('click', () => {
+    const el = card.querySelector('.player');
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req) req.call(el).catch?.(() => {});
+    else if (f.webkitEnterFullscreen) f.webkitEnterFullscreen();
+  });
+  bar.querySelector('.stop').addEventListener('click', stopAll);
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // ---------- admin ----------

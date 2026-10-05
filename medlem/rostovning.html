@@ -39,7 +39,7 @@
   .karaoke { contain: paint; }
   .karaoke .k-bg-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; pointer-events: none; transform: translateZ(0); }
   .karaoke.has-bg-video::after { content: ''; position: absolute; inset: 0; background: rgba(8,10,14,0.62); z-index: 0; pointer-events: none; }
-  .karaoke.has-bg-video::before { content: ''; position: absolute; inset: 8% 0; background: url('/icons/logo.png') center / contain no-repeat; background-image: image-set(url('/icons/logo.webp') type('image/webp'), url('/icons/logo.png') type('image/png')); opacity: 0.16; z-index: 1; pointer-events: none; }
+  .karaoke::before { content: ''; position: absolute; inset: 8% 0; background: url('/icons/logo.png') center / contain no-repeat; background-image: image-set(url('/icons/logo.webp') type('image/webp'), url('/icons/logo.png') type('image/png')); opacity: 0.16; z-index: 1; pointer-events: none; }
   .karaoke.has-bg-video .k-now, .karaoke.has-bg-video .k-next { text-shadow: 0 2px 8px rgba(0,0,0,0.85); }
   .canvas-wrap { position: relative; border: 1px solid var(--border); border-radius: 0.6rem; overflow: hidden; background: rgba(0,0,0,0.25); touch-action: none; }
   #overview { display: block; width: 100%; height: 56px; cursor: pointer; border-bottom: 1px solid var(--border); }

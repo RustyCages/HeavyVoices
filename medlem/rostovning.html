@@ -106,6 +106,12 @@
   .toggle-btn::after { content: '▸'; display: inline-block; margin-left: 0.45rem; transition: transform 0.15s ease; }
   .toggle-btn[aria-expanded="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
   .toggle-btn[aria-expanded="true"]::after { transform: rotate(90deg); }
+  .harm-panel { margin-top: 0.5rem; }
+  .harm-grid { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
+  .harm-grid label { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-size: 0.85rem; }
+  .harm-grid select { width: auto; margin: 0; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+  .harm-copy { display: grid; gap: 0.45rem; font-size: 0.82rem; color: var(--text-muted); padding-top: 0.5rem; border-top: 1px solid var(--border); }
+  .harm-copy b { color: var(--text); }
   .us-search { display: grid; gap: 0.45rem; padding: 0.6rem 0.7rem; border: 1px solid var(--border); border-radius: 0.6rem; }
   .us-form { display: flex; flex-wrap: wrap; gap: 0.4rem; }
   .us-form input { flex: 1 1 8rem; min-width: 0; margin: 0; padding: 0.35rem 0.5rem; }
@@ -422,8 +428,39 @@
         <button type="button" class="btn-outline" data-op="selall" title="Markera alla noter (Ctrl+A)">▦ Markera alla</button>
         <button type="button" class="btn-outline" data-op="copy" title="Kopiera markerade noter (Ctrl+C)">⎘ Kopiera</button>
         <button type="button" class="btn-outline" data-op="paste" title="Klistra in vid spelhuvudet (Ctrl+V)">📋 Klistra in</button>
+        <button type="button" class="btn-outline toggle-btn" id="harmBtn" aria-expanded="false" aria-controls="harmPanel" title="Flytta markerade noter i tonarten, rätta till tonarten eller skapa en harmonistämma">🎼 Tonart &amp; harmoni</button>
         <button type="button" data-op="save">💾 Spara noter</button>
         <span class="edit-status" id="editStatus"></span>
+      </div>
+      <div class="copy-panel harm-panel" id="harmPanel" hidden>
+        <div class="harm-grid">
+          <label>Tonart <select id="harmKey"></select></label>
+          <label>Intervall <select id="harmStep">
+            <option value="-7">Oktav ner</option>
+            <option value="-5">Sext ner</option>
+            <option value="-4">Kvint ner</option>
+            <option value="-3">Kvart ner</option>
+            <option value="-2">Ters ner</option>
+            <option value="-1">Sekund ner</option>
+            <option value="1">Sekund upp</option>
+            <option value="2" selected>Ters upp</option>
+            <option value="3">Kvart upp</option>
+            <option value="4">Kvint upp</option>
+            <option value="5">Sext upp</option>
+            <option value="6">Septim upp</option>
+            <option value="7">Oktav upp</option>
+          </select></label>
+        </div>
+        <small class="xfer-note" id="harmInfo">Markera noter (Shift+dra över ett område, eller ▦ Markera alla). Intervallen räknas i tonarten, så en ters blir stor eller liten beroende på var i skalan noten ligger – som när man sjunger stämmor.</small>
+        <div class="edit-tools">
+          <button type="button" id="harmMove" title="Flytta de markerade noterna med valt intervall">↕ Flytta markerade</button>
+          <button type="button" class="btn-outline" id="harmSnap" title="Flytta toner som ligger utanför tonarten till närmaste ton i skalan">♮ Rätta till tonarten</button>
+        </div>
+        <div class="harm-copy">
+          <div><b>Skapa harmonistämma:</b> en kopia av de markerade noterna med valt intervall läggs i en annan stämma. Den stämmans noter i samma tidsavsnitt ersätts.</div>
+          <div class="chips" id="harmTargets"></div>
+          <div class="edit-tools"><button type="button" class="btn-outline" id="harmCopy">⎘ Lägg i vald stämma</button><span class="edit-status" id="harmStatus"></span></div>
+        </div>
       </div>
       <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av), och noter som ligger kant i kant, och noter över/under i tonhöjd som delar samma kant, <b>följer med</b> när du drar ut en kant. <b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter; <b>Ctrl+C / Ctrl+V</b> kopierar och klistrar in vid spelhuvudet (praktiskt för upprepade refränger). Shift+↑↓ flyttar en oktav. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. <b>Mellanslag</b> spelar/pausar, dra i tom yta för att spola. Medlemmarna får de sparade noterna precis som de är.</p>
     </div>
@@ -987,6 +1024,7 @@ function drawRoll() {
 }
 
 function tick() {
+  if (editMode && !document.getElementById('harmPanel').hidden) harmInfo();
   const d = durationOf();
   let p = position();
   if (playing && p >= d) { stop(); flushSession(); pausedPos = 0; p = 0; }
@@ -1090,6 +1128,7 @@ function setEditMode(on) {
   document.getElementById('editToggle').classList.toggle('on', on);
   document.getElementById('editToggle').textContent = on ? '✓ Klar med redigering' : '✎ Redigera noter';
   document.getElementById('editTools').hidden = !on;
+  if (!on) { const hp = document.getElementById('harmPanel'); if (hp) { hp.hidden = true; document.getElementById('harmBtn').setAttribute('aria-expanded', 'false'); } }
   document.getElementById('editHelp').hidden = !on;
   document.getElementById('roll').classList.toggle('editing', on);
   editStatus();
@@ -1808,6 +1847,109 @@ document.getElementById('overview').addEventListener('click', e => {
 document.getElementById('editToggle')?.addEventListener('click', () => setEditMode(!editMode));
 // Kopiera noterna (analysen) från den visade stämman till andra stämmor, med valfri transponering.
 // Tiderna räknas om med stämsynkens förskjutningar så att noterna hamnar rätt i respektive ljudfil.
+// ---------- admin: tonart & harmoni ----------
+const KEY_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'H'];
+const SCALE = { dur: [0, 2, 4, 5, 7, 9, 11], moll: [0, 2, 3, 5, 7, 8, 10] };
+function harmKey() {
+  const v = document.getElementById('harmKey').value;
+  if (v === 'auto') {
+    const k = (current.pitch && current.pitch.key) || PitchAnalyze.detectKey(eNotes());
+    return k ? { tonic: k.tonic, minor: !!k.minor } : { tonic: 0, minor: false };
+  }
+  const [t, m] = v.split(':'); return { tonic: +t, minor: m === 'moll' };
+}
+// flytta en ton 'steps' skalsteg i tonarten (toner utanför skalan behåller sin förhöjning)
+function diatonicShift(n, key, steps) {
+  const sc = SCALE[key.minor ? 'moll' : 'dur'];
+  const rel = Math.round(n) - key.tonic, oct = Math.floor(rel / 12), pc = rel - oct * 12;
+  let idx = 0; for (let i = 0; i < 7; i++) if (sc[i] <= pc) idx = i;
+  const chrom = pc - sc[idx], tot = idx + steps;
+  return key.tonic + 12 * (oct + Math.floor(tot / 7)) + sc[((tot % 7) + 7) % 7] + chrom;
+}
+function snapToKey(n, key) {
+  const sc = SCALE[key.minor ? 'moll' : 'dur'].map(x => (x + key.tonic) % 12);
+  if (sc.includes(((n % 12) + 12) % 12)) return n;
+  return sc.includes(((n - 1) % 12 + 12) % 12) ? n - 1 : n + 1;   // vid lika avstånd: nedåt
+}
+function harmSelection() {
+  const ns = eNotes();
+  if (multi.size) return [...multi].sort((a, b) => a.t - b.t);
+  if (sel >= 0 && ns[sel]) return [ns[sel]];
+  return [];
+}
+function renderHarmPanel() {
+  const ks = document.getElementById('harmKey');
+  const det = (current.pitch && current.pitch.key) || PitchAnalyze.detectKey(eNotes());
+  const keep = ks.value;
+  ks.innerHTML = `<option value="auto">Auto${det ? ' – ' + esc(det.name) : ''}</option>` +
+    ['dur', 'moll'].map(m => KEY_NAMES.map((nmK, i) => `<option value="${i}:${m}">${nmK}-${m}</option>`).join('')).join('');
+  if (keep) ks.value = keep;
+  const others = stems.filter(st => st !== current && st.key !== 'stem_backtrack_path');
+  document.getElementById('harmTargets').innerHTML = others.length ? others.map((st, i) =>
+    `<label><input type="radio" name="harmTarget" value="${esc(st.key)}" ${i === 0 ? 'checked' : ''}> ${esc(st.label)}</label>`).join('')
+    : '<span class="xfer-note">Låten har inga andra sångstämmor.</span>';
+  document.getElementById('harmCopy').disabled = !others.length;
+  harmInfo();
+}
+function harmInfo() {
+  const n = harmSelection().length;
+  document.getElementById('harmInfo').textContent = n
+    ? `${n} not${n === 1 ? '' : 'er'} markerad${n === 1 ? '' : 'e'}. Intervallen räknas i tonarten, så en ters blir stor eller liten beroende på var i skalan noten ligger – som när man sjunger stämmor.`
+    : 'Markera noter först: Shift+dra över ett område, Shift+klick, eller ▦ Markera alla.';
+}
+document.getElementById('harmBtn')?.addEventListener('click', () => {
+  const p = document.getElementById('harmPanel'), b = document.getElementById('harmBtn');
+  p.hidden = !p.hidden; b.setAttribute('aria-expanded', String(!p.hidden));
+  if (!p.hidden) renderHarmPanel();
+});
+document.getElementById('harmMove')?.addEventListener('click', () => {
+  const src = harmSelection(); if (!src.length) { harmInfo(); toast('Markera noter först'); return; }
+  const key = harmKey(), steps = +document.getElementById('harmStep').value;
+  snapshot();
+  src.forEach(x => { x.n = diatonicShift(x.n, key, steps); });
+  afterEdit(src[0]); multi = new Set(src); tick();
+  editStatus(`${src.length} noter flyttade ${document.getElementById('harmStep').selectedOptions[0].text.toLowerCase()} i ${KEY_NAMES[key.tonic]}-${key.minor ? 'moll' : 'dur'}`);
+});
+document.getElementById('harmSnap')?.addEventListener('click', () => {
+  let src = harmSelection();
+  if (!src.length) { if (!confirm('Inga noter markerade – rätta till tonarten för alla noter?')) return; src = eNotes().slice(); }
+  const key = harmKey();
+  snapshot();
+  let ch = 0; src.forEach(x => { const m = snapToKey(x.n, key); if (m !== x.n) { x.n = m; ch++; } });
+  afterEdit(src[0]); multi = new Set(src); tick();
+  editStatus(ch ? `${ch} not${ch === 1 ? '' : 'er'} flyttade in i ${KEY_NAMES[key.tonic]}-${key.minor ? 'moll' : 'dur'}` : 'Alla markerade noter ligger redan i tonarten');
+});
+document.getElementById('harmCopy')?.addEventListener('click', async () => {
+  const src = harmSelection(); if (!src.length) { harmInfo(); toast('Markera noter först'); return; }
+  const tk = (document.querySelector('input[name=harmTarget]:checked') || {}).value;
+  const tg = stems.find(st => st.key === tk); if (!tg) return;
+  const key = harmKey(), steps = +document.getElementById('harmStep').value;
+  const offs = song.stem_offsets || {};
+  const dT = ((Number(offs[current.key]) || 0) - (Number(offs[tg.key]) || 0)) / 1000;   // denna fil → målfilen
+  const harm = src.map(x => ({ t: Math.round((x.t + dT) * 100) / 100, d: x.d, n: diatonicShift(x.n, key, steps) })).filter(x => x.t >= 0);
+  if (!harm.length) return;
+  const a = harm[0].t, b = Math.max(...harm.map(x => x.t + x.d));
+  const base = tg.pitch ? tg.pitch.notes.map(x => ({ t: x.t, d: x.d, n: x.n })) : [];
+  const kept = base.filter(x => { const m = x.t + x.d / 2; return m < a || m > b; });
+  const replaced = base.length - kept.length;
+  if (!confirm(`Lägga ${harm.length} noter (${document.getElementById('harmStep').selectedOptions[0].text.toLowerCase()}) i ${tg.label}?` + (replaced ? `\n${replaced} befintliga noter i samma avsnitt ersätts.` : '') + '\n\nSparas direkt – medlemmarna ser det i den stämman.')) return;
+  const notes = kept.concat(harm).sort((p, q) => p.t - q.t);
+  const now = new Date().toISOString(), r = current.raw || {};
+  let data;
+  if (tg.raw) data = { ...tg.raw, edited_notes: notes, edited_at: now };
+  else {
+    const k = r.hop ? Math.round(dT / r.hop) : 0, mid = r.midi || [];
+    data = { ...r, edited_notes: notes, edited_at: now, created_at: now, midi: mid.map((_, i) => mid[i - k] || 0) };
+  }
+  const st = document.getElementById('harmStatus'); st.textContent = 'Sparar…';
+  const { error } = await supabaseClient.from('song_pitch').upsert({ song_id: song.id, stem_key: tg.key, stem_path: tg.path, data, updated_at: now });
+  if (error) { st.textContent = 'Kunde inte spara: ' + error.message; return; }
+  tg.raw = data; tg.pitchBase = tg.pitch = prepPitch(data); tg._rr = null; tg.pitchPath = tg.path; tg.pitchAt = now;
+  st.textContent = `✓ ${harm.length} noter lagda i ${tg.label}`;
+  renderRows();
+  toast(`Harmonistämma sparad i ${tg.label} – tryck Välj på ${tg.label} för att se och lyssna`, 5000);
+});
+
 // ---------- admin: exportera / importera noter ----------
 const xStatus = (m) => { document.getElementById('xStatus').textContent = m || ''; };
 function fileBase() {

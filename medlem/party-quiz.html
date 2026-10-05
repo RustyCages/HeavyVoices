@@ -61,6 +61,7 @@
   .q-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 1.2rem; }
   .q-actions button { font-size: 1.05rem; padding: 0.75rem 1.4rem; }
   .fact { margin-top: 1rem; color: var(--text-muted); }
+  .credit { margin-top: 2rem; font-size: 0.75rem; color: var(--text-muted); opacity: 0.7; }
 
   /* resultat */
   .podium { display: grid; gap: 0.6rem; max-width: 560px; margin: 1rem 0 1.5rem; }
@@ -83,7 +84,8 @@
       <div class="q-box">
         <h3>Omgångar</h3>
         <div class="round-pick">
-          <label><input type="checkbox" name="round" value="rock" checked><span><b>🎸 Rockfrågor</b><small>Klassisk rock- och metalltrivia.</small></span></label>
+          <label><input type="checkbox" name="round" value="rock" checked><span><b>🎸 Rockfrågor</b><small>Klassisk rock- och metalltrivia på svenska (42 frågor).</small></span></label>
+          <label><input type="checkbox" name="round" value="online" checked><span><b>🌍 Rockfrågor online</b><small>Nya slumpade rockfrågor varje gång, på engelska. Hämtas från the-trivia-api.com.</small></span></label>
           <label id="rGuess"><input type="checkbox" name="round" value="guess" checked><span><b>🎧 Gissa låten</b><small>Ett klipp ur vår repertoar spelas – vilken låt är det?</small></span></label>
           <label id="rLine"><input type="checkbox" name="round" value="line" checked><span><b>📝 Fortsätt raden</b><small>En textrad ur våra låtar – hur fortsätter den?</small></span></label>
         </div>
@@ -125,6 +127,7 @@
       <button type="button" id="revealBtn">👀 Visa svaret</button>
       <button type="button" id="nextBtn" hidden>Nästa →</button>
     </div>
+    <p class="credit" id="credit" hidden>Frågor märkta 🌍 kommer från <a href="https://the-trivia-api.com" target="_blank" rel="noopener">The Trivia API</a> (CC BY-NC 4.0).</p>
   </section>
 
   <!-- resultat -->
@@ -241,14 +244,45 @@ function makeLine(n) {
   }
   return out;
 }
-function buildQuiz() {
+// ---------- rockfrågor online (The Trivia API, tagg rock_music) ----------
+// Redan visade frågor sparas i webbläsaren så att samma fråga inte kommer igen i första taget.
+const SEEN_KEY = 'hv-quiz-seen';
+function getSeen() { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '[]'); } catch (e) { return []; } }
+function addSeen(ids) { try { const all = getSeen().concat(ids); localStorage.setItem(SEEN_KEY, JSON.stringify(all.slice(-1500))); } catch (e) {} }
+const decodeHtml = t => { const el = document.createElement('textarea'); el.innerHTML = String(t ?? ''); return el.value; };
+async function fetchOnline(n) {
+  const seen = new Set(getSeen());
+  const out = [], got = new Set();
+  for (let attempt = 0; attempt < 3 && out.length < n; attempt++) {
+    const res = await fetch('https://the-trivia-api.com/v2/questions?limit=50&tags=rock_music', { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const items = await res.json();
+    (Array.isArray(items) ? items : (items.items || [])).forEach(it => {
+      if (!it || got.has(it.id) || out.length >= n) return;
+      if (attempt < 2 && seen.has(it.id)) return;          // sista försöket: ta även redan visade
+      const text = decodeHtml(typeof it.question === 'object' ? it.question.text : it.question);
+      const correct = decodeHtml(it.correctAnswer), wrong = (it.incorrectAnswers || []).map(decodeHtml);
+      if (!text || !correct || wrong.length < 1) return;
+      got.add(it.id);
+      out.push({ kind: 'online', id: it.id, label: '🌍 Rockfrågor online', text, correct, options: shuffle([correct, ...wrong.slice(0, 3)]) });
+    });
+  }
+  return out;
+}
+
+async function buildQuiz() {
   const rounds = [...document.querySelectorAll('input[name=round]:checked')].map(i => i.value);
   if (!rounds.length) { toast('Välj minst en omgång'); return null; }
   const per = Math.ceil(qCount / rounds.length);
   let qs = [];
-  rounds.forEach(r => { qs = qs.concat(r === 'rock' ? makeRock(per) : r === 'guess' ? makeGuess(Math.min(per, Math.max(3, songs.length * 2))) : makeLine(per)); });
+  for (const r of rounds) {
+    if (r === 'online') {
+      try { qs = qs.concat(await fetchOnline(per)); }
+      catch (e) { toast('Kunde inte hämta frågor online – kör med de inbyggda rockfrågorna i stället', 5000); }
+    } else qs = qs.concat(r === 'rock' ? makeRock(per) : r === 'guess' ? makeGuess(Math.min(per, Math.max(3, songs.length * 2))) : makeLine(per));
+  }
   // fyll på med rockfrågor om någon omgång gav för få
-  if (qs.length < qCount) qs = qs.concat(makeRock(qCount - qs.length).filter(q => !qs.some(x => x.text === q.text)));
+  if (qs.length < qCount) qs = qs.concat(makeRock(window.ROCK_QUESTIONS.length).filter(q => !qs.some(x => x.text === q.text)).slice(0, qCount - qs.length));
   // blanda men undvik två "Gissa låten" med samma låt i rad
   qs = shuffle(qs).slice(0, qCount);
   return qs;
@@ -368,10 +402,19 @@ function finish() {
   show('result');
   PartyFX.confetti(300, true);
 }
-function start() {
+let starting = false;
+async function start() {
+  if (starting) return;
   teams = teams.map((t, i) => (t || '').trim() || 'Lag ' + (i + 1));
-  const qs = buildQuiz();
+  starting = true;
+  const sb = document.getElementById('startBtn'), ab = document.getElementById('againBtn');
+  const labels = [sb.textContent, ab.textContent];
+  sb.textContent = ab.textContent = '⏳ Hämtar frågor…'; sb.disabled = ab.disabled = true;
+  let qs;
+  try { qs = await buildQuiz(); } finally { starting = false; sb.textContent = labels[0]; ab.textContent = labels[1]; sb.disabled = ab.disabled = false; }
   if (!qs) return;
+  addSeen(qs.filter(q => q.kind === 'online').map(q => q.id));
+  document.getElementById('credit').hidden = !qs.some(q => q.kind === 'online');
   if (!qs.length) { toast('Hittade inga frågor'); return; }
   PartyFX.unlockAudio();
   questions = qs; qi = 0; scores = teams.map(() => 0);

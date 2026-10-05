@@ -543,6 +543,15 @@ async function signed(path) {
 const offOf = st => (Number(((stSong && stSong.stem_offsets) || {})[st.key]) || 0) / 1000;
 const songTime = () => audio.currentTime + (stTrack ? offOf(stTrack) : 0);
 
+// Installerad som app låser manifestet skärmen i stående läge. För video/karaoke går vi i
+// helskärm och släpper låset, så att man kan vrida mobilen till liggande (Android/Chrome).
+function allowRotate(el) {
+  const app = matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches;
+  if (!app || !el.requestFullscreen) return;
+  const p = document.fullscreenElement ? Promise.resolve() : el.requestFullscreen({ navigationUI: 'hide' });
+  p.then(() => screen.orientation && screen.orientation.lock ? screen.orientation.lock('any') : null).catch(() => {});
+}
+function leaveRotate() { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }
 async function openStage(s) {
   if (!s) return;
   PartyFX.unlockAudio();
@@ -552,6 +561,7 @@ async function openStage(s) {
   comp.hidden = !pitchIds.has(String(s.id));
   comp.href = '/medlem/rostovning.html?party=1&song=' + encodeURIComponent(s.id);
   stage.hidden = false; document.body.style.overflow = 'hidden';
+  allowRotate(stage);
   lastIdx = -99; setLine('lNow', 'Laddar…'); setLine('lPrev', ''); setLine('lNext', ''); setLine('lNext2', '');
   bgv.setSong(s, supabaseClient, STEMS_BUCKET);
   await pickTrack(stTracks[0], 0);
@@ -678,8 +688,9 @@ function openYt(v) {
   f.allowFullscreen = true; f.title = v.title || 'YouTube-video';
   document.getElementById('ytpFrame').replaceChildren(f);
   document.getElementById('ytPlayer').hidden = false; document.body.style.overflow = 'hidden';
+  allowRotate(document.getElementById('ytPlayer'));
 }
-function closeYt() { document.getElementById('ytpFrame').replaceChildren(); document.getElementById('ytPlayer').hidden = true; document.body.style.overflow = ''; }
+function closeYt() { leaveRotate(); document.getElementById('ytpFrame').replaceChildren(); document.getElementById('ytPlayer').hidden = true; document.body.style.overflow = ''; }
 document.getElementById('ytpClose').addEventListener('click', closeYt);
 
 function ytCard(v, isFav) {

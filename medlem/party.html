@@ -372,12 +372,15 @@ function rampVol(a, to, ms) {
   };
   requestAnimationFrame(step);
 }
+// iPhone/iPad låter inte webbsidor ändra volymen – där kan musiken inte tonas ner,
+// så den spelas bara kort (under introt) och stängs sedan av.
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 function duckMusic(delay = 0) {
   clearTimeout(duckTimer);
-  duckTimer = setTimeout(() => rampVol(introMusic, MUSIC_BG, 2500), delay);
+  duckTimer = setTimeout(() => { if (IS_IOS) stopIntroMusic(); else rampVol(introMusic, MUSIC_BG, 2500); }, IS_IOS ? Math.min(delay, 1000) : delay);
 }
 function startIntroMusic(u) {
-  const a = new Audio(u); a.volume = MUSIC_FULL; a.loop = true; introMusic = a;
+  const a = new Audio(u); a.volume = MUSIC_FULL; a.loop = !IS_IOS; introMusic = a;
   const p = a.play();
   // är introt redan borta (musiken startade på tryckningen) – tona ner efter en stund
   p.then(() => { const el = document.getElementById('intro'); if (el.hidden || el.classList.contains('gone')) duckMusic(3000); }).catch(() => {});

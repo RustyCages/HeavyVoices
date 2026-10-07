@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<title>Tidslinjen — Party Mode</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/party.css">
+<style>html.gate body { visibility: hidden; }</style>
+<script>document.documentElement.classList.add('gate');</script>
+<style>
+  /* Tidslinjen: lyssna på låten och placera den rätt i tiden. Först till X kort vinner. */
+  .setup { display: grid; gap: 1.2rem; max-width: 760px; }
+  .box { padding: 1rem 1.1rem; border-radius: 0.9rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
+  .box h3 { margin: 0 0 0.6rem; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); }
+  .box p { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--text-muted); }
+  .teams { display: grid; gap: 0.5rem; }
+  .team-row { display: flex; gap: 0.5rem; align-items: center; }
+  .team-row input { margin: 0; }
+  .dot { width: 0.9rem; height: 0.9rem; border-radius: 50%; flex: none; display: inline-block; }
+  .seg { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
+  .seg button { background: rgba(255,255,255,0.06); color: #d1d5db; border: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
+  .start-btn { font-size: 1.25rem; padding: 0.9rem 2rem; border-radius: 0.8rem; justify-self: start; }
+
+  /* spel */
+  .score { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.6rem 0 1rem; }
+  .score span { display: inline-flex; gap: 0.45rem; align-items: center; padding: 0.35rem 0.85rem; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid var(--border); font-weight: 600; }
+  .score span.cur { border-color: var(--accent); background: rgba(229,169,104,0.15); }
+  .score b { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .turn { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(1.6rem, 5vw, 2.6rem); text-transform: uppercase; margin: 0.2rem 0 0.8rem; }
+  .player { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 1rem 1.1rem; border-radius: 1rem; background: linear-gradient(135deg, rgba(255,61,90,0.16), rgba(168,85,247,0.14)); border: 1px solid rgba(229,169,104,0.25); }
+  .mystery { width: 7.5rem; height: 9.5rem; border-radius: 0.8rem; flex: none; display: grid; place-items: center; text-align: center; padding: 0.6rem; font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 3rem; background: repeating-linear-gradient(45deg, #2a1f36, #2a1f36 10px, #241a2f 10px, #241a2f 20px); border: 2px dashed var(--accent); color: var(--accent); }
+  .mystery.open { font-size: 0.95rem; background: var(--accent); color: #111317; border: 2px solid var(--accent); animation: flip 0.5s ease both; }
+  .mystery.open .y { font-size: 2.2rem; line-height: 1; display: block; margin-bottom: 0.3rem; }
+  .mystery.open small { display: block; font-weight: 400; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; margin-top: 0.2rem; }
+  @keyframes flip { from { transform: rotateY(90deg); } to { transform: none; } }
+  .pctl { display: grid; gap: 0.5rem; flex: 1; min-width: 14rem; }
+  .pctl .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  .eq { display: inline-flex; gap: 3px; align-items: flex-end; height: 1.4rem; }
+  .eq i { width: 4px; background: var(--accent); border-radius: 2px; animation: eq 0.8s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-delay: -0.3s; } .eq i:nth-child(3) { animation-delay: -0.55s; } .eq i:nth-child(4) { animation-delay: -0.15s; }
+  .eq.paused i { animation-play-state: paused; }
+  @keyframes eq { 0%, 100% { height: 20%; } 50% { height: 100%; } }
+  .hint { font-size: 0.9rem; color: var(--text-muted); margin: 0; }
+  .verdict { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 1.6rem; text-transform: uppercase; }
+  .verdict.ok { color: #4ade80; } .verdict.bad { color: #f87171; }
+
+  .tl-wrap { margin-top: 1.2rem; overflow-x: auto; padding: 0.4rem 0 1rem; -webkit-overflow-scrolling: touch; }
+  .tl { display: flex; align-items: stretch; gap: 0; min-width: min-content; }
+  .card { width: 6.6rem; min-height: 8.2rem; flex: none; border-radius: 0.8rem; padding: 0.55rem; display: grid; align-content: start; gap: 0.25rem; background: rgba(255,255,255,0.07); border: 1px solid var(--border); text-align: center; }
+  .card .y { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 1.8rem; color: var(--accent); line-height: 1; }
+  .card .t { font-size: 0.78rem; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+  .card .a { font-size: 0.7rem; color: var(--text-muted); overflow-wrap: anywhere; }
+  .card.new { border-color: #4ade80; box-shadow: 0 0 18px rgba(74,222,128,0.4); animation: intro-pop 0.6s cubic-bezier(.2,1.6,.4,1) both; }
+  .slot { width: 2.6rem; flex: none; display: grid; place-items: center; padding: 0; margin: 0 0.25rem; border-radius: 0.7rem; background: transparent; border: 2px dashed rgba(229,169,104,0.35); color: var(--accent); font-size: 1.3rem; min-height: 8.2rem; }
+  .slot:hover { background: rgba(229,169,104,0.12); transform: none; box-shadow: none; color: var(--accent); }
+  .slot.sel { width: 5.2rem; background: rgba(229,169,104,0.25); border-style: solid; border-color: var(--accent); }
+  .slot.sel::after { content: '?'; font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 2rem; }
+  .slot.sel { font-size: 0; }
+  .slot.right { border-color: #4ade80; background: rgba(74,222,128,0.18); }
+  .tl.locked .slot { pointer-events: none; }
+  .tl.locked .slot:not(.sel):not(.right) { opacity: 0.25; }
+  .acts { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.4rem; }
+  .acts button { font-size: 1.05rem; padding: 0.75rem 1.4rem; }
+  .others { margin-top: 1.6rem; display: grid; gap: 0.8rem; }
+  .others h4 { margin: 0 0 0.3rem; font-size: 0.9rem; color: var(--text-muted); font-weight: 600; }
+  .mini { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+  .mini span { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 0.85rem; padding: 0.15rem 0.5rem; border-radius: 0.4rem; background: rgba(255,255,255,0.06); color: var(--accent); }
+  .loading { display: grid; justify-items: center; gap: 1rem; padding: 3rem 0; text-align: center; color: var(--text-muted); }
+  .spin { width: 2.6rem; height: 2.6rem; border-radius: 50%; border: 4px solid rgba(255,255,255,0.12); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .winner { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; text-transform: uppercase; font-size: clamp(2.2rem, 8vw, 4.5rem); line-height: 1; color: #fff; text-shadow: var(--party-glow); margin: 0.5rem 0 1rem; animation: intro-pop 0.8s cubic-bezier(.2,1.6,.4,1) both; }
+  .credit { margin-top: 2rem; font-size: 0.75rem; color: var(--text-muted); opacity: 0.7; }
+  #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 2100; display: none; max-width: calc(100vw - 3rem); }
+</style>
+</head>
+<body class="party-page">
+<header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+
+<div class="container">
+  <!-- inställningar -->
+  <section id="setup">
+    <a href="/medlem/party.html" class="back-btn">&larr; Party</a>
+    <h1 class="party-title">Tids<span class="hot">linjen</span></h1>
+    <p class="party-sub">Lyssna på låten och placera den rätt i din tidslinje – före, efter eller mellan låtarna du redan har. Rätt placering = kortet är ditt. Först till målet vinner!</p>
+    <div class="setup">
+      <div class="box">
+        <h3>Lag / spelare</h3>
+        <div class="teams" id="teams"></div>
+        <button type="button" class="btn-outline" id="addTeam" style="margin-top:0.6rem">+ Lägg till lag</button>
+        <p>Lagen turas om. Alla börjar med ett kort med årtal.</p>
+      </div>
+      <div class="box">
+        <h3>Antal kort för att vinna</h3>
+        <div class="seg" id="segGoal"><button type="button" data-v="5" aria-pressed="false">5</button><button type="button" data-v="8" aria-pressed="true">8</button><button type="button" data-v="10" aria-pressed="false">10</button></div>
+      </div>
+      <button type="button" class="start-btn" id="startBtn">🎵 Starta</button>
+    </div>
+  </section>
+
+  <!-- laddar -->
+  <section id="loading" hidden><div class="loading"><div class="spin"></div><p id="loadMsg">Hämtar låtar…</p></div></section>
+
+  <!-- spel -->
+  <section id="play" hidden>
+    <div class="party-top"><button type="button" class="btn-outline" id="quitBtn">✕ Avsluta</button><span class="hint" id="goalTxt"></span></div>
+    <div class="score" id="score"></div>
+    <div class="turn" id="turn"></div>
+    <div class="player">
+      <div class="mystery" id="mystery">?</div>
+      <div class="pctl">
+        <div class="row"><button type="button" id="playBtn">⏸ Pausa</button><span class="eq" id="eq"><i></i><i></i><i></i><i></i></span></div>
+        <p class="hint" id="instr">Tryck på <b>+</b> i tidslinjen där låten hör hemma.</p>
+        <div class="verdict" id="verdict" hidden></div>
+        <div class="acts">
+          <button type="button" id="lockBtn" disabled>🔒 Lås placering</button>
+          <button type="button" id="nextBtn" hidden>Nästa lag →</button>
+        </div>
+      </div>
+    </div>
+    <div class="tl-wrap"><div class="tl" id="tl"></div></div>
+    <div class="others" id="others"></div>
+    <p class="credit">Låtklipp från iTunes/Apple Music och Deezer, årtal från MusicBrainz.</p>
+  </section>
+
+  <!-- vinnare -->
+  <section id="result" hidden>
+    <a href="/medlem/party.html" class="back-btn">&larr; Party</a>
+    <div class="winner" id="winner"></div>
+    <div class="others" id="finalLines"></div>
+    <div class="acts" style="margin-top:1.4rem"><button type="button" id="againBtn">🔁 Spela igen</button></div>
+  </section>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/party.js"></script>
+<script src="/js/party-quiz-questions.js"></script>
+<script src="/js/party-music.js"></script>
+<script>
+const COLORS = ['#E5A968', '#ff3d5a', '#60a5fa', '#4ade80', '#c084fc', '#facc15'];
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function toast(msg, ms = 4000) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
+const show = id => ['setup', 'loading', 'play', 'result'].forEach(s => $(s).hidden = s !== id);
+const SEEN_KEY = 'hv-timeline-seen';
+const getSeen = () => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '[]'); } catch (e) { return []; } };
+const saveSeen = ids => { try { localStorage.setItem(SEEN_KEY, JSON.stringify(ids.slice(-800))); } catch (e) {} };
+
+let teamNames = ['Lag 1', 'Lag 2'], goal = 8;
+let teams = [], cur = 0, song = null, sel = -1, locked = false, feed = null;
+const audio = new Audio(); audio.preload = 'auto';
+
+// ---------- inställningar ----------
+function renderTeams() {
+  $('teams').innerHTML = teamNames.map((t, i) => `<div class="team-row"><span class="dot" style="background:${COLORS[i]}"></span>
+    <input type="text" value="${esc(t)}" data-i="${i}" maxlength="24" aria-label="Lag ${i + 1}">
+    ${teamNames.length > 1 ? `<button type="button" class="btn-outline" data-del="${i}" title="Ta bort">✕</button>` : ''}</div>`).join('');
+  $('teams').querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => teamNames[+inp.dataset.i] = inp.value));
+  $('teams').querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => { teamNames.splice(+b.dataset.del, 1); renderTeams(); }));
+  $('addTeam').hidden = teamNames.length >= 6;
+}
+$('addTeam').addEventListener('click', () => { teamNames.push('Lag ' + (teamNames.length + 1)); renderTeams(); });
+$('segGoal').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+  $('segGoal').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  goal = +b.dataset.v;
+}));
+
+// ---------- spelet ----------
+async function start() {
+  PartyFX.unlockAudio();
+  teamNames = teamNames.map((t, i) => (t || '').trim() || 'Lag ' + (i + 1));
+  if (!feed) feed = PartyMusic.createFeed({ seen: getSeen(), ahead: 3 });
+  show('loading');
+  $('loadMsg').textContent = 'Hämtar låtar och årtal…';
+  try {
+    // startkort: ett per lag, med årtal synligt
+    const first = [];
+    for (let i = 0; i < teamNames.length; i++) {
+      $('loadMsg').textContent = `Delar ut startkort ${i + 1}/${teamNames.length}…`;
+      first.push(await feed.next());
+    }
+    teams = teamNames.map((name, i) => ({ name, color: COLORS[i], cards: [first[i]] }));
+  } catch (e) { show('setup'); toast(e.message || 'Kunde inte hämta låtar'); return; }
+  cur = 0;
+  $('goalTxt').textContent = `Först till ${goal} kort vinner`;
+  show('play');
+  newTurn();
+}
+async function newTurn() {
+  locked = false; sel = -1; song = null;
+  $('verdict').hidden = true; $('nextBtn').hidden = true; $('lockBtn').hidden = false; $('lockBtn').disabled = true;
+  $('mystery').className = 'mystery'; $('mystery').textContent = '?';
+  $('instr').innerHTML = 'Hämtar nästa låt…';
+  renderAll();
+  try { song = await feed.next(); } catch (e) { toast(e.message); return; }
+  saveSeen(feed.seen);
+  $('instr').innerHTML = `<b style="color:${teams[cur].color}">${esc(teams[cur].name)}</b>: tryck på <b>+</b> där låten hör hemma i er tidslinje.`;
+  audio.src = song.url; audio.currentTime = 0;
+  audio.play().catch(() => {});
+  renderAll();
+  feed.warm(3);
+}
+function renderAll() {
+  $('score').innerHTML = teams.map((t, i) => `<span class="${i === cur ? 'cur' : ''}"><i class="dot" style="background:${t.color}"></i>${esc(t.name)} <b>${t.cards.length}</b></span>`).join('');
+  $('turn').innerHTML = `🎵 <span style="color:${teams[cur].color}">${esc(teams[cur].name)}</span> spelar`;
+  renderTimeline();
+  $('others').innerHTML = teams.length > 1 ? teams.map((t, i) => i === cur ? '' :
+    `<div><h4><span class="dot" style="background:${t.color}"></span> ${esc(t.name)}</h4><div class="mini">${t.cards.map(c => `<span>${c.year}</span>`).join('')}</div></div>`).join('') : '';
+}
+function cardHtml(c, cls = '') { return `<div class="card ${cls}"><span class="y">${c.year}</span><span class="t">${esc(c.title)}</span><span class="a">${esc(c.artist)}</span></div>`; }
+function renderTimeline(newCard) {
+  const cards = teams[cur].cards;
+  let h = '';
+  for (let i = 0; i <= cards.length; i++) {
+    h += `<button type="button" class="slot${i === sel ? ' sel' : ''}" data-i="${i}" aria-label="Placera här">+</button>`;
+    if (i < cards.length) h += cardHtml(cards[i], cards[i] === newCard ? 'new' : '');
+  }
+  $('tl').innerHTML = h;
+  $('tl').classList.toggle('locked', locked);
+  $('tl').querySelectorAll('.slot').forEach(b => b.addEventListener('click', () => {
+    if (locked || !song) return;
+    sel = +b.dataset.i; $('lockBtn').disabled = false;
+    renderTimeline();
+    const s = $('tl').querySelector('.slot.sel'); if (s) s.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }));
+}
+// rätt om årtalet ligger mellan grannarna (lika år räknas som rätt)
+function slotOk(cards, i, y) { const before = cards[i - 1], after = cards[i]; return (!before || before.year <= y) && (!after || y <= after.year); }
+function lock() {
+  if (locked || sel < 0 || !song) return;
+  locked = true;
+  const t = teams[cur], ok = slotOk(t.cards, sel, song.year);
+  $('mystery').className = 'mystery open';
+  $('mystery').innerHTML = `<span class="y">${song.year}</span>${esc(song.title)}<small>${esc(song.artist)}</small>`;
+  const v = $('verdict'); v.hidden = false;
+  v.className = 'verdict ' + (ok ? 'ok' : 'bad');
+  v.textContent = ok ? '✅ Rätt! Kortet är ert' : '❌ Fel plats';
+  $('lockBtn').hidden = true;
+  $('instr').textContent = ok ? `Låten hamnade rätt i tiden – ${t.name} har nu ${t.cards.length + 1} kort.` : 'Den gröna platsen visar var låten skulle ha legat.';
+  if (ok) {
+    t.cards.splice(sel, 0, song);
+    PartyFX.confetti(120, false);
+    renderTimeline(song);
+  } else {
+    // visa var den skulle ha legat
+    renderTimeline();
+    for (let i = 0; i <= t.cards.length; i++) if (slotOk(t.cards, i, song.year)) { const s = $('tl').querySelector(`.slot[data-i="${i}"]`); if (s) s.classList.add('right'); break; }
+  }
+  renderAllScoresOnly();
+  if (ok && t.cards.length >= goal) { setTimeout(finish, 1800); return; }
+  const nb = $('nextBtn'); nb.hidden = false; nb.textContent = teams.length > 1 ? `Nästa: ${teams[(cur + 1) % teams.length].name} →` : 'Nästa låt →';
+}
+function renderAllScoresOnly() {
+  $('score').innerHTML = teams.map((t, i) => `<span class="${i === cur ? 'cur' : ''}"><i class="dot" style="background:${t.color}"></i>${esc(t.name)} <b>${t.cards.length}</b></span>`).join('');
+}
+function next() { audio.pause(); cur = (cur + 1) % teams.length; newTurn(); }
+function finish() {
+  audio.pause();
+  const w = teams[cur];
+  $('winner').innerHTML = `🏆 <span style="color:${w.color}">${esc(w.name)}</span> vinner!`;
+  $('finalLines').innerHTML = teams.map(t => `<div><h4><span class="dot" style="background:${t.color}"></span> ${esc(t.name)} – ${t.cards.length} kort</h4><div class="mini">${t.cards.map(c => `<span title="${esc(c.title + ' – ' + c.artist)}">${c.year}</span>`).join('')}</div></div>`).join('');
+  show('result');
+  PartyFX.confetti(320, true);
+}
+
+const eqSync = () => $('eq').classList.toggle('paused', audio.paused);
+audio.addEventListener('play', () => { eqSync(); $('playBtn').textContent = '⏸ Pausa'; });
+audio.addEventListener('pause', () => { eqSync(); $('playBtn').textContent = '▶ Spela'; });
+audio.addEventListener('ended', () => { eqSync(); $('playBtn').textContent = '↺ Spela igen'; });
+$('playBtn').addEventListener('click', () => { if (!song) return; if (audio.paused) { if (audio.ended) audio.currentTime = 0; audio.play().catch(e => toast('Kunde inte spela: ' + e.message)); } else audio.pause(); });
+audio.addEventListener('error', () => { if (song) toast('Klippet gick inte att spela – tryck Nästa för en ny låt'); });
+$('startBtn').addEventListener('click', start);
+$('againBtn').addEventListener('click', () => { show('setup'); renderTeams(); });
+$('lockBtn').addEventListener('click', lock);
+$('nextBtn').addEventListener('click', next);
+$('quitBtn').addEventListener('click', () => { if (confirm('Avsluta spelet?')) { audio.pause(); show('setup'); renderTeams(); } });
+document.addEventListener('keydown', e => {
+  if ($('play').hidden || e.target.matches('input, textarea')) return;
+  if (e.key === 'Enter') { e.preventDefault(); if (!locked) lock(); else if (!$('nextBtn').hidden) next(); }
+  else if (e.code === 'Space') { e.preventDefault(); $('playBtn').click(); }
+  else if (!locked && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && song) {
+    const n = teams[cur].cards.length;
+    sel = sel < 0 ? 0 : Math.max(0, Math.min(n, sel + (e.key === 'ArrowRight' ? 1 : -1)));
+    $('lockBtn').disabled = false; renderTimeline();
+  }
+});
+
+(async () => {
+  const acc = await requirePartyAccess();
+  if (!acc) return;
+  document.documentElement.classList.remove('gate');
+  renderTeams();
+  // börja hämta låtar direkt så att starten går snabbare
+  feed = PartyMusic.createFeed({ seen: getSeen(), ahead: 3 });
+  feed.warm(teamNames.length + 2);
+})();
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 // <script src="/js/install-app.js" defer></script>. Skriptet:
 //  - lägger till manifest/ikoner i <head> om de saknas och registrerar service workern
 //  - Android/Chrome/Edge: knappen öppnar systemets egen installationsruta (ett tryck)
-//  - iPhone/iPad: knappen visar en kort guide (Dela → Lägg till på hemskärmen) – Apple tillåter inget annat
+//  - iPhone/iPad: knappen visar en kort guide med tre steg (Dela → Lägg till på hemskärmen → Lägg till) – Apple tillåter inget annat
 //  - döljer knappen när sidan redan körs som installerad app
 (function () {
   // ---------- Head-taggar (om sidan inte redan har dem) ----------
@@ -30,6 +30,7 @@
   const isAndroid = /Android/i.test(ua);
   const isInAppBrowser = /FBAN|FBAV|Instagram|Messenger|Line\/|Snapchat/i.test(ua); // kan inte installera härifrån
   const isIOSChrome = isIOS && /CriOS/.test(ua);
+  const isIOSOtherBrowser = isIOS && /FxiOS|EdgiOS|OPiOS|DuckDuckGo|GSA\//.test(ua); // inte Safari/Chrome
 
   let deferredPrompt = null;
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -49,11 +50,13 @@
     .ia-sheet h3 { margin:0 0 0.25rem; font-size:1.2rem; }
     .ia-sheet p { margin:0.25rem 0 0.9rem; color:var(--text-muted, #9ca3af); font-size:0.9rem; }
     .ia-steps { list-style:none; padding:0; margin:0 0 1rem; counter-reset:step; }
-    .ia-steps li { counter-increment:step; display:flex; align-items:center; gap:0.75rem; padding:0.6rem 0; border-top:1px solid var(--border, rgba(255,255,255,0.08)); font-size:0.95rem; }
+    .ia-steps li { counter-increment:step; display:flex; align-items:center; gap:0.75rem; padding:0.6rem 0; border-top:1px solid var(--border, rgba(255,255,255,0.08)); font-size:1.05rem; line-height:1.35; }
     .ia-steps li:first-child { border-top:none; }
     .ia-steps li::before { content:counter(step); flex-shrink:0; width:1.6rem; height:1.6rem; border-radius:50%; background:var(--accent, #E5A968); color:#111317; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:0.85rem; }
+    .ia-sheet .ia-note { margin:-0.3rem 0 0.9rem; font-size:0.85rem; }
+    .ia-note strong { color:var(--text, #f3f4f6); }
     .ia-ico { display:inline-flex; vertical-align:middle; color:#0a84ff; }
-    .ia-ico svg { width:20px; height:20px; }
+    .ia-ico svg { width:24px; height:24px; }
     .ia-close { width:100%; justify-content:center; }
     .ia-arrow { text-align:center; font-size:1.6rem; color:var(--accent, #E5A968); animation:ia-bounce 1.2s ease-in-out infinite; margin-top:0.3rem; }
     @keyframes ia-bounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(6px); } }
@@ -68,7 +71,7 @@
 
   // ---------- Guide-ruta ----------
   function showGuide() {
-    let title = 'Installera Heavy Voices', intro, steps, arrow = false;
+    let title = 'Installera Heavy Voices', intro, steps, arrow = false, note = '';
     if (isInAppBrowser) {
       intro = 'Du har öppnat sidan inuti en annan app. Öppna den i telefonens vanliga webbläsare först:';
       steps = [
@@ -76,13 +79,17 @@
         `Välj <strong>Öppna i webbläsare</strong> (Safari/Chrome)`,
         'Tryck på <strong>Installera appen</strong> igen där',
       ];
+    } else if (isIOS && isIOSOtherBrowser) {
+      intro = 'På iPhone fungerar det bara i Safari (Apples webbläsare med den blå kompassen). Öppna den här sidan i Safari och tryck på knappen igen.';
+      steps = [];
     } else if (isIOS) {
-      intro = 'Så lägger du Heavy Voices som en app på hemskärmen – tar 10 sekunder:';
+      intro = 'Så här lägger du Heavy Voices på hemskärmen:';
       steps = [
-        `Tryck på <span class="ia-ico">${ICON_SHARE}</span> <strong>Dela</strong> ${isIOSChrome ? 'uppe till höger i adressfältet' : 'i verktygsraden längst ner'}`,
-        `Scrolla ner och välj <span class="ia-ico">${ICON_ADD}</span> <strong>Lägg till på hemskärmen</strong>`,
-        'Tryck <strong>Lägg till</strong> uppe till höger – klart!',
+        `Tryck på <span class="ia-ico">${ICON_SHARE}</span> <strong>Dela</strong> – ${isIOSChrome ? 'uppe till höger bredvid adressen' : 'längst ner på skärmen'}`,
+        `Dra upp listan och tryck på <span class="ia-ico">${ICON_ADD}</span> <strong>Lägg till på hemskärmen</strong>`,
+        'Tryck <strong>Lägg till</strong>. Klart!',
       ];
+      note = isIOSChrome ? '' : 'Ser du inte Dela? Tryck först på <strong>•••</strong> längst ner.';
       arrow = !isIOSChrome; // Safari: Dela-knappen sitter oftast längst ner
     } else if (isAndroid) {
       intro = 'Installera via webbläsarens meny:';
@@ -102,6 +109,7 @@
         <h3>${title}</h3>
         <p>${intro}</p>
         ${steps.length ? `<ol class="ia-steps">${steps.map(s => `<li><span>${s}</span></li>`).join('')}</ol>` : ''}
+        ${note ? `<p class="ia-note">${note}</p>` : ''}
         <button type="button" class="btn-outline ia-close">Stäng</button>
         ${arrow ? '<div class="ia-arrow" aria-hidden="true">↓</div>' : ''}
       </div>`;

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c10">
+<title>Tidslinjen — Heavy Voices</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/party.css">
+<style>
+  /* Mobilsidan för Tidslinjen: gå med med kod + namn och placera låtarna i din tidslinje. Inget konto krävs. */
+  .wrap { max-width: 520px; margin: 0 auto; padding: 1rem 1rem calc(6rem + env(safe-area-inset-bottom)); min-height: 100dvh; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.6rem; }
+  .top img { height: 30px; width: auto; }
+  .me { font-size: 0.85rem; color: var(--text-muted); text-align: right; }
+  .me b { color: var(--accent); }
+  .center { display: grid; align-content: center; justify-items: center; gap: 1rem; text-align: center; min-height: 65dvh; }
+  .center h1 { margin: 0; font-size: clamp(2rem, 9vw, 3rem); text-transform: uppercase; letter-spacing: 0.03em; text-shadow: var(--party-glow); }
+  .center p { margin: 0; color: var(--text-muted); }
+  .join { display: grid; gap: 0.8rem; width: 100%; }
+  .join input { font-size: 1.2rem; padding: 0.9rem 1rem; text-align: center; margin: 0; }
+  .join input#code { font-family: 'Roboto Condensed', sans-serif; font-size: 2rem; letter-spacing: 0.3em; }
+  .join button { font-size: 1.2rem; padding: 0.95rem; border-radius: 0.8rem; }
+  .big { font-size: clamp(3rem, 16vw, 5rem); line-height: 1; }
+  .pill { display: inline-block; padding: 0.4rem 1rem; border-radius: 999px; background: rgba(255,255,255,0.08); font-weight: 600; }
+  .head { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 1.4rem; text-transform: uppercase; margin: 0.2rem 0; }
+  .sub { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 0.8rem; }
+  .timer { height: 7px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; margin-bottom: 0.8rem; }
+  .timer > div { height: 100%; width: 100%; background: linear-gradient(90deg, var(--party-hot), var(--accent)); transform-origin: left; }
+  .tl { display: grid; gap: 0.35rem; }
+  .card { display: grid; grid-template-columns: 4.2rem minmax(0, 1fr); align-items: center; gap: 0.7rem; padding: 0.6rem 0.8rem; border-radius: 0.8rem; background: rgba(255,255,255,0.07); border: 1px solid var(--border); }
+  .card .y { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 1.7rem; color: var(--accent); line-height: 1; }
+  .card .t { font-weight: 600; font-size: 0.92rem; line-height: 1.25; }
+  .card .a { display: block; font-weight: 400; font-size: 0.78rem; color: var(--text-muted); }
+  .card.new { border-color: #4ade80; box-shadow: 0 0 16px rgba(74,222,128,0.35); }
+  .slot { width: 100%; padding: 0.55rem; border-radius: 0.7rem; background: transparent; border: 2px dashed rgba(229,169,104,0.4); color: var(--accent); font-size: 0.95rem; font-weight: 600; justify-content: center; }
+  .slot:hover { background: rgba(229,169,104,0.1); color: var(--accent); transform: none; box-shadow: none; }
+  .slot.sel { background: rgba(229,169,104,0.28); border-style: solid; border-color: var(--accent); color: #fff; padding: 1.1rem; font-size: 1.1rem; }
+  .slot.taken { border-color: rgba(255,255,255,0.15); color: var(--text-muted); background: rgba(255,255,255,0.04); pointer-events: none; }
+  .slot.right { border-color: #4ade80; background: rgba(74,222,128,0.16); color: #4ade80; pointer-events: none; }
+  .slot.ro { pointer-events: none; opacity: 0.35; padding: 0.25rem; font-size: 0.75rem; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 0.8rem 1rem calc(0.8rem + env(safe-area-inset-bottom)); background: linear-gradient(to top, rgba(11,12,16,0.98) 60%, rgba(11,12,16,0)); display: flex; gap: 0.6rem; justify-content: center; }
+  .bar button { flex: 1; max-width: 360px; font-size: 1.15rem; padding: 0.95rem; border-radius: 0.9rem; }
+  .verdict { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(1.8rem, 9vw, 2.6rem); text-transform: uppercase; }
+  .verdict.ok { color: #4ade80; } .verdict.bad { color: #f87171; }
+  .songcard { padding: 1rem 1.2rem; border-radius: 1rem; background: var(--accent); color: #111317; font-weight: 700; text-align: center; animation: intro-pop 0.6s cubic-bezier(.2,1.6,.4,1) both; }
+  .songcard .y { font-family: 'Roboto Condensed', sans-serif; font-size: 2.6rem; line-height: 1; display: block; }
+  .songcard small { display: block; font-weight: 400; }
+  .mini { display: flex; gap: 0.3rem; flex-wrap: wrap; justify-content: center; }
+  .mini span { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 0.85rem; padding: 0.15rem 0.5rem; border-radius: 0.4rem; background: rgba(255,255,255,0.08); color: var(--accent); }
+  .spin { width: 2.4rem; height: 2.4rem; border-radius: 50%; border: 4px solid rgba(255,255,255,0.12); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .err { color: #f87171 !important; }
+</style>
+</head>
+<body class="party-page">
+<div class="wrap">
+  <div class="top">
+    <picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" width="480" height="220"></picture>
+    <div class="me" id="me"></div>
+  </div>
+  <main id="screen"></main>
+</div>
+<div class="bar" id="bar" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/party.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+let pid = store.get('hv-quiz-pid');
+if (!pid) { pid = 'p' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); store.set('hv-quiz-pid', pid); }
+let name = store.get('hv-quiz-name') || '';
+let code = (new URLSearchParams(location.search).get('kod') || '').replace(/\D/g, '').slice(0, 4);
+let ch = null, last = null, lastSeen = 0, renderKey = '', sel = -1, sent = {}, deadline = {}, raf = null;
+
+function render(html, bar) {
+  $('screen').innerHTML = html;
+  $('bar').innerHTML = bar || ''; $('bar').hidden = !bar;
+  window.scrollTo(0, 0);
+}
+function renderMe() {
+  const mine = last && last.cards && last.cards[pid];
+  $('me').innerHTML = name && ch ? `${esc(name)}${mine ? ` · <b>${mine.length}</b> kort` : ''}` : '';
+}
+
+// ---------- gå med ----------
+function joinForm(msg) {
+  render(`<div class="center"><h1>Tids<span style="color:var(--accent)">linjen</span></h1>
+    <p>Skriv koden som syns på storbildsskärmen.</p>
+    <form class="join" id="jf">
+      <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Kod" value="${esc(code)}" autocomplete="off" aria-label="Kod">
+      <input id="nm" maxlength="24" placeholder="Ditt namn" value="${esc(name)}" autocomplete="nickname" aria-label="Ditt namn">
+      <button type="submit">🎵 Gå med</button>
+      ${msg ? `<p class="err">${esc(msg)}</p>` : ''}
+    </form></div>`);
+  $('jf').addEventListener('submit', e => {
+    e.preventDefault();
+    const c = $('code').value.replace(/\D/g, ''), n = $('nm').value.trim();
+    if (c.length !== 4) { joinForm('Koden har fyra siffror.'); return; }
+    if (!n) { joinForm('Skriv ditt namn.'); return; }
+    code = c; name = n.slice(0, 24); store.set('hv-quiz-name', name);
+    history.replaceState(null, '', '?kod=' + code);
+    connect();
+  });
+}
+function connect() {
+  if (ch) supabaseClient.removeChannel(ch);
+  last = null; lastSeen = 0; renderKey = '';
+  render('<div class="center"><div class="spin"></div><p>Ansluter…</p></div>');
+  ch = supabaseClient.channel('hvtl-' + code, { config: { broadcast: { self: false }, presence: { key: pid } } });
+  ch.on('broadcast', { event: 'state' }, ({ payload }) => onState(payload || {}));
+  ch.subscribe(async status => {
+    if (status === 'SUBSCRIBED') {
+      await ch.track({ name });
+      ch.send({ type: 'broadcast', event: 'hello', payload: { pid } });
+      setTimeout(() => { if (!lastSeen) joinForm(`Hittar inget spel med koden ${code}. Kolla koden på skärmen.`); }, 6000);
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') joinForm('Kunde inte ansluta. Kolla nätet och försök igen.');
+  });
+}
+
+// ---------- hjälpare ----------
+const cardHtml = (c, cls = '') => `<div class="card ${cls}"><span class="y">${c[0]}</span><span class="t">${esc(c[1])}<span class="a">${esc(c[2])}</span></span></div>`;
+const slotOk = (cards, i, y) => (!cards[i - 1] || cards[i - 1][0] <= y) && (!cards[i] || y <= cards[i][0]);
+function timeline(cards, opts = {}) {
+  // opts: pick (klickbara platser), taken (plats som inte får väljas), right (rätt plats), mark (vald plats, låst)
+  let h = '<div class="tl">';
+  const bare = !opts.pick && opts.taken == null && opts.right == null;   // bara korten, inga platser
+  for (let i = 0; i <= cards.length; i++) {
+    if (bare) { if (i < cards.length) h += cardHtml(cards[i], opts.newIdx === i ? 'new' : ''); continue; }
+    let cls = 'slot', txt = '＋ Här';
+    if (!opts.pick) { cls += ' ro'; txt = '·'; }
+    if (i === opts.taken) { cls = 'slot taken'; txt = opts.takenTxt || 'Upptagen'; }
+    if (opts.pick && i === sel) cls += ' sel', txt = '🎵 Här!';
+    if (i === opts.mark) { cls = 'slot sel'; txt = opts.markTxt || 'Din plats'; }
+    if (i === opts.right) { cls = 'slot right'; txt = '✓ Rätt plats'; }
+    h += `<button type="button" class="${cls}" data-i="${i}">${txt}</button>`;
+    if (i < cards.length) h += cardHtml(cards[i], opts.newIdx === i ? 'new' : '');
+  }
+  return h + '</div>';
+}
+function wirePick(onPick) {
+  document.querySelectorAll('.slot:not(.ro):not(.taken):not(.right)').forEach(b => b.addEventListener('click', () => { sel = +b.dataset.i; onPick(); }));
+}
+function timerBar(s) {
+  cancelAnimationFrame(raf);
+  if (s.remainMs == null) return '';
+  const k = s.phase + s.round;
+  if (deadline[k] == null) deadline[k] = performance.now() + s.remainMs;
+  const step = () => {
+    const bar = $('tbar'); if (!bar) return;
+    const left = Math.max(0, deadline[k] - performance.now()) / (s.timeMs || 1);
+    bar.style.transform = `scaleX(${left})`;
+    if (left > 0) raf = requestAnimationFrame(step);
+  };
+  setTimeout(() => { raf = requestAnimationFrame(step); }, 0);
+  return '<div class="timer"><div id="tbar"></div></div>';
+}
+
+// ---------- läget från storbilden ----------
+function onState(s) {
+  lastSeen = Date.now();
+  if (s.phase === 'closed') { render('<div class="center"><div class="big">👋</div><h1>Spelet är avslutat</h1><p>Tack för att du var med!</p></div>'); renderKey = 'closed'; return; }
+  last = s; renderMe();
+  const me = (s.players || []).find(p => p.pid === pid) || {};
+  const key = [s.phase, s.round, s.active, me.placed, me.chal, s.phase === 'lobby' ? (s.players || []).length : ''].join('|');
+  if (key === renderKey) return;      // inget nytt för den här mobilen – rita inte om (behåll valet)
+  renderKey = key; sel = -1;
+  const myCards = (s.cards || {})[pid] || [];
+  const activeName = ((s.players || []).find(p => p.pid === s.active) || {}).name || '';
+
+  if (s.phase === 'lobby') {
+    render(`<div class="center"><div class="big">🎵</div><h1>Du är med!</h1><p>Hej ${esc(name)} – vänta tills spelet startar.</p><span class="pill">👥 ${(s.players || []).filter(p => p.on).length} spelare</span>
+      <p style="font-size:0.85rem">${s.mode === 'turn' ? 'Ni turas om att placera låtar. När det inte är din tur kan du utmana!' : 'Alla placerar varje låt samtidigt i sin egen tidslinje.'} Först till ${s.goal} kort vinner.</p>
+      <p><a href="#" id="rename">Byt namn</a></p></div>`);
+    $('rename').addEventListener('click', e => { e.preventDefault(); if (ch) supabaseClient.removeChannel(ch); ch = null; renderMe(); joinForm(); });
+    return;
+  }
+  if (s.phase === 'loading') { render('<div class="center"><div class="spin"></div><p>Nästa låt kommer…</p></div>'); return; }
+
+  if (s.phase === 'guess') {
+    const myTurn = s.mode === 'all' || s.active === pid;
+    if (!myTurn) {
+      render(`<p class="head">🎵 ${esc(activeName)} placerar</p><p class="sub">Lyssna och tänk efter – när ${esc(activeName)} har låst kan du utmana.</p>
+        ${timerBar(s)}${timeline(s.snapshot || [], {})}`);
+      return;
+    }
+    if (me.placed || sent['p' + s.round] != null) {
+      render(`<div class="center"><div class="big">🔒</div><h1>Låst!</h1><p>Väntar på ${s.mode === 'all' ? 'de andra' : 'utmanarna'}…</p></div>`);
+      return;
+    }
+    const cards = s.mode === 'turn' ? (s.snapshot || myCards) : myCards;
+    const draw = () => {
+      render(`<p class="head">🎧 Var hör låten hemma?</p><p class="sub">Tryck på platsen i din tidslinje och lås.</p>${timerBar(s)}${timeline(cards, { pick: true })}`,
+        `<button type="button" id="lockBtn" ${sel < 0 ? 'disabled' : ''}>🔒 Lås placering</button>`);
+      wirePick(draw);
+      $('lockBtn').addEventListener('click', () => {
+        if (sel < 0) return;
+        sent['p' + s.round] = sel;
+        if (navigator.vibrate) navigator.vibrate(30);
+        ch.send({ type: 'broadcast', event: 'place', payload: { pid, round: s.round, slot: sel } });
+        renderKey = ''; onState(Object.assign({}, s, { players: (s.players || []).map(p => p.pid === pid ? { ...p, placed: true } : p) }));
+      });
+      const x = document.querySelector('.slot.sel'); if (x) x.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    };
+    draw();
+    return;
+  }
+
+  if (s.phase === 'challenge') {
+    if (s.active === pid) { render(`<div class="center"><div class="big">🔒</div><h1>Låst!</h1><p>Nu kan de andra utmana dig… 😬</p></div>`); return; }
+    if (me.chal || sent['c' + s.round] != null) { render(`<div class="center"><div class="big">⚔️</div><h1>Klart!</h1><p>Väntar på svaret…</p></div>`); return; }
+    const draw = () => {
+      render(`<p class="head">⚔️ Utmana ${esc(activeName)}?</p><p class="sub">Tror du att ${esc(activeName)} har fel? Välj en annan plats – har du rätt snor du kortet!</p>${timerBar(s)}
+        ${timeline(s.snapshot || [], { pick: true, taken: s.activeSlot, takenTxt: '🎯 ' + activeName })}`,
+        `<button type="button" class="btn-outline" id="passBtn">Passa</button><button type="button" id="chalBtn" ${sel < 0 ? 'disabled' : ''}>⚔️ Utmana</button>`);
+      wirePick(draw);
+      const send = slot => {
+        sent['c' + s.round] = slot;
+        ch.send({ type: 'broadcast', event: 'challenge', payload: { pid, round: s.round, slot } });
+        renderKey = ''; onState(Object.assign({}, s, { players: (s.players || []).map(p => p.pid === pid ? { ...p, chal: true } : p) }));
+      };
+      $('passBtn').addEventListener('click', () => send(-1));
+      $('chalBtn').addEventListener('click', () => { if (sel >= 0) send(sel); });
+    };
+    draw();
+    return;
+  }
+
+  if (s.phase === 'reveal' || s.phase === 'end') {
+    cancelAnimationFrame(raf);
+    const r = (s.res || {})[pid], song = s.song;
+    let verdict = '', cls = 'bad';
+    if (s.mode === 'all') {
+      if (r && r.ok) { verdict = '✅ Rätt! Kortet är ditt'; cls = 'ok'; }
+      else if (r) verdict = '❌ Fel plats';
+      else verdict = '⏰ Du hann inte';
+    } else if (s.active === pid) {
+      if (r && r.ok) { verdict = '✅ Rätt! Kortet är ditt'; cls = 'ok'; }
+      else if (s.thief) verdict = `❌ Fel – ${esc(((s.players || []).find(p => p.pid === s.thief) || {}).name || '')} snodde kortet`;
+      else verdict = r && r.placed ? '❌ Fel plats' : '⏰ Du hann inte';
+    } else if (r && r.stole) { verdict = '⚔️ Du snodde kortet!'; cls = 'ok'; }
+    else if (r && r.challenged) verdict = '❌ Fel utmaning';
+    else { const ar = (s.res || {})[s.active]; verdict = ar && ar.ok ? `${esc(activeName)} hade rätt` : `${esc(activeName)} hade fel`; cls = ar && ar.ok ? 'ok' : 'bad'; }
+    if (cls === 'ok' && (r && (r.ok || r.stole))) { PartyFX.confetti(120, false); if (navigator.vibrate) navigator.vibrate([60, 40, 60]); }
+    const newIdx = song ? myCards.findIndex(c => c[0] === song[0] && c[1] === song[1]) : -1;
+    const end = s.phase === 'end';
+    const won = end && (s.winners || []).includes(name);
+    if (won) PartyFX.confetti(260, true);
+    render(`<div style="display:grid;gap:0.9rem;justify-items:center;text-align:center">
+      ${end ? `<div class="big">${won ? '🏆' : '🎸'}</div><div class="verdict ${won ? 'ok' : ''}">${won ? 'Du vann!' : 'Slut!'}</div><p class="sub">Vinnare: <b style="color:var(--accent)">${esc((s.winners || []).join(' & '))}</b></p>` : `<div class="verdict ${cls}">${verdict}</div>`}
+      ${song ? `<div class="songcard"><span class="y">${song[0]}</span>${esc(song[1])}<small>${esc(song[2])}</small></div>` : ''}
+      <span class="pill">Du har ${myCards.length} av ${s.goal} kort</span></div>
+      <div style="margin-top:1rem">${timeline(myCards, { newIdx: (r && (r.ok || r.stole)) ? newIdx : -1 })}</div>`);
+    return;
+  }
+}
+
+// tappar vi kontakten med storbilden en stund
+setInterval(() => {
+  if (ch && lastSeen && Date.now() - lastSeen > 9000) { lastSeen = Date.now(); ch.send({ type: 'broadcast', event: 'hello', payload: { pid } }); }
+}, 3000);
+
+(async () => {
+  if (!name) { try { const m = await getCurrentMember(); if (m && m.name) name = m.name.split(' ')[0]; } catch (e) {} }
+  if (code && name) connect(); else joinForm();
+})();
+</script>
+</body>
+</html>

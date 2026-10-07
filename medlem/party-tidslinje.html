@@ -73,6 +73,27 @@
   .spin { width: 2.6rem; height: 2.6rem; border-radius: 50%; border: 4px solid rgba(255,255,255,0.12); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .winner { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; text-transform: uppercase; font-size: clamp(2.2rem, 8vw, 4.5rem); line-height: 1; color: #fff; text-shadow: var(--party-glow); margin: 0.5rem 0 1rem; animation: intro-pop 0.8s cubic-bezier(.2,1.6,.4,1) both; }
+  /* mobillägen */
+  .lobby { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2rem; align-items: start; margin-top: 1rem; }
+  @media (max-width: 760px) { .lobby { grid-template-columns: 1fr; } }
+  .qr { background: #fff; border-radius: 1rem; padding: 0.8rem; line-height: 0; width: min(78vw, 340px); }
+  .qr svg { width: 100%; height: auto; }
+  .join-how { font-size: 1.1rem; color: var(--text-muted); margin: 0 0 0.4rem; }
+  .join-url { font-size: clamp(1.1rem, 2.6vw, 1.6rem); font-weight: 700; color: #fff; word-break: break-all; }
+  .join-code { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(3.5rem, 11vw, 6.5rem); letter-spacing: 0.12em; line-height: 1; color: var(--accent); text-shadow: var(--party-glow); margin: 0.3rem 0 1rem; }
+  .players { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.8rem 0 1.4rem; min-height: 2.5rem; }
+  .players span { padding: 0.4rem 0.9rem; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid var(--border); font-weight: 600; animation: intro-pop 0.5s cubic-bezier(.2,1.6,.4,1) both; }
+  .players span.off { opacity: 0.4; }
+  .timer { height: 7px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  .timer > div { height: 100%; width: 100%; background: linear-gradient(90deg, var(--party-hot), var(--accent)); transform-origin: left; }
+  .board { margin-top: 1.4rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem; }
+  .board > div { display: grid; grid-template-columns: 1.8rem minmax(0, 1fr) auto auto; gap: 0.5rem; align-items: center; padding: 0.55rem 0.8rem; border-radius: 0.7rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); font-weight: 600; }
+  .board > div.act { border-color: var(--accent); background: rgba(229,169,104,0.14); }
+  .board .st { font-size: 0.85rem; }
+  .board b { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .board .off { opacity: 0.45; }
+  .slot.chal { border-color: #60a5fa; background: rgba(96,165,250,0.15); }
+  .slot.right.chal { border-color: #4ade80; background: rgba(74,222,128,0.25); }
   .credit { margin-top: 2rem; font-size: 0.75rem; color: var(--text-muted); opacity: 0.7; }
   #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 2100; display: none; max-width: calc(100vw - 3rem); }
 </style>
@@ -85,9 +106,18 @@
   <section id="setup">
     <a href="/medlem/party.html" class="back-btn">&larr; Party</a>
     <h1 class="party-title">Tids<span class="hot">linjen</span></h1>
-    <p class="party-sub">Lyssna på låten och placera den rätt i din tidslinje – före, efter eller mellan låtarna du redan har. Rätt placering = kortet är ditt. Först till målet vinner!</p>
+    <p class="party-sub">Lyssna på låten och placera den rätt i din tidslinje – före, efter eller mellan låtarna du redan har. Rätt placering = kortet är ditt. Först till målet vinner! Spela med mobilerna eller direkt på storbildsskärmen.</p>
     <div class="setup">
       <div class="box">
+        <h3>Hur spelar ni?</h3>
+        <div class="seg" id="segMode">
+          <button type="button" data-v="all" aria-pressed="true">📱 Alla samtidigt</button>
+          <button type="button" data-v="turn" aria-pressed="false">📱 Turordning</button>
+          <button type="button" data-v="local" aria-pressed="false">🗣 Lag på skärmen</button>
+        </div>
+        <p id="modeHelp"></p>
+      </div>
+      <div class="box" id="teamBox">
         <h3>Lag / spelare</h3>
         <div class="teams" id="teams"></div>
         <button type="button" class="btn-outline" id="addTeam" style="margin-top:0.6rem">+ Lägg till lag</button>
@@ -97,8 +127,50 @@
         <h3>Antal kort för att vinna</h3>
         <div class="seg" id="segGoal"><button type="button" data-v="5" aria-pressed="false">5</button><button type="button" data-v="8" aria-pressed="true">8</button><button type="button" data-v="10" aria-pressed="false">10</button></div>
       </div>
+      <div class="box" id="timeBox">
+        <h3>Tid att placera</h3>
+        <div class="seg" id="segTime"><button type="button" data-v="20" aria-pressed="false">20 s</button><button type="button" data-v="30" aria-pressed="true">30 s</button><button type="button" data-v="45" aria-pressed="false">45 s</button><button type="button" data-v="0" aria-pressed="false">Ingen tid</button></div>
+      </div>
       <button type="button" class="start-btn" id="startBtn">🎵 Starta</button>
     </div>
+  </section>
+
+  <!-- lobby (mobillägen) -->
+  <section id="lobby" hidden>
+    <div class="party-top"><button type="button" class="btn-outline" id="lobbyCancel">✕ Avbryt</button><span class="hint" id="lobbyMode"></span></div>
+    <div class="lobby">
+      <div class="qr" id="qr"></div>
+      <div>
+        <p class="join-how">Skanna QR-koden eller gå till</p>
+        <div class="join-url" id="joinUrl"></div>
+        <p class="join-how" style="margin-top:1rem">och skriv in koden</p>
+        <div class="join-code" id="joinCode"></div>
+        <h3 style="margin:0">👥 <span id="playerCount">0</span> spelare</h3>
+        <div class="players" id="players"></div>
+        <button type="button" class="start-btn" id="goBtn" disabled>🎵 Starta spelet</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- online-spel (storbilden) -->
+  <section id="oplay" hidden>
+    <div class="party-top"><button type="button" class="btn-outline" id="oQuit">✕ Avsluta</button><span class="hint" id="oInfo"></span></div>
+    <div class="turn" id="oTurn"></div>
+    <div class="player">
+      <div class="mystery" id="oMystery">?</div>
+      <div class="pctl">
+        <div class="row"><button type="button" id="oPlayBtn">⏸ Pausa</button><span class="eq" id="oEq"><i></i><i></i><i></i><i></i></span></div>
+        <div class="timer" id="oTimerWrap"><div id="oTimer"></div></div>
+        <p class="hint" id="oStatus"></p>
+        <div class="acts">
+          <button type="button" id="oRevealBtn">👀 Visa svaret</button>
+          <button type="button" id="oNextBtn" hidden>Nästa låt →</button>
+        </div>
+      </div>
+    </div>
+    <div class="tl-wrap" id="oTlWrap" hidden><div class="tl locked" id="oTl"></div></div>
+    <div class="board" id="oBoard"></div>
+    <p class="credit">Låtklipp från iTunes/Apple Music och Deezer, årtal från MusicBrainz.</p>
   </section>
 
   <!-- laddar -->
@@ -142,12 +214,13 @@
 <script src="/js/party.js"></script>
 <script src="/js/party-quiz-questions.js"></script>
 <script src="/js/party-music.js"></script>
+<script src="/js/vendor/qrcode.js"></script>
 <script>
 const COLORS = ['#E5A968', '#ff3d5a', '#60a5fa', '#4ade80', '#c084fc', '#facc15'];
 const $ = id => document.getElementById(id);
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 function toast(msg, ms = 4000) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
-const show = id => ['setup', 'loading', 'play', 'result'].forEach(s => $(s).hidden = s !== id);
+const show = id => ['setup', 'lobby', 'oplay', 'loading', 'play', 'result'].forEach(s => $(s).hidden = s !== id);
 const SEEN_KEY = 'hv-timeline-seen';
 const getSeen = () => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '[]'); } catch (e) { return []; } };
 const saveSeen = ids => { try { localStorage.setItem(SEEN_KEY, JSON.stringify(ids.slice(-800))); } catch (e) {} };
@@ -269,14 +342,15 @@ function finish() {
   PartyFX.confetti(320, true);
 }
 
-const eqSync = () => $('eq').classList.toggle('paused', audio.paused);
-audio.addEventListener('play', () => { eqSync(); $('playBtn').textContent = '⏸ Pausa'; });
-audio.addEventListener('pause', () => { eqSync(); $('playBtn').textContent = '▶ Spela'; });
-audio.addEventListener('ended', () => { eqSync(); $('playBtn').textContent = '↺ Spela igen'; });
-$('playBtn').addEventListener('click', () => { if (!song) return; if (audio.paused) { if (audio.ended) audio.currentTime = 0; audio.play().catch(e => toast('Kunde inte spela: ' + e.message)); } else audio.pause(); });
+const eqSync = () => { $('eq').classList.toggle('paused', audio.paused); $('oEq').classList.toggle('paused', audio.paused); };
+const setPB = t => { $('playBtn').textContent = t; $('oPlayBtn').textContent = t; };
+audio.addEventListener('play', () => { eqSync(); setPB('⏸ Pausa'); });
+audio.addEventListener('pause', () => { eqSync(); setPB('▶ Spela'); });
+audio.addEventListener('ended', () => { eqSync(); setPB('↺ Spela igen'); });
+$('playBtn').addEventListener('click', () => { if (!song && !osong) return; if (audio.paused) { if (audio.ended) audio.currentTime = 0; audio.play().catch(e => toast('Kunde inte spela: ' + e.message)); } else audio.pause(); });
 audio.addEventListener('error', () => { if (song) toast('Klippet gick inte att spela – tryck Nästa för en ny låt'); });
-$('startBtn').addEventListener('click', start);
-$('againBtn').addEventListener('click', () => { show('setup'); renderTeams(); });
+$('startBtn').addEventListener('click', () => mode === 'local' ? start() : openRoom());
+$('againBtn').addEventListener('click', () => { if (rt) { backToLobby(); return; } show('setup'); renderTeams(); });
 $('lockBtn').addEventListener('click', lock);
 $('nextBtn').addEventListener('click', next);
 $('quitBtn').addEventListener('click', () => { if (confirm('Avsluta spelet?')) { audio.pause(); show('setup'); renderTeams(); } });
@@ -291,11 +365,286 @@ document.addEventListener('keydown', e => {
   }
 });
 
+
+// =====================================================================
+// Mobillägen: "Alla samtidigt" och "Turordning" via Supabase Realtime.
+// Storbilden är värd (håller spelare, kort och låtar); mobilerna kör /tidslinjen.html.
+// =====================================================================
+let mode = 'all', tlTime = 30;
+const MODE_HELP = {
+  all: 'Alla går med på mobilen och placerar varje låt samtidigt i sin egen tidslinje. Rätt = kortet är ditt. Passar stora sällskap – ingen väntar på sin tur.',
+  turn: 'Alla går med på mobilen men turas om att placera. De andra kan utmana: tror du att placeringen är fel lägger du ditt eget svar – har du rätt snor du kortet!',
+  local: 'Ingen mobil behövs. Lagen turas om och trycker direkt på storbildsskärmen.',
+};
+function renderMode() {
+  $('teamBox').hidden = mode !== 'local';
+  $('timeBox').hidden = mode === 'local';
+  $('modeHelp').textContent = MODE_HELP[mode];
+}
+$('segMode').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+  $('segMode').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  mode = b.dataset.v; renderMode();
+}));
+$('segTime').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+  $('segTime').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  tlTime = +b.dataset.v;
+}));
+
+const CHALLENGE_SEC = 12;
+let rt = null, code = '', ophase = 'idle', oplayers = new Map(), order = [], round = 0, activeIdx = -1, activePid = null;
+let startCard = null, osong = null, placements = new Map(), challenges = new Map(), snapshot = [], lastRes = null, thief = null;
+let oEnd = 0, oTimerRaf = null, beat = null, winners = [];
+const onlinePlayers = () => [...oplayers.values()].filter(p => p.online);
+const pname = pid => (oplayers.get(pid) || {}).name || '?';
+
+function closeRoom() {
+  clearInterval(beat); beat = null; cancelAnimationFrame(oTimerRaf);
+  if (rt) { try { rt.send({ type: 'broadcast', event: 'state', payload: { phase: 'closed' } }); } catch (e) {} supabaseClient.removeChannel(rt); }
+  rt = null; ophase = 'idle'; audio.pause();
+}
+function openRoom() {
+  closeRoom(); PartyFX.unlockAudio();
+  if (!feed) feed = PartyMusic.createFeed({ seen: getSeen(), ahead: 3 });
+  feed.warm(4);
+  code = String(Math.floor(1000 + Math.random() * 9000));
+  oplayers = new Map(); order = []; ophase = 'lobby'; startCard = null; winners = []; round = 0; activeIdx = -1;
+  rt = supabaseClient.channel('hvtl-' + code, { config: { broadcast: { self: false }, presence: { key: 'host' } } });
+  rt.on('presence', { event: 'sync' }, syncPresence);
+  rt.on('broadcast', { event: 'place' }, ({ payload }) => onPlace(payload || {}));
+  rt.on('broadcast', { event: 'challenge' }, ({ payload }) => onChallenge(payload || {}));
+  rt.on('broadcast', { event: 'hello' }, () => sendState());
+  rt.subscribe(st => {
+    if (st === 'SUBSCRIBED') sendState();
+    else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') toast('Kunde inte ansluta till realtid – kontrollera nätet', 5000);
+  });
+  beat = setInterval(sendState, 2500);
+  const url = location.origin + '/tidslinjen.html?kod=' + code;
+  try { const qr = window.qrcode(0, 'M'); qr.addData(url); qr.make(); $('qr').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true }); } catch (e) { $('qr').hidden = true; }
+  $('joinUrl').textContent = location.host + '/tidslinjen.html';
+  $('joinCode').textContent = code;
+  $('lobbyMode').textContent = mode === 'all' ? '📱 Alla samtidigt' : '📱 Turordning med utmaningar';
+  $('goBtn').textContent = '🎵 Starta spelet';
+  renderLobby(); show('lobby');
+}
+function backToLobby() {
+  ophase = 'lobby'; round = 0; activeIdx = -1; winners = []; startCard = null;
+  oplayers.forEach(p => { p.cards = []; });
+  $('goBtn').textContent = '🎵 Starta spelet';
+  renderLobby(); show('lobby'); sendState();
+}
+function syncPresence() {
+  const st = rt.presenceState();
+  oplayers.forEach(p => p.online = false);
+  Object.entries(st).forEach(([pid, metas]) => {
+    if (pid === 'host' || !metas.length) return;
+    const name = String(metas[0].name || 'Spelare').slice(0, 24);
+    let p = oplayers.get(pid);
+    if (!p) { p = { pid, name, cards: startCard ? [startCard] : [], online: true }; oplayers.set(pid, p); order.push(pid); }
+    p.name = name; p.online = true;
+  });
+  renderLobby();
+  if (ophase !== 'lobby' && ophase !== 'idle') { renderBoard(); updateStatus(); maybeDone(); }
+}
+function renderLobby() {
+  const list = [...oplayers.values()];
+  $('playerCount').textContent = onlinePlayers().length;
+  $('players').innerHTML = list.length ? list.map(p => `<span class="${p.online ? '' : 'off'}">${esc(p.name)}</span>`).join('')
+    : '<span class="text-muted" style="background:none;border:0;animation:none;font-weight:400">Väntar på spelare…</span>';
+  $('goBtn').disabled = !onlinePlayers().length || $('goBtn').textContent.startsWith('⏳');
+}
+async function oStart() {
+  $('goBtn').disabled = true; $('goBtn').textContent = '⏳ Hämtar låtar…';
+  try { startCard = await feed.next(); }
+  catch (e) { toast(e.message || 'Kunde inte hämta låtar'); $('goBtn').textContent = '🎵 Starta spelet'; renderLobby(); return; }
+  oplayers.forEach(p => { p.cards = [startCard]; });   // alla börjar med samma kort
+  round = 0; activeIdx = -1; winners = [];
+  $('oInfo').textContent = `Kod ${code} · först till ${goal} kort vinner`;
+  show('oplay');
+  oNewRound();
+}
+function nextActive() {
+  for (let k = 1; k <= order.length; k++) {
+    const i = (activeIdx + k) % order.length, p = oplayers.get(order[i]);
+    if (p && p.online) { activeIdx = i; return p.pid; }
+  }
+  return null;
+}
+async function oNewRound() {
+  round++; ophase = 'loading'; placements = new Map(); challenges = new Map(); lastRes = null; thief = null; osong = null;
+  cancelAnimationFrame(oTimerRaf); $('oTimerWrap').hidden = true;
+  if (mode === 'turn') { activePid = nextActive(); snapshot = activePid ? oplayers.get(activePid).cards.slice() : []; }
+  $('oMystery').className = 'mystery'; $('oMystery').textContent = '?';
+  $('oNextBtn').hidden = true; $('oRevealBtn').hidden = false;
+  renderOTurn(); renderBoard(); updateStatus(); sendState();
+  try { osong = await feed.next(); } catch (e) { toast(e.message || 'Kunde inte hämta låt'); return; }
+  saveSeen(feed.seen);
+  ophase = 'guess';
+  startOTimer(tlTime);
+  audio.src = osong.url; audio.currentTime = 0; audio.play().catch(() => {});
+  renderOTurn(); renderBoard(); updateStatus(); sendState();
+  feed.warm(3);
+}
+function startOTimer(sec) {
+  cancelAnimationFrame(oTimerRaf);
+  $('oTimerWrap').hidden = !sec;
+  if (!sec) { oEnd = 0; return; }
+  const tot = sec * 1000; oEnd = performance.now() + tot;
+  const step = () => {
+    const left = Math.max(0, oEnd - performance.now());
+    $('oTimer').style.transform = `scaleX(${left / tot})`;
+    if (left <= 0) { oEnd = 0; oReveal(); return; }
+    oTimerRaf = requestAnimationFrame(step);
+  };
+  oTimerRaf = requestAnimationFrame(step);
+}
+function onPlace(m) {
+  if (ophase !== 'guess' || m.round !== round || !m.pid) return;
+  const p = oplayers.get(m.pid); if (!p) return;
+  if (mode === 'turn' && m.pid !== activePid) return;
+  if (placements.has(m.pid)) return;
+  const n = (mode === 'turn' ? snapshot : p.cards).length, slot = Number(m.slot);
+  if (!(slot >= 0 && slot <= n)) return;
+  placements.set(m.pid, { slot, t: performance.now() });
+  if (mode === 'turn') {
+    const others = onlinePlayers().filter(x => x.pid !== activePid);
+    if (!others.length) { oReveal(); return; }
+    ophase = 'challenge'; startOTimer(CHALLENGE_SEC);
+  }
+  renderOTurn(); renderBoard(); updateStatus(); sendState(); maybeDone();
+}
+function onChallenge(m) {
+  if (ophase !== 'challenge' || m.round !== round || !m.pid || m.pid === activePid || challenges.has(m.pid) || !oplayers.has(m.pid)) return;
+  const slot = Number(m.slot), act = placements.get(activePid);
+  if (slot !== -1 && (!(slot >= 0 && slot <= snapshot.length) || (act && slot === act.slot))) return;
+  challenges.set(m.pid, { slot, t: performance.now() });
+  renderBoard(); updateStatus(); sendState(); maybeDone();
+}
+function maybeDone() {
+  if (mode === 'all' && ophase === 'guess') {
+    const on = onlinePlayers();
+    if (on.length && on.every(p => placements.has(p.pid))) setTimeout(oReveal, 600);
+  } else if (mode === 'turn' && ophase === 'challenge') {
+    const others = onlinePlayers().filter(x => x.pid !== activePid);
+    if (others.every(p => challenges.has(p.pid))) setTimeout(oReveal, 600);
+  } else if (mode === 'turn' && ophase === 'guess') {
+    const a = oplayers.get(activePid);
+    if (!a || !a.online) setTimeout(() => { if (ophase === 'guess') oReveal(); }, 1500);   // den aktiva försvann
+  }
+}
+function insertSorted(cards, s) { let i = cards.findIndex(c => c.year > s.year); if (i < 0) i = cards.length; cards.splice(i, 0, s); }
+function oReveal() {
+  if (!(ophase === 'guess' || ophase === 'challenge') || !osong) return;
+  cancelAnimationFrame(oTimerRaf); oEnd = 0; ophase = 'reveal'; $('oTimerWrap').hidden = true;
+  const y = osong.year, res = {};
+  let anyOk = false;
+  if (mode === 'all') {
+    placements.forEach((pl, pid) => {
+      const p = oplayers.get(pid); if (!p) return;
+      const ok = slotOk(p.cards, pl.slot, y);
+      if (ok) { p.cards.splice(pl.slot, 0, osong); anyOk = true; }
+      res[pid] = { ok, placed: true };
+    });
+  } else {
+    const a = oplayers.get(activePid), pl = placements.get(activePid);
+    const ok = !!(a && pl && slotOk(snapshot, pl.slot, y));
+    if (ok) { a.cards.splice(pl.slot, 0, osong); anyOk = true; }
+    if (activePid) res[activePid] = { ok, placed: !!pl, active: true };
+    [...challenges.entries()].filter(([, c]) => c.slot >= 0).sort((x, z) => x[1].t - z[1].t).forEach(([pid, c]) => {
+      const okc = !ok && slotOk(snapshot, c.slot, y);
+      res[pid] = { ok: okc, challenged: true };
+      if (okc && !thief) { thief = pid; res[pid].stole = true; insertSorted(oplayers.get(pid).cards, osong); anyOk = true; }
+    });
+  }
+  lastRes = res;
+  winners = [...oplayers.values()].filter(p => p.cards.length >= goal);
+  $('oMystery').className = 'mystery open';
+  $('oMystery').innerHTML = `<span class="y">${osong.year}</span>${esc(osong.title)}<small>${esc(osong.artist)}</small>`;
+  if (anyOk) PartyFX.confetti(110, false);
+  renderOTurn(); renderBoard(); updateStatus(); sendState();
+  $('oRevealBtn').hidden = true;
+  if (winners.length) { setTimeout(oFinish, 2500); return; }
+  $('oNextBtn').hidden = false;
+  $('oNextBtn').textContent = mode === 'turn' ? 'Nästa spelare →' : 'Nästa låt →';
+}
+function oFinish() {
+  ophase = 'end'; audio.pause();
+  const names = winners.map(w => w.name);
+  $('winner').innerHTML = `🏆 ${names.map(esc).join(' &amp; ')} ${names.length > 1 ? 'vinner!' : 'vinner!'}`;
+  $('finalLines').innerHTML = [...oplayers.values()].sort((a, b) => b.cards.length - a.cards.length).map(p =>
+    `<div><h4>${esc(p.name)} – ${p.cards.length} kort</h4><div class="mini">${p.cards.map(c => `<span title="${esc(c.title + ' – ' + c.artist)}">${c.year}</span>`).join('')}</div></div>`).join('');
+  show('result'); PartyFX.confetti(320, true);
+  sendState();
+}
+function renderOTurn() {
+  if (mode === 'turn') {
+    $('oTurn').innerHTML = activePid ? `🎵 <span style="color:var(--accent)">${esc(pname(activePid))}</span> spelar` : 'Väntar på spelare…';
+    $('oTlWrap').hidden = !activePid;
+    let h = '';
+    const pl = placements.get(activePid);
+    const right = ophase === 'reveal' && osong ? [...Array(snapshot.length + 1).keys()].find(i => slotOk(snapshot, i, osong.year)) : -1;
+    const chal = ophase === 'reveal' ? new Set([...challenges.values()].map(c => c.slot)) : new Set();
+    for (let i = 0; i <= snapshot.length; i++) {
+      const cls = [pl && pl.slot === i ? 'sel' : '', i === right ? 'right' : '', chal.has(i) ? 'chal' : ''].join(' ');
+      h += `<span class="slot ${cls}">+</span>`;
+      if (i < snapshot.length) h += cardHtml(snapshot[i]);
+    }
+    $('oTl').innerHTML = h;
+  } else {
+    $('oTurn').innerHTML = `🎵 Runda ${round} – alla placerar`;
+    $('oTlWrap').hidden = true;
+  }
+}
+function renderBoard() {
+  const list = [...oplayers.values()].sort((a, b) => b.cards.length - a.cards.length || a.name.localeCompare(b.name, 'sv'));
+  $('oBoard').innerHTML = list.map((p, i) => {
+    let st = '';
+    const r = lastRes && lastRes[p.pid];
+    if (ophase === 'reveal' && r) st = r.stole ? '⚔️' : r.ok ? '✅' : '❌';
+    else if (mode === 'all' && ophase === 'guess') st = placements.has(p.pid) ? '✓' : '⏳';
+    else if (mode === 'turn' && p.pid === activePid) st = placements.has(p.pid) ? '🔒' : '🎯';
+    else if (mode === 'turn' && ophase === 'challenge') st = challenges.has(p.pid) ? (challenges.get(p.pid).slot >= 0 ? '⚔️' : '–') : '⏳';
+    return `<div class="${p.pid === activePid && mode === 'turn' ? 'act' : ''}"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'}</span><span class="${p.online ? '' : 'off'}">${esc(p.name)}</span><span class="st">${st}</span><b>${p.cards.length}</b></div>`;
+  }).join('');
+}
+function updateStatus() {
+  let t = '';
+  if (ophase === 'loading') t = 'Hämtar nästa låt…';
+  else if (ophase === 'guess' && mode === 'all') t = `🙋 ${placements.size}/${onlinePlayers().length} har placerat låten`;
+  else if (ophase === 'guess') t = `${pname(activePid)} väljer plats på sin mobil…`;
+  else if (ophase === 'challenge') t = `⚔️ Utmana! Tror ni att ${pname(activePid)} har fel? Lägg ert eget svar på mobilen. (${challenges.size} svar)`;
+  else if (ophase === 'reveal' && mode === 'all') { const n = Object.values(lastRes || {}).filter(r => r.ok).length; t = `${n} av ${placements.size} hade rätt!`; }
+  else if (ophase === 'reveal') {
+    const r = (lastRes || {})[activePid];
+    t = r && r.ok ? `✅ ${pname(activePid)} hade rätt!` : thief ? `⚔️ ${pname(thief)} snodde kortet!` : r && !r.placed ? `⏰ ${pname(activePid)} hann inte placera` : `❌ Fel – ingen fick kortet`;
+  }
+  $('oStatus').textContent = t;
+}
+function sendState() {
+  if (!rt) return;
+  const P = [...oplayers.values()], pack = c => [c.year, c.title, c.artist];
+  const p = {
+    phase: ophase, mode, round, goal, code, active: mode === 'turn' ? activePid : null,
+    players: P.map(x => ({ pid: x.pid, name: x.name, n: x.cards.length, on: x.online, placed: placements.has(x.pid), chal: challenges.has(x.pid) })),
+    cards: Object.fromEntries(P.map(x => [x.pid, x.cards.map(pack)])),
+  };
+  if (mode === 'turn') { p.snapshot = snapshot.map(pack); const a = placements.get(activePid); p.activeSlot = a ? a.slot : null; }
+  if (ophase === 'guess' || ophase === 'challenge') { p.remainMs = oEnd ? Math.max(0, oEnd - performance.now()) : null; p.timeMs = ophase === 'challenge' ? CHALLENGE_SEC * 1000 : tlTime * 1000; }
+  if (ophase === 'reveal' || ophase === 'end') { if (osong) p.song = pack(osong); p.res = lastRes || {}; p.thief = thief; p.winners = winners.map(w => w.name); }
+  rt.send({ type: 'broadcast', event: 'state', payload: p });
+}
+$('goBtn').addEventListener('click', oStart);
+$('lobbyCancel').addEventListener('click', () => { closeRoom(); show('setup'); });
+$('oRevealBtn').addEventListener('click', oReveal);
+$('oNextBtn').addEventListener('click', () => { audio.pause(); oNewRound(); });
+$('oQuit').addEventListener('click', () => { if (confirm('Avsluta spelet?')) { closeRoom(); show('setup'); } });
+$('oPlayBtn').addEventListener('click', () => $('playBtn').click());
+window.addEventListener('beforeunload', closeRoom);
+
 (async () => {
   const acc = await requirePartyAccess();
   if (!acc) return;
   document.documentElement.classList.remove('gate');
-  renderTeams();
+  renderTeams(); renderMode();
   // börja hämta låtar direkt så att starten går snabbare
   feed = PartyMusic.createFeed({ seen: getSeen(), ahead: 3 });
   feed.warm(teamNames.length + 2);

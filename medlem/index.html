@@ -19,6 +19,8 @@
   .title-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
   .title-row h1 { margin: 0; }
   #welcome { margin: 0.2rem 0 0; }
+  #installTop { margin-top: 0.7rem; }
+  #installTop .install-app-btn { padding: 0.5rem 0.9rem; }
   /* Mobil: hela sidan ska rymmas utan att scrolla */
   @media (max-width: 600px) {
     .site-header--logo { padding-top: 0.6rem; }
@@ -44,6 +46,7 @@
     <span id="roleBadge" class="badge"></span>
   </div>
   <p id="welcome" class="text-muted">Laddar...</p>
+  <div id="installTop" data-install-app="Lägg till som app"></div>
 
   <div class="card" id="checkinCard" hidden>
     <h3>Idag</h3>
@@ -99,7 +102,6 @@
 
   <div class="page-footer">
     <div class="page-footer-actions">
-      <span data-install-app></span>
       <a href="/konto.html"><button type="button" class="btn-outline">Mitt konto</button></a>
       <button id="logoutBtn" class="btn-outline">Logga ut</button>
     </div>

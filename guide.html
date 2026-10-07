@@ -399,6 +399,19 @@ const MEMBER = [
      <div class="btn ghost" style="margin-top:auto">Logga ut</div>`,
    act: [['wait',500],['hot','#k2'],['wait',500],['hot','#k3'],['wait',500],['hot','#k4'],['wait',500],['tap','#k1'],['hot','#k1'],['wait',900]] },
 
+ { t: 'Lägg till som app', path: '/medlem/', url: 'heavyvoices.se/<b>medlem/</b>',
+   d: 'Lägg Heavy Voices på hemskärmen, så öppnas det som en vanlig app med egen ikon. Tryck på knappen Lägg till som app högst upp på medlemssidan.',
+   tips: ['Android: tryck Installera i rutan som visas. Då är det klart.', 'iPhone: använd Safari. Tryck Dela (fyrkanten med pilen uppåt) → Lägg till på hemskärmen → Lägg till.', 'Ser du inte Dela på iPhone? Tryck först på ••• längst ner.', 'Knappen försvinner när appen är installerad.'],
+   html: `${bar('Anna · Alt')}<h3 class="s-h">Hej Anna!</h3>
+     <div class="btn ghost" id="ib" style="margin-bottom:8px">⬇ Lägg till som app</div>
+     <div class="card off" id="sh" style="font-size:10.5px;line-height:1.8">
+       <b>Installera Heavy Voices</b><br>
+       <b style="color:var(--accent)">1</b> Tryck <b>Dela</b> ⬆<br>
+       <b style="color:var(--accent)">2</b> Välj <b>Lägg till på hemskärmen</b><br>
+       <b style="color:var(--accent)">3</b> Tryck <b>Lägg till</b>. Klart!
+     </div>`,
+   act: [['wait',600],['tap','#ib'],['hot','#ib'],['wait',500],['show','#sh'],['wait',2200]] },
+
  { t: 'Öva med stämfiler', path: '/medlem/repertoar.html', url: 'heavyvoices.se/medlem/<b>repertoar.html</b>',
    d: 'Tryck på en låt för att spela den. Varje låt har separata spår för sopran, alt, tenor, bas och komp, och du blandar själv hur mycket du hör av varje.',
    tips: ['Dra upp din egen stämma och sänk de andra när du lär dig din del.', 'Vänd på det när du kan den: sänk din stämma och sjung själv mot resten av kören.'],

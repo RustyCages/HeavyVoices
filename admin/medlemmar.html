@@ -117,11 +117,11 @@
       <h4 style="margin: 0 0 0.6rem;">Signaturer</h4>
       <div id="sigList" style="margin-bottom: 0.8rem;"></div>
       <input type="text" id="sigName" placeholder="Namn på signaturen (syns bara för admins), t.ex. Kören" maxlength="60">
-      <textarea id="sigBody" placeholder="Text som hamnar sist i mejlet, t.ex.&#10;Hälsningar,&#10;Niklas&#10;Heavy Voices"></textarea>
+      <textarea id="sigBody" placeholder="Skriv signaturtexten här (exempel: Hälsningar, Niklas, Heavy Voices)" rows="4"></textarea>
       <div class="toolbar" style="margin-top: 0;">
         <button type="button" id="sigSaveBtn">Spara signatur</button>
         <button type="button" class="btn-outline" id="sigCancelBtn" style="display:none;">Avbryt redigering</button>
-        <span class="muted" id="sigStatus"></span>
+        <span id="sigStatus" style="font-weight:600; color: var(--accent);"></span>
       </div>
     </div>
     <div class="toolbar" style="margin-top: 0;">
@@ -502,17 +502,28 @@ document.getElementById('sigSaveBtn').addEventListener('click', async () => {
   const name = document.getElementById('sigName').value.trim();
   const body = document.getElementById('sigBody').value.trim();
   const st = document.getElementById('sigStatus');
+  const btn = document.getElementById('sigSaveBtn');
   st.textContent = '';
-  if (!name) { st.textContent = 'Ge signaturen ett namn.'; return; }
-  if (!body) { st.textContent = 'Skriv signaturtexten.'; return; }
-  const q = editingSigId
-    ? supabaseClient.from('email_signatures').update({ name, body }).eq('id', editingSigId)
-    : supabaseClient.from('email_signatures').insert({ name, body });
-  const { error } = await q;
-  if (error) { st.textContent = 'Kunde inte spara: ' + error.message; return; }
-  resetSigForm();
-  st.textContent = 'Sparad ✓';
-  await loadSignatures();
+  if (!name) { st.textContent = 'Ge signaturen ett namn.'; document.getElementById('sigName').focus(); return; }
+  if (!body) { st.textContent = 'Skriv signaturtexten i den stora rutan.'; document.getElementById('sigBody').focus(); return; }
+  btn.disabled = true;
+  st.textContent = 'Sparar...';
+  try {
+    const q = editingSigId
+      ? supabaseClient.from('email_signatures').update({ name, body }).eq('id', editingSigId).select()
+      : supabaseClient.from('email_signatures').insert({ name, body }).select();
+    const { data, error } = await q;
+    if (error) { st.textContent = 'Kunde inte spara: ' + error.message; return; }
+    if (!data || !data.length) { st.textContent = 'Kunde inte spara (ingen behörighet?).'; return; }
+    resetSigForm();
+    await loadSignatures();
+    document.getElementById('mailSignature').value = data[0].id;
+    st.textContent = 'Sparad ✓';
+  } catch (err) {
+    st.textContent = 'Fel: ' + (err && err.message ? err.message : err);
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 document.getElementById('sendMailBtn').addEventListener('click', async () => {

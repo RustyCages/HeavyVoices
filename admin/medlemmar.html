@@ -108,6 +108,22 @@
     <p class="muted" style="margin-top: 0;">Mottagare: <span id="mailRecipients">inga markerade</span> — markera i listan ovan. Varje person får ett eget mejl och svar går till din e-postadress.</p>
     <input type="text" id="mailSubject" placeholder="Ämne" maxlength="200">
     <textarea id="mailMessage" placeholder="Meddelande...&#10;&#10;Tips: skriv {namn} så byts det mot mottagarens förnamn."></textarea>
+    <div class="toolbar" style="margin-top: 0; align-items: center;">
+      <label for="mailSignature" class="muted" style="margin:0;">Signatur:</label>
+      <select id="mailSignature" style="max-width: 16rem;"></select>
+      <button type="button" class="btn-outline" id="manageSigBtn">Hantera signaturer</button>
+    </div>
+    <div id="sigPanel" style="display:none; margin: 0.5rem 0 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: 0.6rem;">
+      <h4 style="margin: 0 0 0.6rem;">Signaturer</h4>
+      <div id="sigList" style="margin-bottom: 0.8rem;"></div>
+      <input type="text" id="sigName" placeholder="Namn på signaturen (syns bara för admins), t.ex. Kören" maxlength="60">
+      <textarea id="sigBody" placeholder="Text som hamnar sist i mejlet, t.ex.&#10;Hälsningar,&#10;Niklas&#10;Heavy Voices"></textarea>
+      <div class="toolbar" style="margin-top: 0;">
+        <button type="button" id="sigSaveBtn">Spara signatur</button>
+        <button type="button" class="btn-outline" id="sigCancelBtn" style="display:none;">Avbryt redigering</button>
+        <span class="muted" id="sigStatus"></span>
+      </div>
+    </div>
     <div class="toolbar" style="margin-top: 0;">
       <button type="button" id="sendMailBtn">Skicka mejl</button>
       <span class="muted" id="mailStatus"></span>
@@ -410,6 +426,95 @@ document.getElementById('resetFeesBtn').addEventListener('click', async () => {
   loadMembers();
 });
 
+// =========================================================
+// Signaturer (tabellen email_signatures, delas av alla admins)
+// =========================================================
+let signatures = [];
+let editingSigId = null;
+
+async function loadSignatures() {
+  const { data, error } = await supabaseClient.from('email_signatures').select('id, name, body').order('name');
+  const sel = document.getElementById('mailSignature');
+  if (error) { signatures = []; } else { signatures = data || []; }
+  const last = localStorage.getItem('hv_mail_signature') || '';
+  sel.innerHTML = '<option value="">Standard (Hälsningar, mitt namn)</option>' +
+    signatures.map(sg => `<option value="${sg.id}">${escapeHtmlSig(sg.name)}</option>`).join('');
+  if (signatures.some(sg => sg.id === last)) sel.value = last;
+  renderSigList();
+}
+
+function escapeHtmlSig(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderSigList() {
+  const el = document.getElementById('sigList');
+  if (!signatures.length) { el.innerHTML = '<p class="muted" style="margin:0;">Inga signaturer ännu.</p>'; return; }
+  el.innerHTML = signatures.map(sg => `
+    <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--border);">
+      <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtmlSig(sg.name)}</span>
+      <button type="button" class="btn-outline" data-sig-edit="${sg.id}">Redigera</button>
+      <button type="button" class="btn-outline" data-sig-del="${sg.id}">Ta bort</button>
+    </div>`).join('');
+  el.querySelectorAll('[data-sig-edit]').forEach(b => b.addEventListener('click', () => startEditSig(b.dataset.sigEdit)));
+  el.querySelectorAll('[data-sig-del]').forEach(b => b.addEventListener('click', () => deleteSig(b.dataset.sigDel)));
+}
+
+function resetSigForm() {
+  editingSigId = null;
+  document.getElementById('sigName').value = '';
+  document.getElementById('sigBody').value = '';
+  document.getElementById('sigSaveBtn').textContent = 'Spara signatur';
+  document.getElementById('sigCancelBtn').style.display = 'none';
+}
+
+function startEditSig(id) {
+  const sg = signatures.find(x => x.id === id);
+  if (!sg) return;
+  editingSigId = id;
+  document.getElementById('sigName').value = sg.name;
+  document.getElementById('sigBody').value = sg.body;
+  document.getElementById('sigSaveBtn').textContent = 'Uppdatera signatur';
+  document.getElementById('sigCancelBtn').style.display = '';
+  document.getElementById('sigName').focus();
+}
+
+async function deleteSig(id) {
+  const sg = signatures.find(x => x.id === id);
+  if (!sg || !confirm(`Ta bort signaturen "${sg.name}"?`)) return;
+  const { error } = await supabaseClient.from('email_signatures').delete().eq('id', id);
+  const st = document.getElementById('sigStatus');
+  if (error) { st.textContent = 'Kunde inte ta bort: ' + error.message; return; }
+  if (editingSigId === id) resetSigForm();
+  st.textContent = '';
+  await loadSignatures();
+}
+
+document.getElementById('manageSigBtn').addEventListener('click', () => {
+  const p = document.getElementById('sigPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+});
+document.getElementById('sigCancelBtn').addEventListener('click', () => { resetSigForm(); document.getElementById('sigStatus').textContent = ''; });
+document.getElementById('mailSignature').addEventListener('change', (e) => {
+  try { localStorage.setItem('hv_mail_signature', e.target.value); } catch (_) {}
+});
+document.getElementById('sigSaveBtn').addEventListener('click', async () => {
+  const name = document.getElementById('sigName').value.trim();
+  const body = document.getElementById('sigBody').value.trim();
+  const st = document.getElementById('sigStatus');
+  st.textContent = '';
+  if (!name) { st.textContent = 'Ge signaturen ett namn.'; return; }
+  if (!body) { st.textContent = 'Skriv signaturtexten.'; return; }
+  const q = editingSigId
+    ? supabaseClient.from('email_signatures').update({ name, body }).eq('id', editingSigId)
+    : supabaseClient.from('email_signatures').insert({ name, body });
+  const { error } = await q;
+  if (error) { st.textContent = 'Kunde inte spara: ' + error.message; return; }
+  resetSigForm();
+  st.textContent = 'Sparad ✓';
+  await loadSignatures();
+});
+
 document.getElementById('sendMailBtn').addEventListener('click', async () => {
   const subject = document.getElementById('mailSubject').value.trim();
   const message = document.getElementById('mailMessage').value.trim();
@@ -434,7 +539,7 @@ document.getElementById('sendMailBtn').addEventListener('click', async () => {
         'apikey': SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ subject, message, member_ids: ids }),
+      body: JSON.stringify({ subject, message, member_ids: ids, signature_id: document.getElementById('mailSignature').value || undefined }),
     });
     const result = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -508,6 +613,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   if (member) {
     currentUserId = member.id;
     loadMembers();
+    loadSignatures();
   }
 })();
 </script>

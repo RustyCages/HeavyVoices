@@ -87,7 +87,7 @@ body.party-page::after { right: 8vw; animation: party-sweep 11s ease-in-out infi
 
 /* listor */
 .party-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.8rem; }
-.song-card { display: grid; gap: 0.35rem; text-align: left; padding: 1rem 1.05rem; border-radius: 0.8rem; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); color: var(--text); font: inherit; cursor: pointer; }
+.song-card { display: grid; gap: 0.35rem; text-align: left; justify-content: stretch; justify-items: start; padding: 1rem 1.05rem; border-radius: 0.8rem; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); color: var(--text); font: inherit; cursor: pointer; }
 .song-card:hover { border-color: var(--accent); background: rgba(229, 169, 104, 0.08); color: var(--text); transform: translateY(-2px); box-shadow: none; }
 .song-card strong { font-family: 'Roboto Condensed', sans-serif; font-size: 1.15rem; }
 .song-card .meta { display: flex; gap: 0.35rem; flex-wrap: wrap; font-size: 0.75rem; color: var(--text-muted); }

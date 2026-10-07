@@ -86,10 +86,10 @@
       intro = 'Så här lägger du Heavy Voices på hemskärmen:';
       steps = [
         `Tryck på <span class="ia-ico">${ICON_SHARE}</span> <strong>Dela</strong> – ${isIOSChrome ? 'uppe till höger bredvid adressen' : 'längst ner på skärmen'}`,
-        `Dra upp listan och tryck på <span class="ia-ico">${ICON_ADD}</span> <strong>Lägg till på hemskärmen</strong>`,
+        `Hittar du den inte i listan? Tryck <strong>Visa mer</strong> eller dra upp listan. Tryck sedan på <span class="ia-ico">${ICON_ADD}</span> <strong>Lägg till på hemskärmen</strong>`,
         'Tryck <strong>Lägg till</strong>. Klart!',
       ];
-      note = isIOSChrome ? '' : 'Ser du inte Dela? Tryck först på <strong>•••</strong> längst ner.';
+      note = isIOSChrome ? '' : 'Ser du inte Dela? Tryck först på <strong>•••</strong> längst ner till höger, så finns Dela i menyn.';
       arrow = !isIOSChrome; // Safari: Dela-knappen sitter oftast längst ner
     } else if (isAndroid) {
       intro = 'Installera via webbläsarens meny:';

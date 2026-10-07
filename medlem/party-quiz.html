@@ -109,7 +109,7 @@
       <div class="q-box">
         <h3>Omgångar</h3>
         <div class="round-pick">
-          <label><input type="checkbox" name="round" value="online" checked><span><b>🎸 Rockfrågor</b><small>Nya slumpade rockfrågor varje gång, på engelska. Hämtas från the-trivia-api.com.</small></span></label>
+          <label><input type="checkbox" name="round" value="online" checked><span><b>🎸 Rockfrågor</b><small>Nya slumpade frågor varje gång – egna genererade frågor på svenska blandat med engelska frågor från the-trivia-api.com och opentdb.com.</small></span></label>
           <label id="rGuess"><input type="checkbox" name="round" value="guess" checked><span><b>🎧 Gissa låten</b><small>Ett klipp ur en slumpad rocklåt spelas – vilken låt är det? Hämtas från iTunes.</small></span></label>
           <label id="rLine"><input type="checkbox" name="round" value="line" checked><span><b>📝 Fortsätt raden</b><small>En rad ur en känd rocklåt – hur fortsätter den? Texter från lrclib.net (engelska).</small></span></label>
         </div>
@@ -174,7 +174,7 @@
       <button type="button" id="revealBtn">👀 Visa svaret</button>
       <button type="button" id="nextBtn" hidden>Nästa →</button>
     </div>
-    <p class="credit" id="credit" hidden>Källor: frågor från <a href="https://the-trivia-api.com" target="_blank" rel="noopener">The Trivia API</a> (CC BY-NC 4.0), låtklipp från iTunes/Apple Music och Deezer, sångtexter från <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a>.</p>
+    <p class="credit" id="credit" hidden>Källor: frågor från <a href="https://the-trivia-api.com" target="_blank" rel="noopener">The Trivia API</a> (CC BY-NC 4.0) och <a href="https://opentdb.com" target="_blank" rel="noopener">Open Trivia DB</a> (CC BY-SA 4.0), musikdata från iTunes och MusicBrainz, låtklipp från iTunes/Apple Music och Deezer, sångtexter från <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a>.</p>
   </section>
 
   <!-- resultat -->
@@ -193,6 +193,7 @@
 <script src="/js/auth.js"></script>
 <script src="/js/party.js"></script>
 <script src="/js/party-quiz-questions.js"></script>
+<script src="/js/party-music.js"></script>
 <script src="/js/vendor/qrcode.js"></script>
 <script>
 const TEAM_COLORS = ['#E5A968', '#ff3d5a', '#60a5fa', '#4ade80'];
@@ -375,6 +376,19 @@ const SEEN_KEY = 'hv-quiz-seen';
 function getSeen() { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '[]'); } catch (e) { return []; } }
 function addSeen(ids) { try { const all = getSeen().concat(ids); localStorage.setItem(SEEN_KEY, JSON.stringify(all.slice(-1500))); } catch (e) {} }
 const decodeHtml = t => { const el = document.createElement('textarea'); el.innerHTML = String(t ?? ''); return el.value; };
+// Rockfrågor = blandning av tre källor: The Trivia API (engelska), Open Trivia DB (engelska,
+// filtrerat på rock) och egna genererade frågor på svenska (iTunes/MusicBrainz – tar aldrig slut).
+async function fetchRockMix(n) {
+  const seen = getSeen();
+  const [ta, ot, ge] = await Promise.allSettled([fetchOnline(n), PartyMusic.openTriviaRock(n, seen), PartyMusic.makeRockQuestions(Math.ceil(n * 0.6) + 1, seen)]);
+  const lists = [ge, ta, ot].map(r => r.status === 'fulfilled' ? shuffle(r.value) : []);
+  if (!lists.some(l => l.length)) throw new Error('inga källor svarade');
+  const want = [Math.round(n * 0.4), Math.round(n * 0.35), n];   // ungefär 40 % genererade, 35 % Trivia API, resten Open Trivia
+  const out = [];
+  lists.forEach((l, i) => { while (l.length && out.length < Math.min(n, want.slice(0, i + 1).reduce((a, b) => a + b, 0))) out.push(l.shift()); });
+  for (const l of lists) while (l.length && out.length < n) out.push(l.shift());   // fyll på från de som har kvar
+  return shuffle(out);
+}
 async function fetchOnline(n) {
   const seen = new Set(getSeen());
   const out = [], got = new Set();
@@ -401,7 +415,7 @@ async function buildQuiz() {
   const per = Math.ceil(qCount / rounds.length);
   let qs = [];
   const NAMES = { online: 'rockfrågorna', guess: 'låtklippen', line: 'sångtexterna' };
-  const MAKE = { online: fetchOnline, guess: makeGuessOnline, line: makeLineOnline };
+  const MAKE = { online: fetchRockMix, guess: makeGuessOnline, line: makeLineOnline };
   const failed = [];
   const run = async (r, n) => { try { return await MAKE[r](n); } catch (e) { failed.push(r); return []; } };
   (await Promise.all(rounds.map(r => run(r, per)))).forEach(list => { qs = qs.concat(list); });

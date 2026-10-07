@@ -1,4 +1,5 @@
-// Party Mode – låtar online för Tidslinjen (medlem/party-tidslinje.html).
+// Party Mode – låtar online för Tidslinjen (medlem/party-tidslinje.html) och genererade
+// rockfrågor för Rockquiz (medlem/party-quiz.html).
 //  • iTunes Search API (JSONP): 30 s-klipp + utgivningsdatum
 //  • Deezer (JSONP): reservklipp om iTunes-klippet inte går att spela
 //  • MusicBrainz: originalets utgivningsår (iTunes visar ofta årtalet för en remaster/samling)
@@ -33,17 +34,20 @@
     if (cache.has(artist)) return cache.get(artist);
     const url = 'https://itunes.apple.com/search?' + new URLSearchParams({ term: artist, entity: 'song', attribute: 'artistTerm', limit: '50', country: 'se' });
     const data = await jsonp(url);
-    const want = norm(artist), byKey = new Map(), minYear = new Map();
+    const want = norm(artist), byKey = new Map(), minYear = new Map(), album = new Map();
+    const COMP = /greatest|best of|hits|collection|essential|anthology|live|deluxe|edition|anniversary|box set|gold|platinum|ultimate|definitive|years|story|singles|soundtrack|remaster/i;
     (data.results || []).forEach(r => {
       if (r.kind !== 'song' || !r.trackName || !r.artistName || !norm(r.artistName).startsWith(want)) return;
       const title = cleanTitle(r.trackName), key = norm(title);
       if (!key) return;
       const y = yearOf(r.releaseDate);
       if (y && (!minYear.has(key) || y < minYear.get(key))) minYear.set(key, y);
+      const alb = String(r.collectionName || '').replace(/\s*[\(\[].*?[\)\]]\s*/g, ' ').trim();
+      if (y && alb && !COMP.test(r.collectionName || '') && (!album.has(key) || y < album.get(key).y)) album.set(key, { y, name: alb });
       if (!r.previewUrl || SKIP.test(r.trackName) || SKIP.test(r.collectionName || '') || byKey.has(key)) return;
       byKey.set(key, { id: 'it' + r.trackId, title, artist: r.artistName.split(/\s+(feat\.?|&)\s+/i)[0], url: r.previewUrl });
     });
-    const out = [...byKey.entries()].map(([k, s]) => ({ ...s, year: minYear.get(k) || null })).filter(s => s.year);
+    const out = [...byKey.entries()].map(([k, s]) => ({ ...s, year: minYear.get(k) || null, album: album.has(k) && album.get(k).y === minYear.get(k) ? album.get(k).name : null })).filter(s => s.year);
     cache.set(artist, out);
     return out;
   }
@@ -142,5 +146,78 @@
     };
   }
 
-  root.PartyMusic = { createFeed, shuffle, norm };
+
+  // ---------- genererade rockfrågor (svenska) ur iTunes + MusicBrainz ----------
+  // Typer: vilket band, vilket årtionde/år, vilket album, vilken låt är INTE av …
+  const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
+  const decadeLabel = d => d >= 2000 ? `${d}-talet` : `${String(d).slice(2)}-talet`;
+  async function makeRockQuestions(n, seenIds) {
+    const seen = new Set(seenIds || []);
+    const artists = shuffle(root.ROCK_ARTISTS || []).slice(0, Math.min(14, n + 6));
+    const res = await Promise.allSettled(artists.map(artistSongs));
+    const pool = res.map((r, i) => ({ artist: artists[i], songs: r.status === 'fulfilled' ? r.value.slice(0, 15) : [] })).filter(x => x.songs.length >= 4);
+    if (pool.length < 4) throw new Error('för få artister');
+    const out = [], used = new Set();
+    const pickSong = A => shuffle(A.songs.slice(0, 10)).find(x => !used.has(x.id) && !seen.has('gen' + x.id));
+    const otherArtists = A => shuffle(pool.filter(B => B !== A)).map(B => B.songs[0].artist);
+    const types = shuffle(['band', 'band', 'year', 'year', 'album', 'odd']);
+    let mbCalls = 0;
+    for (let k = 0; out.length < n && k < n * 4; k++) {
+      const A = pool[k % pool.length], s = pickSong(A);
+      if (!s) continue;
+      const type = types[k % types.length];
+      let q = null;
+      if (type === 'band') {
+        if (norm(s.title).includes(norm(s.artist))) continue;   // titeln avslöjar svaret
+        const opts = [s.artist, ...otherArtists(A).filter(a => norm(a) !== norm(s.artist)).slice(0, 3)];
+        q = { text: `Vilket band/artist ligger bakom låten "${s.title}"?`, correct: s.artist, options: opts };
+      } else if (type === 'year') {
+        let y = s.year, exact = false;
+        if (mbCalls < 3) { mbCalls++; const m = await mbYear(s); if (m) { y = Math.min(y, m); exact = true; } }
+        if (exact) {
+          const set = new Set([y]); const deltas = shuffle([-6, -4, -3, -2, 2, 3, 4, 6]);
+          for (const d of deltas) { if (set.size >= 4) break; const v = y + d; if (v <= THIS_YEAR && v >= 1950) set.add(v); }
+          q = { text: `Vilket år släpptes "${s.title}" med ${s.artist}?`, correct: String(y), options: [...set].map(String) };
+        } else {
+          const d = Math.floor(y / 10) * 10, near = DECADES.filter(x => x !== d).sort((a, b) => Math.abs(a - d) - Math.abs(b - d)).slice(0, 3);
+          q = { text: `Från vilket årtionde är "${s.title}" med ${s.artist}?`, correct: decadeLabel(d), options: [d, ...near].sort((a, b) => a - b).map(decadeLabel), keepOrder: true };
+        }
+      } else if (type === 'album') {
+        const albums = [...new Set(A.songs.map(x => x.album).filter(Boolean))];
+        if (!s.album || albums.length < 4) continue;
+        q = { text: `På vilket ${s.artist}-album finns "${s.title}"?`, correct: s.album, options: [s.album, ...shuffle(albums.filter(a => a !== s.album)).slice(0, 3)] };
+      } else if (type === 'odd') {
+        const B = shuffle(pool.filter(x => x !== A))[0], intruder = B && pickSong(B);
+        const mine = shuffle(A.songs.slice(0, 12).filter(x => x !== s && norm(x.title) !== norm(intruder ? intruder.title : ''))).slice(0, 2);
+        if (!intruder || mine.length < 2) continue;
+        used.add(intruder.id);
+        q = { text: `Vilken av låtarna är INTE av ${s.artist}?`, correct: intruder.title, options: [intruder.title, s.title, ...mine.map(x => x.title)], fact: `"${intruder.title}" är av ${intruder.artist}` };
+      }
+      if (!q || new Set(q.options.map(norm)).size < 4) continue;
+      used.add(s.id);
+      out.push({ kind: 'online', id: 'gen' + s.id, label: '🎸 Rockfrågor', text: q.text, correct: q.correct, options: q.keepOrder ? q.options : shuffle(q.options), fact: q.fact || '' });
+    }
+    if (!out.length) throw new Error('inga genererade frågor');
+    return out;
+  }
+
+  // ---------- Open Trivia DB: musikfrågor som handlar om rock ----------
+  async function openTriviaRock(n, seenIds) {
+    const seen = new Set(seenIds || []);
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
+    try {
+      const res = await fetch('https://opentdb.com/api.php?amount=50&category=12&type=multiple&encode=url3986', { signal: ctl.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+      const dec = x => { try { return decodeURIComponent(x); } catch (e) { return x; } };
+      const names = (root.ROCK_ARTISTS || []).map(norm).filter(x => x.length > 3);
+      const ROCKY = /\b(rock|metal|punk|grunge|guitar|guitarist|drummer|bassist|riff|headbang|mosh)\b/i;
+      return (d.results || []).map(r => ({ text: dec(r.question), correct: dec(r.correct_answer), wrong: (r.incorrect_answers || []).map(dec) }))
+        .filter(r => { const all = norm([r.text, r.correct, ...r.wrong].join(' ')); return ROCKY.test(r.text) || names.some(a => (' ' + all + ' ').includes(' ' + a + ' ')); })
+        .map(r => ({ kind: 'online', id: 'otdb:' + norm(r.text).slice(0, 60), label: '🎸 Rockfrågor', text: r.text, correct: r.correct, options: shuffle([r.correct, ...r.wrong.slice(0, 3)]) }))
+        .filter(q => !seen.has(q.id)).slice(0, n);
+    } finally { clearTimeout(t); }
+  }
+
+  root.PartyMusic = { createFeed, shuffle, norm, makeRockQuestions, openTriviaRock };
 })(window);

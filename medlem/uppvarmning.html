@@ -385,6 +385,19 @@ document.getElementById('browseBtn').addEventListener('click', () => {
 document.getElementById('bMore').addEventListener('click', () => loadChannel(true));
 document.getElementById('bSearch').addEventListener('input', renderChannel);
 
+  document.getElementById('allBtn').addEventListener('click', (e) => {
+  const box = document.getElementById('allPlayer');
+  if (!box.hidden) { box.replaceChildren(); box.hidden = true; e.currentTarget.textContent = '▶ Visa alla videor'; return; }
+  const f = document.createElement('iframe');
+  f.src = 'https://www.youtube-nocookie.com/embed/videoseries?list=UUbAHuHgj0RjadzpDzZ0OWVA&rel=0&playsinline=1';
+  f.allow = 'autoplay; encrypted-media; fullscreen';
+  f.allowFullscreen = true;
+  f.title = 'Aussie Vocal Coach – alla videor';
+  box.replaceChildren(f);
+  box.hidden = false;
+  e.currentTarget.textContent = '✕ Stäng';
+});
+
 (async () => {
   const member = await requireAuth();
   if (!member) return;

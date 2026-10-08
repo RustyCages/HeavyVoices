@@ -8,44 +8,73 @@
 <link rel="stylesheet" href="/css/style.css">
 <style>
   .card.static:hover { transform: none; border-color: var(--border); box-shadow: var(--card-shadow); }
-  .row-flex { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
   .hint { font-size: 0.85rem; color: var(--text-muted); margin: 0.25rem 0 1rem; }
-
-  .transport { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 1rem 0 0.25rem; }
-  .transport .time { font-variant-numeric: tabular-nums; font-size: 0.85rem; color: var(--text-muted); min-width: 4.2rem; text-align: center; }
-  .transport input[type=range] { flex: 1; min-width: 160px; margin: 0; padding: 0; }
-  .play-btn { width: 2.8rem; height: 2.8rem; border-radius: 50%; justify-content: center; font-size: 1.1rem; padding: 0; }
-
-  .stem-sync-row { display: grid; grid-template-columns: minmax(80px, 1fr) auto auto; gap: 0.5rem 0.75rem; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
-  .stem-sync-row:last-child { border-bottom: none; }
-  .stem-name { font-weight: 600; min-width: 0; }
-  .stem-name small { display: block; font-weight: 400; font-size: 0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .stem-name .ref-tag { font-size: 0.7rem; color: var(--accent); font-weight: 600; margin-left: 0.35rem; }
-  .ms-ctrl { display: flex; align-items: center; gap: 0.25rem; }
-  .ms-ctrl button { padding: 0.3rem 0.45rem; font-size: 0.75rem; min-width: 2.4rem; justify-content: center; }
-  .ms-ctrl input { width: 5.2rem; margin: 0; padding: 0.35rem 0.4rem; text-align: right; font-variant-numeric: tabular-nums; }
-  .ms-ctrl .unit { font-size: 0.75rem; color: var(--text-muted); }
-  .ms-ctrl input.changed { border-color: var(--accent); }
-  .ms-ctrl input.nonzero { color: var(--accent); }
-  .ms-ctrl input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
-  .toggles { display: flex; gap: 0.3rem; }
-  .toggles button { width: 2.1rem; height: 2.1rem; padding: 0; justify-content: center; font-size: 0.75rem; font-weight: 700; }
-  .toggles button svg { width: 16px; height: 16px; }
-  .toggles .muteBtn.on { background: #ef4444; color: #fff; border-color: #ef4444; }
-  .toggles .soloBtn.on { background: var(--accent); color: #111317; border-color: var(--accent); }
-  .suggestion { grid-column: 1 / -1; font-size: 0.8rem; color: var(--text-muted); }
-  .suggestion.low { color: #facc15; }
-
-  .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.25rem; align-items: center; }
-  .save-state { font-size: 0.85rem; color: var(--text-muted); }
-  .save-state.dirty { color: var(--accent); }
+  .field-k { display: block; margin: 0 0 0.35rem; font-family: 'Roboto Condensed', sans-serif; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); }
   #loadingNote { color: var(--text-muted); }
 
-  @media (max-width: 640px) {
-    .stem-sync-row { grid-template-columns: 1fr auto; }
-    .ms-ctrl { grid-column: 1 / -1; justify-content: space-between; }
-    .ms-ctrl input { flex: 1; width: auto; }
-  }
+  .transport { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0 0.6rem; }
+  .transport .time { font-variant-numeric: tabular-nums; font-size: 0.85rem; color: var(--text-muted); min-width: 4.2rem; text-align: center; }
+  .play-btn { width: 2.8rem; height: 2.8rem; border-radius: 50%; justify-content: center; font-size: 1.1rem; padding: 0; }
+  .transport .sp { flex: 1; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 0.4rem 0.75rem; font-size: 0.85rem; background: transparent; color: var(--text); }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #111317; }
+  .zoom { display: inline-flex; align-items: center; gap: 0.3rem; }
+  .zoom button { width: 2rem; height: 2rem; padding: 0; justify-content: center; font-size: 1.05rem; }
+  .zoom .zv { min-width: 3.4rem; text-align: center; font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+  /* tidslinje */
+  .tl { position: relative; user-select: none; }
+  #ruler { display: block; width: 100%; height: 26px; cursor: pointer; border-bottom: 1px solid var(--border); }
+  .track { border-bottom: 1px solid var(--border); }
+  .track.active { background: rgba(229,169,104,0.05); }
+  .t-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.7rem; padding: 0.45rem 0.1rem 0.3rem; }
+  .t-name { font-weight: 600; min-width: 0; display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+  .t-name i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+  .t-name small { font-weight: 400; font-size: 0.72rem; color: var(--text-muted); }
+  .tag { font-size: 0.68rem; padding: 0.05rem 0.45rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); }
+  .tag.ref { color: var(--accent); border-color: rgba(229,169,104,0.5); }
+  .tag.edit { color: #facc15; border-color: rgba(250,204,21,0.5); }
+  .ms-ctrl { display: inline-flex; align-items: center; gap: 0.2rem; margin-left: auto; }
+  .ms-ctrl button { padding: 0.25rem 0.4rem; font-size: 0.72rem; min-width: 2.3rem; justify-content: center; }
+  .ms-ctrl input { width: 4.8rem; margin: 0; padding: 0.3rem 0.35rem; text-align: right; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+  .ms-ctrl input.changed { border-color: var(--accent); }
+  .ms-ctrl .unit { font-size: 0.72rem; color: var(--text-muted); }
+  .toggles { display: inline-flex; gap: 0.25rem; }
+  .toggles button { width: 2rem; height: 2rem; padding: 0; justify-content: center; font-size: 0.75rem; font-weight: 700; }
+  .toggles button svg { width: 15px; height: 15px; }
+  .toggles .muteBtn.on { background: #ef4444; color: #fff; border-color: #ef4444; }
+  .toggles .soloBtn.on { background: var(--accent); color: #111317; border-color: var(--accent); }
+  .wave { display: block; width: 100%; height: 72px; touch-action: none; }
+  .tl.tool-move .wave { cursor: grab; }
+  .tl.tool-move .wave.dragging { cursor: grabbing; }
+  .tl.tool-select .wave { cursor: text; }
+  .suggestion { font-size: 0.78rem; color: var(--text-muted); padding: 0 0.1rem 0.4rem; }
+  .suggestion.low { color: #facc15; }
+  .playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 6px rgba(0,0,0,0.6); pointer-events: none; z-index: 3; }
+
+  /* verktyg för valt spår */
+  .tools { margin-top: 1rem; padding: 0.8rem 0.9rem; border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(0,0,0,0.2); display: grid; gap: 0.6rem; }
+  .tools h3 { margin: 0; font-size: 1rem; }
+  .tools h3 span { color: var(--accent); }
+  .tool-row { display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; align-items: center; font-size: 0.85rem; }
+  .tool-row .k { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); min-width: 5.5rem; }
+  .tool-row button { font-size: 0.8rem; padding: 0.35rem 0.65rem; }
+  .tool-row input[type=number] { width: 5rem; margin: 0; padding: 0.3rem 0.4rem; }
+  .tool-row select { width: auto; margin: 0; padding: 0.3rem 0.45rem; font-size: 0.82rem; }
+  .status { font-size: 0.82rem; color: var(--text-muted); }
+  .status.warn { color: #facc15; }
+  .backups { display: grid; gap: 0.3rem; }
+  .backups div { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.8rem; color: var(--text-muted); }
+  .backups button { font-size: 0.75rem; padding: 0.25rem 0.55rem; }
+
+  .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; align-items: center; }
+  .save-state { font-size: 0.85rem; color: var(--text-muted); }
+  .save-state.dirty { color: var(--accent); }
+  .guide-box { margin-top: 1rem; font-size: 0.84rem; color: var(--text-muted); line-height: 1.55; }
+  .guide-box b { color: var(--text); }
+  @media (max-width: 640px) { .ms-ctrl { margin-left: 0; width: 100%; } .ms-ctrl input { flex: 1; } }
 </style>
 </head>
 <body>
@@ -53,33 +82,87 @@
 <div class="container">
   <a href="/admin/latar.html" class="back-btn">&larr; Tillbaka till låtar</a>
   <h1>Stämsynk</h1>
-  <p class="hint">Spela alla stämmor samtidigt och justera tills de ligger i fas. <strong>+ms</strong> = stämman spelas senare, <strong>−ms</strong> = tidigare. Ändringar hörs direkt; tryck <em>Spara</em> när det låter rätt. Tips: tysta alla utom två stämmor (eller använd S = solo) och lyssna på ett tydligt ansatsställe.</p>
+  <p class="hint">Lägg stämmorna och spåren i fas med varandra. Dra ett spår i sidled eller justera millisekunderna – det sparas som en förskjutning och gäller överallt (spelaren, Röstövning, karaoke). Behöver själva filen ändras kan du klippa, lägga till tystnad eller ändra tempo och spara en ny ljudfil – den gamla sparas som säkerhetskopia.</p>
 
   <div class="card static">
-    <label class="hint" for="songSelect" style="display:block; margin:0 0 0.3rem;">Låt</label>
+    <label class="field-k" for="songSelect">Låt</label>
     <select id="songSelect"><option value="">Laddar låtar…</option></select>
 
     <div id="syncArea" hidden>
       <div class="transport">
         <button class="play-btn" id="playBtn" title="Spela/pausa (mellanslag)">▶&#xFE0E;</button>
         <button class="btn-outline" id="backBtn" title="5 s bakåt">−5 s</button>
-        <span class="time" id="curTime">0:00.0</span>
-        <input type="range" id="scrubber" min="0" max="1" step="0.01" value="0">
-        <span class="time" id="durTime">0:00</span>
+        <span class="time" id="curTime">0:00.0</span><span class="time" id="durTime" style="min-width:auto">/ 0:00</span>
+        <span class="sp"></span>
+        <div class="seg" role="group" aria-label="Verktyg">
+          <button type="button" id="toolMove" aria-pressed="true" title="Dra ett spår i sidled för att flytta det (förskjutning)">↔ Flytta spår</button>
+          <button type="button" id="toolSelect" aria-pressed="false" title="Dra i ett spår för att markera ett område att klippa">▭ Markera</button>
+        </div>
+        <button class="btn-outline" id="markBtn" title="Sätt en markör vid spelhuvudet (M)">⚑ Markör</button>
+        <div class="zoom" role="group" aria-label="Zoom">
+          <button type="button" class="btn-outline" id="zoomOut" title="Zooma ut (−)">−</button>
+          <span class="zv" id="zoomVal"></span>
+          <button type="button" class="btn-outline" id="zoomIn" title="Zooma in (+)">+</button>
+          <button type="button" class="btn-outline" id="zoomFit" style="width:auto; padding:0 0.6rem; font-size:0.8rem;" title="Visa hela låten">Allt</button>
+        </div>
       </div>
 
-      <div id="stemRows"></div>
+      <div class="tl tool-move" id="tl">
+        <canvas id="ruler" title="Klicka för att hoppa, dra för att bläddra"></canvas>
+        <div id="tracks"></div>
+        <div class="playhead" id="playhead"></div>
+      </div>
+
+      <div class="tools" id="tools">
+        <h3>Valt spår: <span id="tName">–</span> <span class="status" id="tInfo"></span></h3>
+        <div class="tool-row">
+          <span class="k">Klipp</span>
+          <button type="button" class="btn-outline" id="tCut" title="Ta bort det markerade (Delete)">✂ Ta bort markerat</button>
+          <button type="button" class="btn-outline" id="tCrop" title="Behåll bara det markerade">⌗ Beskär till markerat</button>
+          <span class="status" id="selInfo">Markera ett område med ▭ Markera</span>
+        </div>
+        <div class="tool-row">
+          <span class="k">Tystnad</span>
+          <input type="number" id="silSec" value="0.5" min="0.01" max="60" step="0.05"> s
+          <button type="button" class="btn-outline" id="silStart">i början</button>
+          <button type="button" class="btn-outline" id="silHead" title="Vid spelhuvudet">vid spelhuvudet</button>
+          <button type="button" class="btn-outline" id="silEnd">i slutet</button>
+          <button type="button" class="btn-outline" id="tBake" title="Gör förskjutningen till en del av filen: tystnad läggs till eller början klipps bort, och förskjutningen blir 0">⇥ Baka in förskjutningen</button>
+        </div>
+        <div class="tool-row">
+          <span class="k">Tempo</span>
+          <input type="number" id="tPct" value="100" min="50" max="200" step="0.1"> %
+          <span class="status">eller BPM</span> <input type="number" id="bpmFrom" min="30" max="300" step="0.1" placeholder="nu"> → <input type="number" id="bpmTo" min="30" max="300" step="0.1" placeholder="ska bli">
+          <button type="button" class="btn-outline" id="tTempo" title="Ändrar tempot utan att ändra tonhöjden">⏱ Ändra tempo</button>
+        </div>
+        <div class="tool-row">
+          <span class="k">Fil</span>
+          <button type="button" class="btn-outline" id="tUndo" title="Ångra (Ctrl+Z)">↶ Ångra</button>
+          <button type="button" class="btn-outline" id="tOrig" title="Tillbaka till filen som den var när du öppnade sidan">⟲ Original</button>
+          <select id="fmt" title="Filformat"><option value="mp3">MP3 192 kbps</option><option value="wav">WAV (stor, förlustfri)</option></select>
+          <button type="button" class="btn-outline" id="tDownload">⬇ Ladda ner</button>
+          <button type="button" id="tSaveFile" title="Ersätter stämfilen i låten – den gamla sparas som säkerhetskopia">💾 Spara som stämfil</button>
+          <span class="status" id="fileStatus"></span>
+        </div>
+        <div class="tool-row" id="backupRow" hidden>
+          <span class="k">Kopior</span>
+          <div class="backups" id="backups"></div>
+        </div>
+      </div>
 
       <div class="actions">
         <label class="hint" style="margin:0;" for="refSelect">Referens:</label>
         <select id="refSelect" style="width:auto; margin:0;"></select>
-        <button class="btn-outline" id="autoBtn" title="Räknar ut förskjutningen för varje stämma mot referensen genom att jämföra ljudets energikurvor">Auto-synka</button>
+        <button class="btn-outline" id="autoBtn" title="Räknar ut förskjutningen för varje spår mot referensen – jämför tonhöjd/ackord och sedan ansatserna">Auto-synka</button>
       </div>
-
       <div class="actions">
-        <button id="saveBtn" disabled>Spara</button>
+        <button id="saveBtn" disabled>Spara förskjutningar</button>
         <button class="btn-outline" id="resetBtn">Nollställ alla</button>
         <span class="save-state" id="saveState"></span>
+      </div>
+      <div class="guide-box">
+        <b>Så gör du:</b> Välj <b>↔ Flytta spår</b> och dra ett spår tills topparna (trumslag, insatser) ligger rakt under referensens. Zooma in (+ eller Ctrl+hjul) för precision, finjustera med ±10 ms. Klicka i linjalen för att hoppa, <b>mellanslag</b> spelar/pausar, <b>S</b> = solo, högtalaren = tysta. <b>Spara förskjutningar</b> när det låter rätt.<br>
+        <b>Ändra filen:</b> välj <b>▭ Markera</b>, dra över ett område i ett spår och tryck <b>✂ Ta bort markerat</b> (t.ex. en inräkning), eller lägg till tystnad. <b>⏱ Ändra tempo</b> om ett spår är inspelat i ett annat tempo (fungerar bäst för små skillnader, några procent). Tryck <b>💾 Spara som stämfil</b> – den gamla filen sparas som säkerhetskopia och kan återställas. Notanalysen för stämman behöver göras om efteråt.
       </div>
     </div>
     <p id="loadingNote" hidden></p>
@@ -91,6 +174,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
+<script src="/js/audio-edit.js"></script>
 <script>
 const STEMS_BUCKET = 'heavy-voices-stems';
 const FIXED_STEMS = [
@@ -100,33 +184,28 @@ const FIXED_STEMS = [
   { col: 'stem_tenor_path',     label: 'Tenor' },
   { col: 'stem_bas_path',       label: 'Bas' },
 ];
-const MAX_OFFSET_MS = 5000;
+const COLORS = ['#E5A968', '#60a5fa', '#c084fc', '#34d399', '#f472b6', '#facc15', '#fb923c', '#a3e635'];
+const MAX_OFFSET_MS = 30000;
 const MUTE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>';
 
-let songs = [];
-let song = null;
-let stems = [];            // { key, label, path, buffer, offsetMs, savedMs, muted, solo }
-let audioCtx = null;
-let sources = [];
-let playing = false;
-let startCtxTime = 0, startPos = 0, pausedPos = 0;
-let timer = null;
-let loadToken = 0;
+let songs = [], song = null;
+let stems = [];   // { key, label, path, clip, buffer, peaks, orig, undo:[], edited, offsetMs, savedMs, muted, solo, color, canvas, rowEl }
+let audioCtx = null, sources = [], playing = false, startCtxTime = 0, startPos = 0, pausedPos = 0, raf = null, loadToken = 0;
+let view = { t0: 0, pps: 20 };   // tidslinjen: första synliga sekund + pixlar per sekund (css-px)
+let tool = 'move', active = null, sel = null, markers = [];
 
 // ---------- hjälpare ----------
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
-function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', 2800); }
+function toast(msg, ms = 2800) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
 function fmt(sec, tenths) {
-  sec = Math.max(0, sec || 0);
+  const neg = sec < 0; sec = Math.abs(sec || 0);
   const m = Math.floor(sec / 60), s = sec % 60;
-  return m + ':' + (tenths ? s.toFixed(1).padStart(4, '0') : String(Math.floor(s)).padStart(2, '0'));
+  return (neg ? '−' : '') + m + ':' + (tenths ? s.toFixed(1).padStart(4, '0') : String(Math.floor(s)).padStart(2, '0'));
 }
 function stemFilename(path) {
-  const base = (path || '').split('/').pop();
-  const parts = base.split('__');
-  return decodeURIComponent(parts.length > 1 ? parts.slice(1).join('__') : base);
+  const base = (path || '').split('/').pop(), parts = base.split('__');
+  try { return decodeURIComponent(parts.length > 1 ? parts.slice(1).join('__') : base); } catch (e) { return base; }
 }
-// Eget namn/ordning från admin (songs.stem_meta / lyric_meta = { order: [nyckel], labels: { nyckel: namn } })
 function applyPartMeta(items, meta, keyOf) {
   const m = meta || {}, labels = m.labels || {}, order = m.order || [];
   items.forEach(it => { const k = keyOf(it); if (labels[k]) it.label = labels[k]; });
@@ -134,162 +213,469 @@ function applyPartMeta(items, meta, keyOf) {
   return items.map((it, i) => ({ it, i })).sort((a, b) => (pos(a.it) - pos(b.it)) || (a.i - b.i)).map(x => x.it);
 }
 function stemListFor(s) {
-  const list = FIXED_STEMS.filter(f => s[f.col]).map(f => ({ key: f.col, label: f.label, path: s[f.col] }));
-  (s.extra_stems || []).forEach(ex => list.push({ key: ex.id, label: ex.label, path: ex.path }));
+  const list = FIXED_STEMS.filter(f => s[f.col]).map(f => ({ key: f.col, label: f.label, path: s[f.col], fixed: true }));
+  (s.extra_stems || []).forEach(ex => list.push({ key: ex.id, label: ex.label, path: ex.path, fixed: false }));
   return applyPartMeta(list, s.stem_meta, it => it.key);
 }
+// avkodning fungerar utan klick; resume() väntar på ett klick (webbläsarens autoplay-regler), så det görs bara vid uppspelning
+function getCtx() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
 async function ensureCtx() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  getCtx();
   if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} }
 }
+const offS = st => st.offsetMs / 1000;
+const stDur = st => st.clip ? AudioEdit.duration(st.clip) : 0;
+const dirtyOffsets = () => stems.some(st => st.offsetMs !== st.savedMs);
+const dirtyFiles = () => stems.some(st => st.edited);
 
 // ---------- uppspelning ----------
-function duration() { return Math.max(0, ...stems.map(st => st.buffer ? st.buffer.duration + st.offsetMs / 1000 : 0)); }
+function duration() { return Math.max(0, ...stems.map(st => stDur(st) + offS(st))); }
 function position() { return playing ? startPos + (audioCtx.currentTime - startCtxTime) : pausedPos; }
 function audible(st) { const anySolo = stems.some(x => x.solo); return anySolo ? st.solo : !st.muted; }
-
 function stopSources() {
   sources.forEach(({ src }) => { try { src.onended = null; src.stop(); } catch (e) {} try { src.disconnect(); } catch (e) {} });
   sources = [];
 }
-
 function startAt(pos) {
   stopSources();
-  const when = audioCtx.currentTime + 0.08;
+  const when = audioCtx.currentTime + 0.06;
   startCtxTime = when; startPos = pos;
   stems.forEach(st => {
     if (!st.buffer) return;
-    const o = st.offsetMs / 1000;
-    const inFile = pos - o;
+    const inFile = pos - offS(st);
     if (inFile >= st.buffer.duration) return;
-    const src = audioCtx.createBufferSource();
-    src.buffer = st.buffer;
-    const gain = audioCtx.createGain();
-    gain.gain.value = audible(st) ? 1 : 0;
+    const src = audioCtx.createBufferSource(); src.buffer = st.buffer;
+    const gain = audioCtx.createGain(); gain.gain.value = audible(st) ? 1 : 0;
     src.connect(gain); gain.connect(audioCtx.destination);
     if (inFile >= 0) src.start(when, inFile); else src.start(when - inFile, 0);
     sources.push({ st, src, gain });
   });
   playing = true;
-  document.getElementById('playBtn').textContent = '⏸\uFE0E';
-  clearInterval(timer);
-  timer = setInterval(tick, 100);
+  document.getElementById('playBtn').textContent = '⏸︎';
+  cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
 }
-
 function pause() {
   if (!playing) return;
-  pausedPos = position();
-  stopSources();
-  playing = false;
-  clearInterval(timer);
-  document.getElementById('playBtn').textContent = '▶\uFE0E';
+  pausedPos = position(); stopSources(); playing = false;
+  cancelAnimationFrame(raf);
+  document.getElementById('playBtn').textContent = '▶︎';
   tick();
 }
+function loop() { tick(); if (playing) raf = requestAnimationFrame(loop); }
+function seek(pos) {
+  pos = Math.max(0, Math.min(pos, duration()));
+  if (playing) startAt(pos); else { pausedPos = pos; tick(); }
+}
+function applyGains() { sources.forEach(({ st, gain }) => { gain.gain.value = audible(st) ? 1 : 0; }); }
+function restartIfPlaying() { if (playing) startAt(position()); }
 
+// ---------- tidslinje ----------
+function tlWidth() { return document.getElementById('ruler').clientWidth || 600; }
+const xOf = t => (t - view.t0) * view.pps;
+const tOf = x => view.t0 + x / view.pps;
+function clampView() {
+  const span = tlWidth() / view.pps, d = Math.max(duration(), span);
+  view.t0 = Math.max(Math.min(view.t0, d - span * 0.5), -span * 0.1);
+}
+function zoomTo(pps, aroundX) {
+  const ax = aroundX ?? tlWidth() / 2, at = tOf(ax);
+  view.pps = Math.max(2, Math.min(4000, pps));
+  view.t0 = at - ax / view.pps;
+  clampView(); drawAll();
+}
+function fitAll() { const d = duration() || 10; view.pps = Math.max(2, (tlWidth() - 10) / (d * 1.02)); view.t0 = 0; drawAll(); }
+function zoomLabel() {
+  const span = tlWidth() / view.pps;
+  document.getElementById('zoomVal').textContent = span >= 60 ? Math.round(span / 6) / 10 + ' min' : (span >= 10 ? Math.round(span) : span.toFixed(1)) + ' s';
+}
+function sizeCanvas(c) {
+  const dpr = window.devicePixelRatio || 1, w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  return dpr;
+}
+function drawRuler() {
+  const c = document.getElementById('ruler'), dpr = sizeCanvas(c), ctx = c.getContext('2d'), W = c.width, H = c.height;
+  ctx.clearRect(0, 0, W, H);
+  const span = W / dpr / view.pps;
+  const steps = [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120];
+  const step = steps.find(s => s * view.pps >= 70) || 300;
+  ctx.font = `${10.5 * dpr}px DM Sans, sans-serif`; ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.textBaseline = 'top';
+  for (let t = Math.ceil(view.t0 / step) * step; t < view.t0 + span; t += step) {
+    const x = xOf(t) * dpr;
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(Math.round(x), H * 0.55, 1, H * 0.45);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    const lbl = step < 1 ? (t < 60 ? t.toFixed(step < 0.1 ? 2 : 1) + ' s' : fmt(t, true)) : fmt(t);
+    ctx.fillText(lbl, x + 3 * dpr, 3 * dpr);
+  }
+  markers.forEach(m => { ctx.fillStyle = '#facc15'; ctx.fillText('⚑', xOf(m) * dpr - 4 * dpr, 12 * dpr); });
+}
+function drawTrack(st) {
+  const c = st.canvas; if (!c) return;
+  const dpr = sizeCanvas(c), ctx = c.getContext('2d'), W = c.width, H = c.height, mid = H / 2;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = st === active ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.015)'; ctx.fillRect(0, 0, W, H);
+  // ljudets utsträckning
+  const a = xOf(offS(st)) * dpr, b = xOf(offS(st) + stDur(st)) * dpr;
+  ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(Math.max(0, a), 0, Math.min(W, b) - Math.max(0, a), H);
+  // markering
+  if (sel && sel.st === st) {
+    const s0 = xOf(Math.min(sel.a, sel.b)) * dpr, s1 = xOf(Math.max(sel.a, sel.b)) * dpr;
+    ctx.fillStyle = 'rgba(96,165,250,0.25)'; ctx.fillRect(s0, 0, s1 - s0, H);
+    ctx.fillStyle = 'rgba(96,165,250,0.9)'; ctx.fillRect(s0, 0, 1 * dpr, H); ctx.fillRect(s1 - dpr, 0, 1 * dpr, H);
+  }
+  // vågform
+  const p = st.peaks; if (!p) return;
+  const amp = (H / 2 - 3 * dpr);
+  ctx.fillStyle = audible(st) ? st.color : 'rgba(255,255,255,0.18)';
+  const secPerPx = 1 / (view.pps * dpr), samplesDirect = view.pps * dpr > p.rate;
+  const ch0 = st.clip.channels[0], ch1 = st.clip.channels[1] || ch0, sr = st.clip.sampleRate;
+  for (let x = Math.max(0, Math.floor(a)); x < Math.min(W, Math.ceil(b)); x++) {
+    const ft = view.t0 + x * secPerPx - offS(st);
+    if (ft < 0) continue;
+    let lo = 0, hi = 0;
+    if (samplesDirect) {
+      const i0 = Math.floor(ft * sr), i1 = Math.max(i0 + 1, Math.floor((ft + secPerPx) * sr));
+      for (let i = i0; i < i1 && i < ch0.length; i++) { const v = (ch0[i] + ch1[i]) * 0.5; if (v < lo) lo = v; if (v > hi) hi = v; }
+    } else {
+      const i0 = Math.floor(ft * p.rate), i1 = Math.max(i0 + 1, Math.floor((ft + secPerPx) * p.rate));
+      for (let i = i0; i < i1 && i < p.min.length; i++) { if (p.min[i] < lo) lo = p.min[i]; if (p.max[i] > hi) hi = p.max[i]; }
+    }
+    const y0 = mid - hi * amp * 1.6, y1 = mid - lo * amp * 1.6;
+    ctx.fillRect(x, Math.max(1, y0), 1, Math.max(1, Math.min(H - 1, y1) - Math.max(1, y0)));
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, mid, W, 1);
+  markers.forEach(m => { ctx.fillStyle = 'rgba(250,204,21,0.6)'; ctx.fillRect(Math.round(xOf(m) * dpr), 0, dpr, H); });
+}
+function drawAll() { zoomLabel(); drawRuler(); stems.forEach(drawTrack); placePlayhead(); }
+function placePlayhead() {
+  const ph = document.getElementById('playhead'), x = xOf(position());
+  ph.style.display = x < 0 || x > tlWidth() ? 'none' : '';
+  ph.style.left = (document.getElementById('ruler').offsetLeft + x - 1) + 'px';
+}
 function tick() {
   const d = duration();
   let p = position();
   if (playing && p >= d) { pause(); pausedPos = 0; p = 0; }
   document.getElementById('curTime').textContent = fmt(p, true);
-  const sc = document.getElementById('scrubber');
-  if (!sc.matches(':active')) sc.value = Math.min(p, d);
+  // följ spelhuvudet: bläddra en sida när det går utanför
+  const span = tlWidth() / view.pps;
+  if (playing && (p > view.t0 + span * 0.95 || p < view.t0)) { view.t0 = p - span * 0.05; drawAll(); }
+  placePlayhead();
 }
 
-function seek(pos) {
-  pos = Math.max(0, Math.min(pos, duration()));
-  if (playing) startAt(pos); else { pausedPos = pos; tick(); }
-}
-
-function applyGains() { sources.forEach(({ st, gain }) => { gain.gain.value = audible(st) ? 1 : 0; }); }
-
-// ---------- rader ----------
-function renderRows() {
-  const wrap = document.getElementById('stemRows');
-  const ref = document.getElementById('refSelect').value;
+// ---------- spårrader ----------
+function renderTracks() {
+  const wrap = document.getElementById('tracks'), ref = document.getElementById('refSelect').value;
   wrap.innerHTML = '';
-  stems.forEach((st, i) => {
+  stems.forEach(st => {
     const row = document.createElement('div');
-    row.className = 'stem-sync-row';
+    row.className = 'track' + (st === active ? ' active' : '');
     row.innerHTML = `
-      <div class="stem-name">${esc(st.label)}${st.key === ref ? '<span class="ref-tag">REF</span>' : ''}<small>${esc(stemFilename(st.path))}</small></div>
-      <div class="ms-ctrl">
-        <button class="btn-outline" data-d="-50">−50</button>
-        <button class="btn-outline" data-d="-10">−10</button>
-        <input type="number" step="1" min="${-MAX_OFFSET_MS}" max="${MAX_OFFSET_MS}" value="${st.offsetMs}" aria-label="Förskjutning för ${esc(st.label)} i millisekunder">
-        <span class="unit">ms</span>
-        <button class="btn-outline" data-d="10">+10</button>
-        <button class="btn-outline" data-d="50">+50</button>
+      <div class="t-head">
+        <span class="t-name" title="Välj spåret för verktygen nedan"><i style="background:${st.color}"></i>${esc(st.label)}
+          <small>${esc(stemFilename(st.path))}</small>${st.key === ref ? '<span class="tag ref">REF</span>' : ''}${st.edited ? '<span class="tag edit">ändrad – osparad</span>' : ''}</span>
+        <span class="ms-ctrl">
+          <button class="btn-outline" data-d="-50">−50</button><button class="btn-outline" data-d="-10">−10</button>
+          <input type="number" step="1" min="${-MAX_OFFSET_MS}" max="${MAX_OFFSET_MS}" aria-label="Förskjutning för ${esc(st.label)} i millisekunder">
+          <span class="unit">ms</span>
+          <button class="btn-outline" data-d="10">+10</button><button class="btn-outline" data-d="50">+50</button>
+        </span>
+        <span class="toggles">
+          <button class="btn-outline muteBtn ${st.muted ? 'on' : ''}" title="Tysta">${MUTE_SVG}</button>
+          <button class="btn-outline soloBtn ${st.solo ? 'on' : ''}" title="Solo">S</button>
+        </span>
       </div>
-      <div class="toggles">
-        <button class="btn-outline muteBtn ${st.muted ? 'on' : ''}" title="Tysta">${MUTE_SVG}</button>
-        <button class="btn-outline soloBtn ${st.solo ? 'on' : ''}" title="Solo">S</button>
-      </div>
+      <canvas class="wave"></canvas>
       <div class="suggestion" hidden></div>`;
+    st.canvas = row.querySelector('canvas'); st.rowEl = row;
     const input = row.querySelector('input');
-    const refreshInput = () => {
-      input.value = st.offsetMs;
-      input.classList.toggle('changed', st.offsetMs !== st.savedMs);
-      input.classList.toggle('nonzero', st.offsetMs !== 0);
-    };
-    refreshInput();
-    const setOffset = (ms) => {
-      ms = Math.round(Math.max(-MAX_OFFSET_MS, Math.min(MAX_OFFSET_MS, Number(ms) || 0)));
-      if (ms === st.offsetMs) { refreshInput(); return; }
-      st.offsetMs = ms;
-      refreshInput();
-      onOffsetsChanged();
-    };
-    st.setOffset = setOffset;
-    st.rowEl = row;
-    row.querySelectorAll('.ms-ctrl button').forEach(b => b.addEventListener('click', () => setOffset(st.offsetMs + Number(b.dataset.d))));
-    input.addEventListener('change', () => setOffset(input.value));
-    row.querySelector('.muteBtn').addEventListener('click', (e) => { st.muted = !st.muted; e.currentTarget.classList.toggle('on', st.muted); applyGains(); });
-    row.querySelector('.soloBtn').addEventListener('click', (e) => { st.solo = !st.solo; e.currentTarget.classList.toggle('on', st.solo); applyGains(); });
+    st.refreshInput = () => { input.value = st.offsetMs; input.classList.toggle('changed', st.offsetMs !== st.savedMs); };
+    st.refreshInput();
+    row.querySelectorAll('.ms-ctrl button').forEach(b => b.addEventListener('click', () => setOffset(st, st.offsetMs + Number(b.dataset.d))));
+    input.addEventListener('change', () => setOffset(st, input.value));
+    row.querySelector('.muteBtn').addEventListener('click', e => { st.muted = !st.muted; e.currentTarget.classList.toggle('on', st.muted); applyGains(); drawTrack(st); });
+    row.querySelector('.soloBtn').addEventListener('click', e => { st.solo = !st.solo; e.currentTarget.classList.toggle('on', st.solo); applyGains(); stems.forEach(drawTrack); });
+    row.querySelector('.t-name').addEventListener('click', () => setActive(st));
+    wireWave(st);
     wrap.appendChild(row);
   });
+  requestAnimationFrame(drawAll);
+}
+function setOffset(st, ms, live) {
+  ms = Math.round(Math.max(-MAX_OFFSET_MS, Math.min(MAX_OFFSET_MS, Number(ms) || 0)));
+  if (ms === st.offsetMs) { st.refreshInput && st.refreshInput(); return; }
+  st.offsetMs = ms; st.refreshInput && st.refreshInput();
+  drawTrack(st); updateSaveState();
+  if (!live) restartIfPlaying();
+}
+function setActive(st) {
+  active = st;
+  document.querySelectorAll('.track').forEach(r => r.classList.toggle('active', r === st.rowEl));
+  stems.forEach(drawTrack);
+  renderTools();
 }
 
-function onOffsetsChanged() {
-  const d = duration();
-  document.getElementById('scrubber').max = d || 1;
-  document.getElementById('durTime').textContent = fmt(d);
-  if (playing) startAt(position());   // hör ändringen direkt, från samma ställe
-  updateSaveState();
+// dra i vågformen: flytta spåret (förskjutning) eller markera ett område
+function wireWave(st) {
+  const c = st.canvas;
+  let drag = null;
+  c.addEventListener('pointerdown', e => {
+    const r = c.getBoundingClientRect(), x = e.clientX - r.left;
+    if (active !== st) setActive(st);
+    drag = { x0: e.clientX, t: tOf(x), off: st.offsetMs, moved: false };
+    if (tool === 'select') { sel = { st, a: drag.t, b: drag.t }; renderSelInfo(); }
+    c.setPointerCapture(e.pointerId); c.classList.add('dragging');
+  });
+  c.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x0;
+    if (!drag.moved && Math.abs(dx) < 3) return;
+    drag.moved = true;
+    if (tool === 'move') setOffset(st, drag.off + dx / view.pps * 1000, true);
+    else { const r = c.getBoundingClientRect(); sel.b = tOf(e.clientX - r.left); drawTrack(st); renderSelInfo(); }
+  });
+  const end = () => {
+    if (!drag) return;
+    const d = drag; drag = null; c.classList.remove('dragging');
+    if (!d.moved) { if (tool === 'select') { sel = null; renderSelInfo(); drawTrack(st); } seek(d.t); return; }
+    if (tool === 'move') restartIfPlaying();
+  };
+  c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
 }
 
+// ---------- verktyg för valt spår ----------
+function fileT(st, t) { return Math.max(0, Math.min(stDur(st), t - offS(st))); }
+function renderSelInfo() {
+  const el = document.getElementById('selInfo');
+  if (!sel || Math.abs(sel.b - sel.a) < 0.005) { el.textContent = tool === 'select' ? 'Dra i ett spår för att markera' : 'Välj ▭ Markera och dra i ett spår'; return; }
+  const a = Math.min(sel.a, sel.b), b = Math.max(sel.a, sel.b);
+  el.textContent = `Markerat i ${sel.st.label}: ${fmt(a, true)}–${fmt(b, true)} (${(b - a).toFixed(2)} s)`;
+}
+function renderTools() {
+  const st = active;
+  document.getElementById('tName').textContent = st ? st.label : '–';
+  document.getElementById('tInfo').textContent = st ? `${fmt(stDur(st), true)} · ${st.clip.sampleRate} Hz · ${st.clip.channels.length === 2 ? 'stereo' : 'mono'}` : '';
+  document.querySelectorAll('#tools button, #tools input, #tools select').forEach(b => { b.disabled = !st; });
+  if (st) {
+    document.getElementById('tUndo').disabled = !st.undo.length;
+    document.getElementById('tOrig').disabled = !st.edited && !st.undo.length;
+    const bp = (song.stem_backups || {})[st.key] || [];
+    document.getElementById('backupRow').hidden = !bp.length;
+    document.getElementById('backups').innerHTML = bp.map((b, i) => `<div>${new Date(b.at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })} · ${esc(stemFilename(b.path))}${b.note ? ' · ' + esc(b.note) : ''}
+      <button type="button" class="btn-outline" data-bi="${i}" data-ba="dl">⬇</button><button type="button" class="btn-outline" data-bi="${i}" data-ba="restore">↺ Återställ</button></div>`).join('');
+    document.querySelectorAll('#backups button').forEach(b => b.addEventListener('click', () => backupAction(st, Number(b.dataset.bi), b.dataset.ba)));
+  } else document.getElementById('backupRow').hidden = true;
+  renderSelInfo();
+}
+function setStatus(msg, warn) { const el = document.getElementById('fileStatus'); el.textContent = msg || ''; el.classList.toggle('warn', !!warn); }
+// ändra spårets ljud (med ångra)
+function applyEdit(st, clip, newOffsetMs, note) {
+  st.undo.push({ clip: st.clip, offsetMs: st.offsetMs }); if (st.undo.length > 8) st.undo.shift();
+  st.clip = clip; st.buffer = AudioEdit.toBuffer(audioCtx, clip); st.peaks = AudioEdit.peaks(clip);
+  st.edited = true;
+  if (newOffsetMs != null) setOffset(st, newOffsetMs, true);
+  sel = null;
+  renderTracks(); setActive(st); restartIfPlaying(); updateSaveState();
+  setStatus(note + ' – osparat. Spara som stämfil eller ladda ner.', true);
+}
+function needSel() {
+  if (!sel || sel.st !== active || Math.abs(sel.b - sel.a) < 0.01) { toast('Markera först ett område i det valda spåret (▭ Markera och dra)'); return null; }
+  return [fileT(active, Math.min(sel.a, sel.b)), fileT(active, Math.max(sel.a, sel.b))];
+}
+document.getElementById('tCut').addEventListener('click', () => {
+  const r = needSel(); if (!r) return;
+  const c = AudioEdit.cut(active.clip, r[0], r[1]); AudioEdit.fadeEdges(c, r[0]);
+  applyEdit(active, c, null, `${(r[1] - r[0]).toFixed(2)} s borttaget`);
+});
+document.getElementById('tCrop').addEventListener('click', () => {
+  const r = needSel(); if (!r) return;
+  // det som blir kvar ska ligga kvar på samma ställe i låten → förskjutningen flyttas med
+  applyEdit(active, AudioEdit.crop(active.clip, r[0], r[1]), active.offsetMs + Math.round(r[0] * 1000), 'Beskuret');
+});
+const silSec = () => Math.max(0.01, Math.min(60, Number(document.getElementById('silSec').value) || 0.5));
+document.getElementById('silStart').addEventListener('click', () => applyEdit(active, AudioEdit.insertSilence(active.clip, 0, silSec()), null, `${silSec()} s tystnad i början`));
+document.getElementById('silEnd').addEventListener('click', () => applyEdit(active, AudioEdit.insertSilence(active.clip, stDur(active), silSec()), null, `${silSec()} s tystnad i slutet`));
+document.getElementById('silHead').addEventListener('click', () => {
+  const at = position() - offS(active);
+  if (at <= 0 || at >= stDur(active)) { toast('Spelhuvudet ligger utanför spåret'); return; }
+  applyEdit(active, AudioEdit.insertSilence(active.clip, at, silSec()), null, `${silSec()} s tystnad vid ${fmt(position(), true)}`);
+});
+document.getElementById('tBake').addEventListener('click', () => {
+  const st = active, o = offS(st);
+  if (!st.offsetMs) { toast('Spåret har ingen förskjutning att baka in'); return; }
+  const c = o > 0 ? AudioEdit.insertSilence(st.clip, 0, o) : AudioEdit.crop(st.clip, -o, stDur(st));
+  applyEdit(st, c, 0, o > 0 ? `${o.toFixed(3)} s tystnad tillagd i början` : `${(-o).toFixed(3)} s klippt i början`);
+});
+// tempo: % eller från BPM → till BPM
+['bpmFrom', 'bpmTo'].forEach(id => document.getElementById(id).addEventListener('input', () => {
+  const a = Number(document.getElementById('bpmFrom').value), b = Number(document.getElementById('bpmTo').value);
+  if (a > 0 && b > 0) document.getElementById('tPct').value = Math.round(b / a * 10000) / 100;
+}));
+document.getElementById('tTempo').addEventListener('click', async () => {
+  const pct = Number(document.getElementById('tPct').value);
+  if (!(pct >= 50 && pct <= 200) || pct === 100) { toast('Ange ett tempo mellan 50 och 200 % (100 = oförändrat)'); return; }
+  const st = active, btn = document.getElementById('tTempo');
+  btn.disabled = true; setStatus(`Ändrar tempot till ${pct} %… (kan ta några sekunder)`);
+  await new Promise(r => setTimeout(r, 40));
+  try {
+    const c = AudioEdit.timeStretch(st.clip, pct / 100);
+    // starten ligger kvar på samma ställe i låten
+    applyEdit(st, c, null, `Tempo ${pct} %`);
+    document.getElementById('tPct').value = 100; document.getElementById('bpmFrom').value = ''; document.getElementById('bpmTo').value = '';
+  } catch (e) { setStatus('Kunde inte ändra tempot: ' + (e.message || e), true); }
+  btn.disabled = false;
+});
+document.getElementById('tUndo').addEventListener('click', () => undo(active));
+function undo(st) {
+  if (!st || !st.undo.length) return;
+  const u = st.undo.pop();
+  st.clip = u.clip; st.buffer = AudioEdit.toBuffer(audioCtx, u.clip); st.peaks = AudioEdit.peaks(u.clip);
+  st.edited = st.clip !== st.orig;
+  setOffset(st, u.offsetMs, true);
+  renderTracks(); setActive(st); restartIfPlaying(); updateSaveState();
+  setStatus(st.edited ? 'Ångrat – fortfarande ändrat' : 'Ångrat – som originalet');
+}
+document.getElementById('tOrig').addEventListener('click', () => {
+  const st = active; if (!st || !confirm(`Släppa alla ändringar i ${st.label} och gå tillbaka till filen som den var?`)) return;
+  st.undo.push({ clip: st.clip, offsetMs: st.offsetMs });
+  st.clip = st.orig; st.buffer = AudioEdit.toBuffer(audioCtx, st.orig); st.peaks = AudioEdit.peaks(st.orig); st.edited = false;
+  setOffset(st, st.origOffsetMs, true);
+  renderTracks(); setActive(st); restartIfPlaying(); updateSaveState(); setStatus('Tillbaka till originalet');
+});
+
+// ---------- spara / ladda ner ljudfil ----------
+async function encode(st) {
+  const fmtSel = document.getElementById('fmt').value;
+  if (fmtSel === 'wav') return { blob: AudioEdit.encodeWav(st.clip), ext: 'wav', type: 'audio/wav' };
+  setStatus('Kodar MP3… 0 %');
+  const blob = await AudioEdit.encodeMp3(st.clip, 192, p => setStatus(`Kodar MP3… ${Math.round(p * 100)} %`));
+  return { blob, ext: 'mp3', type: 'audio/mpeg' };
+}
+function baseName(st) {
+  return stemFilename(st.path).replace(/\.[a-z0-9]+$/i, '').replace(/-redigerad-\d{6}-\d{4}$/, '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.\-]+/g, '_').slice(0, 80) || 'stamfil';
+}
+function stamp() { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${String(d.getFullYear()).slice(2)}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; }
+document.getElementById('tDownload').addEventListener('click', async () => {
+  const st = active; if (!st) return;
+  try {
+    const { blob, ext } = await encode(st);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${baseName(st)}${st.edited ? '-redigerad' : ''}.${ext}`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    setStatus(`Nedladdad (${(blob.size / 1048576).toFixed(1)} MB)`);
+  } catch (e) { setStatus('Kunde inte skapa filen: ' + (e.message || e), true); }
+});
+// skriv stämmans nya sökväg i låten (fasta kolumner eller extra_stems) + säkerhetskopia + förskjutning
+async function setStemPath(st, newPath, backupNote, newOffsetMs) {
+  const backups = JSON.parse(JSON.stringify(song.stem_backups || {}));
+  const list = backups[st.key] || (backups[st.key] = []);
+  list.unshift({ path: st.path, at: new Date().toISOString(), offsetMs: st.savedMs, note: backupNote });
+  const offsets = { ...(song.stem_offsets || {}) };
+  if (newOffsetMs) offsets[st.key] = newOffsetMs; else delete offsets[st.key];
+  const update = { stem_backups: backups, stem_offsets: offsets };
+  if (st.fixed) update[st.key] = newPath;
+  else update.extra_stems = (song.extra_stems || []).map(x => x.id === st.key ? { ...x, path: newPath } : x);
+  const { error } = await supabaseClient.from('songs').update(update).eq('id', song.id);
+  if (error) throw error;
+  Object.assign(song, update);
+  st.path = newPath; st.savedMs = newOffsetMs; st.offsetMs = newOffsetMs;
+}
+document.getElementById('tSaveFile').addEventListener('click', async () => {
+  const st = active; if (!st) return;
+  if (!st.edited && !confirm(`${st.label} är inte ändrad. Spara den ändå som ny stämfil?`)) return;
+  if (!confirm(`Ersätta stämfilen för ${st.label} i låten?\n\nDen nuvarande filen sparas som säkerhetskopia och kan återställas här. Notanalysen för stämman behöver göras om i Röstövning efteråt.`)) return;
+  const btn = document.getElementById('tSaveFile'); btn.disabled = true;
+  try {
+    const { blob, ext, type } = await encode(st);
+    const name = `${baseName(st)}-redigerad-${stamp()}.${ext}`;
+    const path = st.fixed ? `${song.id}/${st.key}__${name}` : `${song.id}/stem_${st.key}__${name}`;
+    setStatus(`Laddar upp ${(blob.size / 1048576).toFixed(1)} MB…`);
+    const { error } = await supabaseClient.storage.from(STEMS_BUCKET).upload(path, blob, { upsert: false, contentType: type });
+    if (error) throw error;
+    await setStemPath(st, path, st.editNote || 'före redigering', st.offsetMs);
+    st.orig = st.clip; st.origOffsetMs = st.offsetMs; st.edited = false; st.undo = [];
+    renderTracks(); setActive(st); updateSaveState();
+    setStatus('Sparad ✓ – medlemmarna får den nya filen. Analysera stämman igen i Röstövning.');
+    toast('Stämfilen ersatt – den gamla finns som säkerhetskopia');
+  } catch (e) { setStatus('Kunde inte spara: ' + (e.message || e), true); }
+  btn.disabled = false;
+});
+async function backupAction(st, i, act) {
+  const b = ((song.stem_backups || {})[st.key] || [])[i]; if (!b) return;
+  if (act === 'dl') {
+    const { data, error } = await supabaseClient.storage.from(STEMS_BUCKET).createSignedUrl(b.path, 600, { download: stemFilename(b.path) });
+    if (error) { toast('Kunde inte hämta: ' + error.message); return; }
+    location.href = data.signedUrl; return;
+  }
+  if (st.edited && !confirm('Spåret har osparade ändringar som försvinner. Fortsätta?')) return;
+  if (!confirm(`Återställa ${st.label} till kopian från ${new Date(b.at).toLocaleString('sv-SE')}?\n\nDen nuvarande filen sparas i sin tur som kopia.`)) return;
+  try {
+    setStatus('Återställer…');
+    const old = { path: st.path, offsetMs: st.savedMs };
+    // ta bort den återställda ur listan och lägg den nuvarande överst
+    const backups = JSON.parse(JSON.stringify(song.stem_backups || {}));
+    backups[st.key] = (backups[st.key] || []).filter((_, k) => k !== i);
+    song.stem_backups = backups;
+    st.savedMs = old.offsetMs;
+    await setStemPath(st, b.path, 'innan återställning', Math.round(Number(b.offsetMs) || 0));
+    const clip = await loadClip(b.path);
+    st.clip = st.orig = clip; st.origOffsetMs = st.offsetMs; st.buffer = AudioEdit.toBuffer(audioCtx, clip); st.peaks = AudioEdit.peaks(clip);
+    st.edited = false; st.undo = [];
+    renderTracks(); setActive(st); restartIfPlaying(); updateSaveState();
+    setStatus('Återställd ✓ – analysera stämman igen i Röstövning om noterna inte stämmer.');
+  } catch (e) { setStatus('Kunde inte återställa: ' + (e.message || e), true); }
+}
+
+// ---------- förskjutningar ----------
 function updateSaveState() {
-  const dirty = stems.some(st => st.offsetMs !== st.savedMs);
-  document.getElementById('saveBtn').disabled = !dirty;
+  const d = dirtyOffsets();
+  document.getElementById('saveBtn').disabled = !d;
+  document.getElementById('durTime').textContent = '/ ' + fmt(duration());
   const el = document.getElementById('saveState');
-  el.textContent = dirty ? 'Osparade ändringar' : (stems.some(st => st.savedMs) ? 'Sparat' : '');
-  el.classList.toggle('dirty', dirty);
+  el.textContent = d ? 'Osparade förskjutningar' : (dirtyFiles() ? 'Ändrade ljudfiler är inte sparade' : (stems.some(st => st.savedMs) ? 'Sparat' : ''));
+  el.classList.toggle('dirty', d || dirtyFiles());
+}
+async function saveOffsets() {
+  const offsets = { ...(song.stem_offsets || {}) };
+  stems.forEach(st => { if (st.offsetMs) offsets[st.key] = st.offsetMs; else delete offsets[st.key]; });
+  const btn = document.getElementById('saveBtn'); btn.disabled = true;
+  const { error } = await supabaseClient.from('songs').update({ stem_offsets: offsets }).eq('id', song.id);
+  if (error) { toast('Kunde inte spara: ' + error.message); updateSaveState(); return; }
+  song.stem_offsets = offsets;
+  stems.forEach(st => { st.savedMs = st.offsetMs; st.refreshInput(); });
+  updateSaveState();
+  toast(dirtyFiles() ? 'Förskjutningarna sparade – obs: ändrade ljudfiler är inte sparade än' : 'Sparat – medlemmarnas spelare använder nu de nya värdena');
 }
 
 // ---------- ladda låt ----------
+async function loadClip(path) {
+  const { data, error } = await supabaseClient.storage.from(STEMS_BUCKET).createSignedUrl(path, 3600);
+  if (error) throw error;
+  const resp = await fetch(data.signedUrl);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return AudioEdit.fromBuffer(await audioCtx.decodeAudioData(await resp.arrayBuffer()));
+}
 async function loadSong(id) {
   const myToken = ++loadToken;
-  pause(); pausedPos = 0;
+  pause(); pausedPos = 0; sel = null; markers = []; active = null;
   song = songs.find(s => String(s.id) === String(id)) || null;
   document.getElementById('syncArea').hidden = true;
   if (!song) return;
   history.replaceState(null, '', '?song=' + encodeURIComponent(id));
-
   const note = document.getElementById('loadingNote');
-  note.hidden = false;
-  note.textContent = 'Laddar och avkodar stämfiler…';
-
+  note.hidden = false; note.textContent = 'Laddar och avkodar stämfiler…';
   const saved = song.stem_offsets || {};
   try {
-    await ensureCtx();
+    getCtx();
     const list = stemListFor(song);
-    const loaded = await Promise.all(list.map(async (st) => {
-      const { data, error } = await supabaseClient.storage.from(STEMS_BUCKET).createSignedUrl(st.path, 3600);
-      if (error) throw error;
-      const resp = await fetch(data.signedUrl);
-      if (!resp.ok) throw new Error(`${st.label}: HTTP ${resp.status}`);
-      const buffer = await audioCtx.decodeAudioData(await resp.arrayBuffer());
+    let done = 0;
+    const loaded = await Promise.all(list.map(async (st, i) => {
+      let clip;
+      try { clip = await loadClip(st.path); } catch (e) { throw new Error(`${st.label}: ${e.message || e}`); }
+      note.textContent = `Laddar och avkodar stämfiler… ${++done}/${list.length}`;
       const ms = Math.round(Number(saved[st.key]) || 0);
-      return { ...st, buffer, offsetMs: ms, savedMs: ms, muted: false, solo: false };
+      return { ...st, clip, orig: clip, buffer: AudioEdit.toBuffer(audioCtx, clip), peaks: AudioEdit.peaks(clip), undo: [], edited: false,
+        offsetMs: ms, savedMs: ms, origOffsetMs: ms, muted: false, solo: false, color: COLORS[i % COLORS.length] };
     }));
     if (myToken !== loadToken) return;
     stems = loaded;
@@ -298,161 +684,211 @@ async function loadSong(id) {
     note.textContent = 'Kunde inte ladda stämfilerna: ' + (e.message || e);
     return;
   }
-
   note.hidden = true;
   const refSel = document.getElementById('refSelect');
-  const defaultRef = stems.find(st => st.key === 'stem_backtrack_path') || stems[0];
+  // helst hela mixen (innehåller både sång och komp), annars backtrack/instrumental
+  const defaultRef = stems.find(st => /\bfull\b|mix/i.test(st.label)) || stems.find(st => st.key === 'stem_backtrack_path') || stems.find(st => /instrument/i.test(st.label)) || stems[0];
   refSel.innerHTML = stems.map(st => `<option value="${esc(st.key)}" ${st === defaultRef ? 'selected' : ''}>${esc(st.label)}</option>`).join('');
-  renderRows();
-  onOffsetsChanged();
-  tick();
   document.getElementById('syncArea').hidden = false;
+  active = stems[0];
+  renderTracks(); renderTools(); updateSaveState();
+  requestAnimationFrame(() => { fitAll(); tick(); });
 }
 
 // ---------- auto-synk ----------
-// Gör om varje spår till en energikurva (1 värde/ms), tar fram ansatser (ökning i energi)
-// och korskorrelerar mot referensen inom ±1 s. Toppen = hur mycket spåret ligger efter.
-const ENV_RATE = 1000;       // värden per sekund (1 ms upplösning)
-const ANALYSE_SEC = 90;      // analysera de första 90 s
-const MAX_LAG_MS = 1000;
-
-function onsetEnvelope(buffer) {
-  const hop = Math.max(1, Math.round(buffer.sampleRate / ENV_RATE));
-  const n = Math.min(Math.floor(buffer.length / hop), ANALYSE_SEC * ENV_RATE);
-  const chans = [];
-  for (let c = 0; c < buffer.numberOfChannels; c++) chans.push(buffer.getChannelData(c));
-  const env = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    let sum = 0;
-    const start = i * hop;
-    for (let j = 0; j < hop; j++) {
-      let v = 0;
-      for (const ch of chans) v += ch[start + j];
-      sum += v * v;
-    }
-    env[i] = Math.sqrt(sum / hop);
-  }
-  // utjämna lite (5 ms) och ta positiv derivata → ansatser
-  const out = new Float32Array(n);
-  let prev = 0;
-  for (let i = 0; i < n; i++) {
-    let s = 0, k = 0;
-    for (let j = Math.max(0, i - 2); j <= Math.min(n - 1, i + 2); j++) { s += env[j]; k++; }
-    const sm = s / k;
-    out[i] = Math.max(0, sm - prev);
-    prev = sm;
-  }
-  // normalisera (medel 0, varians 1) så att starka och svaga spår väger lika
-  let mean = 0; for (let i = 0; i < n; i++) mean += out[i]; mean /= n || 1;
-  let vr = 0; for (let i = 0; i < n; i++) { out[i] -= mean; vr += out[i] * out[i]; }
-  const sd = Math.sqrt(vr / (n || 1)) || 1;
-  for (let i = 0; i < n; i++) out[i] /= sd;
-  return out;
+// 1) grovt (±8 s): ackord-/tonhöjdsprofil (kromagram, 12 tonklasser var 40:e ms) – fungerar även sång mot hel mix
+// 2) fint (±60 ms runt det grova): ansatser i energin, 1 ms upplösning
+const ANALYSE_SEC = 90;
+function monoOf(clip, maxSec) {
+  const n = Math.min(clip.channels[0].length, Math.round(maxSec * clip.sampleRate));
+  const m = new Float32Array(n), a = clip.channels[0], b = clip.channels[1] || a;
+  for (let i = 0; i < n; i++) m[i] = (a[i] + b[i]) * 0.5;
+  return m;
 }
-
-// Returnerar { lagMs, confidence }: lagMs > 0 betyder att spåret ligger efter referensen.
-function bestLag(ref, sig) {
-  const n = Math.min(ref.length, sig.length);
-  let best = -Infinity, bestLag = 0;
-  const scores = [];
-  for (let lag = -MAX_LAG_MS; lag <= MAX_LAG_MS; lag++) {
-    let s = 0;
-    const from = Math.max(0, -lag), to = Math.min(n, n - lag);
-    for (let t = from; t < to; t++) s += ref[t] * sig[t + lag];
-    s /= (to - from) || 1;
-    scores.push(s);
+function fft(re, im) {   // radix-2 på plats
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; } }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const a = i + k, b = a + len / 2, tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+        const nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+      }
+    }
+  }
+}
+function chroma(clip) {
+  const sr = clip.sampleRate, x = monoOf(clip, ANALYSE_SEC), hop = Math.round(sr * 0.04), N = 2048;
+  const frames = Math.max(0, Math.floor((x.length - N) / hop));
+  const out = new Float32Array(frames * 12), re = new Float32Array(N), im = new Float32Array(N);
+  const binPc = new Int8Array(N / 2).fill(-1);
+  for (let k = 1; k < N / 2; k++) { const f = k * sr / N; if (f >= 80 && f <= 2000) binPc[k] = ((Math.round(12 * Math.log2(f / 440)) % 12) + 12 + 9) % 12; }
+  const win = new Float32Array(N); for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+  for (let f = 0; f < frames; f++) {
+    for (let i = 0; i < N; i++) { re[i] = x[f * hop + i] * win[i]; im[i] = 0; }
+    fft(re, im);
+    let tot = 0;
+    for (let k = 1; k < N / 2; k++) { const pc = binPc[k]; if (pc < 0) continue; const m = Math.sqrt(re[k] * re[k] + im[k] * im[k]); out[f * 12 + pc] += m; tot += m; }
+    if (tot > 0) for (let p = 0; p < 12; p++) out[f * 12 + p] /= tot; // bara tonklassfördelningen räknas
+  }
+  return { frames, data: out };
+}
+function chromaLag(ref, sig, maxLagFrames) {
+  let best = -Infinity, bestLag = 0; const scores = [];
+  for (let lag = -maxLagFrames; lag <= maxLagFrames; lag++) {
+    let s = 0, n = 0;
+    for (let t = Math.max(0, -lag); t < Math.min(ref.frames, sig.frames - lag); t++) {
+      const a = t * 12, b = (t + lag) * 12; let d = 0;
+      for (let p = 0; p < 12; p++) d += ref.data[a + p] * sig.data[b + p];
+      s += d; n++;
+    }
+    s = n ? s / n : 0; scores.push(s);
     if (s > best) { best = s; bestLag = lag; }
   }
-  // säkerhet: hur mycket toppen sticker ut jämfört med resten (z-värde)
-  const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
-  const sd = Math.sqrt(scores.reduce((a, b) => a + (b - mean) ** 2, 0) / scores.length) || 1;
-  return { lagMs: bestLag, confidence: (best - mean) / sd };
+  return { lag: bestLag, scores };
 }
-
+function onsetEnvelope(clip) {
+  const sr = clip.sampleRate, hop = Math.max(1, Math.round(sr / 1000)), x = monoOf(clip, ANALYSE_SEC), n = Math.floor(x.length / hop);
+  const env = new Float32Array(n);
+  for (let i = 0; i < n; i++) { let s = 0; for (let j = 0; j < hop; j++) { const v = x[i * hop + j]; s += v * v; } env[i] = Math.sqrt(s / hop); }
+  const out = new Float32Array(n); let prev = 0;
+  for (let i = 0; i < n; i++) { let s = 0, k = 0; for (let j = Math.max(0, i - 2); j <= Math.min(n - 1, i + 2); j++) { s += env[j]; k++; } const sm = s / k; out[i] = Math.max(0, sm - prev); prev = sm; }
+  let mean = 0; for (let i = 0; i < n; i++) mean += out[i]; mean /= n || 1;
+  let vr = 0; for (let i = 0; i < n; i++) { out[i] -= mean; vr += out[i] * out[i]; }
+  const sd = Math.sqrt(vr / (n || 1)) || 1; for (let i = 0; i < n; i++) out[i] /= sd;
+  return out;
+}
+// grovt på ansatser: 10 ms upplösning, ±8 s
+function downsample(env, f) { const n = Math.floor(env.length / f), o = new Float32Array(n); for (let i = 0; i < n; i++) { let m = -1e9; for (let j = 0; j < f; j++) m = Math.max(m, env[i * f + j]); o[i] = m; } return o; }
+function coarseOnsetLag(ref10, sig10, maxLag) {
+  let best = -Infinity, bestLag = 0; const scores = [];
+  for (let lag = -maxLag; lag <= maxLag; lag++) {
+    let s = 0; const from = Math.max(0, -lag), to = Math.min(ref10.length, sig10.length - lag);
+    for (let t = from; t < to; t++) s += ref10[t] * sig10[t + lag];
+    s /= (to - from) || 1; scores.push(s);
+    if (s > best) { best = s; bestLag = lag; }
+  }
+  return { lag: bestLag, scores };
+}
+const zNorm = a => { const m = a.reduce((x, y) => x + y, 0) / a.length, sd = Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / a.length) || 1; return a.map(v => (v - m) / sd); };
+// slå ihop båda metodernas kurvor på 40 ms-rutnät: ackordmatchning + ansatsmatchning.
+// Säkerhet = hur mycket bästa toppen slår näst bästa (minst 0,25 s bort) – ett jämnt trumkomp ger många lika toppar = osäkert.
+function combinedLag(ch, on) {
+  const zc = zNorm(ch.scores), zo = zNorm(on.scores), n = zc.length, half = (n - 1) / 2;
+  const comb = zc.map((v, i) => { let m = -1e9; for (let k = 0; k < 4; k++) { const j = i * 4 + k - 2 + 0; const jj = Math.max(0, Math.min(zo.length - 1, j)); m = Math.max(m, zo[jj]); } return v + m; });
+  let bi = 0; comb.forEach((v, i) => { if (v > comb[bi]) bi = i; });
+  let second = -1e9; comb.forEach((v, i) => { if (Math.abs(i - bi) * 40 >= 250 && v > second) second = v; });
+  return { ms: (bi - half) * 40, margin: comb[bi] - second };
+}
+function onsetLag(ref, sig, center, win) {
+  let best = -Infinity, bestLag = center;
+  for (let lag = center - win; lag <= center + win; lag++) {
+    let s = 0; const from = Math.max(0, -lag), to = Math.min(ref.length, sig.length - lag);
+    for (let t = from; t < to; t++) s += ref[t] * sig[t + lag];
+    s /= (to - from) || 1;
+    if (s > best) { best = s; bestLag = lag; }
+  }
+  return bestLag;
+}
 async function autoSync() {
-  const refKey = document.getElementById('refSelect').value;
-  const ref = stems.find(st => st.key === refKey);
+  const ref = stems.find(st => st.key === document.getElementById('refSelect').value);
   if (!ref || stems.length < 2) return;
   const btn = document.getElementById('autoBtn');
   btn.disabled = true; btn.textContent = 'Analyserar…';
-  await new Promise(r => setTimeout(r, 30)); // låt knapptexten ritas innan tung beräkning
-
+  await new Promise(r => setTimeout(r, 30));
   try {
-    const refEnv = onsetEnvelope(ref.buffer);
+    const refC = chroma(ref.clip), refE = onsetEnvelope(ref.clip), refE10 = downsample(refE, 10);
     let changed = 0;
     for (const st of stems) {
       const sugg = st.rowEl.querySelector('.suggestion');
       if (st === ref) { sugg.hidden = true; continue; }
-      await new Promise(r => setTimeout(r, 0)); // håll sidan responsiv mellan spåren
-      const { lagMs, confidence } = bestLag(refEnv, onsetEnvelope(st.buffer));
-      // Filen ligger lagMs efter referensens fil → flytta den lagMs tidigare, relativt referensens offset.
-      const target = ref.offsetMs - lagMs;
-      const low = confidence < 6;
-      sugg.hidden = false;
-      sugg.classList.toggle('low', low);
-      if (low) {
-        sugg.textContent = `Osäker matchning (förslag ${target > 0 ? '+' : ''}${target} ms) – lyssna och justera manuellt.`;
-      } else {
-        sugg.textContent = `Auto: ${target > 0 ? '+' : ''}${target} ms (säkerhet ${confidence.toFixed(0)})`;
-        if (target !== st.offsetMs) { st.setOffset(target); changed++; }
+      await new Promise(r => setTimeout(r, 0));
+      const sigE = onsetEnvelope(st.clip);
+      const ch = chromaLag(refC, chroma(st.clip), 200);                 // tonhöjd/ackord, 40 ms steg
+      const on = coarseOnsetLag(refE10, downsample(sigE, 10), 800);     // ansatser, 10 ms steg
+      const c = combinedLag(ch, on);
+      const lagMs = onsetLag(refE, sigE, c.ms, 60);                     // finjustera ±60 ms, 1 ms
+      const target = ref.offsetMs - lagMs;   // filen ligger lagMs efter referensen → flytta tidigare
+      c.confidence = c.margin * 4;
+      const low = c.margin < 0.6;
+      sugg.hidden = false; sugg.classList.toggle('low', low);
+      if (low) sugg.textContent = `Osäker matchning (förslag ${target > 0 ? '+' : ''}${target} ms) – titta på vågformerna och dra själv.`;
+      else {
+        sugg.textContent = `Auto: ${target > 0 ? '+' : ''}${target} ms (säkerhet ${c.confidence.toFixed(0)})`;
+        if (target !== st.offsetMs) { setOffset(st, target, true); changed++; }
       }
     }
-    toast(changed ? `Auto-synk justerade ${changed} stämm${changed === 1 ? 'a' : 'or'} – lyssna och spara` : 'Inga ändringar behövdes');
-  } catch (e) {
-    toast('Auto-synk misslyckades: ' + (e.message || e));
-  } finally {
-    btn.disabled = false; btn.textContent = 'Auto-synka';
-  }
-}
-
-// ---------- spara ----------
-async function save() {
-  const offsets = { ...(song.stem_offsets || {}) };
-  stems.forEach(st => { if (st.offsetMs) offsets[st.key] = st.offsetMs; else delete offsets[st.key]; });
-  const btn = document.getElementById('saveBtn');
-  btn.disabled = true;
-  const { error } = await supabaseClient.from('songs').update({ stem_offsets: offsets }).eq('id', song.id);
-  if (error) { toast('Kunde inte spara: ' + error.message); updateSaveState(); return; }
-  song.stem_offsets = offsets;
-  stems.forEach(st => { st.savedMs = st.offsetMs; st.setOffset(st.offsetMs); });
-  updateSaveState();
-  stems.forEach(st => st.rowEl.querySelector('input').classList.remove('changed'));
-  toast('Sparat – medlemmarnas spelare använder nu de nya värdena');
+    restartIfPlaying();
+    toast(changed ? `Auto-synk justerade ${changed} spår – lyssna, kontrollera vågformerna och spara` : 'Inga ändringar behövdes');
+  } catch (e) { toast('Auto-synk misslyckades: ' + (e.message || e)); }
+  finally { btn.disabled = false; btn.textContent = 'Auto-synka'; }
 }
 
 // ---------- händelser ----------
-document.getElementById('songSelect').addEventListener('change', (e) => {
-  if (stems.some(st => st.offsetMs !== st.savedMs) && !confirm('Du har osparade ändringar. Byta låt ändå?')) {
-    e.target.value = song ? song.id : '';
-    return;
-  }
+document.getElementById('songSelect').addEventListener('change', e => {
+  if ((dirtyOffsets() || dirtyFiles()) && !confirm('Du har osparade ändringar. Byta låt ändå?')) { e.target.value = song ? song.id : ''; return; }
   loadSong(e.target.value);
 });
 document.getElementById('playBtn').addEventListener('click', async () => {
   if (!stems.length) return;
   await ensureCtx();
-  if (playing) pause();
-  else startAt(pausedPos >= duration() ? 0 : pausedPos);
+  if (playing) pause(); else startAt(pausedPos >= duration() ? 0 : pausedPos);
 });
 document.getElementById('backBtn').addEventListener('click', () => seek(position() - 5));
-document.getElementById('scrubber').addEventListener('change', (e) => seek(Number(e.target.value)));
-document.getElementById('scrubber').addEventListener('input', (e) => { document.getElementById('curTime').textContent = fmt(Number(e.target.value), true); });
-document.getElementById('refSelect').addEventListener('change', renderRows);
+const setTool = t => {
+  tool = t;
+  document.getElementById('toolMove').setAttribute('aria-pressed', String(t === 'move'));
+  document.getElementById('toolSelect').setAttribute('aria-pressed', String(t === 'select'));
+  document.getElementById('tl').className = 'tl tool-' + t;
+  renderSelInfo();
+};
+document.getElementById('toolMove').addEventListener('click', () => setTool('move'));
+document.getElementById('toolSelect').addEventListener('click', () => setTool('select'));
+document.getElementById('zoomIn').addEventListener('click', () => zoomTo(view.pps * 2, xOf(position())));
+document.getElementById('zoomOut').addEventListener('click', () => zoomTo(view.pps / 2, xOf(position())));
+document.getElementById('zoomFit').addEventListener('click', fitAll);
+document.getElementById('markBtn').addEventListener('click', () => { markers.push(position()); drawAll(); });
+// linjalen: klicka = hoppa, dra = bläddra
+(() => {
+  const r = document.getElementById('ruler');
+  let d = null;
+  r.addEventListener('pointerdown', e => { d = { x: e.clientX, t0: view.t0, moved: false }; r.setPointerCapture(e.pointerId); });
+  r.addEventListener('pointermove', e => {
+    if (!d) return; const dx = e.clientX - d.x;
+    if (!d.moved && Math.abs(dx) < 4) return;
+    d.moved = true; view.t0 = d.t0 - dx / view.pps; clampView(); drawAll();
+  });
+  r.addEventListener('pointerup', e => { if (d && !d.moved) seek(tOf(e.clientX - r.getBoundingClientRect().left)); d = null; });
+})();
+// hjul: Ctrl/⌘ = zoom runt pekaren, sidled (eller Shift) = bläddra
+document.getElementById('tl').addEventListener('wheel', e => {
+  const x = e.clientX - document.getElementById('ruler').getBoundingClientRect().left;
+  if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoomTo(view.pps * (e.deltaY < 0 ? 1.25 : 0.8), x); }
+  else if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) { e.preventDefault(); view.t0 += (e.deltaX || e.deltaY) / view.pps; clampView(); drawAll(); }
+}, { passive: false });
+document.getElementById('refSelect').addEventListener('change', renderTracks);
 document.getElementById('autoBtn').addEventListener('click', autoSync);
-document.getElementById('saveBtn').addEventListener('click', save);
+document.getElementById('saveBtn').addEventListener('click', saveOffsets);
 document.getElementById('resetBtn').addEventListener('click', () => {
-  if (!confirm('Nollställa förskjutningen för alla stämmor? (Sparas först när du trycker Spara.)')) return;
-  stems.forEach(st => st.setOffset(0));
+  if (!confirm('Nollställa förskjutningen för alla spår? (Sparas först när du trycker Spara.)')) return;
+  stems.forEach(st => setOffset(st, 0, true)); restartIfPlaying();
 });
-document.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && !e.target.matches('input, select, textarea, button')) {
-    e.preventDefault();
-    document.getElementById('playBtn').click();
-  }
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, select, textarea')) return;
+  if (e.code === 'Space' && !e.target.matches('button')) { e.preventDefault(); document.getElementById('playBtn').click(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(active); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') { if (sel) { e.preventDefault(); document.getElementById('tCut').click(); } return; }
+  if (e.key === 'm' || e.key === 'M') { document.getElementById('markBtn').click(); return; }
+  if (e.key === '+') { zoomTo(view.pps * 2, xOf(position())); return; }
+  if (e.key === '-') { zoomTo(view.pps / 2, xOf(position())); return; }
+  if (e.key === 'Escape') { sel = null; stems.forEach(drawTrack); renderSelInfo(); }
 });
-window.addEventListener('beforeunload', (e) => {
-  if (stems.some(st => st.offsetMs !== st.savedMs)) { e.preventDefault(); e.returnValue = ''; }
-});
+window.addEventListener('resize', () => { if (stems.length) drawAll(); });
+window.addEventListener('beforeunload', e => { if (dirtyOffsets() || dirtyFiles()) { e.preventDefault(); e.returnValue = ''; } });
 
 (async () => {
   const member = await requireAuth('admin');
@@ -460,12 +896,12 @@ window.addEventListener('beforeunload', (e) => {
   const { data, error } = await supabaseClient.from('songs').select('*').order('title');
   const sel = document.getElementById('songSelect');
   if (error) { sel.innerHTML = `<option>Fel: ${esc(error.message)}</option>`; return; }
-  songs = (data || []).filter(s => stemListFor(s).length >= 2);
-  if (!songs.length) { sel.innerHTML = '<option value="">Ingen låt har två eller fler stämfiler</option>'; return; }
+  songs = (data || []).filter(s => stemListFor(s).length >= 1);
+  if (!songs.length) { sel.innerHTML = '<option value="">Ingen låt har stämfiler än</option>'; return; }
   sel.innerHTML = '<option value="">Välj låt…</option>' +
     songs.map(s => `<option value="${s.id}">${esc(s.title)} (${stemListFor(s).length} spår)</option>`).join('');
   const pre = new URLSearchParams(location.search).get('song');
-  if (pre && songs.some(s => String(s.id) === pre)) { sel.value = pre; loadSong(songs.find(s => String(s.id) === pre).id); }
+  if (pre && songs.some(s => String(s.id) === pre)) { sel.value = pre; loadSong(pre); }
 })();
 </script>
 </body>

@@ -572,7 +572,7 @@ function renderStemsArea(s) {
     ${addRow}
     ${s.stem_backtrack_path ? `<label class="practiceBtLabel" style="display:flex; align-items:center; gap:0.5rem; margin-top:0.6rem; font-size:0.88rem; cursor:pointer;"><input type="checkbox" class="practiceBtChk" ${s.practice_backtrack === false ? '' : 'checked'} style="width:auto; margin:0;"> Backtrack kan väljas i Röstövning <span style="color: var(--text-muted); font-size:0.8rem;">(medlemmarna ser en kryssruta)</span></label>` : ''}
     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem;">
-      ${(uploaded.length + s.extra_stems.length) >= 2 ? `<a href="/admin/stam-synk.html?song=${encodeURIComponent(s.id)}" class="btn btn-outline btn-small">&#8644; Synka stämmorna</a>` : ''}
+      ${(uploaded.length + s.extra_stems.length) >= 1 ? `<a href="/admin/stam-synk.html?song=${encodeURIComponent(s.id)}" class="btn btn-outline btn-small" title="Synka spåren, klipp, lägg till tystnad eller ändra tempo">&#8644; Synka / redigera ljud</a>` : ''}
       ${(uploaded.length + s.extra_stems.length) >= 1 ? `<a href="/medlem/rostovning.html?song=${encodeURIComponent(s.id)}" class="btn btn-outline btn-small">&#127929; Tonkurvor</a>` : ''}
       ${(uploaded.length + s.extra_stems.length) >= 1 ? `<button type="button" class="btn-small zipStemsBtn" style="background: transparent; border: 1px solid var(--border); color: var(--text);">&#11015; Ladda ner alla (.zip)</button>` : ''}
       <button type="button" class="btn btn-outline btn-small bgVidBtn" aria-expanded="false">&#127916; Bakgrundsvideo${s.bg_video_path ? ' ✓' : ''}</button>

@@ -57,6 +57,25 @@
   .t-ctrl .soloBtn.on { background: var(--accent); color: #111317; border-color: var(--accent); }
   .t-ctrl .ms { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 4.2rem; text-align: right; }
 
+  /* adminläge: låtens egna spår (synk, stämfiler) */
+  .admin-sync { margin-top: 1rem; padding: 0.8rem 0.9rem; border: 1px dashed rgba(229,169,104,0.5); border-radius: 0.6rem; display: grid; gap: 0.5rem; }
+  .admin-sync .k { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .admin-sync .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; font-size: 0.85rem; }
+  .admin-sync select { width: auto; margin: 0; padding: 0.3rem 0.45rem; font-size: 0.85rem; }
+  .admin-sync .note { font-size: 0.8rem; color: var(--text-muted); margin: 0; }
+  .save-state { font-size: 0.85rem; color: var(--text-muted); }
+  .save-state.dirty { color: var(--accent); }
+  .ms-ctrl { display: inline-flex; align-items: center; gap: 0.2rem; }
+  .ms-ctrl button { width: auto !important; height: auto !important; padding: 0.25rem 0.4rem !important; font-size: 0.72rem !important; min-width: 2.3rem; justify-content: center; font-weight: 400 !important; }
+  .ms-ctrl input { width: 4.6rem; margin: 0; padding: 0.3rem 0.35rem; text-align: right; font-variant-numeric: tabular-nums; font-size: 0.82rem; }
+  .ms-ctrl input.changed { border-color: var(--accent); }
+  .ms-ctrl .unit { font-size: 0.72rem; color: var(--text-muted); }
+  .tag.ref { color: var(--accent); border-color: rgba(229,169,104,0.5); }
+  .suggestion { font-size: 0.78rem; color: var(--text-muted); padding: 0 0.1rem 0.4rem; }
+  .suggestion.low { color: #facc15; }
+  .backups { display: grid; gap: 0.3rem; }
+  .backups div { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.8rem; color: var(--text-muted); }
+  .backups button { font-size: 0.75rem; padding: 0.25rem 0.55rem; }
   .recs { display: grid; gap: 0.4rem; }
   .rec-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.3rem 0.6rem; align-items: center; padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.85rem; }
   .rec-row b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -161,6 +180,17 @@
       <div class="lyric" id="lyric" hidden><div class="now" id="lyNow">&nbsp;</div><div class="next" id="lyNext"></div></div>
       <div id="tl"></div>
       <div id="panel"></div>
+      <div class="admin-sync" id="adminSync" hidden>
+        <span class="k">Admin · låtens spår</span>
+        <p class="note">Som admin kan du också flytta låtens egna spår (förskjutning), auto-synka dem och ändra själva stämfilerna – välj ett spår och använd verktygen ovan, sedan <b>💾 Spara som stämfil</b>. Den gamla filen sparas som säkerhetskopia.</p>
+        <div class="actions">
+          <label for="refSelect">Referens:</label> <select id="refSelect"></select>
+          <button type="button" class="btn-outline" id="autoBtn" title="Räknar ut förskjutningen för låtens spår mot referensen – ackord och ansatser">Auto-synka</button>
+          <button type="button" id="saveOffBtn" disabled>Spara förskjutningar</button>
+          <button type="button" class="btn-outline" id="resetBtn">Nollställ alla</button>
+          <span class="save-state" id="saveState"></span>
+        </div>
+      </div>
       <div class="guide-box">
         <b>Så gör du:</b> välj låt, sätt i hörlurarna och tryck <b>⏺ Spela in</b> (eller R). Du hör låten från spelhuvudet – med <b>inräkning</b> börjar den lite före. Tryck igen (eller mellanslag) för att stoppa. Varje tagning blir ett nytt spår. Lyssna, dra den i sidled om den inte ligger i takt, och klipp bort det du inte vill ha med <b>▭ Markera</b>. Ge den ett namn och tryck <b>💾 Spara inspelning</b>. <b>Kalibrera</b> en gång per dator/hörlurar så hamnar inspelningarna rätt från början.
       </div>
@@ -213,8 +243,8 @@ function applyPartMeta(items, meta, keyOf) {
   return items.map((it, i) => ({ it, i })).sort((a, b) => (pos(a.it) - pos(b.it)) || (a.i - b.i)).map(x => x.it);
 }
 function stemListFor(s) {
-  const list = FIXED_STEMS.filter(f => s[f.col]).map(f => ({ key: f.col, label: f.label, path: s[f.col] }));
-  (s.extra_stems || []).forEach(ex => list.push({ key: ex.id, label: ex.label, path: ex.path }));
+  const list = FIXED_STEMS.filter(f => s[f.col]).map(f => ({ key: f.col, label: f.label, path: s[f.col], fixed: true }));
+  (s.extra_stems || []).forEach(ex => list.push({ key: ex.id, label: ex.label, path: ex.path, fixed: false }));
   return applyPartMeta(list, s.stem_meta, it => it.key);
 }
 function getCtx() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
@@ -222,7 +252,12 @@ async function ensureCtx() { getCtx(); if (audioCtx.state === 'suspended') { try
 const offS = t => (t.offsetMs || 0) / 1000;
 const tDur = t => t.clip ? AudioEdit.duration(t.clip) : 0;
 const isAccomp = t => t.key === 'stem_backtrack_path' || /instrument|karaoke|playback|komp|backing|\bfull\b/i.test(t.label || '');
-const unsaved = () => tracks.some(t => t.kind === 'rec' && t.mine && (t.edited || !t.id || t.offsetMs !== t.savedOffsetMs));
+const unsaved = () => tracks.some(t => (t.kind === 'rec' && t.mine && (t.edited || !t.id || t.offsetMs !== t.savedOffsetMs))
+  || (t.kind === 'stem' && isAdmin && (t.edited || t.offsetMs !== t.savedOffsetMs)));
+function stemFilename(path) {
+  const base = (path || '').split('/').pop(), parts = base.split('__');
+  try { return decodeURIComponent(parts.length > 1 ? parts.slice(1).join('__') : base); } catch (e) { return base; }
+}
 function safeName(s) { return String(s || 'inspelning').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.\-]+/g, '_').slice(0, 60) || 'inspelning'; }
 async function signed(bucket, path) {
   const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 3600);
@@ -322,12 +357,22 @@ const tl = WaveTimeline.create(document.getElementById('tl'), {
   getTracks: () => tracks, getDuration: duration, getPosition: position,
   isAudible: audible, isActive: t => t === active,
   onSeek: seek,
-  onOffset: (t, ms, live) => { if (t.locked) return; t.offsetMs = Math.round(ms); renderMs(t); tl.drawTrack(t); if (!live) { restartIfPlaying(); updateRecTools(); } },
+  onOffset: (t, ms, live) => setOffset(t, ms, live),
   onActive: t => setActive(t),
   onSelection: s => { sel = s; panel.selInfo(); },
   onView: () => { document.getElementById('zoomVal').textContent = tl.spanLabel(); },
   renderHead,
+  renderFoot: (t, foot) => { if (t.kind === 'stem' && isAdmin) { foot.innerHTML = '<div class="suggestion" hidden></div>'; t._sugg = foot.firstChild; } },
 });
+const MAX_OFFSET_MS = 30000;
+function setOffset(t, ms, live) {
+  if (t.locked) return;
+  ms = Math.round(Math.max(-MAX_OFFSET_MS, Math.min(MAX_OFFSET_MS, Number(ms) || 0)));
+  if (ms !== t.offsetMs) { t.offsetMs = ms; tl.drawTrack(t); }
+  renderMs(t); if (t._msIn) t._msIn();
+  if (!live) { restartIfPlaying(); updateRecTools(); panel.refresh(); }
+  updateSaveState();
+}
 const panel = TrackEditPanel.mount(document.getElementById('panel'), {
   getTrack: () => active, getSelection: () => sel, getPosition: position, toast,
   onEdit: applyEdit, onUndo: undo, onOriginal: original,
@@ -347,23 +392,42 @@ const panel = TrackEditPanel.mount(document.getElementById('panel'), {
       <button type="button" class="btn-outline" id="dlMix" title="Ladda ner allt som hörs just nu, mixat till en fil">⬇ Mix av det som hörs</button>
       <button type="button" class="btn-outline" id="recDelete">🗑 Ta bort</button>
       <button type="button" class="btn-outline" id="toStem" hidden title="Lägg inspelningen som ett nytt spår i låten (syns för alla)">➕ Gör till stämfil i låten</button>
+    </div>
+    <div class="tool-row" id="stemRow" hidden>
+      <span class="k">Stämfil</span>
+      <button type="button" id="stemSave" title="Ersätter stämfilen i låten – den gamla sparas som säkerhetskopia">💾 Spara som stämfil</button>
+      <span class="status" id="fileStatus"></span>
+    </div>
+    <div class="tool-row" id="backupRow" hidden>
+      <span class="k">Kopior</span>
+      <div class="backups" id="backups"></div>
     </div>`,
 });
 function renderMs(t) { if (t._ms) t._ms.textContent = (t.offsetMs >= 0 ? '+' : '') + t.offsetMs + ' ms'; }
 function renderHead(t, head) {
+  const adminStem = t.kind === 'stem' && isAdmin;
   const tags = t.kind === 'rec'
     ? (t.mine ? `<span class="tag mine">${t.id ? VIS[t.visibility] : 'ny tagning'}</span>` : `<span class="tag">${esc(names[t.memberId] || 'Någon')} · ${VIS[t.visibility]}</span>`) +
       ((t.mine && (t.edited || !t.id)) ? '<span class="tag edit">osparad</span>' : '')
-    : '';
+    : (adminStem ? `<small>${esc(stemFilename(t.path))}</small>${t.key === document.getElementById('refSelect').value ? '<span class="tag ref">REF</span>' : ''}${t.edited ? '<span class="tag edit">ändrad – osparad</span>' : ''}` : '');
   head.innerHTML = `
     <span class="t-name" title="Välj spåret"><i style="background:${t.color}"></i>${esc(t.label)}${tags}</span>
     <span class="t-ctrl">
+      ${adminStem ? `<span class="ms-ctrl"><button class="btn-outline" data-d="-50">−50</button><button class="btn-outline" data-d="-10">−10</button><input type="number" step="1" aria-label="Förskjutning i ms"><span class="unit">ms</span><button class="btn-outline" data-d="10">+10</button><button class="btn-outline" data-d="50">+50</button></span>` : ''}
       ${t.kind === 'rec' ? '<span class="ms" title="Var inspelningen ligger i låten"></span>' : ''}
       <input type="range" min="0" max="1.5" step="0.05" value="${t.vol ?? 1}" title="Volym" aria-label="Volym för ${esc(t.label)}">
       <button class="btn-outline muteBtn ${t.muted ? 'on' : ''}" title="Tysta">${MUTE_SVG}</button>
       <button class="btn-outline soloBtn ${t.solo ? 'on' : ''}" title="Solo">S</button>
     </span>`;
   t._ms = head.querySelector('.ms'); renderMs(t);
+  t._msIn = null;
+  if (adminStem) {
+    const inp = head.querySelector('.ms-ctrl input');
+    t._msIn = () => { inp.value = t.offsetMs; inp.classList.toggle('changed', t.offsetMs !== t.savedOffsetMs); };
+    t._msIn();
+    head.querySelectorAll('.ms-ctrl button').forEach(b => b.addEventListener('click', () => setOffset(t, t.offsetMs + Number(b.dataset.d))));
+    inp.addEventListener('change', () => setOffset(t, inp.value));
+  }
   head.querySelector('.t-name').addEventListener('click', () => setActive(t));
   head.querySelector('input[type=range]').addEventListener('input', e => { t.vol = Number(e.target.value); applyGains(); });
   head.querySelector('.muteBtn').addEventListener('click', e => { t.muted = !t.muted; e.currentTarget.classList.toggle('on', t.muted); applyGains(); tl.drawTrack(t); });
@@ -374,6 +438,9 @@ function setActive(t) {
 }
 function updateRecTools() {
   const t = active, isRec = !!(t && t.kind === 'rec'), mine = isRec && t.mine;
+  const adminStem = !!(t && t.kind === 'stem' && isAdmin);
+  document.getElementById('stemRow').hidden = !adminStem;
+  renderBackups();
   document.getElementById('recRow1').hidden = !mine;
   ['recDelete'].forEach(id => { document.getElementById(id).hidden = !isRec || !(mine || (isAdmin && t.id)); });
   document.getElementById('toStem').hidden = !(isAdmin && isRec);
@@ -394,18 +461,18 @@ function applyEdit(t, clip, newOffsetMs, note) {
   t.clip = clip; setPeaks(t); t.edited = true;
   if (newOffsetMs != null) t.offsetMs = newOffsetMs;
   tl.selection = null; sel = null;
-  tl.render(); setActive(t); restartIfPlaying();
-  panel.status(note + ' – osparat', true);
+  tl.render(); setActive(t); restartIfPlaying(); updateSaveState();
+  panel.status(note + ' – osparat' + (t.kind === 'stem' ? '. Spara som stämfil eller ladda ner.' : ''), true);
 }
 function undo(t) {
   if (!t || !t.undo || !t.undo.length) return;
   const u = t.undo.pop(); t.clip = u.clip; t.offsetMs = u.offsetMs; setPeaks(t); t.edited = t.clip !== t.orig;
-  tl.render(); setActive(t); restartIfPlaying(); panel.status('Ångrat');
+  tl.render(); setActive(t); restartIfPlaying(); updateSaveState(); panel.status('Ångrat');
 }
 function original(t) {
   t.undo.push({ clip: t.clip, offsetMs: t.offsetMs });
   t.clip = t.orig; t.offsetMs = t.savedOffsetMs; setPeaks(t); t.edited = false;
-  tl.render(); setActive(t); restartIfPlaying(); panel.status('Tillbaka till originalet');
+  tl.render(); setActive(t); restartIfPlaying(); updateSaveState(); panel.status('Tillbaka till originalet');
 }
 
 // ---------- mikrofon och inspelning ----------
@@ -592,6 +659,228 @@ document.getElementById('toStem').addEventListener('click', async () => {
   } catch (e) { toast('Kunde inte skapa stämfil: ' + (e.message || e), 6000); }
 });
 
+// ---------- admin: låtens spår (från Stämsynk) ----------
+function updateSaveState() {
+  if (!isAdmin) return;
+  const stems = tracks.filter(t => t.kind === 'stem');
+  const dOff = stems.some(t => t.offsetMs !== t.savedOffsetMs), dFile = stems.some(t => t.edited);
+  document.getElementById('saveOffBtn').disabled = !dOff;
+  const el = document.getElementById('saveState');
+  el.textContent = dOff ? 'Osparade förskjutningar' : dFile ? 'Ändrade stämfiler är inte sparade' : '';
+  el.classList.toggle('dirty', dOff || dFile);
+}
+async function saveOffsets() {
+  const offsets = { ...(song.stem_offsets || {}) };
+  tracks.filter(t => t.kind === 'stem').forEach(t => { if (t.offsetMs) offsets[t.key] = t.offsetMs; else delete offsets[t.key]; });
+  const btn = document.getElementById('saveOffBtn'); btn.disabled = true;
+  const { error } = await supabaseClient.from('songs').update({ stem_offsets: offsets }).eq('id', song.id);
+  if (error) { toast('Kunde inte spara: ' + error.message); updateSaveState(); return; }
+  song.stem_offsets = offsets;
+  tracks.filter(t => t.kind === 'stem').forEach(t => { t.savedOffsetMs = t.offsetMs; if (t._msIn) t._msIn(); });
+  updateSaveState();
+  toast('Förskjutningarna sparade – spelaren, Röstövning och karaoken använder dem nu');
+}
+function baseName(t) {
+  return stemFilename(t.path).replace(/\.[a-z0-9]+$/i, '').replace(/-redigerad-\d{6}-\d{4}$/, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.\-]+/g, '_').slice(0, 80) || 'stamfil';
+}
+function stamp() { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${String(d.getFullYear()).slice(2)}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; }
+function setFileStatus(msg, warn) { const el = document.getElementById('fileStatus'); el.textContent = msg || ''; el.classList.toggle('warn', !!warn); }
+// skriv stämmans nya sökväg i låten + säkerhetskopia + förskjutning
+async function setStemPath(t, newPath, backupNote, newOffsetMs) {
+  const backups = JSON.parse(JSON.stringify(song.stem_backups || {}));
+  (backups[t.key] || (backups[t.key] = [])).unshift({ path: t.path, at: new Date().toISOString(), offsetMs: t.savedOffsetMs, note: backupNote });
+  const offsets = { ...(song.stem_offsets || {}) };
+  if (newOffsetMs) offsets[t.key] = newOffsetMs; else delete offsets[t.key];
+  const update = { stem_backups: backups, stem_offsets: offsets };
+  if (t.fixed) update[t.key] = newPath;
+  else update.extra_stems = (song.extra_stems || []).map(x => x.id === t.key ? { ...x, path: newPath } : x);
+  const { error } = await supabaseClient.from('songs').update(update).eq('id', song.id);
+  if (error) throw error;
+  Object.assign(song, update);
+  t.path = newPath; t.savedOffsetMs = newOffsetMs; t.offsetMs = newOffsetMs;
+}
+document.getElementById('stemSave').addEventListener('click', async () => {
+  const t = active; if (!isAdmin || !t || t.kind !== 'stem') return;
+  if (!t.edited && !confirm(`${t.label} är inte ändrad. Spara den ändå som ny stämfil?`)) return;
+  if (!confirm(`Ersätta stämfilen för ${t.label} i låten?\n\nDen nuvarande filen sparas som säkerhetskopia och kan återställas. Notanalysen för stämman behöver göras om i Röstövning efteråt.`)) return;
+  const btn = document.getElementById('stemSave'); btn.disabled = true;
+  try {
+    const { blob, ext, type } = await encodeTrack(t.clip);
+    const name = `${baseName(t)}-redigerad-${stamp()}.${ext}`;
+    const path = t.fixed ? `${song.id}/${t.key}__${name}` : `${song.id}/stem_${t.key}__${name}`;
+    setFileStatus(`Laddar upp ${(blob.size / 1048576).toFixed(1)} MB…`);
+    const { error } = await supabaseClient.storage.from(STEMS_BUCKET).upload(path, blob, { upsert: false, contentType: type });
+    if (error) throw error;
+    await setStemPath(t, path, 'före redigering', t.offsetMs);
+    t.orig = t.clip; t.edited = false; t.undo = [];
+    tl.render(); setActive(t); updateSaveState();
+    setFileStatus('Sparad ✓ – alla får den nya filen. Notanalysera stämman igen i Röstövning.');
+    toast('Stämfilen ersatt – den gamla finns som säkerhetskopia');
+  } catch (e) { setFileStatus('Kunde inte spara: ' + (e.message || e), true); }
+  btn.disabled = false;
+});
+function renderBackups() {
+  const t = active, show = isAdmin && t && t.kind === 'stem';
+  const bp = show ? ((song.stem_backups || {})[t.key] || []) : [];
+  document.getElementById('backupRow').hidden = !bp.length;
+  document.getElementById('backups').innerHTML = bp.map((b, i) => `<div>${new Date(b.at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })} · ${esc(stemFilename(b.path))}${b.note ? ' · ' + esc(b.note) : ''}
+    <button type="button" class="btn-outline" data-bi="${i}" data-ba="dl">⬇</button><button type="button" class="btn-outline" data-bi="${i}" data-ba="restore">↺ Återställ</button></div>`).join('');
+  document.querySelectorAll('#backups button').forEach(b => b.addEventListener('click', () => backupAction(t, Number(b.dataset.bi), b.dataset.ba)));
+}
+async function backupAction(t, i, act) {
+  const b = ((song.stem_backups || {})[t.key] || [])[i]; if (!b) return;
+  if (act === 'dl') {
+    const { data, error } = await supabaseClient.storage.from(STEMS_BUCKET).createSignedUrl(b.path, 600, { download: stemFilename(b.path) });
+    if (error) { toast('Kunde inte hämta: ' + error.message); return; }
+    location.href = data.signedUrl; return;
+  }
+  if (t.edited && !confirm('Spåret har osparade ändringar som försvinner. Fortsätta?')) return;
+  if (!confirm(`Återställa ${t.label} till kopian från ${new Date(b.at).toLocaleString('sv-SE')}?\n\nDen nuvarande filen sparas i sin tur som kopia.`)) return;
+  try {
+    setFileStatus('Återställer…');
+    const backups = JSON.parse(JSON.stringify(song.stem_backups || {}));
+    backups[t.key] = (backups[t.key] || []).filter((_, k) => k !== i);
+    song.stem_backups = backups;
+    await setStemPath(t, b.path, 'innan återställning', Math.round(Number(b.offsetMs) || 0));
+    const clip = await loadClip(STEMS_BUCKET, b.path);
+    t.clip = t.orig = clip; setPeaks(t); t.edited = false; t.undo = [];
+    tl.render(); setActive(t); restartIfPlaying(); updateSaveState();
+    setFileStatus('Återställd ✓ – notanalysera stämman igen i Röstövning om noterna inte stämmer.');
+  } catch (e) { setFileStatus('Kunde inte återställa: ' + (e.message || e), true); }
+}
+// ---------- admin: auto-synk ----------
+// 1) grovt (±8 s): ackordprofil (kromagram, 40 ms) + ansatser (10 ms) ihop  2) fint ±60 ms på ansatser, 1 ms
+const ANALYSE_SEC = 90;
+function monoOf(clip, maxSec) {
+  const n = Math.min(clip.channels[0].length, Math.round(maxSec * clip.sampleRate));
+  const m = new Float32Array(n), a = clip.channels[0], b = clip.channels[1] || a;
+  for (let i = 0; i < n; i++) m[i] = (a[i] + b[i]) * 0.5;
+  return m;
+}
+function fft(re, im) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; } }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const a = i + k, b = a + len / 2, tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+        const nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+      }
+    }
+  }
+}
+function chroma(clip) {
+  const sr = clip.sampleRate, x = monoOf(clip, ANALYSE_SEC), hop = Math.round(sr * 0.04), N = 2048;
+  const frames = Math.max(0, Math.floor((x.length - N) / hop));
+  const out = new Float32Array(frames * 12), re = new Float32Array(N), im = new Float32Array(N);
+  const binPc = new Int8Array(N / 2).fill(-1);
+  for (let k = 1; k < N / 2; k++) { const f = k * sr / N; if (f >= 80 && f <= 2000) binPc[k] = ((Math.round(12 * Math.log2(f / 440)) % 12) + 12 + 9) % 12; }
+  const win = new Float32Array(N); for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+  for (let f = 0; f < frames; f++) {
+    for (let i = 0; i < N; i++) { re[i] = x[f * hop + i] * win[i]; im[i] = 0; }
+    fft(re, im);
+    let tot = 0;
+    for (let k = 1; k < N / 2; k++) { const pc = binPc[k]; if (pc < 0) continue; const m = Math.sqrt(re[k] * re[k] + im[k] * im[k]); out[f * 12 + pc] += m; tot += m; }
+    if (tot > 0) for (let q = 0; q < 12; q++) out[f * 12 + q] /= tot;
+  }
+  return { frames, data: out };
+}
+function chromaLag(ref, sig, maxLag) {
+  let best = -Infinity, bestLag = 0; const scores = [];
+  for (let lag = -maxLag; lag <= maxLag; lag++) {
+    let s2 = 0, n = 0;
+    for (let t = Math.max(0, -lag); t < Math.min(ref.frames, sig.frames - lag); t++) {
+      const a = t * 12, b = (t + lag) * 12; let d = 0;
+      for (let q = 0; q < 12; q++) d += ref.data[a + q] * sig.data[b + q];
+      s2 += d; n++;
+    }
+    s2 = n ? s2 / n : 0; scores.push(s2);
+    if (s2 > best) { best = s2; bestLag = lag; }
+  }
+  return { lag: bestLag, scores };
+}
+function onsetEnvelope(clip) {
+  const sr = clip.sampleRate, hop = Math.max(1, Math.round(sr / 1000)), x = monoOf(clip, ANALYSE_SEC), n = Math.floor(x.length / hop);
+  const env = new Float32Array(n);
+  for (let i = 0; i < n; i++) { let s2 = 0; for (let j = 0; j < hop; j++) { const v = x[i * hop + j]; s2 += v * v; } env[i] = Math.sqrt(s2 / hop); }
+  const out = new Float32Array(n); let prev = 0;
+  for (let i = 0; i < n; i++) { let s2 = 0, k = 0; for (let j = Math.max(0, i - 2); j <= Math.min(n - 1, i + 2); j++) { s2 += env[j]; k++; } const sm = s2 / k; out[i] = Math.max(0, sm - prev); prev = sm; }
+  let mean = 0; for (let i = 0; i < n; i++) mean += out[i]; mean /= n || 1;
+  let vr = 0; for (let i = 0; i < n; i++) { out[i] -= mean; vr += out[i] * out[i]; }
+  const sd = Math.sqrt(vr / (n || 1)) || 1; for (let i = 0; i < n; i++) out[i] /= sd;
+  return out;
+}
+function downsample(env, f) { const n = Math.floor(env.length / f), o = new Float32Array(n); for (let i = 0; i < n; i++) { let m = -1e9; for (let j = 0; j < f; j++) m = Math.max(m, env[i * f + j]); o[i] = m; } return o; }
+function coarseOnsetLag(ref10, sig10, maxLag) {
+  let best = -Infinity, bestLag = 0; const scores = [];
+  for (let lag = -maxLag; lag <= maxLag; lag++) {
+    let s2 = 0; const from = Math.max(0, -lag), to = Math.min(ref10.length, sig10.length - lag);
+    for (let t = from; t < to; t++) s2 += ref10[t] * sig10[t + lag];
+    s2 /= (to - from) || 1; scores.push(s2);
+    if (s2 > best) { best = s2; bestLag = lag; }
+  }
+  return { lag: bestLag, scores };
+}
+const zNorm = a => { const m = a.reduce((x, y) => x + y, 0) / a.length, sd = Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / a.length) || 1; return a.map(v => (v - m) / sd); };
+// säkerhet = hur mycket bästa toppen slår näst bästa (minst 0,25 s bort) – ett jämnt trumkomp ger många lika toppar
+function combinedLag(ch, on) {
+  const zc = zNorm(ch.scores), zo = zNorm(on.scores), half = (zc.length - 1) / 2;
+  const comb = zc.map((v, i) => { let m = -1e9; for (let k = 0; k < 4; k++) { const jj = Math.max(0, Math.min(zo.length - 1, i * 4 + k - 2)); m = Math.max(m, zo[jj]); } return v + m; });
+  let bi = 0; comb.forEach((v, i) => { if (v > comb[bi]) bi = i; });
+  let second = -1e9; comb.forEach((v, i) => { if (Math.abs(i - bi) * 40 >= 250 && v > second) second = v; });
+  return { ms: (bi - half) * 40, margin: comb[bi] - second };
+}
+function onsetLag(ref, sig, center, win) {
+  let best = -Infinity, bestLag = center;
+  for (let lag = center - win; lag <= center + win; lag++) {
+    let s2 = 0; const from = Math.max(0, -lag), to = Math.min(ref.length, sig.length - lag);
+    for (let t = from; t < to; t++) s2 += ref[t] * sig[t + lag];
+    s2 /= (to - from) || 1;
+    if (s2 > best) { best = s2; bestLag = lag; }
+  }
+  return bestLag;
+}
+async function autoSync() {
+  const stems = tracks.filter(t => t.kind === 'stem');
+  const ref = stems.find(t => t.key === document.getElementById('refSelect').value);
+  if (!ref || stems.length < 2) { toast('Det behövs minst två spår att synka'); return; }
+  const btn = document.getElementById('autoBtn');
+  btn.disabled = true; btn.textContent = 'Analyserar…';
+  await new Promise(r => setTimeout(r, 30));
+  try {
+    const refC = chroma(ref.clip), refE = onsetEnvelope(ref.clip), refE10 = downsample(refE, 10);
+    let changed = 0;
+    for (const t of stems) {
+      const sugg = t._sugg;
+      if (t === ref) { if (sugg) sugg.hidden = true; continue; }
+      await new Promise(r => setTimeout(r, 0));
+      const sigE = onsetEnvelope(t.clip);
+      const c = combinedLag(chromaLag(refC, chroma(t.clip), 200), coarseOnsetLag(refE10, downsample(sigE, 10), 800));
+      const lagMs = onsetLag(refE, sigE, c.ms, 60);
+      const target = ref.offsetMs - lagMs, low = c.margin < 0.6;
+      if (sugg) {
+        sugg.hidden = false; sugg.classList.toggle('low', low);
+        sugg.textContent = low ? `Osäker matchning (förslag ${target > 0 ? '+' : ''}${target} ms) – titta på vågformerna och dra själv.` : `Auto: ${target > 0 ? '+' : ''}${target} ms (säkerhet ${(c.margin * 4).toFixed(0)})`;
+      }
+      if (!low && target !== t.offsetMs) { setOffset(t, target, true); changed++; }
+    }
+    restartIfPlaying();
+    toast(changed ? `Auto-synk justerade ${changed} spår – lyssna, kontrollera vågformerna och spara` : 'Inga ändringar behövdes');
+  } catch (e) { toast('Auto-synk misslyckades: ' + (e.message || e)); }
+  finally { btn.disabled = false; btn.textContent = 'Auto-synka'; }
+}
+document.getElementById('autoBtn').addEventListener('click', autoSync);
+document.getElementById('saveOffBtn').addEventListener('click', saveOffsets);
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Nollställa förskjutningen för alla låtens spår? (Sparas först när du trycker Spara förskjutningar.)')) return;
+  tracks.filter(t => t.kind === 'stem').forEach(t => setOffset(t, 0, true)); restartIfPlaying();
+});
+document.getElementById('refSelect').addEventListener('change', () => tl.render());
+
 // ---------- mina inspelningar ----------
 async function loadMyRecs() {
   const box = document.getElementById('myRecs');
@@ -633,8 +922,10 @@ async function loadSong(id) {
   try {
     const stemTracks = await Promise.all(stemDefs.map(async (s, i) => {
       const clip = await loadClip(STEMS_BUCKET, s.path); prog();
-      return { kind: 'stem', key: s.key, label: s.label, color: STEM_COLORS[i % STEM_COLORS.length], clip, offsetMs: Math.round(Number(offs[s.key]) || 0),
-        locked: true, readOnly: true, vol: 1, muted: false, solo: false };
+      const ms = Math.round(Number(offs[s.key]) || 0);
+      return { kind: 'stem', key: s.key, label: s.label, path: s.path, fixed: s.fixed, color: STEM_COLORS[i % STEM_COLORS.length], clip, orig: clip,
+        offsetMs: ms, savedOffsetMs: ms, undo: [], edited: false,
+        locked: !isAdmin, readOnly: !isAdmin, vol: 1, muted: false, solo: false };
     }));
     const recTracks = (await Promise.all((recs || []).map(async r => {
       try {
@@ -658,6 +949,13 @@ async function loadSong(id) {
   document.getElementById('clickOpt').hidden = !(Number(song.bpm) >= 20);
   document.getElementById('studio').hidden = false;
   takeNo = tracks.filter(t => t.kind === 'rec' && t.mine).length;
+  if (isAdmin) {
+    const stemsOnly = tracks.filter(t => t.kind === 'stem');
+    const ref = stemsOnly.find(t => /\bfull\b|mix/i.test(t.label)) || stemsOnly.find(t => t.key === 'stem_backtrack_path') || stemsOnly.find(t => /instrument/i.test(t.label)) || stemsOnly[0];
+    document.getElementById('refSelect').innerHTML = stemsOnly.map(t => `<option value="${esc(t.key)}" ${t === ref ? 'selected' : ''}>${esc(t.label)}</option>`).join('');
+    document.getElementById('adminSync').hidden = stemsOnly.length < 1;
+    updateSaveState();
+  }
   active = tracks.find(t => t.kind === 'rec' && t.mine) || tracks[0];
   tl.render(); setActive(active);
   requestAnimationFrame(() => { tl.fit(); tick(); });

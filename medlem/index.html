@@ -21,6 +21,13 @@
   #welcome { margin: 0.2rem 0 0; }
   #installTop { margin-top: 0.7rem; }
   #installTop .install-app-btn { padding: 0.5rem 0.9rem; }
+  /* Info-ruta efter inloggning */
+  .notice-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .notice-box { background: var(--bg, #121418); color: var(--text, #f3f4f6); border: 1px solid var(--border, rgba(255,255,255,0.08)); border-radius: 1rem; max-width: 420px; width: 100%; padding: 1.4rem 1.3rem 1.2rem; box-shadow: 0 10px 40px rgba(0,0,0,0.6); text-align: center; }
+  .notice-box h3 { margin: 0 0 0.6rem; font-size: 1.35rem; }
+  .notice-box p { margin: 0 0 0.8rem; color: var(--text-muted, #9ca3af); font-size: 1rem; line-height: 1.5; }
+  .notice-box p strong { color: var(--text, #f3f4f6); }
+  .notice-box button { width: 100%; justify-content: center; margin-top: 0.4rem; }
   /* Mobil: hela sidan ska rymmas utan att scrolla */
   @media (max-width: 600px) {
     .site-header--logo { padding-top: 0.6rem; }
@@ -120,6 +127,7 @@
     document.getElementById('roleBadge').textContent = member.role;
     loadCheckin(member);
     showParty(member);
+    if (member.role !== 'admin') showUpdateNotice();
     if (member.role === 'admin') {
       const a = document.createElement('a');
       a.href = '/admin/';
@@ -129,6 +137,28 @@
     }
   }
 })();
+
+// ---------- Info-ruta efter inloggning (en gång per inloggning) ----------
+function showUpdateNotice() {
+  try { if (sessionStorage.getItem('hvNoticeSeen')) return; sessionStorage.setItem('hvNoticeSeen', '1'); } catch (e) {}
+  const wrap = document.createElement('div');
+  wrap.className = 'notice-backdrop';
+  wrap.innerHTML = `
+    <div class="notice-box" role="dialog" aria-modal="true" aria-labelledby="noticeTitle">
+      <h3 id="noticeTitle">🛠️ Sidan byggs fortfarande</h3>
+      <p>Heavy Voices-sidan uppdateras hela tiden, så saker kan flytta sig eller ändras medan du är här.</p>
+      <p><strong>Feedback och önskemål är varmt välkomna!</strong> Tipsa gärna om vad som funkar bra och vad du saknar.</p>
+      <p>Klagomål däremot… förbises. 😉</p>
+      <button type="button" class="btn-gold" id="noticeOk">Uppfattat!</button>
+    </div>`;
+  const close = () => { wrap.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+  wrap.querySelector('#noticeOk').addEventListener('click', close);
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(wrap);
+  wrap.querySelector('#noticeOk').focus();
+}
 
 document.getElementById('logoutBtn').addEventListener('click', signOut);
 

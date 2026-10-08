@@ -187,6 +187,9 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .with-wrap .chips label small { color: var(--text-muted); font-size: 0.75rem; }
   .tempo-info { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.9rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
   .tempo-info { font-size: 1rem; }
+  .vol { display: inline-flex; align-items: center; gap: 0.2rem; }
+  .vol button { width: 1.7rem; height: 1.7rem; padding: 0; justify-content: center; font-size: 1rem; line-height: 1; border-radius: 0.4rem; }
+  .vol-v { min-width: 1.3rem; text-align: center; font-size: 0.85rem; font-variant-numeric: tabular-nums; color: var(--text-muted); }
   .tempo-info b { color: var(--text); font-family: 'Roboto Condensed', sans-serif; font-size: 1.05rem; }
   .ghost-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; margin: 0 0 0.6rem; }
   .ghost-row .field-k { margin: 0; font-size: 0.8rem; }
@@ -392,8 +395,8 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
       <div id="withWrap" class="with-wrap" hidden><div class="field-k">Sjung till <small>det här hör du i hörlurarna</small></div><div class="chips" id="withRow"></div></div>
       <div class="practice-controls">
         <span class="tempo-info" id="tempoInfo" hidden title="Låtens tempo">♩ <b id="tempoVal"></b> BPM</span>
-        <span class="opt"><label><input type="checkbox" id="optTone" checked> Referenston</label><button type="button" class="help" data-help="tone" aria-label="Vad är referenston?">?</button></span>
-        <span class="opt" id="optClickWrap" hidden><label><input type="checkbox" id="optClick"> Klick</label><button type="button" class="help" data-help="click" aria-label="Vad är klick?">?</button></span>
+        <span class="opt"><label><input type="checkbox" id="optTone" checked> Referenston</label><span class="vol" data-vol="tone" role="group" aria-label="Referenstonens volym"><button type="button" class="btn-outline" data-d="-1" aria-label="Sänk referenstonen">−</button><span class="vol-v"></span><button type="button" class="btn-outline" data-d="1" aria-label="Höj referenstonen">+</button></span><button type="button" class="help" data-help="tone" aria-label="Vad är referenston?">?</button></span>
+        <span class="opt" id="optClickWrap" hidden><label><input type="checkbox" id="optClick"> Klick</label><span class="vol" data-vol="click" role="group" aria-label="Klickets volym"><button type="button" class="btn-outline" data-d="-1" aria-label="Sänk klicket">−</button><span class="vol-v"></span><button type="button" class="btn-outline" data-d="1" aria-label="Höj klicket">+</button></span><button type="button" class="help" data-help="click" aria-label="Vad är klick?">?</button></span>
         <span class="opt diff"><label for="optTol">Svårighetsgrad</label>
           <select id="optTol">
             <option value="100">Nybörjare</option>
@@ -1733,8 +1736,11 @@ function startAt(pos) {
   cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
 }
 
+// volym för referenston och klick: steg 0–10 (5 = standard), sparas i webbläsaren
+const VOL = { tone: 5, click: 5 }, volOut = { tone: null, click: null };
+const volGain = k => (k === 'tone' ? 0.18 : 0.5) * Math.pow(VOL[k] / 5, 1.6);
 function scheduleTones(when, pos) {
-  const out = audioCtx.createGain(); out.gain.value = 0.18;
+  const out = audioCtx.createGain(); out.gain.value = volGain('tone'); volOut.tone = out;
   const lp = audioCtx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2200;
   lp.connect(out); out.connect(audioCtx.destination);
   nodes.push(out, lp);
@@ -1773,7 +1779,7 @@ function beatTimes(from, to) {
   return out;
 }
 function scheduleClicks(when, pos) {
-  const out = audioCtx.createGain(); out.gain.value = 0.5;
+  const out = audioCtx.createGain(); out.gain.value = volGain('click'); volOut.click = out;
   out.connect(audioCtx.destination);
   nodes.push(out);
   beatTimes(pos, durationOf() + 0.01).forEach(([t, one]) => {
@@ -2191,7 +2197,7 @@ function openWordEditor(i) {
 function updateTempoUI() {
   const bpm = songBpm();
   document.getElementById('tempoInfo').hidden = !bpm;
-  document.getElementById('optClickWrap').hidden = !bpm && !isAdmin;
+  document.getElementById('optClickWrap').hidden = !bpm;   // inget tempo inställt = inget klick
   if (bpm) document.getElementById('tempoVal').textContent = (Math.round(bpm * 10) / 10).toLocaleString('sv-SE');
   const tp = document.getElementById('tempoPanel');
   if (tp && !tp.hidden) fillTempoPanel();
@@ -2409,6 +2415,20 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
 
 })();
 
+(() => {
+  const show = k => { const el = document.querySelector(`.vol[data-vol="${k}"] .vol-v`); if (el) el.textContent = VOL[k]; };
+  ['tone', 'click'].forEach(k => {
+    try { const v = Number(localStorage.getItem('hv-vol-' + k)); if (localStorage.getItem('hv-vol-' + k) != null && v >= 0 && v <= 10) VOL[k] = v; } catch (e) {}
+    show(k);
+    document.querySelectorAll(`.vol[data-vol="${k}"] button`).forEach(b => b.addEventListener('click', () => {
+      VOL[k] = Math.max(0, Math.min(10, VOL[k] + Number(b.dataset.d)));
+      show(k);
+      try { localStorage.setItem('hv-vol-' + k, String(VOL[k])); } catch (e) {}
+      // ändras direkt medan det spelar
+      if (volOut[k] && audioCtx) volOut[k].gain.setTargetAtTime(volGain(k), audioCtx.currentTime, 0.02);
+    }));
+  });
+})();
 ['optStem', 'optTone', 'optClick'].forEach(id => document.getElementById(id).addEventListener('change', () => { if (playing) startAt(position()); }));
 document.getElementById('optStem').addEventListener('change', e => { const o = document.querySelector('#withRow [data-own]'); if (o) o.checked = e.target.checked; });
 (() => {

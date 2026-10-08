@@ -65,6 +65,23 @@
   .vis { font-size: 0.7rem; padding: 0.05rem 0.45rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); margin-left: 0.3rem; }
   .vis.all { color: #4ade80; border-color: rgba(74,222,128,0.5); }
   .vis.leaders { color: #60a5fa; border-color: rgba(96,165,250,0.5); }
+  /* guide */
+  .title-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  #guideBtn[aria-expanded="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
+  .guide { margin-bottom: 1.5rem; }
+  .guide h2 { margin: 0 0 0.25rem; font-size: 1.15rem; }
+  .guide .g-p { margin: 0; font-size: 0.9rem; color: var(--text-muted); line-height: 1.55; }
+  .guide .g-p b, .guide li b, .guide .tips b { color: var(--text); }
+  .guide ol { list-style: none; padding: 0; margin: 0.9rem 0 0; display: grid; gap: 0.85rem; counter-reset: g; }
+  .guide li { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 0.75rem; counter-increment: g; }
+  .guide li::before { content: counter(g); width: 2rem; height: 2rem; border-radius: 50%; display: grid; place-items: center; background: rgba(229,169,104,0.15); color: var(--accent); font-weight: 700; font-family: 'Roboto Condensed', sans-serif; }
+  .guide li b { display: block; margin-bottom: 0.1rem; }
+  .guide li p { margin: 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; }
+  .guide li p b { display: inline; }
+  .guide .must { margin: 0.9rem 0 0; padding: 0.7rem 0.9rem; border: 1px solid rgba(229,169,104,0.55); border-left: 4px solid var(--accent); border-radius: 0.6rem; background: rgba(229,169,104,0.1); font-size: 0.9rem; line-height: 1.5; }
+  .guide .must b { color: var(--accent); }
+  .guide h3 { margin: 1.3rem 0 0.3rem; font-size: 1rem; }
+  .guide .tips { margin: 1rem 0 0; padding: 0.7rem 0.9rem; border-radius: 0.6rem; background: rgba(0,0,0,0.2); font-size: 0.84rem; color: var(--text-muted); line-height: 1.6; }
   .guide-box { margin-top: 1rem; font-size: 0.84rem; color: var(--text-muted); line-height: 1.55; }
   .guide-box b { color: var(--text); }
   @media (max-width: 640px) { .t-ctrl { margin-left: 0; width: 100%; } .t-ctrl input[type=range] { flex: 1; } }
@@ -76,9 +93,31 @@
   <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
   <div class="title-row">
     <h1>🎙 Studio</h1>
-    <a href="/medlem/rostovning.html" class="btn btn-outline">🎤 Röstövning</a>
+    <div class="title-actions">
+      <button type="button" class="btn-outline" id="guideBtn" aria-expanded="false" aria-controls="guide">❔ Så funkar det</button>
+      <a href="/medlem/rostovning.html" class="btn btn-outline">🎤 Röstövning</a>
+    </div>
   </div>
   <p class="hint">Sjung in en egen stämma eller idé till en låt. Du hör låtens spår i hörlurarna medan du spelar in, och kan sedan flytta, klippa och spara inspelningen. Dina inspelningar är privata tills du delar dem.</p>
+
+  <div class="card static guide" id="guide" hidden>
+    <h2>Så funkar Studio</h2>
+    <p class="g-p">I Studio sjunger du in din egen stämma eller en idé till en av körens låtar. Du hör låten i hörlurarna medan du sjunger, och inspelningen hamnar på rätt ställe i låten. Den är <b>privat</b> tills du själv väljer att dela den.</p>
+    <div class="must"><b>🎧 Hörlurar är ett måste.</b> Utan hörlurar spelar mikrofonen in låten från högtalarna tillsammans med din röst. Sladdhörlurar är bäst – trådlösa fungerar, men kalibrera då först (steg 2).</div>
+    <ol>
+      <li><div><b>Välj låt</b><p>Låtens spår visas som vågformer, ett per rad. Med reglaget och knapparna till höger på varje rad bestämmer du vad du hör: volym, 🔇 tysta och <b>S</b> = bara det spåret.</p></div></li>
+      <li><div><b>Kalibrera – en gång per dator eller telefon</b><p>Tryck <b>🎯 Kalibrera</b> och sedan <b>Starta</b>. Klappa i takt med de 8 klicken. Sidan mäter hur lång fördröjning dina hörlurar har, så att inspelningen hamnar i takt. Värdet sparas, så du behöver bara göra om det om du byter hörlurar.</p></div></li>
+      <li><div><b>Spela in</b><p>Klicka i tidslinjen där du vill börja och tryck <b>⏺ Spela in</b>. Låten börjar spela – med <b>Inräkning</b> startar den 2 sekunder före, så du hinner komma in. Sjung! Tryck <b>⏹ Stoppa</b> (eller mellanslag) när du är klar. Den gröna mätaren visar att mikrofonen hör dig.</p></div></li>
+      <li><div><b>Lyssna</b><p>Din tagning dyker upp som ett rött spår. Tryck ▶ och lyssna tillsammans med låten. Inte nöjd? Spela in en gång till – varje försök blir ett eget spår, och du kan ta bort de du inte vill ha med <b>🗑 Ta bort</b>.</p></div></li>
+      <li><div><b>Putsa (om du vill)</b><p>Ligger inspelningen lite fel i tid? Välj <b>↔ Flytta</b> och dra det röda spåret i sidled. Vill du ta bort ett harkel eller en tyst början? Välj <b>▭ Markera</b>, dra över biten och tryck <b>✂ Ta bort markerat</b>. <b>📶 Normalisera</b> gör en svag inspelning starkare. <b>↶ Ångra</b> tar tillbaka.</p></div></li>
+      <li><div><b>Spara</b><p>Skriv ett namn, till exempel ”Ters över refrängen”, välj vem som får höra den och tryck <b>💾 Spara inspelning</b>. Den hamnar under <b>Mina inspelningar</b> längst ner på sidan.</p></div></li>
+    </ol>
+    <h3>Vem hör min inspelning?</h3>
+    <p class="g-p">🔒 <b>Privat</b> – bara du. 👥 <b>Körledningen</b> – du och körledningen, bra när du vill visa en idé. 🌍 <b>Alla</b> – hela kören kan lyssna på den i Studio. Du kan ändra valet när du vill och spara igen.</p>
+    <div class="tips">
+      <b>Tips:</b> Sjung in en stämma i taget och lyssna på den tillsammans med originalstämman. Sänk låtens volym eller tysta sångspåren om du vill höra dig själv tydligare. <b>⬇ Mix av det som hörs</b> laddar ner allt som är påslaget som en ljudfil – bra att skicka till någon. Kortkommandon på dator: <b>R</b> = spela in, <b>mellanslag</b> = spela/stoppa, <b>Ctrl+Z</b> = ångra.
+    </div>
+  </div>
 
   <div class="card static">
     <label class="field-k" for="songSelect">Låt</label>
@@ -668,6 +707,15 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { tl.selection = null; sel = null; panel.selInfo(); }
 });
 window.addEventListener('beforeunload', e => { if (rec || unsaved()) { e.preventDefault(); e.returnValue = ''; } });
+
+(() => {
+  const g = document.getElementById('guide'), b = document.getElementById('guideBtn');
+  const set = open => { g.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? '✕ Stäng guiden' : '❔ Så funkar det'; };
+  let seen = null; try { seen = localStorage.getItem('hv-studio-guide'); } catch (e) {}
+  set(!seen);   // visas automatiskt första gången
+  if (!seen) { try { localStorage.setItem('hv-studio-guide', '1'); } catch (e) {} }
+  b.addEventListener('click', () => set(g.hidden));
+})();
 
 (async () => {
   const member = await requireAuth();

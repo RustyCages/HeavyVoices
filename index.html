@@ -254,6 +254,7 @@
   </div>
 
   <div class="flash-overlay" id="flash"></div>
+  <div class="flash-overlay" id="blackout" style="background:#000; z-index:11"></div>
 
   <!-- Skript som tonar och växlar citat automatiskt -->
   <script>
@@ -295,8 +296,12 @@
       document.getElementById('flash').animate(
         [{ opacity: 0 }, { opacity: 0, offset: 0.55 }, { opacity: 1 }],
         { duration: 1100, easing: 'ease-in', fill: 'forwards' });
+      // Blixten tonar ner till svart precis innan sidbytet
+      const black = document.getElementById('blackout').animate(
+        [{ opacity: 0 }, { opacity: 1 }],
+        { duration: 500, delay: 900, easing: 'ease-in-out', fill: 'forwards' });
       let done = false; const go = () => { if (!done) { done = true; goLogin(); } };
-      zoom.onfinish = go; setTimeout(go, 1500); // reserv om animationen hänger sig
+      black.onfinish = go; setTimeout(go, 2000); // reserv om animationen hänger sig
     });
     // Tillbaka-knappen (bfcache): återställ sidan
     window.addEventListener('pageshow', (e) => {
@@ -304,6 +309,7 @@
       document.body.classList.remove('leaving');
       logoWrap.getAnimations().forEach(a => a.cancel());
       document.getElementById('flash').getAnimations().forEach(a => a.cancel());
+      document.getElementById('blackout').getAnimations().forEach(a => a.cancel());
     });
   </script>
 

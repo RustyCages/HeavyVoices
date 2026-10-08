@@ -57,6 +57,8 @@
   .add-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
   .status { font-size: 0.82rem; color: var(--text-muted); }
   @media (max-width: 600px) { .add-form .row { grid-template-columns: 1fr; } }
+  .chan-btns { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .chan-btns button.on { background: #facc15; border-color: #facc15; color: #111; }
   .b-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin: 0.75rem 0; }
   .b-item { border: 1px solid var(--border); border-radius: 0.7rem; overflow: hidden; background: var(--bg-elevated); display: grid; gap: 0.4rem; padding-bottom: 0.6rem; align-content: start; }
   .b-item img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; background: #000; }
@@ -116,7 +118,7 @@
       </div>
     </form>
     <div style="margin-top:1.1rem;">
-      <button type="button" class="btn-outline" id="browseBtn">📺 Bläddra i kanalen Aussie Vocal Coach</button>
+      <div class="chan-btns" id="chanBtns"></div>
       <div id="browsePanel" hidden>
         <p class="hint" style="margin-top:0.75rem;">Tryck <b>+ Lägg till</b> på en video så hamnar den i kategorin och för stämman som är valda i formuläret ovan. Du kan ändra den efteråt.</p>
         <input type="search" id="bSearch" placeholder="Sök i titlarna…">
@@ -324,9 +326,17 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   resetForm(); render();
 });
 
-// ---------- bläddra i kanalen (admin) ----------
-let chanVideos = [], chanNext = null, chanLoaded = false;
+// ---------- bläddra i YouTube-kanaler (admin) ----------
+// Lägg till fler kanaler här: id = kanalens UC…-id (finns i kanalens RSS-länk / "Dela kanal → Kopiera kanal-id").
+const CHANNELS = [
+  { id: 'UCbAHuHgj0RjadzpDzZ0OWVA', name: 'Aussie Vocal Coach' },
+  { id: 'UCYvO0FPpDlJA8S5n9elvQuw', name: 'Singeo' },
+];
+const chanState = {};        // kanal-id → { videos, next, loaded }
+let curChan = null;
+const cs = () => chanState[curChan] || (chanState[curChan] = { videos: [], next: null, loaded: false });
 async function loadChannel(more) {
+  const ch = curChan, state = cs();
   const st = document.getElementById('bStatus');
   st.textContent = 'Hämtar…';
   try {
@@ -334,31 +344,34 @@ async function loadChannel(more) {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/youtube-channel`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ page_token: more ? chanNext : undefined }),
+      body: JSON.stringify({ channel_id: ch, page_token: more ? state.next : undefined }),
     });
     const r = await res.json().catch(() => ({}));
-    if (!res.ok) { st.textContent = 'Kunde inte hämta: ' + (r.error || 'fel ' + res.status); return; }
-    chanVideos = more ? chanVideos.concat(r.videos) : r.videos;
-    chanNext = r.next_page_token || null;
-    st.textContent = r.source === 'rss' ? 'Visar de senaste videorna. Lägg till YOUTUBE_API_KEY i Supabase för hela arkivet.' : '';
+    if (ch !== curChan) return;          // admin bytte kanal medan vi hämtade
+    if (!res.ok) { state.loaded = false; st.textContent = 'Kunde inte hämta: ' + (r.error || 'fel ' + res.status); return; }
+    state.videos = more ? state.videos.concat(r.videos) : r.videos;
+    state.next = r.next_page_token || null;
+    state.rss = r.source === 'rss';
     renderChannel();
-  } catch (err) { st.textContent = 'Fel: ' + err.message; }
+  } catch (err) { state.loaded = false; if (ch === curChan) st.textContent = 'Fel: ' + err.message; }
 }
 function renderChannel() {
+  const state = cs();
   const q = document.getElementById('bSearch').value.trim().toLowerCase();
   const have = new Set(videos.map(v => v.youtube_id));
-  const items = chanVideos.filter(v => !q || v.title.toLowerCase().includes(q));
+  const items = state.videos.filter(v => !q || v.title.toLowerCase().includes(q));
   const list = document.getElementById('bList');
   list.innerHTML = items.map(v => `<div class="b-item">
     <img src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt="" loading="lazy">
     <div class="b-title">${esc(v.title)}</div>
     ${have.has(v.id) ? '<span class="tag">✓ Tillagd</span>' : `<button type="button" data-add="${esc(v.id)}">+ Lägg till</button>`}
-  </div>`).join('') || '<p class="empty">Inga träffar.</p>';
-  document.getElementById('bMore').hidden = !chanNext;
+  </div>`).join('') || (state.loaded && state.videos.length ? '<p class="empty">Inga träffar.</p>' : '');
+  document.getElementById('bMore').hidden = !state.next;
+  document.getElementById('bStatus').textContent = state.rss ? 'Visar de senaste videorna. Lägg till YOUTUBE_API_KEY i Supabase för hela arkivet.' : '';
   list.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => addFromChannel(b.dataset.add)));
 }
 async function addFromChannel(id) {
-  const v = chanVideos.find(x => x.id === id); if (!v) return;
+  const v = cs().videos.find(x => x.id === id); if (!v) return;
   const category = document.getElementById('fCat').value.trim() || 'Uppvärmning';
   const row = { youtube_id: id, title: v.title, category, voice: document.getElementById('fVoice').value || null, description: null, start_sec: 0 };
   row.position = Math.max(-1, ...videos.filter(x => x.category === category).map(x => x.position)) + 1;
@@ -368,11 +381,20 @@ async function addFromChannel(id) {
   render(); renderChannel();
   toast(`"${v.title}" tillagd i ${category}`);
 }
-document.getElementById('browseBtn').addEventListener('click', () => {
-  const p = document.getElementById('browsePanel');
-  p.hidden = !p.hidden;
-  if (!p.hidden && !chanLoaded) { chanLoaded = true; loadChannel(false); }
-});
+(() => {
+  const box = document.getElementById('chanBtns');
+  box.innerHTML = CHANNELS.map(c => `<button type="button" class="btn-outline" data-chan="${esc(c.id)}">📺 Bläddra i kanalen ${esc(c.name)}</button>`).join('');
+  box.querySelectorAll('[data-chan]').forEach(b => b.addEventListener('click', () => {
+    const p = document.getElementById('browsePanel');
+    if (curChan === b.dataset.chan && !p.hidden) { p.hidden = true; b.classList.remove('on'); return; }
+    curChan = b.dataset.chan;
+    box.querySelectorAll('[data-chan]').forEach(x => x.classList.toggle('on', x === b));
+    p.hidden = false;
+    document.getElementById('bSearch').value = '';
+    renderChannel();
+    if (!cs().loaded) { cs().loaded = true; loadChannel(false); }
+  }));
+})();
 document.getElementById('bMore').addEventListener('click', () => loadChannel(true));
 document.getElementById('bSearch').addEventListener('input', renderChannel);
 

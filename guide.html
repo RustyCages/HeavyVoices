@@ -44,6 +44,8 @@ body {
   padding-block: 20px 40px;
   min-height: 100%;
 }
+.back-btn-g { align-self: flex-start; display: inline-flex; align-items: center; gap: .4rem; padding: .45rem 1rem; margin-bottom: -6px; border: 1px solid rgba(255,255,255,.14); border-radius: .5rem; color: #f3f4f6; text-decoration: none; font-size: .875rem; background: rgba(255,255,255,.04); transition: all .2s ease; }
+.back-btn-g:hover { border-color: #E5A968; color: #E5A968; background: rgba(229,169,104,.08); }
 .wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
 
 header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px; }
@@ -273,6 +275,7 @@ footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--lin
 
 
 <div class="wrap">
+  <a href="/medlem/" id="backBtn" class="back-btn-g">&larr; Tillbaka</a>
   <header>
     <div class="brand">
       <small id="kicker">heavyvoices.se · guide</small>
@@ -815,5 +818,14 @@ if (fixedGuide && GUIDES[fixedGuide]) {
 }
 </script>
 
+<script>
+(function () {
+  var g = new URLSearchParams(location.search).get('guide');
+  var b = document.getElementById('backBtn');
+  if (g === 'admin') b.href = '/admin/';
+  else if (g === 'registrera') b.href = '/logga-in.html';
+  else b.href = '/medlem/';
+})();
+</script>
 </body>
 </html>

@@ -50,3 +50,26 @@ async function requireAuth(requiredRole = null) {
 
   return member;
 }
+
+
+// Mjuk utton vid sidbyte: tona ut sidan innan länken följs (inton sker i css/style.css)
+(function () {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a || a.target === '_blank' || a.hasAttribute('download') || a.hasAttribute('data-no-transition')) return;
+    var u;
+    try { u = new URL(a.href, location.href); } catch (_) { return; }
+    if (u.origin !== location.origin || !/^https?:$/.test(u.protocol)) return;
+    if (u.pathname === location.pathname && u.search === location.search) return; // bara #-hopp eller samma sida
+    e.preventDefault();
+    document.body.style.transition = 'opacity 0.22s ease-in';
+    document.body.style.opacity = '0';
+    var go = function () { location.href = u.href; };
+    setTimeout(go, 230);
+  });
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) { document.body.style.transition = ''; document.body.style.opacity = ''; }
+  });
+})();

@@ -54,12 +54,14 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .transport { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0.9rem 0 0.25rem; }
   .transport .time { font-variant-numeric: tabular-nums; font-size: 0.85rem; color: var(--text-muted); min-width: 4.2rem; text-align: center; }
   .transport input[type=range] { flex: 1; min-width: 140px; margin: 0; padding: 0; }
-  .play-btn { width: 2.8rem; height: 2.8rem; border-radius: 50%; justify-content: center; font-size: 1.1rem; padding: 0; }
+  .play-btn { position: relative; width: 2.8rem; height: 2.8rem; border-radius: 50%; justify-content: center; font-size: 1.1rem; padding: 0; }
+  .play-btn.loading::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 3px solid transparent; border-top-color: var(--accent); border-right-color: var(--accent); animation: hv-spin 0.8s linear infinite; pointer-events: none; }
+  @keyframes hv-spin { to { transform: rotate(360deg); } }
+  .load-state { font-size: 0.85rem; color: var(--accent); font-weight: 600; }
   #loadingNote { color: var(--text-muted); }
   .karaoke { margin-top: 0.9rem; padding: 0.6rem 0.75rem; text-align: center; border-radius: 0.6rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border); min-height: 4.2rem; display: grid; align-content: center; gap: 0.15rem; }
-  .k-now { font-family: 'Roboto Condensed', sans-serif; font-size: 1.45rem; font-weight: 700; line-height: 1.25; color: rgba(255,255,255,0.9);
-    background-image: linear-gradient(to right, var(--accent) var(--k, 0%), rgba(255,255,255,0.9) var(--k, 0%));
-    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .k-now { font-family: 'Roboto Condensed', sans-serif; font-size: 1.45rem; font-weight: 700; line-height: 1.25; color: var(--accent); }
+  .k-now.idle { color: rgba(255,255,255,0.55); }
   .k-next { font-size: 0.9rem; color: var(--text-muted); min-height: 1.3em; }
   .k-src { font-size: 0.7rem; color: var(--text-muted); opacity: 0.7; }
   @media (max-width: 640px) { .k-now { font-size: 1.2rem; } }
@@ -164,13 +166,30 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .legend-row span { display: inline-flex; align-items: center; gap: 0.4rem; }
   .swatch { display: inline-block; width: 18px; height: 9px; border-radius: 3px; }
 
+  /* tydliga rubriker: Låt, Stämma, Sjung till … */
+  .field-k { display: block; margin: 0 0 0.35rem; font-family: 'Roboto Condensed', sans-serif; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); }
+  .field-k small { font-family: 'DM Sans', sans-serif; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-muted); font-size: 0.78rem; margin-left: 0.35rem; }
+  .with-wrap .chips label.own { border-style: dashed; }
+  .with-wrap .chips label small { color: var(--text-muted); font-size: 0.75rem; }
+  .tempo-info { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.9rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .tempo-info { font-size: 1rem; }
+  .tempo-info b { color: var(--text); font-family: 'Roboto Condensed', sans-serif; font-size: 1.05rem; }
+  .ghost-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; margin: 0 0 0.6rem; }
+  .ghost-row .field-k { margin: 0; font-size: 0.8rem; }
+  .ghost-row .chips { margin: 0; }
+  .ghost-row .chips label { display: flex; align-items: center; gap: 0.35rem; margin: 0; cursor: pointer; font-size: 0.82rem; color: var(--text); width: auto; }
+  .ghost-row .chips input { width: auto; margin: 0; accent-color: var(--accent); }
+  .ghost-row .chips label.me { border-color: rgba(229,169,104,0.6); background: rgba(229,169,104,0.12); cursor: default; }
+  .tempo-panel .harm-grid input[type=number] { width: 5.5rem; margin: 0; padding: 0.3rem 0.45rem; }
+  .tempo-panel .edit-tools button { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
+  .tempo-panel #tTap.flash { background: var(--accent); color: #111317; }
+
   /* stämval för medlemmar */
   .voice-pick { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.9rem; }
   .with-wrap { margin-top: 0.9rem; }
   .with-wrap .chips label { display: flex; align-items: center; gap: 0.3rem; margin: 0; cursor: pointer; font-size: 0.85rem; color: var(--text); width: auto; }
   .with-wrap .chips input[type=checkbox] { width: auto; margin: 0; accent-color: var(--accent); }
-  .with-wrap .vp-k { font-size: 0.8rem; color: var(--text-muted); }
-  .voice-pick .vp-k { width: 100%; font-size: 0.8rem; color: var(--text-muted); }
+  .voice-pick .field-k { width: 100%; margin: 0; }
   .voice-pick button { padding: 0.45rem 0.95rem; border-radius: 999px; font-size: 0.9rem; }
   .voice-pick button[aria-pressed="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
 
@@ -292,16 +311,16 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
       <ol class="g-rec-steps">
         <li><b>🎧 Använd hörlurar – det är nästan ett krav.</b> Mikrofonen hör allt i rummet. Spelar musiken i högtalaren tror den att musiken är du, och då blir resultatet fel.</li>
         <li>Välj <b>din stämma</b> (eller <b>Vocals</b>) som huvudspår – <u>inte</u> backtracket. Det är huvudspåret som bestämmer vilka noter du ska sjunga.</li>
-        <li>Slå sedan på <b>Spela med backtrack</b> (om körledningen har aktiverat det för låten), så sjunger du till kompet.</li>
+        <li>Bocka sedan i <b>Backtrack</b> (eller <b>Instrumental</b>) under <b>Sjung till</b>, så sjunger du till kompet.</li>
       </ol>
     </div>
     <ol>
       <li class="member-only"><div><b>Välj låt</b><p>Listan visar låtarna som går att öva på.</p></div></li>
-      <li class="member-only"><div><b>Välj stämma</b><p>Tryck på din stämma (eller Vocals). Inget är förvalt. Välj inte backtracket som huvudspår – det lägger du till med <em>Spela med backtrack</em> nedan.</p></div></li>
+      <li class="member-only"><div><b>Välj stämma</b><p>Tryck på din stämma (eller Vocals). Inget är förvalt. Kompet (Backtrack, Instrumental, Full) finns inte här – det lägger du till under <em>Sjung till</em>.</p></div></li>
       <li class="admin-only"><div><b>Välj låt</b><p>Listan visar låtar som har minst en sångstämma uppladdad.</p></div></li>
       <li class="admin-only"><div><b>Analysera stämmorna</b><p>Tryck <em>Analysera alla sångstämmor</em> (eller <em>Analysera</em> på en stämma). Sidan lyssnar igenom ljudfilen och räknar fram vilka toner som sjungs. Resultatet sparas direkt. Byts stämfilen ut visas ⚠ – analysera då igen.</p></div></li>
       <li class="admin-only"><div><b>Kontrollera resultatet</b><p>Tryck <em>Välj</em> på stämman och sedan ▶ med <em>Referenston</em> på. Följer pipet stämman är analysen bra. Ligger det backvocals i filen kan det bli extra noter där.</p></div></li>
-      <li><div><b>Välj vad du vill höra</b><p>Under stämmorna: slå på <em>Referenston</em> (ett pip på noterna), <em>Spela med backtrack</em> för att sjunga till kompet, och kryssa i övriga stämmor om du vill höra dem också. Välj <em>Svårighetsgrad</em> – börja med <em>Lätt</em>.</p></div></li>
+      <li><div><b>Välj vad du vill höra</b><p>Under <em>Sjung till</em> bockar du i det du vill höra: din egen stämma, kompet och andra stämmor. Slå på <em>Referenston</em> (ett pip på noterna) och <em>Klick</em> (metronom) om du vill. Välj <em>Svårighetsgrad</em> – börja med <em>Lätt</em>.</p></div></li>
       <li><div><b>Lyssna först</b><p>Tryck ▶ (eller klicka i notbanan) för att höra hur stämman går.</p></div></li>
       <li><div><b>Sjung med</b><p>Sätt i hörlurar och tryck <em>🎤 Sjung med</em>. Tillåt mikrofonen första gången. Tryck sedan ▶ och sjung.</p></div></li>
       <li><div><b>Läs av</b><p>Den vita linjen är din röst. Noterna fylls <span style="color:#4ade80">grönt</span> där du träffar och <span style="color:#f87171">rött</span> där du missar. Uppe till höger ser du vilken ton du sjunger och hur många cent du ligger fel. Under spelaren visas träffprocent och hur många noter du klarat.</p></div></li>
@@ -315,10 +334,10 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         <dl>
           <dt>Referenston <em>(?)</em></dt>
           <dd>Ett enkelt pip som spelar exakt de noter du ser i notbanan. Tryck på <em>?</em> för förklaring.</dd>
-          <dt>Spela med</dt>
-          <dd>Under stämmorna kan du välja att höra övriga stämmor samtidigt.</dd>
-          <dt>Spela med backtrack</dt>
-          <dd><b class="g-strong">Sjung till kompet.</b> Rutan syns bara om körledningen har aktiverat backtrack för låten.</dd>
+          <dt>Sjung till</dt>
+          <dd>Välj vad du hör: din stämma, <b class="g-strong">kompet (Backtrack/Instrumental)</b> och andra stämmor. Stäng av din egen stämma när du kan den.</dd>
+          <dt>Klick</dt>
+          <dd>Metronom på låtens slag. Syns när körledningen har ställt in tempot (BPM).</dd>
         </dl>
       </section>
       <section class="g-set">
@@ -342,7 +361,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         </dl>
       </section>
     </div>
-    <p class="g-p">Sångtexten visas automatiskt över notbanan när låten har synkad text.</p>
+    <p class="g-p">Sångtexten visas i notblocken och i rutan under notbanan när låten har synkad text. Under <b>Visa i notbanan</b> kan du se andra stämmor som färgade block – mikrofonen och referenstonen följer alltid stämman du valt.</p>
 
     <h3 class="g-h">Rutorna med resultat</h3>
     <p class="g-p">Visas när mikrofonen är på. <b>Du sjunger</b> = tonen du tar just nu och hur många cent du ligger fel. <b>Träff</b> = hur stor del av tiden du legat rätt när det finns en not att sjunga. <b>Noter klara</b> = hur många noter du har klarat, där du legat rätt minst 60 % av notens längd. Allt nollställs när du startar om från början.</p>
@@ -354,14 +373,15 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   </div>
 
   <div class="card static">
-    <label class="hint" for="songSelect" style="display:block; margin:0 0 0.3rem;">Låt</label>
+    <label class="field-k" for="songSelect">Låt</label>
     <select id="songSelect"><option value="">Laddar låtar…</option></select>
     <div id="stemArea" hidden>
       <div id="stemRows"></div>
-      <div id="withWrap" class="with-wrap" hidden><div class="vp-k">Spela med</div><div class="chips" id="withRow"></div></div>
+      <div id="withWrap" class="with-wrap" hidden><div class="field-k">Sjung till <small>det här hör du i hörlurarna</small></div><div class="chips" id="withRow"></div></div>
       <div class="practice-controls">
+        <span class="tempo-info" id="tempoInfo" hidden title="Låtens tempo">♩ <b id="tempoVal"></b> BPM</span>
         <span class="opt"><label><input type="checkbox" id="optTone" checked> Referenston</label><button type="button" class="help" data-help="tone" aria-label="Vad är referenston?">?</button></span>
-        <label id="optWithBackWrap" hidden><input type="checkbox" id="optWithBackMember"> Spela med backtrack</label>
+        <span class="opt" id="optClickWrap" hidden><label><input type="checkbox" id="optClick"> Klick</label><button type="button" class="help" data-help="click" aria-label="Vad är klick?">?</button></span>
         <span class="opt diff"><label for="optTol">Svårighetsgrad</label>
           <select id="optTol">
             <option value="100">Nybörjare</option>
@@ -381,6 +401,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   <div class="card static" id="viewer" hidden>
     <div class="viewer-head"><h2 id="viewerTitle"></h2></div>
     <div class="stats" id="stats"></div>
+    <div class="ghost-row" id="ghostRow" hidden><span class="field-k">Visa i notbanan</span><div class="chips" id="ghostChips"></div><button type="button" class="help" data-help="ghost" aria-label="Vad är Visa i notbanan?">?</button></div>
     <div class="canvas-wrap">
       <canvas id="overview" title="Hela låten – klicka för att hoppa"></canvas>
       <canvas id="roll" title="Klicka för att spela/pausa – dra i sidled för att spola"></canvas>
@@ -408,6 +429,26 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
     <div class="edit-bar admin-only">
       <button type="button" class="btn-outline" id="editToggle">✎ Redigera noter</button>
       <button type="button" class="btn-outline" id="copyAnalysisBtn" title="Lägg samma noter på andra stämmor">⎘ Kopiera analys till andra stämmor</button>
+      <button type="button" class="btn-outline toggle-btn" id="tempoBtn" aria-expanded="false" aria-controls="tempoPanel" title="Ställ in låtens tempo (BPM) och var takten börjar – ger taktstreck och klick">🥁 Tempo &amp; klick</button>
+      <div class="copy-panel tempo-panel" id="tempoPanel" hidden>
+        <small class="xfer-note">Taktstrecken i notbanan och klicket följer det här. Slå på <b>Klick</b> ovan och spela – justera tills klicket ligger på slagen. Gäller hela låten (alla stämmor).</small>
+        <div class="harm-grid">
+          <label>BPM <input type="number" id="tBpm" min="30" max="300" step="0.1" placeholder="t.ex. 120"></label>
+          <span class="edit-tools"><button type="button" class="btn-outline" data-bpm="-1">−1</button><button type="button" class="btn-outline" data-bpm="-0.1">−0,1</button><button type="button" class="btn-outline" data-bpm="0.1">+0,1</button><button type="button" class="btn-outline" data-bpm="1">+1</button><button type="button" class="btn-outline" data-bpmx="0.5" title="Halva tempot">÷2</button><button type="button" class="btn-outline" data-bpmx="2" title="Dubbla tempot">×2</button></span>
+          <label>Taktart <select id="tBpb"><option value="2">2/4</option><option value="3">3/4</option><option value="4" selected>4/4</option><option value="5">5/4</option><option value="6">6/8</option><option value="7">7/8</option></select></label>
+        </div>
+        <div class="harm-grid">
+          <label>Första taktslaget <input type="number" id="tOff" step="0.01"> s</label>
+          <span class="edit-tools"><button type="button" class="btn-outline" data-off="-0.1">−0,1</button><button type="button" class="btn-outline" data-off="-0.01">−0,01</button><button type="button" class="btn-outline" data-off="0.01">+0,01</button><button type="button" class="btn-outline" data-off="0.1">+0,1</button><button type="button" class="btn-outline" id="tOffHere" title="Ställ spelhuvudet på en taktetta (slag 1) och tryck">⌖ Taktetta vid spelhuvudet</button></span>
+        </div>
+        <div class="edit-tools">
+          <button type="button" class="btn-outline" id="tAuto" title="Lyssnar igenom komp/backtrack och räknar fram tempo och slag">🔎 Räkna fram tempot</button>
+          <button type="button" class="btn-outline" id="tTap" title="Tryck i takt med musiken medan låten spelar (minst 4 gånger), börja på en etta">👆 Tappa takten</button>
+          <button type="button" id="tSave">💾 Spara tempo</button>
+          <button type="button" class="btn-outline" id="tClear" title="Ta bort tempot för låten">Ta bort</button>
+          <span class="edit-status" id="tStatus"></span>
+        </div>
+      </div>
       <button type="button" class="btn-outline toggle-btn" id="vidBtn" aria-expanded="false" aria-controls="vidPanel" title="Lägg en egen videofil bakom notbanan för den här låten">🎬 Bakgrundsvideo</button>
       <div class="copy-panel" id="vidPanel" hidden></div>
       <button type="button" class="btn-outline toggle-btn" id="xferBtn" aria-expanded="false" aria-controls="xferPanel" title="Spara noterna som fil eller i biblioteket, eller hämta in noter">⇅ Exportera / importera noter</button>
@@ -514,6 +555,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
     </div>
     <div class="transport">
       <button class="play-btn" id="playBtn" title="Spela/pausa (mellanslag)">▶&#xFE0E;</button>
+      <span class="load-state" id="loadState" hidden>Laddar låten…</span>
       <button class="btn-outline" id="backBtn" title="5 s bakåt">−5 s</button>
       <span class="time" id="curTime">0:00.0</span>
       <input type="range" id="scrubber" min="0" max="1" step="0.01" value="0">
@@ -616,6 +658,11 @@ let dispMidi = null;     // utjämnad visad ton
 let lastTarget = null;   // senaste noten (för oktav mellan noterna)
 let unsaved = false;     // nya sångdata sedan senaste sparning
 let sessions = [];       // mina sparade övningar
+let ghosts = new Set();  // andra stämmor som visas som färgade block i notbanan (bara för att titta)
+const GHOST_COLORS = ['#60a5fa', '#c084fc', '#34d399', '#f472b6', '#facc15', '#fb923c'];
+// spår som inte är en sångstämma att sjunga (döljs i stämvalet för medlemmar)
+const NOT_SING = /instrument|\bfull\b|backtrack|karaoke|playback/i;
+const singable = st => st.key !== 'stem_backtrack_path' && !NOT_SING.test(st.label || '');
 let progScope = 'stem';
 
 // ---------- hjälpare ----------
@@ -664,8 +711,9 @@ function renderRows() {
   const wrap = document.getElementById('stemRows');
   wrap.innerHTML = '';
   if (!isAdmin) {
-    const ready = stems.filter(st => st.pitch);
-    wrap.innerHTML = '<div class="voice-pick"><span class="vp-k">Stämma</span>' + ready.map((st, i) =>
+    let ready = stems.filter(st => st.pitch && singable(st));
+    if (!ready.length) ready = stems.filter(st => st.pitch);
+    wrap.innerHTML = '<div class="voice-pick"><span class="field-k">Stämma <small>den du sjunger</small></span>' + ready.map((st, i) =>
       `<button type="button" class="btn-outline" data-i="${i}" aria-pressed="${st === current}">${esc(st.label)}</button>`).join('') + '</div>';
     wrap.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
       showStem(ready[Number(b.dataset.i)]);
@@ -712,6 +760,7 @@ async function loadSong(id) {
   if (!song) return;
   if (isAdmin) history.replaceState(null, '', '?song=' + encodeURIComponent(id));
   setupBgVideo();
+  ghosts = new Set();
   { const vp = document.getElementById('vidPanel'); if (vp && !vp.hidden) renderVidPanel(); }
 
   const note = document.getElementById('loadingNote');
@@ -746,8 +795,12 @@ async function loadSong(id) {
   if (!isAdmin) renderRows();
 }
 
-async function loadBuffer(st) {
-  if (st.buffer) return st.buffer;
+function loadBuffer(st) {
+  if (st.buffer) return Promise.resolve(st.buffer);
+  if (!st._loading) st._loading = fetchBuffer(st).finally(() => { st._loading = null; });
+  return st._loading;
+}
+async function fetchBuffer(st) {
   await ensureCtx();
   const { data, error } = await supabaseClient.storage.from(STEMS_BUCKET).createSignedUrl(st.path, 3600);
   if (error) throw error;
@@ -821,8 +874,11 @@ function showStem(st) {
   stop();
   current = st;
   voice = []; noteStats = []; if (mic) updateScore();
+  ghosts.delete(st.key);
   renderWithRow();
   setupKaraoke();
+  renderGhostRow();
+  updateTempoUI();
   setTimeout(placeBgVideo, 0);
   applyMerge(st);
   pausedPos = 0;
@@ -844,7 +900,8 @@ function showStem(st) {
   tick();
   renderProgress();
   // förladda ljudet i bakgrunden så Spela startar direkt
-  loadBuffer(st).then(() => {
+  if (!st.buffer) setLoading(true);
+  loadBuffer(st).finally(() => { if (current === st && !playPending) setLoading(false); }).then(() => {
     if (current !== st) return;
     document.getElementById('scrubber').max = durationOf() || 1;
     document.getElementById('durTime').textContent = fmt(durationOf());
@@ -866,7 +923,7 @@ function sizeCanvases() {
 // Låtens "riktiga" omfång: enstaka extremtoner (analysfel, skrik) räknas bort
 function songRange() {
   if (current._rr) return current._rr;
-  const ns = current.pitch.notes.slice().sort((a, b) => a.n - b.n);
+  const ns = current.pitch.notes.concat(...ghostList().map(ghostNotes)).sort((a, b) => a.n - b.n);
   const s = current.pitch.stats || {};
   // oktavfelen är redan rättade → ta med alla noter så ingen klipps
   const pad = rangePad();
@@ -882,7 +939,7 @@ function rangePad() { return Math.max(0.45, (Number(document.getElementById('opt
 let viewLo = null, viewHi = null, viewFor = null;
 function rollRange(t0, span) {
   if (!document.getElementById('optFit').checked) return songRange();
-  const ns = current.pitch.notes.filter(n => n.t + n.d > t0 - 0.5 && n.t < t0 + span * 1.2);
+  const ns = current.pitch.notes.concat(...ghostList().map(ghostNotes)).filter(n => n.t + n.d > t0 - 0.5 && n.t < t0 + span * 1.2);
   let lo, hi;
   if (ns.length) {
     const pad = rangePad();
@@ -915,6 +972,64 @@ function drawOverview() {
 
 function viewStart(pos, span) { return Math.max(0, pos - span * 0.3); }
 
+// kortar texten med … så den får plats (canvas)
+function fitText(ctx, s, w) {
+  if (w <= 8 || !s) return '';
+  if (ctx.measureText(s).width <= w) return s;
+  let n = Math.max(1, Math.floor(s.length * w / ctx.measureText(s).width));
+  while (n > 1 && ctx.measureText(s.slice(0, n) + '…').width > w) n--;
+  return n > 1 ? s.slice(0, n).trimEnd() + '…' : '';
+}
+// textradens ord fördelade på noterna som ligger i raden (karaokens radtider)
+function lyricMap() {
+  const ns = current.pitch.notes;
+  if (current._lm && current._lmN === ns && current._lmLen === ns.length && current._lmK === kLines) return current._lm;
+  const map = new Array(ns.length).fill('');
+  const off = stemOffSec();
+  kLines.forEach((l, li) => {
+    if (!l.text || l.text === '♪') return;
+    const a = l.time - off, b = (li + 1 < kLines.length ? kLines[li + 1].time : l.time + 8) - off;
+    const idx = [];
+    ns.forEach((n, i) => { const m = n.t + n.d / 2; if (m >= a - 0.15 && m < b + 0.15 && !map[i]) idx.push(i); });
+    if (!idx.length) return;
+    const words = l.text.split(/\s+/).filter(Boolean), W = words.length, N = idx.length;
+    if (W >= N) idx.forEach((ni, k) => { map[ni] = words.slice(Math.floor(k * W / N), Math.floor((k + 1) * W / N)).join(' '); });
+    else words.forEach((w, j) => { const ni = idx[Math.floor(j * N / W)]; map[ni] = map[ni] ? map[ni] + ' ' + w : w; });
+  });
+  current._lm = map; current._lmN = ns; current._lmLen = ns.length; current._lmK = kLines;
+  return map;
+}
+// ---------- fler stämmor i notbanan (bara visning – mic och referenston följer vald stämma) ----------
+function ghostCandidates() { return current ? stems.filter(st => st !== current && st.pitch && singable(st)) : []; }
+function ghostList() { return ghostCandidates().filter(st => ghosts.has(st.key)); }
+function ghostColor(st) { return GHOST_COLORS[Math.max(0, ghostCandidates().indexOf(st)) % GHOST_COLORS.length]; }
+// den andra stämmans noter flyttade till din stämmas tidslinje (stämsynkens förskjutningar)
+function ghostNotes(st) {
+  const offs = song.stem_offsets || {};
+  const sh = ((Number(offs[st.key]) || 0) - (Number(offs[current.key]) || 0)) / 1000;
+  const merge = document.getElementById('optMerge').checked;
+  const key = [current.key, sh, merge, kLines.length].join('|');
+  if (st._gh && st._ghKey === key) return st._gh;
+  const base = st.pitchBase || st.pitch;
+  let notes = base.notes;
+  if (!base.edited && merge) notes = mergeNotes(notes, kLines.length ? lyricSpans(st) : []);
+  st._gh = notes.map(n => ({ t: n.t + sh, d: n.d, n: n.n })); st._ghKey = key;
+  return st._gh;
+}
+function renderGhostRow() {
+  const cands = ghostCandidates(), row = document.getElementById('ghostRow');
+  row.hidden = !cands.length || PARTY;
+  if (row.hidden) return;
+  document.getElementById('ghostChips').innerHTML =
+    `<label class="me" title="Stämman du sjunger – mikrofonen och referenstonen följer den"><i class="swatch" style="background: rgba(229,169,104,0.45); border: 1px solid var(--accent);"></i>${esc(current.label)} 🎤</label>` +
+    cands.map(st => `<label><input type="checkbox" data-gk="${esc(st.key)}" ${ghosts.has(st.key) ? 'checked' : ''}><i class="swatch" style="background:${ghostColor(st)}"></i>${esc(st.label)}</label>`).join('');
+  document.querySelectorAll('#ghostChips [data-gk]').forEach(inp => inp.addEventListener('change', () => {
+    if (inp.checked) ghosts.add(inp.dataset.gk); else ghosts.delete(inp.dataset.gk);
+    current._rr = null; viewLo = null;
+    tick();
+  }));
+}
+
 function drawRoll() {
   const c = document.getElementById('roll'), ctx = c.getContext('2d');
   const W = c.width, H = c.height, dpr = window.devicePixelRatio || 1;
@@ -938,10 +1053,17 @@ function drawRoll() {
     else if (p.key && pc === p.key.tonic) { ctx.fillStyle = 'rgba(229,169,104,0.06)'; ctx.fillRect(0, y(m + 0.5), W, rowH); }
     if (pc === (p.key ? p.key.tonic : 0)) { ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, Math.round(y(m - 0.5)), W, 1); }
   }
-  // taktstreck var halv sekund, lite starkare på hela sekunder
-  for (let s = Math.ceil(t0 * 2) / 2; s < t0 + span; s += 0.5) {
-    ctx.fillStyle = Number.isInteger(s) ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)';
-    ctx.fillRect(Math.round(x(s)), 0, 1, H);
+  // taktstreck: låtens slag om tempot är inställt (taktettor starkare), annars var halv sekund
+  if (songBpm()) {
+    beatTimes(t0, t0 + span).forEach(([bt, one]) => {
+      ctx.fillStyle = one ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.05)';
+      ctx.fillRect(Math.round(x(bt)), 0, one ? 2 * dpr : 1, H);
+    });
+  } else {
+    for (let s = Math.ceil(t0 * 2) / 2; s < t0 + span; s += 0.5) {
+      ctx.fillStyle = Number.isInteger(s) ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)';
+      ctx.fillRect(Math.round(x(s)), 0, 1, H);
+    }
   }
 
   // noter: rundade block, fylls grönt/rött där du sjungit
@@ -950,6 +1072,21 @@ function drawRoll() {
   const boxHalf = Math.max(0.45, tolSemi);
   const r = Math.min(8 * dpr, rowH * boxHalf);
   rollGeom = { t0, pxs, lo, H, rowH, boxHalf, dpr };
+  // andra stämmor (bara att titta på): färgade block bakom din stämma
+  ghostList().forEach(gs => {
+    const col = ghostColor(gs);
+    ghostNotes(gs).forEach(n => {
+      if (n.t + n.d < t0 || n.t > t0 + span) return;
+      const nx = x(n.t), nw = Math.max(3, n.d * pxs), top = y(n.n + boxHalf * 0.8), h = rowH * boxHalf * 1.6;
+      ctx.globalAlpha = 0.2; ctx.fillStyle = col;
+      ctx.beginPath(); ctx.roundRect(nx, top, nw, h, r); ctx.fill();
+      ctx.globalAlpha = 0.85; ctx.strokeStyle = col; ctx.lineWidth = 1.3 * dpr;
+      ctx.setLineDash([5 * dpr, 3 * dpr]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    });
+  });
+  const lmap = editMode ? null : lyricMap();
+  const labels = [];   // ritas efter tonkurvan så linjen inte stryker över texten
   const vis = [];
   p.notes.forEach((n, ni) => { if (!(n.t + n.d < t0 || n.t > t0 + span)) vis.push([n, ni]); });
   vis.forEach(([n, ni]) => {
@@ -982,11 +1119,9 @@ function drawRoll() {
       ctx.font = `600 ${12 * dpr}px DM Sans, sans-serif`; ctx.textBaseline = 'bottom';
       ctx.fillText(`${nm(n.n)} · ${n.d.toFixed(2)} s`, nx, top - 4 * dpr);
     }
-    if (nw > 30 * dpr && h > 12 * dpr) {
-      ctx.font = `500 ${Math.min(11 * dpr, h * 0.7)}px DM Sans, sans-serif`;
-      ctx.fillStyle = 'rgba(255,255,255,0.65)'; ctx.textBaseline = 'middle';
-      ctx.fillText(nm(n.n), nx + 6 * dpr, top + h / 2, nw - 8 * dpr);
-    }
+    // i blocket: texten som sjungs på noten (tonen syns på linjerna till vänster). Admin som redigerar ser tonnamnet.
+    const label = editMode ? (nw > 30 * dpr && h > 12 * dpr && !isSel ? nm(n.n) : '') : (lmap[ni] || '');
+    if (label) labels.push([label, ni, nx, nw, top, h]);
   });
 
   if (editMode && rangeBand) {
@@ -1011,6 +1146,24 @@ function drawRoll() {
     pen = true;
   }
   ctx.stroke();
+
+  // text i notblocken: i nedre halvan (under tonkurvan) om blocket är högt nog, annars precis ovanför
+  labels.forEach(([label, ni, nx, nw, top, h]) => {
+    const fs = Math.max(10 * dpr, Math.min(13 * dpr, h * 0.42));
+    ctx.font = `600 ${fs}px DM Sans, sans-serif`;
+    ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 3 * dpr;
+    // inuti om hela ordet (eller det mesta) får plats, annars ovanför där det finns mer plats
+    const inside = nw >= 28 * dpr && h >= fs * 2 + 4 * dpr ? fitText(ctx, label, nw - 10 * dpr) : '';
+    if (inside && (inside === label || inside.length >= 6)) {
+      ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.textBaseline = 'bottom'; ctx.fillText(inside, nx + 5 * dpr, top + h - 2 * dpr);
+    } else {
+      const nxt = p.notes[ni + 1];
+      const room = Math.max(nw, (nxt ? x(nxt.t) - nx : 80 * dpr) - 4 * dpr, 40 * dpr);
+      const t = fitText(ctx, label, room);
+      if (t) { ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.textBaseline = 'bottom'; ctx.fillText(t, nx + 2 * dpr, top - 2 * dpr); }
+    }
+    ctx.shadowBlur = 0;
+  });
 
   // din röst: tjock vit linje
   // i noterna: tjock vit linje. Mellan noterna: tunn och svag (andning, glid). Inga lodräta streck vid hopp.
@@ -1061,12 +1214,16 @@ function drawRoll() {
     const col = lastV[2] === 1 ? '#4ade80' : lastV[2] === 0 ? '#f87171' : '#ffffff';
     ctx.beginPath(); ctx.arc(dx, dy, 7 * dpr, 0, Math.PI * 2);
     ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 16 * dpr; ctx.fill(); ctx.shadowBlur = 0;
-  } else if (!mic) {
+  }
+  // tonen som ska sjungas just nu (referenstonen) – syns även när du sjunger
+  {
     const now = p.notes.find(n => pos >= n.t && pos < n.t + n.d);
     if (now) {
       ctx.font = `bold ${13 * dpr}px DM Sans, sans-serif`;
-      ctx.fillStyle = ACCENT;
-      ctx.fillText(nm(now.n), hx + 8 * dpr, Math.max(12 * dpr, y(now.n + 1.4)));
+      ctx.fillStyle = ACCENT; ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 3 * dpr;
+      ctx.fillText('♪ ' + nm(now.n), hx + 6 * dpr, Math.min(H - 10 * dpr, y(now.n - boxHalf) + 11 * dpr));
+      ctx.shadowBlur = 0;
     }
   }
 
@@ -1168,8 +1325,8 @@ document.getElementById('vidBtn')?.addEventListener('click', () => {
 });
 
 // ---------- slå ihop noter per textrad (färre småklipp) ----------
-function lyricSpans() {
-  const off = (Number((song.stem_offsets || {})[current.key]) || 0) / 1000;
+function lyricSpans(st = current) {
+  const off = (Number((song.stem_offsets || {})[st.key]) || 0) / 1000;
   const out = [];
   kLines.forEach((l, i) => {
     if (!l.text || l.text === '♪') return;
@@ -1243,7 +1400,7 @@ function afterEdit(selObj) {
   if (!selObj) multi = new Set(); else if (!multi.has(selObj)) multi = new Set([selObj]);
   current.pitch.stats = { ...(current.pitch.stats || {}), noteCount: ns.length };
   const sb = document.querySelector('#stats b'); if (sb) sb.textContent = ns.length;
-  current._rr = null;
+  current._rr = null; current._lm = null;
   if (voice.length) recomputeStats();
   tick();
 }
@@ -1401,26 +1558,33 @@ function renderKaraoke(pos) {
   const nowEl = document.getElementById('kNow');
   if (i !== kIdx) {
     kIdx = i;
+    // hela raden lyser när den sjungs (samma som karaoken i spelaren)
+    const sung = !!(now && now.text && now.text !== '♪');
     nowEl.textContent = now && now.text ? now.text : (nextLine && i < 0 ? '…' : ' ');
+    nowEl.classList.toggle('idle', !sung);
     document.getElementById('kNext').textContent = nextLine ? nextLine.text : '';
   }
-  // svep: andel av raden som passerat (fram till nästa tidsstämpel, max 6 s)
-  let pct = 0;
-  if (now && now.text && now.text !== '♪') {
-    const end = i + 1 < kLines.length ? Math.min(kLines[i + 1].time, now.time + 6) : now.time + 4;
-    pct = Math.max(0, Math.min(100, (t - now.time) / Math.max(0.3, end - now.time) * 100));
-  }
-  nowEl.style.setProperty('--k', pct.toFixed(1) + '%');
 }
 
 function loop() { tick(); if (playing) raf = requestAnimationFrame(loop); }
 
 // ---------- uppspelning: stämljud + syntetisk referenston ----------
+let playPending = false;
+function setLoading(on) {
+  document.getElementById('playBtn').classList.toggle('loading', on);
+  document.getElementById('loadState').hidden = !on;
+}
 async function play() {
-  if (!current) return;
+  if (!current || playPending) return;
   await ensureCtx();
+  const st0 = current;
   const extra = stems.filter(st => st !== current && playWith.has(st.key) && !btBlocked(st));
-  try { await Promise.all([current, ...extra].map(loadBuffer)); } catch (e) { toast('Kunde inte ladda ljudet: ' + (e.message || e)); return; }
+  const need = [current, ...extra].filter(st => !st.buffer);
+  if (need.length) { playPending = true; setLoading(true); }
+  try { await Promise.all([current, ...extra].map(loadBuffer)); }
+  catch (e) { toast('Kunde inte ladda ljudet: ' + (e.message || e)); return; }
+  finally { playPending = false; setLoading(false); }
+  if (current !== st0) return;
   startAt(pausedPos >= durationOf() ? 0 : pausedPos);
 }
 
@@ -1451,6 +1615,7 @@ function startAt(pos) {
     nodes.push(src, g);
   });
   if (document.getElementById('optTone').checked) scheduleTones(when, pos);
+  if (document.getElementById('optClick').checked && songBpm()) scheduleClicks(when, pos);
   playing = true;
   document.getElementById('playBtn').textContent = '⏸\uFE0E';
   cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
@@ -1475,6 +1640,41 @@ function scheduleTones(when, pos) {
     g.gain.linearRampToValueAtTime(0, en);
     osc.connect(g); g.connect(lp);
     osc.start(st); osc.stop(en + 0.02);
+    nodes.push(osc);
+  });
+}
+
+// klick (metronom) på låtens slag – songs.bpm / beat_offset / beats_per_bar
+function songBpm() { const b = Number(song && song.bpm); return b >= 20 && b <= 400 ? b : 0; }
+// slagen i den valda stämmans tid: [[t, taktetta?], …]
+function beatTimes(from, to) {
+  const bpm = songBpm(); if (!bpm) return [];
+  const per = 60 / bpm, off = (Number(song.beat_offset) || 0) - stemOffSec();
+  const bpb = Math.max(1, Number(song.beats_per_bar) || 4);
+  const out = [];
+  for (let k = Math.ceil((from - off) / per - 1e-6); ; k++) {
+    const t = off + k * per;
+    if (t >= to) break;
+    out.push([t, ((k % bpb) + bpb) % bpb === 0]);
+    if (out.length > 5000) break;
+  }
+  return out;
+}
+function scheduleClicks(when, pos) {
+  const out = audioCtx.createGain(); out.gain.value = 0.5;
+  out.connect(audioCtx.destination);
+  nodes.push(out);
+  beatTimes(pos, durationOf() + 0.01).forEach(([t, one]) => {
+    const st = when + (t - pos);
+    const osc = audioCtx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.value = one ? 1760 : 1175;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, st);
+    g.gain.linearRampToValueAtTime(one ? 0.9 : 0.55, st + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.001, st + 0.05);
+    osc.connect(g); g.connect(out);
+    osc.start(st); osc.stop(st + 0.06);
     nodes.push(osc);
   });
 }
@@ -1505,26 +1705,30 @@ function seek(pos) {
 }
 
 // ---------- spela med andra spår ----------
+// "Sjung till": din egen stämma + övriga spår (komp först). Ljudet påverkar inte vad som räknas som rätt.
+const isAccomp = st => st.key === 'stem_backtrack_path' || /instrument|karaoke|playback|komp|backing|\bfull\b/i.test(st.label || '');
 function renderWithRow() {
   const row = document.getElementById('withRow');
+  const optStem = document.getElementById('optStem');
   document.getElementById('optStemLabel').textContent = current.label;
-  const allOthers = stems.filter(st => st !== current && !btBlocked(st));
-  const others = allOthers.filter(st => st.key !== 'stem_backtrack_path' || isAdmin);
-  const _mb = document.getElementById('optWithBackMember');
-  if (_mb) { _mb.checked = playWith.has('stem_backtrack_path'); document.getElementById('optWithBackWrap').hidden = !allOthers.some(st => st.key === 'stem_backtrack_path'); }
-  document.getElementById('withWrap').hidden = !others.length;
-  row.innerHTML = others.map(st =>
-    `<label><input type="checkbox" data-key="${esc(st.key)}" ${playWith.has(st.key) ? 'checked' : ''}> ${esc(st.label)}</label>`).join('');
-  row.querySelectorAll('input').forEach(inp => inp.addEventListener('change', async () => {
+  const others = stems.filter(st => st !== current && !btBlocked(st))
+    .map((st, i) => ({ st, i })).sort((a, b) => (isAccomp(b.st) - isAccomp(a.st)) || (a.i - b.i)).map(x => x.st);
+  document.getElementById('withWrap').hidden = false;
+  row.innerHTML = `<label class="own" title="Stämman du valt – stäng av när du kan den och vill sjunga själv"><input type="checkbox" data-own="1" ${optStem.checked ? 'checked' : ''}> ${esc(current.label)} <small>(din stämma)</small></label>` +
+    others.map(st => `<label><input type="checkbox" data-key="${esc(st.key)}" ${playWith.has(st.key) ? 'checked' : ''}> ${esc(st.key === 'stem_backtrack_path' ? 'Backtrack (komp)' : st.label)}</label>`).join('');
+  row.querySelector('[data-own]').addEventListener('change', e => {
+    optStem.checked = e.target.checked;
+    if (playing) startAt(position());
+  });
+  row.querySelectorAll('input[data-key]').forEach(inp => inp.addEventListener('change', async () => {
     const st = stems.find(x => x.key === inp.dataset.key);
     if (inp.checked) playWith.add(st.key); else playWith.delete(st.key);
-    if (st.key === 'stem_backtrack_path') { const m = document.getElementById('optWithBackMember'); if (m) m.checked = inp.checked; }
     if (!PARTY) try { localStorage.setItem('hv-play-with', JSON.stringify([...playWith])); } catch (e) {}
     if (inp.checked && !st.buffer) {
-      const lbl = inp.parentElement, txt = lbl.lastChild;
-      txt.textContent = ' ' + st.label + ' (laddar…)';
+      const txt = inp.parentElement.lastChild, was = txt.textContent;
+      txt.textContent = was + ' (laddar…)';
       try { await loadBuffer(st); } catch (e) { toast('Kunde inte ladda ' + st.label + ': ' + (e.message || e)); }
-      txt.textContent = ' ' + st.label;
+      txt.textContent = was;
     }
     if (playing) startAt(position());
   }));
@@ -1752,6 +1956,130 @@ function stopMic() {
   if (current) tick();
 }
 
+// ---------- tempo (BPM) ----------
+function updateTempoUI() {
+  const bpm = songBpm();
+  document.getElementById('tempoInfo').hidden = !bpm;
+  document.getElementById('optClickWrap').hidden = !bpm && !isAdmin;
+  if (bpm) document.getElementById('tempoVal').textContent = (Math.round(bpm * 10) / 10).toLocaleString('sv-SE');
+  const tp = document.getElementById('tempoPanel');
+  if (tp && !tp.hidden) fillTempoPanel();
+}
+function fillTempoPanel() {
+  document.getElementById('tBpm').value = songBpm() ? Math.round(songBpm() * 100) / 100 : '';
+  document.getElementById('tOff').value = Math.round((Number(song.beat_offset) || 0) * 1000) / 1000;
+  document.getElementById('tBpb').value = String(song.beats_per_bar || 4);
+}
+function tempoStatus(msg, warn) { const el = document.getElementById('tStatus'); if (!el) return; el.textContent = msg || ''; el.classList.toggle('dirty', !!warn); }
+// ändringar syns och hörs direkt; sparas först med Spara tempo
+function tempoChanged(restart = true) {
+  updateTempoUI(); fillTempoPanel();
+  tempoStatus('Inte sparat – tryck Spara tempo', true);
+  if (restart && playing && document.getElementById('optClick').checked) startAt(position());
+  else if (current) tick();
+}
+// Räknar fram tempo och slag ur ljudet: energins tillslag (onsets) → autokorrelation → finjustering över hela låten
+function detectTempo(buf) {
+  const sr = buf.sampleRate, c0 = buf.getChannelData(0), c1 = buf.numberOfChannels > 1 ? buf.getChannelData(1) : null;
+  const hop = Math.round(sr * 0.01), nF = Math.floor(c0.length / hop);
+  const env = new Float32Array(nF);
+  for (let f = 0; f < nF; f++) {
+    let e = 0; const o = f * hop;
+    for (let i = 0; i < hop; i += 2) { const v = c0[o + i] + (c1 ? c1[o + i] : 0); e += v * v; }
+    env[f] = Math.log(1e-8 + e / hop);
+  }
+  const on = new Float32Array(nF);
+  for (let f = 1; f < nF; f++) on[f] = Math.max(0, env[f] - env[f - 1]);
+  // ta bort långsam nivå (lokalt medel) så bara tydliga slag blir kvar
+  const W = 40, cs = new Float64Array(nF + 1);
+  for (let f = 0; f < nF; f++) cs[f + 1] = cs[f] + on[f];
+  for (let f = 0; f < nF; f++) { const a = Math.max(0, f - W), b = Math.min(nF, f + W); on[f] = Math.max(0, on[f] - (cs[b] - cs[a]) / (b - a)); }
+  // grovt: autokorrelation 60–200 BPM, lätt förkärlek för tempon runt 120
+  const ac = lag => { let x = 0; for (let f = 0; f + lag < nF; f++) x += on[f] * on[f + lag]; return x / (nF - lag); };
+  let best = 0, bestLag = 50;
+  for (let lag = 30; lag <= 100; lag++) {
+    const bpm = 6000 / lag, w = Math.exp(-0.5 * Math.pow(Math.log2(bpm / 120) / 1.0, 2));
+    const sc = (ac(lag) + 0.5 * ac(lag * 2)) * w;
+    if (sc > best) { best = sc; bestLag = lag; }
+  }
+  // fint: perioden (på hundradels frames) och fasen som lägger flest slag på tillslagen över hela låten
+  const comb = (per, ph) => { let x = 0; for (let t = ph; t < nF - 1; t += per) { const i = Math.round(t); x += Math.max(on[i], on[i - 1] || 0, on[i + 1] || 0); } return x; };
+  let bp = bestLag, bph = 0, bs = -1;
+  for (let per = bestLag - 1; per <= bestLag + 1.0001; per += 0.02) {
+    for (let ph = 0; ph < per; ph += 1) { const sc = comb(per, ph); if (sc > bs) { bs = sc; bp = per; bph = ph; } }
+  }
+  return { bpm: 6000 / bp, first: bph * 0.01 };
+}
+(() => {
+  const btn = document.getElementById('tempoBtn'); if (!btn) return;
+  const panel = document.getElementById('tempoPanel');
+  btn.addEventListener('click', () => {
+    panel.hidden = !panel.hidden; btn.setAttribute('aria-expanded', String(!panel.hidden));
+    if (!panel.hidden && song) { fillTempoPanel(); tempoStatus(''); }
+  });
+  document.getElementById('tBpm').addEventListener('change', e => { const v = Number(e.target.value); song.bpm = v >= 30 && v <= 300 ? v : null; tempoChanged(); });
+  document.getElementById('tBpb').addEventListener('change', e => { song.beats_per_bar = Number(e.target.value) || 4; tempoChanged(); });
+  document.getElementById('tOff').addEventListener('change', e => { song.beat_offset = Number(e.target.value) || 0; tempoChanged(); });
+  panel.querySelectorAll('[data-bpm]').forEach(b => b.addEventListener('click', () => {
+    song.bpm = Math.max(30, Math.min(300, Math.round(((songBpm() || 120) + Number(b.dataset.bpm)) * 100) / 100)); tempoChanged();
+  }));
+  panel.querySelectorAll('[data-bpmx]').forEach(b => b.addEventListener('click', () => {
+    if (!songBpm()) return; song.bpm = Math.max(30, Math.min(300, Math.round(songBpm() * Number(b.dataset.bpmx) * 100) / 100)); tempoChanged();
+  }));
+  panel.querySelectorAll('[data-off]').forEach(b => b.addEventListener('click', () => {
+    song.beat_offset = Math.round(((Number(song.beat_offset) || 0) + Number(b.dataset.off)) * 1000) / 1000; tempoChanged();
+  }));
+  document.getElementById('tOffHere').addEventListener('click', () => {
+    if (!current) return;
+    song.beat_offset = Math.round((position() + stemOffSec()) * 1000) / 1000;
+    if (!songBpm()) song.bpm = 120;
+    tempoChanged();
+  });
+  // tappa takten: minst 4 tryck i följd (börja på en etta) medan låten spelar
+  let taps = [];
+  document.getElementById('tTap').addEventListener('click', e => {
+    const b = e.currentTarget; b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 90);
+    if (!playing) { tempoStatus('Starta låten först och tappa i takt med musiken', true); return; }
+    const t = position() + stemOffSec();
+    if (taps.length && t - taps[taps.length - 1] > 2.5) taps = [];
+    taps.push(t);
+    if (taps.length < 4) { tempoStatus(`Tappa vidare… (${taps.length})`); return; }
+    // rak linje genom trycken: lutning = sekunder per slag
+    const n = taps.length, xs = taps.map((_, i) => i), mx = (n - 1) / 2, my = taps.reduce((a, v) => a + v, 0) / n;
+    let num = 0, den = 0; xs.forEach((x, i) => { num += (x - mx) * (taps[i] - my); den += (x - mx) * (x - mx); });
+    const per = num / den, first = my - per * mx;
+    if (!(per > 0.2 && per < 2)) return;
+    song.bpm = Math.round(600 / per) / 10; song.beat_offset = Math.round(first * 1000) / 1000;
+    updateTempoUI(); fillTempoPanel(); if (current) tick();
+    tempoStatus(`${song.bpm} BPM från ${n} tryck – inte sparat`, true);
+  });
+  document.getElementById('tAuto').addEventListener('click', async () => {
+    if (!current) return;
+    // helst kompet (backtrack/instrumental/full), annars stämman som visas
+    const src = stems.find(st => st.key === 'stem_backtrack_path') || stems.find(st => /instrument|karaoke|playback|komp|backing/i.test(st.label || ''))
+      || stems.find(st => /\bfull\b/i.test(st.label || '')) || current;
+    tempoStatus(`Lyssnar på ${src.label}…`);
+    try {
+      const buf = await loadBuffer(src);
+      await new Promise(r => setTimeout(r, 30));
+      const res = detectTempo(buf);
+      const offSrc = (Number((song.stem_offsets || {})[src.key]) || 0) / 1000;
+      song.bpm = Math.round(res.bpm * 10) / 10;
+      song.beat_offset = Math.round((res.first + offSrc) * 1000) / 1000;
+      tempoChanged();
+      tempoStatus(`Förslag: ${song.bpm} BPM (från ${src.label}). Lyssna med Klick – ÷2/×2 om det blev halva/dubbla tempot, ⌖ för att flytta taktettan. Inte sparat.`, true);
+    } catch (e) { tempoStatus('Kunde inte analysera: ' + (e.message || e), true); }
+  });
+  document.getElementById('tSave').addEventListener('click', async () => {
+    if (!song) return;
+    const row = { bpm: songBpm() || null, beat_offset: Number(song.beat_offset) || 0, beats_per_bar: Number(song.beats_per_bar) || 4 };
+    tempoStatus('Sparar…');
+    const { error } = await supabaseClient.from('songs').update(row).eq('id', song.id);
+    tempoStatus(error ? 'Kunde inte spara: ' + error.message : 'Tempot sparat ✓ – medlemmarna ser BPM och kan slå på klick', !!error);
+  });
+  document.getElementById('tClear').addEventListener('click', () => { song.bpm = null; song.beat_offset = 0; tempoChanged(); });
+})();
+
 // ---------- händelser ----------
 document.getElementById('micBtn').addEventListener('click', toggleMic);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSession(); });
@@ -1811,6 +2139,8 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
 // ?-hjälp: en delad ruta som visas vid knappen
 (() => {
   const TEXTS = {
+    click: '<p><b>Klick</b></p><p>Ett metronomklick på låtens slag, med lite högre ton på första slaget i takten. Bra när du övar rytmen eller sjunger utan komp.</p>',
+    ghost: '<p><b>Visa i notbanan</b></p><p>Bocka i andra stämmor så syns deras noter som färgade, streckade block bakom dina – bra för att se hur stämmorna går ihop.</p><p>Det är bara för att titta: <b>mikrofonen och referenstonen följer alltid stämman du valt</b> (märkt 🎤). Vill du öva en annan stämma väljer du den under <b>Stämma</b>.</p>',
     tone: '<p><b>Referenston</b></p><p>Ett enkelt pip som spelar exakt de noter du ska sjunga. Bra för att höra tonerna tydligt, utan text och utan andra röster. Stäng av när du kan stämman.</p>',
     visa: '<p><b>Visa</b></p><p><b>Anpassa höjden efter tonerna</b><br>Notbanan zoomar i höjdled så att just de toner som syns nu fyller rutan. Noterna blir större och lättare att se, men banan rör sig lite när låten spelas. Av = hela låtens tonomfång syns hela tiden.</p><p><b>Slå ihop noter per textrad</b><br>Små, korta toner slås ihop till färre och längre noter, en per textrad där det går. Det blir lugnare att följa. Av = du ser alla noter precis som analysen hittade dem. Gäller inte noter som körledningen förberett.</p>',
     oktav: '<p><b>Godkänn annan oktav</b></p><p>På = det räknas som träff även om du sjunger en eller två oktaver högre eller lägre än noten. Bra om du t.ex. är bas och övar på tenorstämman.</p><p>Av = du måste sjunga i exakt rätt läge för att få grönt.</p>',
@@ -1846,27 +2176,15 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
     });
   }
 
-  const memberWithBack = document.getElementById('optWithBackMember');
-  // Backtrack sync: add/remove from playWith Set
-  if (memberWithBack) {
-    memberWithBack.addEventListener('change', async () => {
-      const bt = stems.find(st => st.key === 'stem_backtrack_path');
-      if (memberWithBack.checked) {
-        playWith.add('stem_backtrack_path');
-        if (bt && !bt.buffer) { try { await loadBuffer(bt); } catch (e) { toast('Kunde inte ladda backtrack'); } }
-      } else {
-        playWith.delete('stem_backtrack_path');
-      }
-      const chip = document.querySelector('#withRow input[data-key="stem_backtrack_path"]'); if (chip) chip.checked = memberWithBack.checked;
-      // Persist choice
-      if (!PARTY) try { localStorage.setItem('hv-play-with', JSON.stringify(Array.from(playWith))); } catch (e) {}
-      // Restart playback with new stems
-      if (playing) startAt(position());
-    });
-  }
 })();
 
-['optStem', 'optTone'].forEach(id => document.getElementById(id).addEventListener('change', () => { if (playing) startAt(position()); }));
+['optStem', 'optTone', 'optClick'].forEach(id => document.getElementById(id).addEventListener('change', () => { if (playing) startAt(position()); }));
+document.getElementById('optStem').addEventListener('change', e => { const o = document.querySelector('#withRow [data-own]'); if (o) o.checked = e.target.checked; });
+(() => {
+  const c = document.getElementById('optClick');
+  try { c.checked = localStorage.getItem('hv-click') === '1'; } catch (e) {}
+  c.addEventListener('change', () => { try { localStorage.setItem('hv-click', c.checked ? '1' : '0'); } catch (e) {} });
+})();
 document.getElementById('overview').addEventListener('click', e => {
   const r = e.currentTarget.getBoundingClientRect();
   seek((e.clientX - r.left) / r.width * durationOf());
@@ -2468,14 +2786,12 @@ document.getElementById('partyResult').addEventListener('click', e => { if (e.ta
     isAdmin = member.role === 'admin';
   }
   meId = member.id;
-  // "Spela med": senaste valet sparas; första gången är Backtrack påslaget för medlemmar
+  // "Sjung till": senaste valet sparas; första gången är Backtrack påslaget för medlemmar
   let savedWith = null;
   try { savedWith = JSON.parse(localStorage.getItem('hv-play-with') || 'null'); } catch (e) {}
   if (PARTY) playWith.add('stem_backtrack_path');
   else if (Array.isArray(savedWith)) savedWith.forEach(k => playWith.add(k));
   else if (!isAdmin) playWith.add('stem_backtrack_path');
-  const memberWithBack = document.getElementById('optWithBackMember');
-  if (memberWithBack) memberWithBack.checked = playWith.has('stem_backtrack_path');
   // admin-delar (analys) visas bara för admin
   document.querySelectorAll(isAdmin ? '.member-only' : '.admin-only').forEach(el => el.remove());
   if (isAdmin) document.getElementById('advSettings').classList.add('open');

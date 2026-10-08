@@ -75,6 +75,15 @@
   .notice-box p { margin: 0 0 0.8rem; color: var(--text-muted, #9ca3af); font-size: 1rem; line-height: 1.5; }
   .notice-box p strong { color: var(--text, #f3f4f6); }
   .notice-box button { width: 100%; justify-content: center; margin-top: 0.4rem; }
+  /* Dator: tätare under loggan (loggan behåller sin storlek) så sidan ryms utan rullist */
+  @media (min-width: 601px) {
+    .site-header--logo { padding-top: 0.6rem; }
+    .container { padding-top: 0.4rem; padding-bottom: 1rem; }
+    #welcome { margin-top: 0; }
+    .card { margin-top: 1rem !important; }
+    #checkinCard { padding-top: 0.8rem; padding-bottom: 0.8rem; }
+    .page-footer { margin-top: 1rem; }
+  }
   /* Mobil: hela sidan ska rymmas utan att scrolla */
   @media (max-width: 600px) {
     .site-header--logo { padding-top: 0.6rem; }

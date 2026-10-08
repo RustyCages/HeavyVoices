@@ -141,6 +141,21 @@
     @keyframes sweep { 0%,70% { left: -60%; } 100% { left: 130%; } }
     @keyframes quotesIn { from { opacity: 0; } to { opacity: 1; } }
 
+
+    /* Zoom in i dödskallen när man trycker Logga in */
+    .flash-overlay {
+      position: fixed; inset: 0; z-index: 10; pointer-events: none; opacity: 0;
+      background: radial-gradient(circle at 50% 38%, #fff 0%, #e5b352 28%, #000 75%);
+    }
+    body.leaving .main-content .quote-box,
+    body.leaving .main-content .login-btn { opacity: 0; transition: opacity 0.35s ease; animation: none; }
+    body.leaving .logo-wrap::before { animation: none; opacity: 1; transition: opacity 0.4s; }
+    body.leaving .logo-float { animation: none; }
+    body.leaving .logo-wrap { transition: none; will-change: transform; }
+    body.leaving .logo { filter: none; animation: none; }
+    body.leaving .logo-wrap::before { display: none; }
+    body.leaving .bg-video { transition: opacity 0.9s ease; opacity: 0.2; }
+
     /* Respektera "minska rörelse" */
     @media (prefers-reduced-motion: reduce) {
       .logo, .logo-float, .logo-wrap::before, .login-btn, .login-btn::after, .quote-box { animation: none !important; }
@@ -238,6 +253,8 @@
     </div>
   </div>
 
+  <div class="flash-overlay" id="flash"></div>
+
   <!-- Skript som tonar och växlar citat automatiskt -->
   <script>
     const quotes = document.querySelectorAll('.quote');
@@ -259,6 +276,35 @@
         logoWrap.style.setProperty('--py', (y * 7).toFixed(1) + 'px');
       });
     }
+
+    // Klick på Logga in: zooma in i loggan (dödskallen) och tona ut, sedan vidare
+    const loginBtn = document.querySelector('.login-btn');
+    const goLogin = () => { window.location.href = loginBtn.href; };
+    loginBtn.addEventListener('click', (e) => {
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches || !logoWrap.animate) return;
+      e.preventDefault();
+      if (document.body.classList.contains('leaving')) return;
+      document.body.classList.add('leaving');
+      const img = logoWrap.querySelector('.logo');
+      logoWrap.style.transformOrigin = '50% 26%'; // dödskallen
+      logoWrap.style.setProperty('--px', '0px'); logoWrap.style.setProperty('--py', '0px');
+      const zoom = logoWrap.animate(
+        [{ transform: 'scale(1)' }, { transform: 'scale(1.5)', offset: 0.25 }, { transform: 'scale(14)' }],
+        { duration: 1100, easing: 'cubic-bezier(.6,0,.9,.4)', fill: 'forwards' });
+      document.getElementById('flash').animate(
+        [{ opacity: 0 }, { opacity: 0, offset: 0.55 }, { opacity: 1 }],
+        { duration: 1100, easing: 'ease-in', fill: 'forwards' });
+      let done = false; const go = () => { if (!done) { done = true; goLogin(); } };
+      zoom.onfinish = go; setTimeout(go, 1500); // reserv om animationen hänger sig
+    });
+    // Tillbaka-knappen (bfcache): återställ sidan
+    window.addEventListener('pageshow', (e) => {
+      if (!e.persisted) return;
+      document.body.classList.remove('leaving');
+      logoWrap.getAnimations().forEach(a => a.cancel());
+      document.getElementById('flash').getAnimations().forEach(a => a.cancel());
+    });
   </script>
 
 </body>

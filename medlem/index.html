@@ -6,6 +6,39 @@
 <title>Medlem — Heavy Voices</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
+<script>try{if(!sessionStorage.getItem('hvIntroSeen')&&!matchMedia('(prefers-reduced-motion: reduce)').matches){document.documentElement.classList.add('intro');}sessionStorage.setItem('hvIntroSeen','1');}catch(e){}</script>
+<style>
+  /* Intro-animation första gången efter inloggning */
+  @keyframes hvDrop { 0% { opacity: 0; transform: translateY(-40px) scale(1.25); filter: blur(10px); } 60% { opacity: 1; filter: blur(0); } 100% { opacity: 1; transform: none; filter: none; } }
+  @keyframes hvRise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+  @keyframes hvSlide { from { opacity: 0; transform: translateX(-34px); } to { opacity: 1; transform: none; } }
+  @keyframes hvPop { 0% { transform: scale(0.4) rotate(-14deg); } 65% { transform: scale(1.18) rotate(4deg); } 100% { transform: none; } }
+  @keyframes hvFlash { 0% { box-shadow: 0 0 0 0 rgba(229,169,104,0.8); } 100% { box-shadow: 0 0 0 16px rgba(229,169,104,0); } }
+  @keyframes hvFrame { 0% { box-shadow: 0 0 0 rgba(229,169,104,0); } 40% { box-shadow: 0 0 34px rgba(229,169,104,0.35); } 100% { box-shadow: none; } }
+  html.intro .site-logo-img { animation: hvDrop 1.1s cubic-bezier(.2,.8,.2,1) both; }
+  html.intro .title-row { animation: hvRise 0.7s ease 0.45s both; }
+  html.intro #welcome { animation: hvRise 0.7s ease 0.6s both; }
+  html.intro #installTop { animation: hvRise 0.7s ease 0.75s both; }
+  html.intro #checkinCard { animation: hvRise 0.7s ease 0.9s both; }
+  html.intro .nav-list { animation: hvFrame 1.8s ease 0.8s both; border-radius: inherit; }
+  html.intro .nav-list > li { animation: hvSlide 0.6s cubic-bezier(.2,.8,.2,1) both; }
+  html.intro .nav-list > li:nth-child(1) { animation-delay: 0.9s; }
+  html.intro .nav-list > li:nth-child(2) { animation-delay: 1.02s; }
+  html.intro .nav-list > li:nth-child(3) { animation-delay: 1.14s; }
+  html.intro .nav-list > li:nth-child(4) { animation-delay: 1.26s; }
+  html.intro .nav-list > li:nth-child(5) { animation-delay: 1.38s; }
+  html.intro .nav-list > li:nth-child(6) { animation-delay: 1.5s; }
+  html.intro .nav-list > li:nth-child(7) { animation-delay: 1.62s; }
+  html.intro .nav-list > li .card-icon-box { animation: hvPop 0.7s cubic-bezier(.2,.8,.2,1) both, hvFlash 0.9s ease-out both; }
+  html.intro .nav-list > li:nth-child(1) .card-icon-box { animation-delay: 1.05s; }
+  html.intro .nav-list > li:nth-child(2) .card-icon-box { animation-delay: 1.17s; }
+  html.intro .nav-list > li:nth-child(3) .card-icon-box { animation-delay: 1.29s; }
+  html.intro .nav-list > li:nth-child(4) .card-icon-box { animation-delay: 1.41s; }
+  html.intro .nav-list > li:nth-child(5) .card-icon-box { animation-delay: 1.53s; }
+  html.intro .nav-list > li:nth-child(6) .card-icon-box { animation-delay: 1.65s; }
+  html.intro .nav-list > li:nth-child(7) .card-icon-box { animation-delay: 1.77s; }
+  html.intro .page-footer, html.intro .container > div:last-child { animation: hvRise 0.7s ease 1.9s both; }
+</style>
 <style>
   #checkinCard { margin-top: 1.5rem; border-color: var(--border-hover); }
   #checkinCard h3 { margin: 0 0 0.6rem; }
@@ -134,7 +167,7 @@
     document.getElementById('roleBadge').textContent = member.role;
     loadCheckin(member);
     showParty(member);
-    if (member.role !== 'admin') showUpdateNotice();
+    if (member.role !== 'admin') setTimeout(showUpdateNotice, document.documentElement.classList.contains('intro') ? 2600 : 0);
     if (member.role === 'admin') {
       const a = document.createElement('a');
       a.href = '/admin/';

@@ -6,7 +6,7 @@ if (/^\/(admin|medlem)(\/|$)/.test(location.pathname)) document.documentElement.
 async function signIn(email, password) {
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) throw error;
-  try { sessionStorage.removeItem('hvNoticeSeen'); } catch (e) {}
+  try { sessionStorage.removeItem('hvNoticeSeen'); sessionStorage.removeItem('hvIntroSeen'); } catch (e) {}
   return data;
 }
 

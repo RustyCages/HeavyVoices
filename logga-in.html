@@ -21,16 +21,19 @@
   }
   /* Loggan lyser upp till och från */
   @keyframes logoGlow {
-    0%, 62%, 100% { filter: drop-shadow(0 2px 10px rgba(0,0,0,0.5)) brightness(1); }
-    75% { filter: drop-shadow(0 0 22px rgba(229,169,104,0.95)) drop-shadow(0 0 6px rgba(255,236,200,0.9)) brightness(1.25); }
-    82% { filter: drop-shadow(0 0 14px rgba(229,169,104,0.6)) brightness(1.1); }
-    88% { filter: drop-shadow(0 0 26px rgba(229,169,104,1)) drop-shadow(0 0 8px rgba(255,236,200,1)) brightness(1.3); }
+    0%, 100% { filter: drop-shadow(0 2px 10px rgba(0,0,0,0.5)) brightness(1); }
+    50% { filter: drop-shadow(0 0 14px rgba(229,169,104,0.45)) brightness(1.08); }
   }
-  .site-logo-img { animation: logoGlow 7s ease-in-out 1.5s infinite; }
+  .site-logo-img { animation: logoGlow 5s ease-in-out 1s infinite; }
   @media (prefers-reduced-motion: reduce) { .site-logo-img { animation: none; } }
+  /* Övergång efter lyckad inloggning */
+  #loginFade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 50; }
+  body.entering .container { transition: opacity 0.5s ease, transform 0.6s ease, filter 0.5s ease; opacity: 0; transform: translateY(16px) scale(0.98); filter: blur(4px); }
+  body.entering .site-header { position: relative; z-index: 51; }
 </style>
 </head>
 <body>
+<div id="loginFade"></div>
 
 <header class="site-header site-header--logo"><a href="/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo.webp" type="image/webp"><img src="/icons/logo.png" alt="Heavy Voices" class="site-logo-img" width="640" height="493"></picture></a></header>
 <div class="container login-page">
@@ -59,6 +62,25 @@
 <script src="/js/auth.js"></script>
 <script src="/js/install-app.js" defer></script>
 <script>
+// Snygg övergång: formuläret tonas bort, loggan flammar upp och sidan går ner i svart
+function playEnter() {
+  return new Promise((resolve) => {
+    const logo = document.querySelector('.site-logo-img');
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches || !logo || !logo.animate) return resolve();
+    document.body.classList.add('entering');
+    logo.style.animation = 'none';
+    logo.animate([
+      { transform: 'scale(1)', filter: 'drop-shadow(0 2px 10px rgba(0,0,0,0.5)) brightness(1)' },
+      { transform: 'scale(1.18)', filter: 'drop-shadow(0 0 26px rgba(229,169,104,1)) drop-shadow(0 0 8px rgba(255,236,200,1)) brightness(1.35)', offset: 0.55 },
+      { transform: 'scale(1.1)', filter: 'drop-shadow(0 0 40px rgba(229,169,104,0.9)) brightness(1.5)' }
+    ], { duration: 900, easing: 'ease-in-out', fill: 'forwards' });
+    const fade = document.getElementById('loginFade');
+    const f = fade.animate([{ opacity: 0 }, { opacity: 0, offset: 0.55 }, { opacity: 1 }], { duration: 1000, easing: 'ease-in', fill: 'forwards' });
+    f.onfinish = () => resolve();
+    setTimeout(resolve, 1500);
+  });
+}
+
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = document.getElementById('email').value;
@@ -77,6 +99,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
       window.location.href = '/vantar.html';
       return;
     }
+    await playEnter();
     window.location.href = member.role === 'admin' ? '/admin/' : '/medlem/';
   } catch (err) {
     errorEl.textContent = 'Fel e-post eller lösenord.';

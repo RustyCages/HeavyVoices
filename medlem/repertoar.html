@@ -273,7 +273,7 @@
 <header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
 <div class="container">
       
-  <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
+  <a href="/medlem/" class="back-btn" id="backLink">&larr; Tillbaka</a>
   <h1>Repertoar</h1>
 
   <div class="tabs">
@@ -426,6 +426,7 @@ function switchTab(name) {
     document.getElementById('tab' + cap[k]).classList.toggle('active', name === k);
   });
 }
+if (new URLSearchParams(location.search).get('from') === 'admin') document.getElementById('backLink').href = '/admin/';  // admin kom från adminmenyn
 { const t = new URLSearchParams(location.search).get('tab'); if (t === 'texter' || t === 'spellistor') switchTab(t); }
 
 // =========================================================

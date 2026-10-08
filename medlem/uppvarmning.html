@@ -63,8 +63,15 @@
   .browse-card h2 { margin: 0 0 0.25rem; font-size: 1.15rem; }
   .browse-card .g-p { margin: 0 0 0.8rem; font-size: 0.88rem; color: var(--text-muted); }
   .b-grid { margin: 0.75rem 0; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.8rem; }
+  .meta-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+  .meta-top h3 { flex: 1; min-width: 0; }
+  button.fav-btn { flex: none; background: transparent; border: 0; padding: 0.05rem 0.15rem; font-size: 1.35rem; line-height: 1; color: var(--text-muted); cursor: pointer; }
+  button.fav-btn:hover, button.fav-btn:focus-visible { color: #facc15; background: transparent; }
+  button.fav-btn[aria-pressed="true"] { color: #facc15; }
+  .fav-section { margin-top: 0.5rem; }
+  .fav-section .hint { margin: 0 0 0.6rem; }
   .b-grid .meta h3 { font-size: 0.9rem; font-weight: 600; }
-  .b-grid .meta button { justify-self: start; font-size: 0.8rem; padding: 0.3rem 0.65rem; }
+  .b-grid .meta button:not(.fav-btn) { justify-self: start; font-size: 0.8rem; padding: 0.3rem 0.65rem; }
 </style>
 </head>
 <body>
@@ -78,7 +85,7 @@
       <a href="/medlem/rostovning.html" class="btn btn-outline">🎤 Till Röstövning</a>
     </div>
   </div>
-  <p class="hint">Videor för andning, uppvärmning och skalövningar. Tryck på en video för att spela den. Börja gärna med andning och uppvärmning innan du sjunger låtarna.</p>
+  <p class="hint">Videor för andning, uppvärmning och skalövningar. Tryck på en video för att spela den, och på ☆ för att spara den i <b>Mina favoriter</b>. Börja gärna med andning och uppvärmning innan du sjunger låtarna.</p>
 
   <div class="card static guide" id="guide" hidden>
     <h2>Så uppdaterar du videorna</h2>
@@ -123,6 +130,12 @@
   <div class="filters" id="filters" role="group" aria-label="Visa kategori"></div>
   <div id="list"><p class="empty">Laddar…</p></div>
 
+  <section class="fav-section" id="favSection" hidden>
+    <h2 class="cat-h">⭐ Mina favoriter</h2>
+    <p class="hint">Bara du ser dina favoriter. Tryck på stjärnan för att ta bort en. Senast tillagda hamnar först.</p>
+    <div class="grid" id="favList"></div>
+  </section>
+
   <section class="card static browse-card" id="browseCard">
     <h2>📺 Fler övningar på YouTube</h2>
     <p class="g-p">Bläddra bland alla videor från de här kanalerna och spela dem direkt här. Tryck på en kanal för att öppna listan.</p>
@@ -148,6 +161,7 @@
 const VOICES = { sopran: 'Sopran', alt: 'Alt', tenor: 'Tenor', bas: 'Bas' };
 const CAT_ORDER = ['Andning', 'Uppvärmning', 'Skalövningar', 'Stämspecifikt', 'Övrigt'];
 let isAdmin = false, myVoice = '', videos = [], filter = 'Alla', editing = null;
+let favs = [];   // egna favoriter (member_favorites), senast tillagda först
 
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 function toast(msg, ms = 3000) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
@@ -199,7 +213,7 @@ function card(v, items) {
     <div class="player"><button type="button" class="poster" data-yt="${esc(v.youtube_id)}" data-start="${v.start_sec || 0}" aria-label="Spela ${esc(v.title)}"
       style="background-image:url('https://i.ytimg.com/vi/${esc(v.youtube_id)}/hqdefault.jpg')"></button></div>
     <div class="meta">
-      <h3>${esc(v.title)}</h3>
+      <div class="meta-top"><h3>${esc(v.title)}</h3>${favBtn(v.youtube_id, v.title, v.start_sec)}</div>
       ${v.description ? `<p>${esc(v.description)}</p>` : ''}
       <div class="tags">${v.voice ? `<span class="tag">${esc(VOICES[v.voice] || v.voice)}</span>` : ''}</div>
       ${isAdmin ? `<div class="admin-bar">
@@ -330,6 +344,57 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   resetForm(); render();
 });
 
+// ---------- mina favoriter (privata per medlem) ----------
+const isFav = id => favs.some(f => f.youtube_id === id);
+function favBtn(id, title, start) {
+  const on = isFav(id);
+  return `<button type="button" class="fav-btn" data-fav="${esc(id)}" data-title="${esc(title)}" data-start="${+start || 0}"
+    aria-pressed="${on}" title="${on ? 'Ta bort från Mina favoriter' : 'Spara i Mina favoriter'}" aria-label="${on ? 'Ta bort från Mina favoriter' : 'Spara i Mina favoriter'}">${on ? '★' : '☆'}</button>`;
+}
+function syncStars() {
+  document.querySelectorAll('[data-fav]').forEach(b => {
+    const on = isFav(b.dataset.fav);
+    b.setAttribute('aria-pressed', on); b.textContent = on ? '★' : '☆';
+    const lbl = on ? 'Ta bort från Mina favoriter' : 'Spara i Mina favoriter';
+    b.title = lbl; b.setAttribute('aria-label', lbl);
+  });
+}
+function renderFavs() {
+  const sec = document.getElementById('favSection'), list = document.getElementById('favList');
+  sec.hidden = !favs.length;
+  list.innerHTML = favs.map(f => `<article class="vid">
+    <div class="player"><button type="button" class="poster" data-yt="${esc(f.youtube_id)}" data-start="${f.start_sec || 0}" aria-label="Spela ${esc(f.title)}"
+      style="background-image:url('https://i.ytimg.com/vi/${esc(f.youtube_id)}/hqdefault.jpg')"></button></div>
+    <div class="meta"><div class="meta-top"><h3>${esc(f.title)}</h3>${favBtn(f.youtube_id, f.title, f.start_sec)}</div></div>
+  </article>`).join('');
+  list.querySelectorAll('button.poster').forEach(b => b.addEventListener('click', () => play(b)));
+}
+async function toggleFav(btn) {
+  const id = btn.dataset.fav;
+  btn.disabled = true;
+  if (isFav(id)) {
+    const { error } = await supabaseClient.from('member_favorites').delete().eq('youtube_id', id);
+    btn.disabled = false;
+    if (error) { toast('Kunde inte ta bort: ' + error.message); return; }
+    favs = favs.filter(f => f.youtube_id !== id);
+    toast('Borttagen från Mina favoriter');
+  } else {
+    const row = { youtube_id: id, title: btn.dataset.title || 'YouTube-video', start_sec: +btn.dataset.start || 0 };
+    const { data, error } = await supabaseClient.from('member_favorites').insert(row).select().single();
+    btn.disabled = false;
+    if (error) { toast('Kunde inte spara: ' + error.message); return; }
+    favs = [data, ...favs];
+    toast('★ Sparad i Mina favoriter');
+  }
+  // spelar en video i favoritlistan låter vi den vara, annars ritas listan om
+  if (!document.querySelector('#favList .vid.playing') || !isFav(id)) renderFavs();
+  syncStars();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-fav]');
+  if (b) toggleFav(b);
+});
+
 // ---------- bläddra i YouTube-kanaler (admin) ----------
 // Lägg till fler kanaler här: id = kanalens UC…-id (finns i kanalens RSS-länk / "Dela kanal → Kopiera kanal-id").
 const CHANNELS = [
@@ -369,7 +434,7 @@ function renderChannel() {
     <div class="player"><button type="button" class="poster" data-yt="${esc(v.id)}" data-start="0" aria-label="Spela ${esc(v.title)}"
       style="background-image:url('https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg')"></button></div>
     <div class="meta">
-      <h3>${esc(v.title)}</h3>
+      <div class="meta-top"><h3>${esc(v.title)}</h3>${favBtn(v.id, v.title, 0)}</div>
       ${!isAdmin ? '' : have.has(v.id) ? '<div class="tags"><span class="tag">✓ Tillagd på sidan</span></div>' : `<button type="button" class="btn-outline" data-add="${esc(v.id)}">+ Lägg till på sidan</button>`}
     </div>
   </article>`).join('') || (state.loaded && state.videos.length ? '<p class="empty">Inga träffar.</p>' : '');
@@ -425,6 +490,8 @@ document.getElementById('bSearch').addEventListener('input', renderChannel);
   const { data: me } = await supabaseClient.from('members').select('stamma').eq('id', member.id).single();
   const st = String((me && me.stamma) || '').toLowerCase();
   myVoice = Object.keys(VOICES).find(k => st.startsWith(k)) || '';
+  supabaseClient.from('member_favorites').select('*').order('created_at', { ascending: false })
+    .then(({ data: f }) => { favs = f || []; renderFavs(); syncStars(); });
   const { data, error } = await supabaseClient.from('warmup_videos').select('*').order('position');
   if (error) { document.getElementById('list').innerHTML = `<p class="empty">Kunde inte hämta videor: ${esc(error.message)}</p>`; return; }
   videos = data || [];

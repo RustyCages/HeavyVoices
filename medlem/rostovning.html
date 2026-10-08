@@ -18,6 +18,8 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .pitch-row:last-child { border-bottom: none; }
   .pitch-row.active .stem-label { color: var(--accent); }
   .stem-label { font-weight: 600; }
+  .stems-more { margin-top: 0.6rem; font-size: 0.8rem; padding: 0.3rem 0.7rem; }
+  .word-inline { position: absolute; z-index: 6; width: 11rem; margin: 0; padding: 0.3rem 0.45rem; font-size: 0.95rem; font-weight: 600; color: #fff; background: #111317; border: 2px solid #fde68a; border-radius: 0.45rem; box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
   .stem-status { display: block; font-size: 0.78rem; color: var(--text-muted); font-weight: 400; }
   .stem-status.stale { color: #facc15; }
   .stem-status.ok { color: #4ade80; }
@@ -393,7 +395,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
       </div>
       <div class="bulk">
         <button id="analyzeAllBtn">Analysera alla sångstämmor</button>
-        <span class="hint" style="margin:0;">Backtracket hoppas över. Tar några sekunder per stämma.</span>
+        <span class="hint" style="margin:0;">Backtrack, Instrumental och Full hoppas över. Tar några sekunder per stämma.</span>
       </div>
     </div>
     <p id="loadingNote" hidden></p>
@@ -554,7 +556,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
           <div class="edit-tools"><button type="button" class="btn-outline" id="harmCopy">⎘ Lägg i vald stämma</button><span class="edit-status" id="harmStatus"></span></div>
         </div>
       </div>
-      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av), och noter som ligger kant i kant, och noter över/under i tonhöjd som delar samma kant, <b>följer med</b> när du drar ut en kant. <b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter; <b>Ctrl+C / Ctrl+V</b> kopierar och klistrar in vid spelhuvudet (praktiskt för upprepade refränger). Shift+↑↓ flyttar en oktav. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. <b>Mellanslag</b> spelar/pausar, dra i tom yta för att spola. <b>Text:</b> orden fördelas automatiskt på noterna i varje textrad (gula ord ovanför blocken). Välj en not och skriv i <b>Text</b>, eller flytta ord med <b>⟵ ord / ord ⟶</b> så de hamnar på rätt upp- och nergång. Medlemmarna får de sparade noterna och orden precis som de är.</p>
+      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av), och noter som ligger kant i kant, och noter över/under i tonhöjd som delar samma kant, <b>följer med</b> när du drar ut en kant. <b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter; <b>Ctrl+C / Ctrl+V</b> kopierar och klistrar in vid spelhuvudet (praktiskt för upprepade refränger). Shift+↑↓ flyttar en oktav. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. <b>Mellanslag</b> spelar/pausar, dra i tom yta för att spola. <b>Text:</b> orden fördelas automatiskt på noterna i varje textrad (gula ord ovanför blocken). <b>Dubbelklicka</b> på en not för att skriva texten direkt på blocket (<b>Tab</b> = nästa not), eller <b>dra ett gult ord</b> till en annan not så det hamnar på rätt upp- och nergång. Fältet <b>Text</b> och <b>⟵ ord / ord ⟶</b> gör samma sak för vald not. Medlemmarna får de sparade noterna och orden precis som de är.</p>
     </div>
     <div class="karaoke" id="karaoke" hidden aria-live="off">
       <div class="k-now" id="kNow">&nbsp;</div>
@@ -662,6 +664,7 @@ let dispMidi = null;     // utjämnad visad ton
 let lastTarget = null;   // senaste noten (för oktav mellan noterna)
 let unsaved = false;     // nya sångdata sedan senaste sparning
 let sessions = [];       // mina sparade övningar
+let showAllStems = false;  // admin: visa även Instrumental/Full/Backtrack i stämlistan
 let ghosts = new Set();  // andra stämmor som visas som färgade block i notbanan (bara för att titta)
 const GHOST_COLORS = ['#60a5fa', '#c084fc', '#34d399', '#f472b6', '#facc15', '#fb923c'];
 // spår som inte är en sångstämma att sjunga (döljs i stämvalet för medlemmar)
@@ -726,7 +729,8 @@ function renderRows() {
     stems.forEach(st => { st.rowEl = null; });
     return;
   }
-  stems.forEach(st => {
+  const hiddenStems = stems.filter(st => !singable(st));
+  stems.filter(st => showAllStems || singable(st) || st === current).forEach(st => {
     const row = document.createElement('div');
     row.className = 'pitch-row' + (st === current ? ' active' : '');
     let status = '<span class="stem-status">Inte analyserad</span>';
@@ -750,6 +754,15 @@ function renderRows() {
     st.rowEl = row;
     wrap.appendChild(row);
   });
+  stems.forEach(st => { if (!st.rowEl || !wrap.contains(st.rowEl)) st.rowEl = null; });
+  if (hiddenStems.length) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn-outline stems-more';
+    b.textContent = showAllStems ? 'Dölj komp och fulla mixar' : `Visa även komp och fulla mixar (${hiddenStems.length})`;
+    b.title = hiddenStems.map(st => st.label).join(', ');
+    b.addEventListener('click', () => { showAllStems = !showAllStems; renderRows(); });
+    wrap.appendChild(b);
+  }
 }
 
 // ---------- ladda låt ----------
@@ -818,6 +831,7 @@ async function fetchBuffer(st) {
 async function analyzeStem(st, show) {
   if (busy) { toast('Vänta – en analys pågår redan'); return false; }
   if (st.raw && st.raw.edited_notes && !confirm(`${st.label} har redigerade noter. En ny analys ersätter dem. Fortsätta?`)) return false;
+  if (!st.rowEl) { showAllStems = true; renderRows(); }
   busy = true;
   setButtonsDisabled(true);
   const prog = st.rowEl.querySelector('.progress');
@@ -859,7 +873,7 @@ function setButtonsDisabled(dis) {
 }
 
 async function analyzeAll() {
-  const list = stems.filter(st => st.key !== 'stem_backtrack_path');
+  const list = stems.filter(singable);
   if (!list.length) { toast('Inga sångstämmor att analysera'); return; }
   let ok = 0;
   for (const st of list) { if (await analyzeStem(st, false)) ok++; }
@@ -1111,6 +1125,7 @@ function drawRoll() {
   const boxHalf = Math.max(0.45, tolSemi);
   const r = Math.min(8 * dpr, rowH * boxHalf);
   rollGeom = { t0, pxs, lo, H, rowH, boxHalf, dpr };
+  wordRects = [];
   const labels = [];   // [text, index, x, bredd, topp, höjd, färg?, noter?] – ritas efter tonkurvan så linjen inte stryker över texten
   // andra stämmor (bara att titta på): färgade block bakom din stämma
   ghostList().forEach(gs => {
@@ -1205,7 +1220,21 @@ function drawRoll() {
       const nxt = list[ni + 1];
       const room = Math.max(nw, (nxt ? x(nxt.t) - nx : 80 * dpr) - 4 * dpr, 40 * dpr);
       const t = fitText(ctx, label, room);
-      if (t) { ctx.fillStyle = col || (above ? '#fde68a' : 'rgba(255,255,255,0.88)'); ctx.textBaseline = 'bottom'; ctx.fillText(t, nx + 2 * dpr, top - 2 * dpr); }
+      if (t) {
+        const tx = nx + 2 * dpr, ty = top - 2 * dpr;
+        ctx.fillStyle = col || (above ? '#fde68a' : 'rgba(255,255,255,0.88)'); ctx.textBaseline = 'bottom'; ctx.fillText(t, tx, ty);
+        if (above) {   // admin: varje ord går att ta tag i och dra till en annan not
+          const full = label.split(' ');
+          let acc = '';
+          full.forEach((w, wi) => {
+            const startX = tx + ctx.measureText(acc).width;
+            acc += (wi ? ' ' : '') + w;
+            if (acc.length > t.replace(/…$/, '').length) return;
+            const x0 = wi ? startX + ctx.measureText(' ').width : startX;
+            wordRects.push({ ni, wi, x0: x0 - 2 * dpr, x1: tx + ctx.measureText(acc).width + 2 * dpr, y0: ty - fs - 2 * dpr, y1: ty + 3 * dpr });
+          });
+        }
+      }
     }
     ctx.shadowBlur = 0;
   });
@@ -1270,6 +1299,19 @@ function drawRoll() {
       ctx.fillText('♪ ' + nm(now.n), hx + 6 * dpr, Math.min(H - 10 * dpr, y(now.n - boxHalf) + 11 * dpr));
       ctx.shadowBlur = 0;
     }
+  }
+
+  // admin drar ett ord till en annan not
+  if (wdrag && wdrag.moved) {
+    const ns = p.notes, tg = wdrag.over != null ? ns[wdrag.over] : null;
+    if (tg && wdrag.over !== wdrag.from) {
+      ctx.strokeStyle = '#fde68a'; ctx.lineWidth = 2.5 * dpr; ctx.setLineDash([4 * dpr, 3 * dpr]);
+      ctx.beginPath(); ctx.roundRect(x(tg.t) - 3 * dpr, y(tg.n + boxHalf) - 3 * dpr, Math.max(3, tg.d * pxs) + 6 * dpr, rowH * boxHalf * 2 + 6 * dpr, r); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.font = `700 ${14 * dpr}px DM Sans, sans-serif`; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = '#fde68a'; ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4 * dpr;
+    ctx.fillText(wdrag.text, wdrag.cx + 8 * dpr, wdrag.cy - 6 * dpr); ctx.shadowBlur = 0;
   }
 
   // stämapparat uppe till höger när micken är på
@@ -1453,6 +1495,7 @@ function afterEdit(selObj) {
 function setEditMode(on) {
   if (!on && dirty && !confirm('Du har osparade ändringar i noterna. Släppa dem?')) return;
   if (!on && dirty) { current.pitch = current.pitchBase; applyMerge(current); dirty = false; }
+  closeWordEditor();
   editMode = on; sel = -1; multi = new Set(); rangeBand = null;
   if (on) {
     // arbeta på en kopia av det som visas just nu
@@ -2013,6 +2056,64 @@ function stopMic() {
   if (current) tick();
 }
 
+// ---------- admin: flytta och skriv text direkt på notblocken ----------
+let wordRects = [], wdrag = null, wordEd = null;
+function hitWord(cx, cy) {
+  for (let i = wordRects.length - 1; i >= 0; i--) { const r = wordRects[i]; if (cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1) return r; }
+  return null;
+}
+// flytta ett ord (och orden på rätt sida om det, så ordningen behålls) till en annan not
+function moveWord(from, wi, to) {
+  snapshot(); ensureWords();
+  const ns = eNotes(), src = ns[from], dst = ns[to];
+  const words = (src.w || '').split(/\s+/).filter(Boolean);
+  if (!words.length) return;
+  let moving, keep;
+  if (to > from) { moving = words.slice(wi); keep = words.slice(0, wi); dst.w = [...moving, ...(dst.w ? [dst.w] : [])].join(' '); }
+  else { moving = words.slice(0, wi + 1); keep = words.slice(wi + 1); dst.w = [...(dst.w ? [dst.w] : []), ...moving].join(' '); }
+  if (keep.length) src.w = keep.join(' '); else delete src.w;
+  afterEdit(dst);
+  editStatus(`"${moving.join(' ')}" flyttat – osparat`);
+}
+function closeWordEditor() { const el = wordEd; wordEd = null; if (el) el.remove(); }
+function openWordEditor(i) {
+  closeWordEditor();
+  const ns = eNotes(), n = ns[i]; if (!n) return;
+  if (playing) pause();
+  const span = Number(document.getElementById('optZoom').value);
+  const t0v = viewStart(position(), span);
+  if (n.t < t0v || n.t + Math.min(n.d, 0.5) > t0v + span) { pausedPos = Math.max(0, n.t - span * 0.1); }
+  sel = i; multi = new Set([n]); tick();
+  const g = rollGeom, roll = document.getElementById('roll');
+  const left = (n.t - g.t0) * g.pxs / g.dpr, top = (g.H - (n.n + g.boxHalf - g.lo) * g.rowH) / g.dpr;
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.className = 'word-inline'; inp.maxLength = 80;
+  inp.value = lyricMap()[i] || ''; inp.placeholder = 'text på noten';
+  inp.title = 'Enter = klar · Tab = nästa not · Shift+Tab = föregående · Esc = avbryt';
+  inp.style.left = Math.max(2, Math.min(roll.clientWidth - 180, left)) + 'px';
+  inp.style.top = (roll.offsetTop + Math.max(2, top - 36)) + 'px';
+  roll.parentElement.appendChild(inp);
+  wordEd = inp; inp.focus(); inp.select();
+  const commit = () => {
+    const v = inp.value.replace(/\s+/g, ' ').trim();
+    if (v === (lyricMap()[i] || '')) return;
+    snapshot(); ensureWords();
+    if (v) ns[i].w = v; else delete ns[i].w;
+    afterEdit(ns[i]);
+  };
+  inp.addEventListener('keydown', ev => {
+    ev.stopPropagation();
+    if (ev.key === 'Enter') { ev.preventDefault(); commit(); closeWordEditor(); tick(); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); closeWordEditor(); tick(); }
+    else if (ev.key === 'Tab') {
+      ev.preventDefault(); commit(); closeWordEditor();
+      const nx = i + (ev.shiftKey ? -1 : 1);
+      if (nx >= 0 && nx < eNotes().length) openWordEditor(nx); else tick();
+    }
+  });
+  inp.addEventListener('blur', () => { if (wordEd === inp) { commit(); closeWordEditor(); tick(); } });
+}
+
 // admin: skriv texten på vald not
 (() => {
   const inp = document.getElementById('noteWord'); if (!inp) return;
@@ -2271,6 +2372,13 @@ document.getElementById('overview').addEventListener('click', e => {
     if (!current) return;
     if (editMode) {
       const [cx, cy] = cxy(e), h = hitNote(cx, cy);
+      const wr = !e.shiftKey && hitWord(cx, cy);
+      if (wr) {   // ta tag i ett ord ovanför blocket
+        const words = (lyricMap()[wr.ni] || '').split(' ');
+        sel = wr.ni; multi = new Set([eNotes()[wr.ni]]);
+        wdrag = { from: wr.ni, wi: wr.wi, words, text: words[wr.wi], x: e.clientX, y: e.clientY, cx, cy, moved: false, over: null };
+        c.setPointerCapture(e.pointerId); tick(); return;
+      }
       if (h) {
         const ns = eNotes(), n = ns[h.i];
         if (e.shiftKey) { if (multi.has(n)) multi.delete(n); else multi.add(n); sel = h.i; tick(); return; }
@@ -2296,6 +2404,15 @@ document.getElementById('overview').addEventListener('click', e => {
     c.setPointerCapture(e.pointerId); c.classList.add('dragging');
   });
   c.addEventListener('pointermove', e => {
+    if (wdrag) {
+      if (!wdrag.moved && Math.abs(e.clientX - wdrag.x) < 4 && Math.abs(e.clientY - wdrag.y) < 4) return;
+      wdrag.moved = true;
+      [wdrag.cx, wdrag.cy] = cxy(e);
+      const h = hitNote(wdrag.cx, wdrag.cy) || hitNote(wdrag.cx, wdrag.cy + 22 * (window.devicePixelRatio || 1));
+      wdrag.over = h ? h.i : null;
+      c.style.cursor = 'grabbing';
+      tick(); return;
+    }
     if (rband) {
       rband.b = rollGeom.t0 + cxy(e)[0] / rollGeom.pxs; rangeBand = [Math.min(rband.a, rband.b), Math.max(rband.a, rband.b)];
       tick(); return;
@@ -2338,7 +2455,7 @@ document.getElementById('overview').addEventListener('click', e => {
     }
     if (editMode && startX == null) {
       const [cx, cy] = cxy(e), h = hitNote(cx, cy);
-      c.style.cursor = !h ? 'grab' : h.zone === 'move' ? 'move' : 'ew-resize';
+      c.style.cursor = hitWord(cx, cy) ? 'grab' : !h ? 'grab' : h.zone === 'move' ? 'move' : 'ew-resize';
     }
     if (startX == null) return;
     if (!scrubbed && Math.abs(e.clientX - startX) < 6) return;   // litet darr räknas som klick
@@ -2349,6 +2466,12 @@ document.getElementById('overview').addEventListener('click', e => {
     tick();
   });
   const end = () => {
+    if (wdrag) {
+      const w = wdrag; wdrag = null; c.style.cursor = '';
+      if (w.moved && w.over != null && w.over !== w.from) moveWord(w.from, w.wi, w.over);
+      else tick();
+      return;
+    }
     if (rband) {
       const a = Math.min(rband.a, rband.b), b = Math.max(rband.a, rband.b), ns = eNotes();
       multi = new Set(ns.filter(x => { const m = x.t + x.d / 2; return m >= a && m <= b; }));
@@ -2365,6 +2488,12 @@ document.getElementById('overview').addEventListener('click', e => {
     if (playing) pause(); else play();
   };
   c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
+  // dubbelklick på en not (eller dess ord): skriv texten direkt på blocket
+  c.addEventListener('dblclick', e => {
+    if (!editMode || !current) return;
+    const [cx, cy] = cxy(e), wr = hitWord(cx, cy), h = wr ? { i: wr.ni } : hitNote(cx, cy);
+    if (h) { e.preventDefault(); openWordEditor(h.i); }
+  });
 })();
 document.getElementById('editToggle')?.addEventListener('click', () => setEditMode(!editMode));
 // Kopiera noterna (analysen) från den visade stämman till andra stämmor, med valfri transponering.

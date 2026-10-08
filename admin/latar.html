@@ -93,6 +93,22 @@
     </form>
   </div>
 
+  <div class="card">
+    <h3>Konvertera WAV till MP3</h3>
+    <p class="text-muted" style="margin: 0 0 0.6rem; font-size: 0.9rem;">Gör om stora WAV-filer till MP3 innan du laddar upp dem som stämfiler. Allt sker i din webbläsare, inget skickas iväg.</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+      <input type="file" id="wavFiles" accept=".wav,.wave,audio/wav,audio/x-wav,audio/*" multiple style="flex: 1 1 14rem; margin: 0;">
+      <select id="mp3Kbps" style="margin: 0; width: auto;" title="Kvalitet">
+        <option value="128">128 kbps</option>
+        <option value="192" selected>192 kbps</option>
+        <option value="256">256 kbps</option>
+        <option value="320">320 kbps</option>
+      </select>
+      <button type="button" id="wavConvertBtn" style="margin: 0;">Konvertera</button>
+    </div>
+    <div id="wavResults" style="margin-top: 0.6rem; display: grid; gap: 0.4rem;"></div>
+  </div>
+
   <h3 style="margin: 1.5rem 0 0.75rem;">Låtar</h3>
   <div id="songList"><p class="text-muted">Laddar...</p></div>
 </div>
@@ -103,6 +119,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
+<script src="/js/audio-edit.js"></script>
 <script src="/js/bg-video-admin.js"></script>
 <script>
 const DOC_FIELDS = [
@@ -895,5 +912,37 @@ document.getElementById('addSongForm').addEventListener('submit', async (e) => {
 })();
 </script>
 
+<script>
+// ---------- WAV → MP3 ----------
+(() => {
+  const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const mb = n => (n / 1048576).toFixed(1).replace('.', ',') + ' MB';
+  document.getElementById('wavConvertBtn').addEventListener('click', async () => {
+    const files = [...document.getElementById('wavFiles').files];
+    const out = document.getElementById('wavResults'), btn = document.getElementById('wavConvertBtn');
+    if (!files.length) { out.innerHTML = '<span class="text-muted">Välj en eller flera filer först.</span>'; return; }
+    const kbps = Number(document.getElementById('mp3Kbps').value) || 192;
+    btn.disabled = true; out.innerHTML = '';
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    for (const f of files) {
+      const row = document.createElement('div'); row.className = 'text-muted'; row.style.fontSize = '0.9rem';
+      row.textContent = f.name + ' – läser in…'; out.appendChild(row);
+      try {
+        const buf = await ctx.decodeAudioData(await f.arrayBuffer());
+        const clip = AudioEdit.fromBuffer(buf);
+        const blob = await AudioEdit.encodeMp3(clip, kbps, p => { row.textContent = `${f.name} – kodar ${Math.round(p * 100)} %…`; });
+        const name = f.name.replace(/\.[^.]+$/, '') + '.mp3';
+        const url = URL.createObjectURL(blob);
+        row.className = ''; row.style.color = '';
+        row.innerHTML = `✅ ${esc(f.name)} (${mb(f.size)}) → <b>${esc(name)}</b> (${mb(blob.size)}) <a href="${url}" download="${esc(name)}" data-no-transition class="btn btn-outline" style="padding:0.2rem 0.7rem;margin-left:0.4rem;text-decoration:none;">Ladda ner</a>`;
+      } catch (e) {
+        row.innerHTML = `❌ ${esc(f.name)} – ${esc(e && e.message || 'kunde inte konverteras')}`;
+      }
+    }
+    try { ctx.close(); } catch (_) {}
+    btn.disabled = false;
+  });
+})();
+</script>
 </body>
 </html>

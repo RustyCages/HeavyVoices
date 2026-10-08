@@ -165,8 +165,9 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .edit-help { margin: 0; font-size: 0.8rem; }
   /* knappraden överst, utfällda paneler under den i full bredd */
   .edit-bar { display: flex !important; flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
-  .edit-bar > button { order: 0; }
-  .edit-bar > :not(button) { order: 1; flex: 1 1 100%; }
+  .edit-bar > button { order: 1; }
+  .edit-bar > #vidBtn { order: 2; margin-left: auto; }
+  .edit-bar > :not(button) { order: 3; flex: 1 1 100%; }
   .edit-voice { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0 0.4rem 0 0; font-size: 0.85rem; font-weight: 600; }
   .edit-voice select { width: auto; margin: 0; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
   .roll-resize { height: 14px; margin-top: 3px; border-radius: 0 0 0.6rem 0.6rem; cursor: ns-resize; touch-action: none; display: grid; place-items: center; color: var(--text-muted); font-size: 0.7rem; line-height: 1; user-select: none; }
@@ -332,7 +333,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
       <li class="member-only"><div><b>Välj stämma</b><p>Tryck på din stämma (eller Vocals). Inget är förvalt. Kompet (Backtrack, Instrumental, Full) finns inte här – det lägger du till under <em>Sjung till</em>.</p></div></li>
       <li class="admin-only"><div><b>Välj låt</b><p>Listan visar låtar som har minst en sångstämma uppladdad.</p></div></li>
       <li class="admin-only"><div><b>Analysera stämmorna</b><p>Tryck <em>Analysera alla sångstämmor</em> (eller <em>Analysera</em> på en stämma). Sidan lyssnar igenom ljudfilen och räknar fram vilka toner som sjungs. Resultatet sparas direkt. Byts stämfilen ut visas ⚠ – analysera då igen.</p></div></li>
-      <li class="admin-only"><div><b>Kontrollera resultatet</b><p>Tryck <em>Välj</em> på stämman och sedan ▶ med <em>Referenston</em> på. Följer pipet stämman är analysen bra. Ligger det backvocals i filen kan det bli extra noter där.</p></div></li>
+      <li class="admin-only"><div><b>Kontrollera resultatet</b><p>Tryck <em>Välj</em> på stämman och sedan ▶ med <em>Referenston</em> på. Följer pipet stämman är notanalysen bra. Ligger det backvocals i filen kan det bli extra noter där.</p></div></li>
       <li><div><b>Välj vad du vill höra</b><p>Under <em>Sjung till</em> bockar du i det du vill höra: din egen stämma, kompet och andra stämmor. Slå på <em>Referenston</em> (ett pip på noterna) och <em>Klick</em> (metronom) om du vill. Välj <em>Svårighetsgrad</em> – börja med <em>Lätt</em>.</p></div></li>
       <li><div><b>Lyssna först</b><p>Tryck ▶ (eller klicka i notbanan) för att höra hur stämman går.</p></div></li>
       <li><div><b>Sjung med</b><p>Sätt i hörlurar och tryck <em>🎤 Sjung med</em>. Tillåt mikrofonen första gången. Tryck sedan ▶ och sjung.</p></div></li>
@@ -428,7 +429,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         <span><i class="swatch" style="background: #45c871;"></i>träff</span>
         <span><i class="swatch" style="background: #d8625f;"></i>miss</span>
         <span><i class="swatch" style="background: #fff; height: 3px;"></i>din röst</span>
-        <span><i class="swatch" style="background: rgba(255,255,255,0.5); height: 2px;"></i>analysens kurva</span>
+        <span><i class="swatch" style="background: rgba(255,255,255,0.5); height: 2px;"></i>notanalysens kurva</span>
       </div>
       <div class="zoom" role="group" aria-label="Zooma notbanan">
         <span class="zoom-k">Zoom</span>
@@ -440,7 +441,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
     </div>
     <div class="edit-bar admin-only">
       <button type="button" class="btn-outline toggle-btn" id="editToggle" aria-expanded="false" aria-controls="editTools">✎ Redigera noter</button>
-      <button type="button" class="btn-outline toggle-btn" id="copyAnalysisBtn" aria-expanded="false" aria-controls="copyPanel" title="Lägg samma noter på andra stämmor">⎘ Kopiera analys</button>
+      <button type="button" class="btn-outline toggle-btn" id="copyAnalysisBtn" aria-expanded="false" aria-controls="copyPanel" title="Lägg samma noter på andra stämmor">⎘ Kopiera notanalys</button>
       <button type="button" class="btn-outline toggle-btn" id="tempoBtn" aria-expanded="false" aria-controls="tempoPanel" title="Ställ in låtens tempo (BPM) och var takten börjar – ger taktstreck och klick">🥁 Tempo &amp; klick</button>
       <div class="copy-panel tempo-panel" id="tempoPanel" hidden>
         <small class="xfer-note">Taktstrecken i notbanan och klicket följer det här. Slå på <b>Klick</b> ovan och spela – justera tills klicket ligger på slagen. Gäller hela låten (alla stämmor).</small>
@@ -522,7 +523,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         <button type="button" class="btn-outline" data-op="add" title="Ny not vid spelhuvudet (N)">＋ Ny not</button>
         <button type="button" class="btn-outline" data-op="del" title="Ta bort vald not (Delete)">🗑 Ta bort</button>
         <button type="button" class="btn-outline" data-op="fit" title="Slå ihop och anpassa alla noter efter textraderna">≡ Anpassa till texten</button>
-        <button type="button" class="btn-outline" data-op="auto" title="Börja om från analysen">⟲ Från analysen</button>
+        <button type="button" class="btn-outline" data-op="auto" title="Börja om från notanalysen">⟲ Från notanalysen</button>
         <button type="button" class="btn-outline" data-op="selall" title="Markera alla noter (Ctrl+A)">▦ Markera alla</button>
         <button type="button" class="btn-outline" data-op="copy" title="Kopiera markerade noter (Ctrl+C)">⎘ Kopiera</button>
         <button type="button" class="btn-outline" data-op="paste" title="Klistra in vid spelhuvudet (Ctrl+V)">📋 Klistra in</button>
@@ -566,7 +567,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
           <div class="edit-tools"><button type="button" class="btn-outline" id="harmCopy">⎘ Lägg i vald stämma</button><span class="edit-status" id="harmStatus"></span></div>
         </div>
       </div>
-      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av), och noter som ligger kant i kant, och noter över/under i tonhöjd som delar samma kant, <b>följer med</b> när du drar ut en kant. <b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter; <b>Ctrl+C / Ctrl+V</b> kopierar och klistrar in vid spelhuvudet (praktiskt för upprepade refränger). Shift+↑↓ flyttar en oktav. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. <b>Mellanslag</b> spelar/pausar, dra i tom yta för att spola. <b>Text:</b> orden fördelas automatiskt på noterna i varje textrad (gula ord ovanför blocken). <b>Dubbelklicka</b> på en not för att skriva texten direkt på blocket (<b>Tab</b> = nästa not), eller <b>dra ett gult ord</b> till en annan not så det hamnar på rätt upp- och nergång. Fältet <b>Text</b> och <b>⟵ ord / ord ⟶</b> gör samma sak för vald not. Medlemmarna får de sparade noterna och orden precis som de är.</p>
+      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av), och noter som ligger kant i kant, och noter över/under i tonhöjd som delar samma kant, <b>följer med</b> när du drar ut en kant. <b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter; <b>Ctrl+C / Ctrl+V</b> kopierar och klistrar in vid spelhuvudet (praktiskt för upprepade refränger). Shift+↑↓ flyttar en oktav. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. <b>Mellanslag</b> spelar/pausar, dra i tom yta för att spola. <b>Text:</b> orden fördelas automatiskt på noterna i varje textrad (gula ord ovanför blocken). <b>Rita:</b> dra i en nots högra kant upp eller ner till andra toner så ritas nya noter längs vägen (dubbelklick i tom yta = ny not att börja från). <b>Dubbelklicka</b> på en not för att skriva texten direkt på blocket (<b>Tab</b> = nästa not), eller <b>dra ett gult ord</b> till en annan not så det hamnar på rätt upp- och nergång. Fältet <b>Text</b> och <b>⟵ ord / ord ⟶</b> gör samma sak för vald not. Medlemmarna får de sparade noterna och orden precis som de är.</p>
     </div>
     <div class="karaoke" id="karaoke" hidden aria-live="off">
       <div class="k-now" id="kNow">&nbsp;</div>
@@ -748,7 +749,7 @@ function renderRows() {
       const s = st.pitch.stats || {};
       const stale = st.pitchPath && st.pitchPath !== st.path;
       status = stale
-        ? '<span class="stem-status stale">⚠ Stämfilen har bytts sedan analysen – analysera igen</span>'
+        ? '<span class="stem-status stale">⚠ Stämfilen har bytts sedan notanalysen – analysera igen</span>'
         : `<span class="stem-status ok">✓ ${s.noteCount ?? '?'} noter${s.low != null ? `, ${nm(s.low)}–${nm(s.high)}` : ''}${st.pitchAt ? ' · ' + fmtDate(st.pitchAt) : ''}</span>`;
     }
     row.innerHTML = `
@@ -839,8 +840,8 @@ async function fetchBuffer(st) {
 
 // ---------- analys ----------
 async function analyzeStem(st, show) {
-  if (busy) { toast('Vänta – en analys pågår redan'); return false; }
-  if (st.raw && st.raw.edited_notes && !confirm(`${st.label} har redigerade noter. En ny analys ersätter dem. Fortsätta?`)) return false;
+  if (busy) { toast('Vänta – en notanalys pågår redan'); return false; }
+  if (st.raw && st.raw.edited_notes && !confirm(`${st.label} har redigerade noter. En ny notanalys ersätter dem. Fortsätta?`)) return false;
   if (!st.rowEl) { showAllStems = true; renderRows(); }
   busy = true;
   setButtonsDisabled(true);
@@ -918,7 +919,7 @@ function showStem(st) {
     `<b>${s.noteCount}</b> noter · omfång <b>${s.low != null ? nm(s.low) + '–' + nm(s.high) : '–'}</b>` +
     (p.key ? ` · tonart <b>${p.key.name}</b>` : '') +
     ` · ton i <b>${s.voicedPct}%</b> av låten · ${fmt(s.duration)} min` +
-    (isAdmin && p.octFixed ? ` · <span title="Noter som analysen hörde en oktav fel har flyttats">${p.octFixed} oktavfel rättade</span>` : '');
+    (isAdmin && p.octFixed ? ` · <span title="Noter som notanalysen hörde en oktav fel har flyttats">${p.octFixed} oktavfel rättade</span>` : '');
   document.getElementById('viewer').hidden = false;
   const d = durationOf();
   document.getElementById('scrubber').max = d || 1;
@@ -1183,8 +1184,8 @@ function drawRoll() {
       ctx.fillStyle = '#fff';
       ctx.fillRect(nx - 1.5 * dpr, top + h * 0.2, 3 * dpr, h * 0.6);
       ctx.fillRect(nx + nw - 1.5 * dpr, top + h * 0.2, 3 * dpr, h * 0.6);
-      ctx.font = `600 ${12 * dpr}px DM Sans, sans-serif`; ctx.textBaseline = 'bottom';
-      ctx.fillText(`${nm(n.n)} · ${n.d.toFixed(2)} s`, nx, top - 4 * dpr);
+      ctx.font = `600 ${12 * dpr}px DM Sans, sans-serif`; ctx.textBaseline = 'top';   // under blocket – texten ovanför syns
+      ctx.fillText(`${nm(n.n)} · ${n.d.toFixed(2)} s`, nx, top + h + 4 * dpr);
     }
     // i blocket: texten som sjungs på noten (tonen syns på linjerna till vänster). Admin som redigerar ser tonnamnet.
     if (editMode && nw > 30 * dpr && h > 12 * dpr && !isSel) {   // admin som redigerar: tonnamnet i blocket, texten ovanför
@@ -1203,8 +1204,8 @@ function drawRoll() {
 
   // exakt tonkurva (analysen) – tunn, och nästan dold när du sjunger själv
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.strokeStyle = mic ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.85)';
-  ctx.lineWidth = (mic ? 1.2 : 1.8) * dpr;
+  ctx.strokeStyle = mic ? 'rgba(255,255,255,0.18)' : editMode ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.32)';
+  ctx.lineWidth = (mic ? 1.2 : editMode ? 1.8 : 1.4) * dpr;
   ctx.beginPath();
   const i0 = Math.max(0, Math.floor(t0 / p.hop)), i1 = Math.min(p.midi.length, Math.ceil((t0 + span) / p.hop) + 1);
   let pen = false;
@@ -1484,7 +1485,7 @@ let multi = new Set(), rband = null, rangeBand = null, noteClip = null;   // fle
 const eNotes = () => current.pitch.notes;
 function editStatus(msg) {
   const el = document.getElementById('editStatus');
-  el.textContent = msg || (dirty ? 'Osparade ändringar' : (current && current.pitchBase.edited ? 'Sparat' : 'Inte sparat än – medlemmar ser analysen'));
+  el.textContent = msg || (dirty ? 'Osparade ändringar' : (current && current.pitchBase.edited ? 'Sparat' : 'Inte sparat än – medlemmar ser notanalysen'));
   el.classList.toggle('dirty', dirty);
 }
 function snapshot() { undoStack.push(JSON.stringify(eNotes())); if (undoStack.length > 80) undoStack.shift(); dirty = true; editStatus(); }
@@ -1540,7 +1541,7 @@ async function saveNotes(removeEdits) {
   st.raw = data; st.pitchBase = prepPitch(data); dirty = false;
   if (removeEdits) { applyMerge(st); setEditMode(false); showStem(st); }
   else { st.pitch = { ...st.pitchBase, notes: st.pitchBase.notes.map(n => ({ ...n })) }; editStatus(); }
-  toast(removeEdits ? 'Redigeringen borttagen – medlemmar ser analysen igen' : 'Noterna sparade – medlemmarna ser dem nu');
+  toast(removeEdits ? 'Redigeringen borttagen – medlemmar ser notanalysen igen' : 'Noterna sparade – medlemmarna ser dem nu');
   renderRows();
   return true;
 }
@@ -1558,7 +1559,7 @@ function editOp(op) {
   }
   if (op === 'auto') {
     const hasSaved = current.pitchBase.edited;
-    if (hasSaved && confirm('Ta bort den sparade redigeringen helt, så medlemmarna ser analysen igen?\n\n(Avbryt = börja om från analysen här, utan att spara än.)')) { saveNotes(true); return; }
+    if (hasSaved && confirm('Ta bort den sparade redigeringen helt, så medlemmarna ser notanalysen igen?\n\n(Avbryt = börja om från notanalysen här, utan att spara än.)')) { saveNotes(true); return; }
     snapshot();
     const auto = PitchAnalyze.foldOctaves({ ...current.raw, edited_notes: undefined }).notes;
     current.pitch.notes = mergeNotes(auto, kLines.length ? lyricSpans() : []).map(x => ({ t: x.t, d: x.d, n: x.n }));
@@ -2067,6 +2068,21 @@ function stopMic() {
   if (current) tick();
 }
 
+// pennan: segs = noterna som ritats i det här draget (första är noten man tog tag i)
+function penMove(segs, pm, pt) {
+  const ns = eNotes();
+  let a = segs[segs.length - 1];
+  while (segs.length > 1 && pt <= a.t + 0.03) { ns.splice(ns.indexOf(a), 1); segs.pop(); a = segs[segs.length - 1]; }   // drar tillbaka
+  if (pm !== a.n && pt - a.t >= 0.08) {
+    a.d = Math.max(0.05, pt - a.t);
+    const nn = { t: pt, d: 0.05, n: pm };
+    ns.push(nn); segs.push(nn); a = nn;
+  } else {
+    if (pm !== a.n && segs.length > 1) a.n = pm;   // nyss påbörjad not följer pekaren i höjdled
+    a.d = Math.max(0.05, pt - a.t);
+  }
+}
+
 // ---------- admin: redigera alla stämmor ----------
 function fillEditVoice() {
   const sel = document.getElementById('editVoice'); if (!sel || !current) return;
@@ -2357,7 +2373,7 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
     click: '<p><b>Klick</b></p><p>Ett metronomklick på låtens slag, med lite högre ton på första slaget i takten. Bra när du övar rytmen eller sjunger utan komp.</p>',
     ghost: '<p><b>Visa i notbanan</b></p><p>Bocka i andra stämmor så syns deras noter som färgade, streckade block bakom dina – bra för att se hur stämmorna går ihop.</p><p>Det är bara för att titta: <b>mikrofonen och referenstonen följer alltid stämman du valt</b> (märkt 🎤). Vill du öva en annan stämma väljer du den under <b>Stämma</b>.</p>',
     tone: '<p><b>Referenston</b></p><p>Ett enkelt pip som spelar exakt de noter du ska sjunga. Bra för att höra tonerna tydligt, utan text och utan andra röster. Stäng av när du kan stämman.</p>',
-    visa: '<p><b>Visa</b></p><p><b>Anpassa höjden efter tonerna</b><br>Notbanan zoomar i höjdled så att just de toner som syns nu fyller rutan. Noterna blir större och lättare att se, men banan rör sig lite när låten spelas. Av = hela låtens tonomfång syns hela tiden.</p><p><b>Slå ihop noter per textrad</b><br>Små, korta toner slås ihop till färre och längre noter, en per textrad där det går. Det blir lugnare att följa. Av = du ser alla noter precis som analysen hittade dem. Gäller inte noter som körledningen förberett.</p>',
+    visa: '<p><b>Visa</b></p><p><b>Anpassa höjden efter tonerna</b><br>Notbanan zoomar i höjdled så att just de toner som syns nu fyller rutan. Noterna blir större och lättare att se, men banan rör sig lite när låten spelas. Av = hela låtens tonomfång syns hela tiden.</p><p><b>Slå ihop noter per textrad</b><br>Små, korta toner slås ihop till färre och längre noter, en per textrad där det går. Det blir lugnare att följa. Av = du ser alla noter precis som notanalysen hittade dem. Gäller inte noter som körledningen förberett.</p>',
     oktav: '<p><b>Godkänn annan oktav</b></p><p>På = det räknas som träff även om du sjunger en eller två oktaver högre eller lägre än noten. Bra om du t.ex. är bas och övar på tenorstämman.</p><p>Av = du måste sjunga i exakt rätt läge för att få grönt.</p>',
     tol: '<p><b>Svårighetsgrad</b></p><p>Hur nära noten du måste ligga för att det ska bli grönt. 100 cent = en halvton.</p><p><b>Nybörjare</b> ±100 cent – mycket förlåtande.<br><b>Lätt</b> ±75 cent – bra att börja med.<br><b>Normal</b> ±50 cent – en kvarts ton fel går bra.<br><b>Svår</b> ±30 cent – för dig som vill finslipa.</p>',
   };
@@ -2487,6 +2503,14 @@ document.getElementById('overview').addEventListener('click', e => {
         nb.forEach(b => { b.m.d = Math.max(0.05, t - b.o.t); });
         al.forEach(b => { b.m.t = t; b.m.d = b.o.t + b.o.d - t; });
       } else {
+        // elastisk: drar man änden upp/ner till en annan ton ritas nya noter längs vägen (som en penna)
+        const [pcx, pcy] = cxy(e);
+        const pm = Math.round(g.lo + (g.H - pcy) / g.rowH), pt = g.t0 + pcx / g.pxs;
+        if (!drag.pen && Math.abs(pm - n.n) >= 1 && pt > n.t + 0.08) {
+          drag.pen = [n];
+          nb.forEach(b => { b.m.t = b.o.t; b.m.d = b.o.d; }); al.forEach(b => { b.m.t = b.o.t; b.m.d = b.o.d; });
+        }
+        if (drag.pen) { penMove(drag.pen, pm, e.altKey ? pt : snapTo(pt)); tick(); return; }
         let e2 = snapTo(o.t + o.d + dt);
         nb.forEach(b => { e2 = Math.min(e2, b.o.t + b.o.d - 0.05); });
         e2 = Math.max(e2, o.t + 0.05);
@@ -2524,7 +2548,12 @@ document.getElementById('overview').addEventListener('click', e => {
       editStatus(multi.size ? `${multi.size} noter markerade – Kopiera (Ctrl+C) och Klistra in (Ctrl+V)` : '');
       return;
     }
-    if (drag) { const n = drag.n, moved = drag.moved; drag = null; if (moved) afterEdit(n); return; }
+    if (drag) {
+      const n = drag.n, moved = drag.moved, pen = drag.pen; drag = null;
+      if (pen && pen.length > 1) { multi = new Set(pen); afterEdit(n); editStatus(`${pen.length} noter ritade – dra eller använd ↑↓ för att flytta dem tillsammans`); return; }
+      if (moved) afterEdit(n);
+      return;
+    }
     if (startX == null) return; startX = null; c.classList.remove('dragging');
     if (scrubbed) { if (wasPlaying) play(); return; }
     // klick (utan att dra): spela/pausa – utom i redigeringsläget, där klick väljer noter (använd mellanslag)
@@ -2536,7 +2565,12 @@ document.getElementById('overview').addEventListener('click', e => {
   c.addEventListener('dblclick', e => {
     if (!editMode || !current) return;
     const [cx, cy] = cxy(e), wr = hitWord(cx, cy), h = wr ? { i: wr.ni } : hitNote(cx, cy);
-    if (h) { e.preventDefault(); openWordEditor(h.i); }
+    if (h) { e.preventDefault(); openWordEditor(h.i); return; }
+    if (hitGhost(cx, cy) || !rollGeom) return;
+    // dubbelklick i tom yta: ny not där – dra sedan i dess högra kant för att rita vidare
+    const g = rollGeom, nn = { t: Math.max(0, Math.round((g.t0 + cx / g.pxs) * 100) / 100), d: 0.3, n: Math.round(g.lo + (g.H - cy) / g.rowH) };
+    snapshot(); eNotes().push(nn); afterEdit(nn);
+    editStatus('Ny not – dra i högra kanten för att förlänga eller rita vidare till andra toner');
   });
 })();
 document.getElementById('editToggle')?.addEventListener('click', () => setEditMode(!editMode));

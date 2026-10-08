@@ -163,7 +163,15 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .edit-status { font-size: 0.8rem; color: var(--text-muted); }
   .edit-status.dirty { color: #facc15; }
   .edit-help { margin: 0; font-size: 0.8rem; }
-  #editToggle.on { background: var(--accent); color: #111317; border-color: var(--accent); }
+  /* knappraden överst, utfällda paneler under den i full bredd */
+  .edit-bar { display: flex !important; flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
+  .edit-bar > button { order: 0; }
+  .edit-bar > :not(button) { order: 1; flex: 1 1 100%; }
+  .edit-voice { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0 0.4rem 0 0; font-size: 0.85rem; font-weight: 600; }
+  .edit-voice select { width: auto; margin: 0; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+  .roll-resize { height: 14px; margin-top: 3px; border-radius: 0 0 0.6rem 0.6rem; cursor: ns-resize; touch-action: none; display: grid; place-items: center; color: var(--text-muted); font-size: 0.7rem; line-height: 1; user-select: none; }
+  .roll-resize::before { content: ''; width: 46px; height: 4px; border-radius: 2px; background: var(--border); }
+  .roll-resize:hover::before, .roll-resize.dragging::before { background: var(--accent); }
   .edited-tag { font-size: 0.75rem; padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid rgba(74,222,128,0.5); color: #4ade80; }
   #roll.editing { cursor: default; }
   .zoom button { width: 2rem; height: 2rem; padding: 0; justify-content: center; font-size: 1.1rem; line-height: 1; }
@@ -413,6 +421,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         <div title="Noter där du träffat minst 60 % av tiden"><span>Noter</span><b id="micNotes">–</b></div>
       </div>
     </div>
+    <div class="roll-resize" id="rollResize" title="Dra för att göra notbanan högre eller lägre (dubbelklick = standard)" role="separator" aria-orientation="horizontal" aria-label="Ändra notbanans höjd"></div>
     <div class="roll-bar">
       <div class="legend-row">
         <span><i class="swatch" style="background: rgba(229,169,104,0.3); border: 1px solid var(--accent);"></i>noter att sjunga</span>
@@ -430,8 +439,8 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
       </div>
     </div>
     <div class="edit-bar admin-only">
-      <button type="button" class="btn-outline" id="editToggle">✎ Redigera noter</button>
-      <button type="button" class="btn-outline" id="copyAnalysisBtn" title="Lägg samma noter på andra stämmor">⎘ Kopiera analys till andra stämmor</button>
+      <button type="button" class="btn-outline toggle-btn" id="editToggle" aria-expanded="false" aria-controls="editTools">✎ Redigera noter</button>
+      <button type="button" class="btn-outline toggle-btn" id="copyAnalysisBtn" aria-expanded="false" aria-controls="copyPanel" title="Lägg samma noter på andra stämmor">⎘ Kopiera analys</button>
       <button type="button" class="btn-outline toggle-btn" id="tempoBtn" aria-expanded="false" aria-controls="tempoPanel" title="Ställ in låtens tempo (BPM) och var takten börjar – ger taktstreck och klick">🥁 Tempo &amp; klick</button>
       <div class="copy-panel tempo-panel" id="tempoPanel" hidden>
         <small class="xfer-note">Taktstrecken i notbanan och klicket följer det här. Slå på <b>Klick</b> ovan och spela – justera tills klicket ligger på slagen. Gäller hela låten (alla stämmor).</small>
@@ -506,6 +515,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         <div class="edit-tools"><button type="button" id="copyGo">Kopiera</button><button type="button" class="btn-outline" id="copyCancel">Avbryt</button><span class="edit-status" id="copyStatus"></span></div>
       </div>
       <div class="edit-tools" id="editTools" hidden>
+        <label class="edit-voice" title="Byt stämma att redigera – eller klicka på en färgad stämma i notbanan">Redigerar <select id="editVoice"></select></label>
         <button type="button" class="btn-outline" data-op="undo" title="Ångra (Ctrl+Z)">↶ Ångra</button>
         <button type="button" class="btn-outline" data-op="merge" title="Slå ihop vald not med nästa (M)">⊕ Slå ihop</button>
         <button type="button" class="btn-outline" data-op="split" title="Dela vald not vid spelhuvudet (S)">✂ Dela</button>
@@ -578,7 +588,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
 
     <!-- Advanced settings (dolt för medlemmar per default) -->
     <div style="margin-top: 1rem;">
-      <button type="button" class="btn-outline adv-toggle member-only" id="advToggle" aria-expanded="false" aria-controls="advSettings">⚙ Fler inställningar</button>
+      <button type="button" class="btn-outline adv-toggle toggle-btn member-only" id="advToggle" aria-expanded="false" aria-controls="advSettings">⚙ Fler inställningar</button>
     </div>
 
     <div class="settings adv-settings" id="advSettings">
@@ -1125,7 +1135,7 @@ function drawRoll() {
   const boxHalf = Math.max(0.45, tolSemi);
   const r = Math.min(8 * dpr, rowH * boxHalf);
   rollGeom = { t0, pxs, lo, H, rowH, boxHalf, dpr };
-  wordRects = [];
+  wordRects = []; ghostRects = [];
   const labels = [];   // [text, index, x, bredd, topp, höjd, färg?, noter?] – ritas efter tonkurvan så linjen inte stryker över texten
   // andra stämmor (bara att titta på): färgade block bakom din stämma
   ghostList().forEach(gs => {
@@ -1134,6 +1144,7 @@ function drawRoll() {
     gn.forEach((n, gi) => {
       if (n.t + n.d < t0 || n.t > t0 + span) return;
       const nx = x(n.t), nw = Math.max(3, n.d * pxs), top = y(n.n + boxHalf * 0.8), h = rowH * boxHalf * 1.6;
+      ghostRects.push({ st: gs, x0: nx, x1: nx + nw, y0: top, y1: top + h });
       if (gs._ghW && gs._ghW[gi]) labels.push([gs._ghW[gi], gi, nx, nw, top, h, col, gn]);
       ctx.globalAlpha = 0.2; ctx.fillStyle = col;
       ctx.beginPath(); ctx.roundRect(nx, top, nw, h, r); ctx.fill();
@@ -1502,8 +1513,8 @@ function setEditMode(on) {
     current.pitch = { ...current.pitch, notes: current.pitch.notes.map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}) })) };
     undoStack = [];
   }
-  document.getElementById('editToggle').classList.toggle('on', on);
-  document.getElementById('editToggle').textContent = on ? '✓ Klar med redigering' : '✎ Redigera noter';
+  document.getElementById('editToggle').setAttribute('aria-expanded', String(on));
+  if (on) fillEditVoice();
   document.getElementById('editTools').hidden = !on;
   if (!on) { const hp = document.getElementById('harmPanel'); if (hp) { hp.hidden = true; document.getElementById('harmBtn').setAttribute('aria-expanded', 'false'); } }
   document.getElementById('editHelp').hidden = !on;
@@ -2056,6 +2067,37 @@ function stopMic() {
   if (current) tick();
 }
 
+// ---------- admin: redigera alla stämmor ----------
+function fillEditVoice() {
+  const sel = document.getElementById('editVoice'); if (!sel || !current) return;
+  sel.innerHTML = stems.filter(st => singable(st) || st === current).map(st =>
+    `<option value="${esc(st.key)}" ${st === current ? 'selected' : ''} ${st.pitch ? '' : 'disabled'}>${esc(st.label)}${st.pitch ? '' : ' (inte analyserad)'}</option>`).join('');
+}
+// byt stämma utan att lämna redigeringen: samma ställe i låten, förra stämman syns kvar som färgade block
+async function switchEditStem(st) {
+  if (!st || st === current || !st.pitch) return;
+  if (dirty) {
+    if (confirm(`Spara ändringarna i ${current.label} innan du byter?\n\nOK = spara, Avbryt = välj om du vill släppa dem.`)) { if (!await saveNotes(false)) return; }
+    else if (!confirm('Släppa ändringarna i ' + current.label + '?')) { fillEditVoice(); return; }
+    else { dirty = false; }
+  }
+  const prev = current, g = position() + stemOffSec();
+  setEditMode(false);
+  if (editMode) return;
+  showStem(st);
+  ghosts.add(prev.key); renderGhostRow();
+  pausedPos = Math.max(0, Math.min(durationOf(), g - stemOffSec()));
+  current._rr = null; viewLo = null;
+  setEditMode(true);
+  editStatus(`Redigerar nu ${st.label}`);
+}
+document.getElementById('editVoice')?.addEventListener('change', e => switchEditStem(stems.find(st => st.key === e.target.value)));
+let ghostRects = [];
+function hitGhost(cx, cy) {
+  for (let i = ghostRects.length - 1; i >= 0; i--) { const r = ghostRects[i]; if (cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1) return r.st; }
+  return null;
+}
+
 // ---------- admin: flytta och skriv text direkt på notblocken ----------
 let wordRects = [], wdrag = null, wordEd = null;
 function hitWord(cx, cy) {
@@ -2394,6 +2436,8 @@ document.getElementById('overview').addEventListener('click', e => {
         drag = { n, zone: h.zone, x: e.clientX, y: e.clientY, o: { ...n }, moved: false, grp, nb, al };
         c.setPointerCapture(e.pointerId); tick(); return;
       }
+      const gh = !e.shiftKey && hitGhost(cx, cy);
+      if (gh) { switchEditStem(gh); return; }   // klick på en annan stämmas block: redigera den stämman
       if (e.shiftKey && rollGeom) {   // Shift+dra i tom yta: markera en tidsrad av noter
         rband = { a: rollGeom.t0 + cx / rollGeom.pxs }; rband.b = rband.a; rangeBand = [rband.a, rband.b];
         c.setPointerCapture(e.pointerId); tick(); return;
@@ -2455,7 +2499,7 @@ document.getElementById('overview').addEventListener('click', e => {
     }
     if (editMode && startX == null) {
       const [cx, cy] = cxy(e), h = hitNote(cx, cy);
-      c.style.cursor = hitWord(cx, cy) ? 'grab' : !h ? 'grab' : h.zone === 'move' ? 'move' : 'ew-resize';
+      c.style.cursor = hitWord(cx, cy) ? 'grab' : h ? (h.zone === 'move' ? 'move' : 'ew-resize') : hitGhost(cx, cy) ? 'pointer' : 'grab';
     }
     if (startX == null) return;
     if (!scrubbed && Math.abs(e.clientX - startX) < 6) return;   // litet darr räknas som klick
@@ -2496,6 +2540,21 @@ document.getElementById('overview').addEventListener('click', e => {
   });
 })();
 document.getElementById('editToggle')?.addEventListener('click', () => setEditMode(!editMode));
+// Admin-knapparna fälls ut som paneler – bara en öppen åt gången
+(() => {
+  const ACC = [['editToggle', 'editTools'], ['copyAnalysisBtn', 'copyPanel'], ['tempoBtn', 'tempoPanel'], ['vidBtn', 'vidPanel'], ['xferBtn', 'xferPanel']]
+    .map(([b, p]) => [document.getElementById(b), document.getElementById(p)]).filter(([b, p]) => b && p);
+  // knappens markering följer alltid panelen (även när panelen stängs på annat sätt)
+  ACC.forEach(([b, p]) => new MutationObserver(() => b.setAttribute('aria-expanded', String(!p.hidden))).observe(p, { attributes: true, attributeFilter: ['hidden'] }));
+  ACC.forEach(([btn]) => btn.addEventListener('click', e => {
+    if (btn.getAttribute('aria-expanded') === 'true') return;   // stänger sig själv
+    for (const [b, p] of ACC) {
+      if (b === btn || p.hidden) continue;
+      if (b.id === 'editToggle') { setEditMode(false); if (editMode) { e.stopImmediatePropagation(); return; } }   // osparat och avbrutet
+      else p.hidden = true;
+    }
+  }, true));
+})();
 // Kopiera noterna (analysen) från den visade stämman till andra stämmor, med valfri transponering.
 // Tiderna räknas om med stämsynkens förskjutningar så att noterna hamnar rätt i respektive ljudfil.
 // ---------- admin: tonart & harmoni ----------
@@ -2852,7 +2911,7 @@ document.getElementById('xFile')?.addEventListener('change', async (e) => {
 });
 
 document.getElementById('copyAnalysisBtn')?.addEventListener('click', () => {
-  document.getElementById('xferPanel').hidden = true; document.getElementById('xferBtn').setAttribute('aria-expanded', 'false');
+  if (!document.getElementById('copyPanel').hidden) { document.getElementById('copyPanel').hidden = true; return; }
   if (!current) return;
   document.getElementById('copySrc').textContent = current.label;
   const targets = stems.filter(st => st !== current && st.key !== 'stem_backtrack_path');
@@ -2934,6 +2993,22 @@ document.addEventListener('keydown', e => {
   }
 });
 window.addEventListener('resize', () => { if (current) { sizeCanvases(); tick(); renderProgress(); } });
+// dra i kanten under notbanan: högre bana = större block och mer luft mellan tonerna
+(() => {
+  const h = document.getElementById('rollResize'), roll = document.getElementById('roll');
+  const apply = px => {
+    if (px) roll.style.height = Math.round(Math.max(180, Math.min(1100, px))) + 'px'; else roll.style.height = '';
+    sizeCanvases(); placeBgVideo(); if (current) tick();
+  };
+  let saved = 0; try { saved = Number(localStorage.getItem('hv-roll-h')) || 0; } catch (e) {}
+  if (saved) roll.style.height = Math.max(180, Math.min(1100, saved)) + 'px';
+  let y0 = null, h0 = 0;
+  h.addEventListener('pointerdown', e => { y0 = e.clientY; h0 = roll.clientHeight; h.setPointerCapture(e.pointerId); h.classList.add('dragging'); e.preventDefault(); });
+  h.addEventListener('pointermove', e => { if (y0 != null) apply(h0 + e.clientY - y0); });
+  const end = () => { if (y0 == null) return; y0 = null; h.classList.remove('dragging'); try { localStorage.setItem('hv-roll-h', String(roll.clientHeight)); } catch (e) {} };
+  h.addEventListener('pointerup', end); h.addEventListener('pointercancel', end);
+  h.addEventListener('dblclick', () => { apply(0); try { localStorage.removeItem('hv-roll-h'); } catch (e) {} });
+})();
 
 // ---------- Party Mode (?party=1) ----------
 function partyInitUi() {

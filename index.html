@@ -47,42 +47,48 @@
       #video-mobile  { display: block; }
     }
 
-    /* Logga in-knapp */
-    .header {
-      position: fixed;
-      top: 16px;
-      right: 16px;
-      z-index: 3;
-    }
-
-    .header { display: flex; gap: 8px; }
-    @media (max-width: 600px) {
-      .header { top: 12px; right: 12px; gap: 6px; }
-      .login-btn { padding: 5px 11px; font-size: 13px; }
-    }
-
+    /* Logga in-knapp (under loggan) */
     .login-btn {
+      position: relative;
+      overflow: hidden;
       background-color: rgba(0, 0, 0, 0.6);
       border: 1.5px solid #ffffff;
       color: #ffffff;
-      padding: 6px 14px;
-      font-size: 14px;
+      padding: 9px 26px;
+      font-size: 16px;
       font-weight: bold;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       border-radius: 4px;
       text-decoration: none;
       display: inline-block;
-      transition: all 0.3s ease;
+      margin-bottom: 18px;
+      transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+      animation: riseIn 0.9s cubic-bezier(.2,.7,.2,1) 0.9s both;
     }
-
+    /* Ljusstråk som sveper över knappen */
+    .login-btn::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0; left: -60%;
+      width: 40%;
+      background: linear-gradient(100deg, transparent, rgba(229,179,82,0.55), transparent);
+      transform: skewX(-20deg);
+      animation: sweep 5s ease-in-out 2.5s infinite;
+      pointer-events: none;
+    }
     .login-btn:hover {
       background-color: #ffffff;
       color: #000000;
+      box-shadow: 0 0 22px rgba(229,179,82,0.6);
+      transform: translateY(-2px);
     }
+    .login-btn:active { transform: translateY(0) scale(0.97); }
 
     /* Huvudbehållare centrerad mitt på skärmen */
     .main-content {
       position: fixed;
-      top: 32%;
+      top: 36%;
       left: 50%;
       transform: translate(-50%, -50%);
       z-index: 2;
@@ -96,13 +102,50 @@
 
     /* Logotypen */
     .main-content picture { display: contents; }
-    .logo {
-      max-width: 380px; /* Ändra storlek på loggan här */
+    /* Lager: wrap = följer pekaren, float = svävar, img = intoning */
+    .logo-wrap {
+      position: relative;
       width: 72%;
+      max-width: min(380px, 42vh); /* Ändra storlek på loggan här */
+      margin-bottom: 20px;
+      transform: translate3d(var(--px, 0px), var(--py, 0px), 0);
+      transition: transform 0.25s ease-out;
+    }
+    /* Pulserande guldsken bakom loggan */
+    .logo-wrap::before {
+      content: '';
+      position: absolute;
+      inset: -18%;
+      background: radial-gradient(closest-side, rgba(229,179,82,0.35), rgba(229,179,82,0) 70%);
+      opacity: 0;
+      animation: glowIn 2s ease 0.4s forwards, glowPulse 5s ease-in-out 2.4s infinite;
+      pointer-events: none;
+    }
+    .logo-float { position: relative; animation: bob 7s ease-in-out 1.8s infinite; }
+    .logo {
+      width: 100%;
       height: auto;
       display: block;
       filter: drop-shadow(0px 4px 15px rgba(0, 0, 0, 0.8));
-      margin-bottom: 30px; /* Avstånd ner till citatet */
+      animation: logoIn 1.4s cubic-bezier(.2,.7,.2,1) both;
+    }
+
+    @keyframes logoIn {
+      from { opacity: 0; transform: scale(0.82); filter: blur(10px) drop-shadow(0px 4px 15px rgba(0,0,0,0.8)); }
+      to   { opacity: 1; transform: scale(1);    filter: blur(0)    drop-shadow(0px 4px 15px rgba(0,0,0,0.8)); }
+    }
+    @keyframes riseIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+    @keyframes glowIn { to { opacity: 1; } }
+    @keyframes glowPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.6; } }
+    @keyframes sweep { 0%,70% { left: -60%; } 100% { left: 130%; } }
+    @keyframes quotesIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Respektera "minska rörelse" */
+    @media (prefers-reduced-motion: reduce) {
+      .logo, .logo-float, .logo-wrap::before, .login-btn, .login-btn::after, .quote-box { animation: none !important; }
+      .logo-wrap::before { opacity: 1; }
+      .logo-wrap { transition: none; }
     }
 
     /* Ramlös textruta för citat */
@@ -114,6 +157,7 @@
       justify-content: center;
       align-items: center;
       padding: 10px;
+      animation: quotesIn 1.2s ease 1.5s both;
     }
 
     .quote {
@@ -124,12 +168,16 @@
       color: #ffffff;
       text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.9), 0px 0px 5px rgba(0, 0, 0, 0.9);
       opacity: 0;
-      transition: opacity 1.2s ease-in-out;
+      transform: translateY(10px);
+      filter: blur(4px);
+      transition: opacity 1.2s ease-in-out, transform 1.2s ease-out, filter 1.2s ease-out;
       width: 100%;
     }
 
     .quote.active {
       opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
     }
 
     .author {
@@ -145,12 +193,13 @@
       .quote {
         font-size: 1.05rem;
       }
-      .logo {
+      .logo-wrap {
         width: 58%;
         max-width: 260px;
         margin-top: 24px;
-        margin-bottom: 15px;
+        margin-bottom: 14px;
       }
+      .login-btn { padding: 8px 22px; font-size: 15px; margin-bottom: 14px; }
     }
   </style>
 </head>
@@ -166,14 +215,11 @@
     <source src="heavyvoices-mobile.mp4" type="video/mp4">
   </video>
 
-  <!-- Logga in-knapp -->
-  <header class="header">
-    <a href="https://heavyvoices.se/logga-in.html" class="login-btn">Logga in</a>
-  </header>
-
   <!-- Centrerat innehåll: Logga + Citat -->
   <div class="main-content">
-    <picture><source srcset="/icons/logo-large.webp" type="image/webp"><img src="/icons/logo-large.png" alt="Heavy Voices" class="logo" width="1200" height="924"></picture>
+    <div class="logo-wrap" id="logoWrap"><div class="logo-float"><picture><source srcset="/icons/logo-large.webp" type="image/webp"><img src="/icons/logo-large.png" alt="Heavy Voices" class="logo" width="1200" height="924"></picture></div></div>
+
+    <a href="https://heavyvoices.se/logga-in.html" class="login-btn">Logga in</a>
 
     <!-- Ramlös textruta med roterande citat -->
     <div class="quote-box">
@@ -201,7 +247,18 @@
       quotes[currentQuote].classList.remove('active');
       currentQuote = (currentQuote + 1) % quotes.length;
       quotes[currentQuote].classList.add('active');
-    }, 5000); // Byter citat var 6:e sekund
+    }, 5000); // Byter citat var 5:e sekund
+
+    // Loggan följer pekaren lite grann (bara mus, inte på touch)
+    const logoWrap = document.getElementById('logoWrap');
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      window.addEventListener('pointermove', (e) => {
+        if (e.pointerType !== 'mouse') return;
+        const x = (e.clientX / innerWidth - 0.5) * 2, y = (e.clientY / innerHeight - 0.5) * 2;
+        logoWrap.style.setProperty('--px', (x * 10).toFixed(1) + 'px');
+        logoWrap.style.setProperty('--py', (y * 7).toFixed(1) + 'px');
+      });
+    }
   </script>
 
 </body>

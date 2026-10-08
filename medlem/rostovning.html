@@ -80,7 +80,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .mic-cents { font-size: 0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* inställningar i tre grupper */
-  .settings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+  .settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-top: 1rem; }
   .set { margin: 0; padding: 0.75rem 0.9rem 0.85rem; border: 1px solid var(--border); border-radius: 0.6rem; display: grid; gap: 0.5rem; align-content: start; min-width: 0; }
   .set legend { padding: 0 0.35rem; font-family: 'Roboto Condensed', sans-serif; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
   .set label { display: flex; align-items: center; gap: 0.45rem; margin: 0; cursor: pointer; font-size: 0.9rem; color: var(--text); }
@@ -108,6 +108,9 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .edit-bar > button { justify-self: start; }
   .edit-tools { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
   .edit-tools button { font-size: 0.82rem; padding: 0.35rem 0.65rem; }
+  .word-edit { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; padding: 0.2rem 0.45rem; border: 1px dashed var(--border); border-radius: 0.5rem; }
+  .word-edit label { display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; font-size: 0.82rem; }
+  .word-edit input { width: 9rem; margin: 0; padding: 0.3rem 0.45rem; font-size: 0.85rem; }
   .xfer-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
   .xfer-col { display: grid; gap: 0.5rem; align-content: start; min-width: 0; }
   .xfer-row { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.85rem; }
@@ -352,8 +355,6 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         <h4>Fler inställningar</h4>
         <p class="g-what">Under <b>⚙ Fler inställningar</b> finns det som de flesta inte behöver.</p>
         <dl>
-          <dt>Spela upp vald stämma</dt>
-          <dd>Du hör alltid stämman du valt. Stäng av när du kan den och vill sjunga själv.</dd>
           <dt>Anpassa höjden / Slå ihop noter</dt>
           <dd>Hur notbanan ritas.</dd>
           <dt>Godkänn annan oktav</dt>
@@ -513,6 +514,12 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         <button type="button" class="btn-outline" data-op="selall" title="Markera alla noter (Ctrl+A)">▦ Markera alla</button>
         <button type="button" class="btn-outline" data-op="copy" title="Kopiera markerade noter (Ctrl+C)">⎘ Kopiera</button>
         <button type="button" class="btn-outline" data-op="paste" title="Klistra in vid spelhuvudet (Ctrl+V)">📋 Klistra in</button>
+        <span class="word-edit" title="Texten som sjungs på den valda noten. Medlemmarna ser den i notblocket.">
+          <label>Text <input type="text" id="noteWord" maxlength="80" placeholder="välj en not" disabled></label>
+          <button type="button" class="btn-outline" data-op="wprev" title="Flytta första ordet till noten före">⟵ ord</button>
+          <button type="button" class="btn-outline" data-op="wnext" title="Flytta sista ordet till noten efter">ord ⟶</button>
+          <button type="button" class="btn-outline" data-op="wauto" title="Fördela textraderna automatiskt på noterna igen">↺ Fördela texten</button>
+        </span>
         <button type="button" class="btn-outline toggle-btn" id="harmBtn" aria-expanded="false" aria-controls="harmPanel" title="Flytta markerade noter i tonarten, rätta till tonarten eller skapa en harmonistämma">🎼 Tonart &amp; harmoni</button>
         <button type="button" data-op="save">💾 Spara noter</button>
         <span class="edit-status" id="editStatus"></span>
@@ -547,7 +554,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
           <div class="edit-tools"><button type="button" class="btn-outline" id="harmCopy">⎘ Lägg i vald stämma</button><span class="edit-status" id="harmStatus"></span></div>
         </div>
       </div>
-      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av), och noter som ligger kant i kant, och noter över/under i tonhöjd som delar samma kant, <b>följer med</b> när du drar ut en kant. <b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter; <b>Ctrl+C / Ctrl+V</b> kopierar och klistrar in vid spelhuvudet (praktiskt för upprepade refränger). Shift+↑↓ flyttar en oktav. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. <b>Mellanslag</b> spelar/pausar, dra i tom yta för att spola. Medlemmarna får de sparade noterna precis som de är.</p>
+      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av), och noter som ligger kant i kant, och noter över/under i tonhöjd som delar samma kant, <b>följer med</b> när du drar ut en kant. <b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter; <b>Ctrl+C / Ctrl+V</b> kopierar och klistrar in vid spelhuvudet (praktiskt för upprepade refränger). Shift+↑↓ flyttar en oktav. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. <b>Mellanslag</b> spelar/pausar, dra i tom yta för att spola. <b>Text:</b> orden fördelas automatiskt på noterna i varje textrad (gula ord ovanför blocken). Välj en not och skriv i <b>Text</b>, eller flytta ord med <b>⟵ ord / ord ⟶</b> så de hamnar på rätt upp- och nergång. Medlemmarna får de sparade noterna och orden precis som de är.</p>
     </div>
     <div class="karaoke" id="karaoke" hidden aria-live="off">
       <div class="k-now" id="kNow">&nbsp;</div>
@@ -573,10 +580,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
     </div>
 
     <div class="settings adv-settings" id="advSettings">
-      <fieldset class="set">
-        <legend>Lyssna</legend>
-        <label><input type="checkbox" id="optStem" checked> Spela upp <span id="optStemLabel">vald stämma</span> <small>stäng av när du kan stämman</small></label>
-      </fieldset>
+      <input type="checkbox" id="optStem" checked hidden><span id="optStemLabel" hidden></span>
       <fieldset class="set">
         <legend>Visa <button type="button" class="help" data-help="visa" aria-label="Vad gör Visa-inställningarna?">?</button></legend>
         <label><input type="checkbox" id="optFit"> Anpassa höjden efter tonerna</label>
@@ -697,7 +701,7 @@ function prepPitch(p) {
   let q = PitchAnalyze.foldOctaves(p);
   if (Array.isArray(p.edited_notes) && p.edited_notes.length) {
     // admin har justerat noterna → används precis som de är
-    const notes = p.edited_notes.map(n => ({ t: n.t, d: n.d, n: n.n }));
+    const notes = p.edited_notes.map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}) }));
     q = { ...q, notes, edited: true, stats: { ...(q.stats || {}), noteCount: notes.length,
       low: Math.min(...notes.map(n => n.n)), high: Math.max(...notes.map(n => n.n)) } };
   }
@@ -980,15 +984,12 @@ function fitText(ctx, s, w) {
   while (n > 1 && ctx.measureText(s.slice(0, n) + '…').width > w) n--;
   return n > 1 ? s.slice(0, n).trimEnd() + '…' : '';
 }
-// textradens ord fördelade på noterna som ligger i raden (karaokens radtider)
-function lyricMap() {
-  const ns = current.pitch.notes;
-  if (current._lm && current._lmN === ns && current._lmLen === ns.length && current._lmK === kLines) return current._lm;
+// textradens ord fördelade på noterna som ligger i raden (karaokens radtider, lines i låtens tid, off = stämmans förskjutning)
+function autoWords(ns, lines, off) {
   const map = new Array(ns.length).fill('');
-  const off = stemOffSec();
-  kLines.forEach((l, li) => {
+  lines.forEach((l, li) => {
     if (!l.text || l.text === '♪') return;
-    const a = l.time - off, b = (li + 1 < kLines.length ? kLines[li + 1].time : l.time + 8) - off;
+    const a = l.time - off, b = (li + 1 < lines.length ? lines[li + 1].time : l.time + 8) - off;
     const idx = [];
     ns.forEach((n, i) => { const m = n.t + n.d / 2; if (m >= a - 0.15 && m < b + 0.15 && !map[i]) idx.push(i); });
     if (!idx.length) return;
@@ -996,8 +997,44 @@ function lyricMap() {
     if (W >= N) idx.forEach((ni, k) => { map[ni] = words.slice(Math.floor(k * W / N), Math.floor((k + 1) * W / N)).join(' '); });
     else words.forEach((w, j) => { const ni = idx[Math.floor(j * N / W)]; map[ni] = map[ni] ? map[ni] + ' ' + w : w; });
   });
-  current._lm = map; current._lmN = ns; current._lmLen = ns.length; current._lmK = kLines;
   return map;
+}
+// körledningen har lagt orden på noterna själv (n.w) → används precis som de är
+const hasWords = ns => ns.some(n => n.w);
+function lyricMap() {
+  const ns = current.pitch.notes;
+  if (hasWords(ns)) return ns.map(n => n.w || '');
+  if (current._lm && current._lmN === ns && current._lmLen === ns.length && current._lmK === kLines) return current._lm;
+  current._lm = autoWords(ns, kLines, stemOffSec()); current._lmN = ns; current._lmLen = ns.length; current._lmK = kLines;
+  return current._lm;
+}
+// admin: första gången man ändrar text läggs den automatiska fördelningen in på noterna
+function ensureWords() {
+  const ns = eNotes();
+  if (hasWords(ns)) return;
+  const m = autoWords(ns, kLines, stemOffSec());
+  ns.forEach((x, i) => { if (m[i]) x.w = m[i]; });
+}
+function syncWordInput() {
+  const inp = document.getElementById('noteWord'); if (!inp) return;
+  const n = editMode && current ? eNotes()[sel] : null;
+  inp.disabled = !n;
+  if (document.activeElement === inp) return;
+  const v = n ? (lyricMap()[sel] || '') : '';
+  if (inp.value !== v) inp.value = v;
+  inp.placeholder = n ? 'ingen text' : 'välj en not';
+}
+// sångtexten för en viss stämma (egen stämtext om den finns, annars gemensam)
+function voiceKeyOf(label) {
+  const l = String(label || '').toLowerCase();
+  return ['sopran', 'alt', 'tenor', 'bas'].find(k => l.startsWith(k))
+    || ['sopran', 'alt', 'tenor', 'bas'].find(k => new RegExp('(^|[^a-zåäö])' + k + '([^a-zåäö]|$)').test(l)) || null;
+}
+function linesFor(st) {
+  const voices = song.lyrics_lrc_voices || {};
+  const vk = voiceKeyOf(st.label);
+  const lrc = (vk && voices[vk]) || song.lyrics_lrc || Object.values(voices).find(Boolean) || '';
+  return parseLrc(lrc).filter((x, i, a) => i === 0 || x.time !== a[i - 1].time || x.text);
 }
 // ---------- fler stämmor i notbanan (bara visning – mic och referenston följer vald stämma) ----------
 function ghostCandidates() { return current ? stems.filter(st => st !== current && st.pitch && singable(st)) : []; }
@@ -1013,7 +1050,9 @@ function ghostNotes(st) {
   const base = st.pitchBase || st.pitch;
   let notes = base.notes;
   if (!base.edited && merge) notes = mergeNotes(notes, kLines.length ? lyricSpans(st) : []);
-  st._gh = notes.map(n => ({ t: n.t + sh, d: n.d, n: n.n })); st._ghKey = key;
+  st._gh = notes.map(n => ({ t: n.t + sh, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}) })); st._ghKey = key;
+  // stämmans egen text (kan ha andra ord) fördelad på dess noter
+  st._ghW = hasWords(st._gh) ? st._gh.map(n => n.w || '') : autoWords(st._gh, linesFor(st), stemOffSec());
   return st._gh;
 }
 function renderGhostRow() {
@@ -1072,12 +1111,15 @@ function drawRoll() {
   const boxHalf = Math.max(0.45, tolSemi);
   const r = Math.min(8 * dpr, rowH * boxHalf);
   rollGeom = { t0, pxs, lo, H, rowH, boxHalf, dpr };
+  const labels = [];   // [text, index, x, bredd, topp, höjd, färg?, noter?] – ritas efter tonkurvan så linjen inte stryker över texten
   // andra stämmor (bara att titta på): färgade block bakom din stämma
   ghostList().forEach(gs => {
     const col = ghostColor(gs);
-    ghostNotes(gs).forEach(n => {
+    const gn = ghostNotes(gs);
+    gn.forEach((n, gi) => {
       if (n.t + n.d < t0 || n.t > t0 + span) return;
       const nx = x(n.t), nw = Math.max(3, n.d * pxs), top = y(n.n + boxHalf * 0.8), h = rowH * boxHalf * 1.6;
+      if (gs._ghW && gs._ghW[gi]) labels.push([gs._ghW[gi], gi, nx, nw, top, h, col, gn]);
       ctx.globalAlpha = 0.2; ctx.fillStyle = col;
       ctx.beginPath(); ctx.roundRect(nx, top, nw, h, r); ctx.fill();
       ctx.globalAlpha = 0.85; ctx.strokeStyle = col; ctx.lineWidth = 1.3 * dpr;
@@ -1085,8 +1127,7 @@ function drawRoll() {
       ctx.globalAlpha = 1;
     });
   });
-  const lmap = editMode ? null : lyricMap();
-  const labels = [];   // ritas efter tonkurvan så linjen inte stryker över texten
+  const lmap = lyricMap();
   const vis = [];
   p.notes.forEach((n, ni) => { if (!(n.t + n.d < t0 || n.t > t0 + span)) vis.push([n, ni]); });
   vis.forEach(([n, ni]) => {
@@ -1120,8 +1161,12 @@ function drawRoll() {
       ctx.fillText(`${nm(n.n)} · ${n.d.toFixed(2)} s`, nx, top - 4 * dpr);
     }
     // i blocket: texten som sjungs på noten (tonen syns på linjerna till vänster). Admin som redigerar ser tonnamnet.
-    const label = editMode ? (nw > 30 * dpr && h > 12 * dpr && !isSel ? nm(n.n) : '') : (lmap[ni] || '');
-    if (label) labels.push([label, ni, nx, nw, top, h]);
+    if (editMode && nw > 30 * dpr && h > 12 * dpr && !isSel) {   // admin som redigerar: tonnamnet i blocket, texten ovanför
+      ctx.font = `500 ${Math.min(11 * dpr, h * 0.7)}px DM Sans, sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.65)'; ctx.textBaseline = 'middle';
+      ctx.fillText(nm(n.n), nx + 6 * dpr, top + h / 2, nw - 8 * dpr);
+    }
+    if (lmap[ni]) labels.push([lmap[ni], ni, nx, nw, top, h, null, p.notes, editMode]);
   });
 
   if (editMode && rangeBand) {
@@ -1148,19 +1193,19 @@ function drawRoll() {
   ctx.stroke();
 
   // text i notblocken: i nedre halvan (under tonkurvan) om blocket är högt nog, annars precis ovanför
-  labels.forEach(([label, ni, nx, nw, top, h]) => {
-    const fs = Math.max(10 * dpr, Math.min(13 * dpr, h * 0.42));
-    ctx.font = `600 ${fs}px DM Sans, sans-serif`;
+  labels.forEach(([label, ni, nx, nw, top, h, col, list, above]) => {
+    const fs = Math.max(10 * dpr, Math.min(col ? 12 * dpr : 13 * dpr, h * 0.42));
+    ctx.font = `${col ? 500 : 600} ${fs}px DM Sans, sans-serif`;
     ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 3 * dpr;
     // inuti om hela ordet (eller det mesta) får plats, annars ovanför där det finns mer plats
-    const inside = nw >= 28 * dpr && h >= fs * 2 + 4 * dpr ? fitText(ctx, label, nw - 10 * dpr) : '';
+    const inside = !above && nw >= 28 * dpr && h >= fs * 2 + 4 * dpr ? fitText(ctx, label, nw - 10 * dpr) : '';
     if (inside && (inside === label || inside.length >= 6)) {
-      ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.textBaseline = 'bottom'; ctx.fillText(inside, nx + 5 * dpr, top + h - 2 * dpr);
+      ctx.fillStyle = col || 'rgba(255,255,255,0.95)'; ctx.textBaseline = 'bottom'; ctx.fillText(inside, nx + 5 * dpr, top + h - 2 * dpr);
     } else {
-      const nxt = p.notes[ni + 1];
+      const nxt = list[ni + 1];
       const room = Math.max(nw, (nxt ? x(nxt.t) - nx : 80 * dpr) - 4 * dpr, 40 * dpr);
       const t = fitText(ctx, label, room);
-      if (t) { ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.textBaseline = 'bottom'; ctx.fillText(t, nx + 2 * dpr, top - 2 * dpr); }
+      if (t) { ctx.fillStyle = col || (above ? '#fde68a' : 'rgba(255,255,255,0.88)'); ctx.textBaseline = 'bottom'; ctx.fillText(t, nx + 2 * dpr, top - 2 * dpr); }
     }
     ctx.shadowBlur = 0;
   });
@@ -1242,6 +1287,7 @@ function drawRoll() {
 
 function tick() {
   if (editMode && !document.getElementById('harmPanel').hidden) harmInfo();
+  if (editMode) syncWordInput();
   const d = durationOf();
   let p = position();
   if (playing && p >= d) { stop(); if (PARTY) partyFinale(); flushSession(); pausedPos = 0; p = 0; }
@@ -1410,7 +1456,7 @@ function setEditMode(on) {
   editMode = on; sel = -1; multi = new Set(); rangeBand = null;
   if (on) {
     // arbeta på en kopia av det som visas just nu
-    current.pitch = { ...current.pitch, notes: current.pitch.notes.map(n => ({ t: n.t, d: n.d, n: n.n })) };
+    current.pitch = { ...current.pitch, notes: current.pitch.notes.map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}) })) };
     undoStack = [];
   }
   document.getElementById('editToggle').classList.toggle('on', on);
@@ -1431,7 +1477,7 @@ async function saveNotes(removeEdits) {
   const st = current;
   const data = { ...(st.raw || {}) };
   if (removeEdits) { delete data.edited_notes; delete data.edited_at; }
-  else { data.edited_notes = eNotes().map(n => ({ t: n.t, d: n.d, n: n.n })); data.edited_at = new Date().toISOString(); }
+  else { data.edited_notes = eNotes().map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}) })); data.edited_at = new Date().toISOString(); }
   editStatus('Sparar…');
   const { error } = await supabaseClient.from('song_pitch').upsert({
     song_id: song.id, stem_key: st.key, stem_path: st.pitchPath || st.path, data, updated_at: st.pitchAt || new Date().toISOString(),
@@ -1476,7 +1522,7 @@ function editOp(op) {
     if (!src.length) { toast('Markera noter först: klicka, Shift+klick eller Shift+dra över ett område'); return; }
     src.sort((a, b) => a.t - b.t);
     const t0 = src[0].t;
-    noteClip = src.map(x => ({ dt: x.t - t0, d: x.d, n: x.n }));
+    noteClip = src.map(x => ({ dt: x.t - t0, d: x.d, n: x.n, w: x.w }));
     toast(`${noteClip.length} noter kopierade – ställ spelhuvudet där de ska in och tryck Klistra in (Ctrl+V)`, 4500);
     return;
   }
@@ -1486,19 +1532,34 @@ function editOp(op) {
     snapshot();
     // noter som ligger i det inklistrade området ersätts (Ångra tar tillbaka dem)
     const kept = ns.filter(x => { const m = x.t + x.d / 2; return !(m >= pos && m <= pos + span); });
-    const added = noteClip.map(x => ({ t: pos + x.dt, d: x.d, n: x.n }));
+    const added = noteClip.map(x => ({ t: pos + x.dt, d: x.d, n: x.n, ...(x.w ? { w: x.w } : {}) }));
     current.pitch.notes = kept.concat(added);
     afterEdit(added[0]);
     multi = new Set(added); tick();
     toast(`${added.length} noter inklistrade${ns.length - kept.length ? ', ' + (ns.length - kept.length) + ' ersatta' : ''}`);
     return;
   }
+  if (op === 'wauto') {
+    if (!kLines.some(x => x.text)) { toast('Låten har ingen synkad text'); return; }
+    snapshot(); const m = autoWords(ns, kLines, stemOffSec()); ns.forEach((x, i) => { if (m[i]) x.w = m[i]; else delete x.w; }); afterEdit(n || null); toast('Texten fördelad på noterna – justera med ⟵ ⟶ och spara'); return;
+  }
   if (!n) { toast('Välj en not först (klicka på den)'); return; }
+  if (op === 'wprev' || op === 'wnext') {
+    ensureWords();
+    const words = (n.w || '').split(/\s+/).filter(Boolean);
+    const other = ns[sel + (op === 'wprev' ? -1 : 1)];
+    if (!words.length || !other) { toast(op === 'wprev' ? 'Inget ord att flytta bakåt' : 'Inget ord att flytta framåt'); return; }
+    snapshot();
+    if (op === 'wprev') { other.w = [other.w, words.shift()].filter(Boolean).join(' '); }
+    else { other.w = [words.pop(), other.w].filter(Boolean).join(' '); }
+    if (words.length) n.w = words.join(' '); else delete n.w;
+    afterEdit(n); return;
+  }
   if (op === 'del') { snapshot(); if (multi.size > 1) current.pitch.notes = ns.filter(x => !multi.has(x)); else ns.splice(sel, 1); afterEdit(null); return; }
   if (op === 'merge') {
     const m = ns[sel + 1]; if (!m) return;
     snapshot(); const keep = m.d > n.d ? m.n : n.n;
-    n.d = m.t + m.d - n.t; n.n = keep; ns.splice(sel + 1, 1); afterEdit(n); return;
+    n.d = m.t + m.d - n.t; n.n = keep; if (m.w) n.w = [n.w, m.w].filter(Boolean).join(' '); ns.splice(sel + 1, 1); afterEdit(n); return;
   }
   if (op === 'split') {
     if (pos <= n.t + 0.05 || pos >= n.t + n.d - 0.05) { toast('Ställ spelhuvudet inne i den valda noten för att dela den'); return; }
@@ -1537,11 +1598,7 @@ function parseLrc(lrc) {
 }
 // Stämmans egen text om den finns (sopran/alt/tenor/bas utifrån namnet), annars gemensam
 function setupKaraoke() {
-  const voices = song.lyrics_lrc_voices || {};
-  const l = String(current.label || '').toLowerCase();
-  const vk = ['sopran', 'alt', 'tenor', 'bas'].find(k => l.startsWith(k));
-  const lrc = (vk && voices[vk]) || song.lyrics_lrc || Object.values(voices).find(Boolean) || '';
-  kLines = parseLrc(lrc).filter((x, i, a) => i === 0 || x.time !== a[i - 1].time || x.text);
+  kLines = linesFor(current);
   kIdx = -2;
   const has = kLines.some(x => x.text);
   document.getElementById('karaoke').hidden = !has;
@@ -1955,6 +2012,21 @@ function stopMic() {
   document.getElementById('micPanel').hidden = true;
   if (current) tick();
 }
+
+// admin: skriv texten på vald not
+(() => {
+  const inp = document.getElementById('noteWord'); if (!inp) return;
+  let snapped = false;
+  inp.addEventListener('focus', () => { snapped = false; });
+  inp.addEventListener('input', () => {
+    const n = eNotes()[sel]; if (!n) return;
+    if (!snapped) { snapshot(); ensureWords(); snapped = true; }
+    const v = inp.value.replace(/\s+/g, ' ').trimStart();
+    if (v.trim()) n.w = v; else delete n.w;
+    tick();
+  });
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') inp.blur(); });
+})();
 
 // ---------- tempo (BPM) ----------
 function updateTempoUI() {

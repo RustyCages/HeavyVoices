@@ -90,7 +90,7 @@
 <body>
 <header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
 <div class="container">
-  <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
+  <a href="/medlem/" class="back-btn" id="backLink">&larr; Tillbaka</a>
   <div class="title-row">
     <h1>🎙 Studio</h1>
     <div class="title-actions">
@@ -721,6 +721,7 @@ window.addEventListener('beforeunload', e => { if (rec || unsaved()) { e.prevent
   const member = await requireAuth();
   if (!member) return;
   me = member; isAdmin = member.role === 'admin';
+  if (isAdmin && /\/admin\//.test(document.referrer)) document.getElementById('backLink').href = '/admin/';
   try { const v = localStorage.getItem('hv-rec-latency'); if (v != null) document.getElementById('latency').value = v; } catch (e) {}
   const { data, error } = await supabaseClient.from('songs').select('*').order('title');
   const sel = document.getElementById('songSelect');

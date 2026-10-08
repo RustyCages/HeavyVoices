@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .card.static:hover { transform: none; border-color: var(--border); box-shadow: var(--card-shadow); }
+  .hint { font-size: 0.85rem; color: var(--text-muted); margin: 0.25rem 0 1rem; }
+  .field-k { display: block; margin: 0 0 0.35rem; font-family: 'Roboto Condensed', sans-serif; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); }
+  .title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+  .title-row h1 { margin: 0.5rem 0; }
+  .warn-box { margin: 0.9rem 0 0; padding: 0.5rem 0.7rem; border-radius: 0.5rem; border: 1px solid rgba(250,204,21,0.45); background: rgba(250,204,21,0.08); font-size: 0.84rem; line-height: 1.45; }
+  .warn-box b { color: #facc15; }
+  #loadingNote { color: var(--text-muted); }
+
+  .transport { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0 0.6rem; }
+  .transport .time { font-variant-numeric: tabular-nums; font-size: 0.85rem; color: var(--text-muted); min-width: 4.2rem; text-align: center; }
+  .play-btn { width: 2.8rem; height: 2.8rem; border-radius: 50%; justify-content: center; font-size: 1.1rem; padding: 0; }
+  .rec-btn { height: 2.8rem; border-radius: 999px; padding: 0 1.1rem; font-weight: 700; background: #b91c1c; border-color: #b91c1c; color: #fff; gap: 0.45rem; }
+  .rec-btn:hover { background: #dc2626; border-color: #dc2626; }
+  .rec-btn.on { background: #ef4444; animation: rec-pulse 1.1s ease-in-out infinite; }
+  @keyframes rec-pulse { 50% { box-shadow: 0 0 0 6px rgba(239,68,68,0.25); } }
+  .meter { width: 70px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); overflow: hidden; }
+  .meter > div { height: 100%; width: 0; background: linear-gradient(90deg, #4ade80 70%, #facc15 85%, #ef4444); transition: width 0.05s linear; }
+  .transport .sp { flex: 1; }
+  .opt { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
+  .opt input[type=checkbox] { width: auto; margin: 0; accent-color: var(--accent); }
+  .opt select { width: auto; margin: 0; padding: 0.25rem 0.4rem; font-size: 0.82rem; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 0.4rem 0.75rem; font-size: 0.85rem; background: transparent; color: var(--text); }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #111317; }
+  .zoom { display: inline-flex; align-items: center; gap: 0.3rem; }
+  .zoom button { width: 2rem; height: 2rem; padding: 0; justify-content: center; font-size: 1.05rem; }
+  .zoom .zv { min-width: 3.4rem; text-align: center; font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .lyric { min-height: 2.6rem; margin: 0.2rem 0 0.6rem; text-align: center; }
+  .lyric .now { font-family: 'Roboto Condensed', sans-serif; font-size: 1.25rem; font-weight: 700; color: var(--accent); }
+  .lyric .next { font-size: 0.85rem; color: var(--text-muted); }
+  .calib { display: grid; gap: 0.5rem; padding: 0.7rem 0.8rem; margin-bottom: 0.6rem; border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(0,0,0,0.2); font-size: 0.85rem; }
+  .calib .row { display: flex; flex-wrap: wrap; gap: 0.4rem 0.7rem; align-items: center; }
+  .calib input { width: 5rem; margin: 0; padding: 0.3rem 0.4rem; }
+
+  .t-name { font-weight: 600; min-width: 0; display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+  .t-name i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+  .t-name small { font-weight: 400; font-size: 0.72rem; color: var(--text-muted); }
+  .tag { font-size: 0.68rem; padding: 0.05rem 0.45rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); }
+  .tag.edit { color: #facc15; border-color: rgba(250,204,21,0.5); }
+  .tag.mine { color: #ef9a9a; border-color: rgba(239,68,68,0.45); }
+  .t-ctrl { display: inline-flex; align-items: center; gap: 0.3rem; margin-left: auto; }
+  .t-ctrl input[type=range] { width: 90px; margin: 0; padding: 0; }
+  .t-ctrl button { width: 2rem; height: 2rem; padding: 0; justify-content: center; font-size: 0.75rem; font-weight: 700; }
+  .t-ctrl button svg { width: 15px; height: 15px; }
+  .t-ctrl .muteBtn.on { background: #ef4444; color: #fff; border-color: #ef4444; }
+  .t-ctrl .soloBtn.on { background: var(--accent); color: #111317; border-color: var(--accent); }
+  .t-ctrl .ms { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 4.2rem; text-align: right; }
+
+  .recs { display: grid; gap: 0.4rem; }
+  .rec-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.3rem 0.6rem; align-items: center; padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.85rem; }
+  .rec-row b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rec-row small { color: var(--text-muted); }
+  .rec-row button { font-size: 0.78rem; padding: 0.3rem 0.6rem; }
+  .vis { font-size: 0.7rem; padding: 0.05rem 0.45rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); margin-left: 0.3rem; }
+  .vis.all { color: #4ade80; border-color: rgba(74,222,128,0.5); }
+  .vis.leaders { color: #60a5fa; border-color: rgba(96,165,250,0.5); }
+  .guide-box { margin-top: 1rem; font-size: 0.84rem; color: var(--text-muted); line-height: 1.55; }
+  .guide-box b { color: var(--text); }
+  @media (max-width: 640px) { .t-ctrl { margin-left: 0; width: 100%; } .t-ctrl input[type=range] { flex: 1; } }
+</style>
+</head>
+<body>
+<header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+<div class="container">
+  <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
+  <div class="title-row">
+    <h1>🎙 Studio</h1>
+    <a href="/medlem/rostovning.html" class="btn btn-outline">🎤 Röstövning</a>
+  </div>
+  <p class="hint">Sjung in en egen stämma eller idé till en låt. Du hör låtens spår i hörlurarna medan du spelar in, och kan sedan flytta, klippa och spara inspelningen. Dina inspelningar är privata tills du delar dem.</p>
+
+  <div class="card static">
+    <label class="field-k" for="songSelect">Låt</label>
+    <select id="songSelect"><option value="">Laddar låtar…</option></select>
+    <p class="warn-box">🎧 <b>Hörlurar krävs när du spelar in.</b> Annars spelas låten in tillsammans med din röst.</p>
+
+    <div id="studio" hidden>
+      <div class="transport">
+        <button class="play-btn" id="playBtn" title="Spela/pausa (mellanslag)">▶&#xFE0E;</button>
+        <button class="btn-outline" id="backBtn" title="5 s bakåt">−5 s</button>
+        <button type="button" class="rec-btn" id="recBtn" title="Spela in från spelhuvudet (R)">⏺ Spela in</button>
+        <span class="meter" title="Mikrofonens nivå"><div id="meter"></div></span>
+        <span class="time" id="curTime">0:00.0</span><span class="time" id="durTime" style="min-width:auto">/ 0:00</span>
+        <span class="sp"></span>
+        <label class="opt" title="Så här mycket av låten spelas före inspelningen">Inräkning <select id="preRoll"><option value="0">0 s</option><option value="2" selected>2 s</option><option value="4">4 s</option></select></label>
+        <label class="opt" id="clickOpt" hidden><input type="checkbox" id="optClick"> Klick</label>
+        <button type="button" class="btn-outline" id="calibBtn" title="Mät fördröjningen i din dator/hörlurar så att inspelningen hamnar i takt">🎯 Kalibrera</button>
+      </div>
+      <div class="calib" id="calib" hidden>
+        <div>Sätt i hörlurarna, tryck <b>Starta</b> och <b>klappa (eller säg ”ta”) i takt med de 8 klicken</b>. Sidan mäter hur långt efter inspelningen hamnar och rättar till det automatiskt.</div>
+        <div class="row">
+          <button type="button" id="calibGo">Starta</button>
+          <span>Fördröjning <input type="number" id="latency" step="1" min="0" max="800"> ms</span>
+          <span class="hint" style="margin:0;" id="calibStatus"></span>
+        </div>
+      </div>
+      <div class="transport" style="margin-top:0">
+        <div class="seg" role="group" aria-label="Verktyg">
+          <button type="button" id="toolMove" aria-pressed="true" title="Dra en inspelning i sidled för att flytta den">↔ Flytta</button>
+          <button type="button" id="toolSelect" aria-pressed="false" title="Dra i en inspelning för att markera ett område att klippa">▭ Markera</button>
+        </div>
+        <button class="btn-outline" id="markBtn" title="Sätt en markör vid spelhuvudet (M)">⚑ Markör</button>
+        <span class="sp"></span>
+        <div class="zoom" role="group" aria-label="Zoom">
+          <button type="button" class="btn-outline" id="zoomOut" title="Zooma ut (−)">−</button>
+          <span class="zv" id="zoomVal"></span>
+          <button type="button" class="btn-outline" id="zoomIn" title="Zooma in (+)">+</button>
+          <button type="button" class="btn-outline" id="zoomFit" style="width:auto; padding:0 0.6rem; font-size:0.8rem;" title="Visa hela låten">Allt</button>
+        </div>
+      </div>
+      <div class="lyric" id="lyric" hidden><div class="now" id="lyNow">&nbsp;</div><div class="next" id="lyNext"></div></div>
+      <div id="tl"></div>
+      <div id="panel"></div>
+      <div class="guide-box">
+        <b>Så gör du:</b> välj låt, sätt i hörlurarna och tryck <b>⏺ Spela in</b> (eller R). Du hör låten från spelhuvudet – med <b>inräkning</b> börjar den lite före. Tryck igen (eller mellanslag) för att stoppa. Varje tagning blir ett nytt spår. Lyssna, dra den i sidled om den inte ligger i takt, och klipp bort det du inte vill ha med <b>▭ Markera</b>. Ge den ett namn och tryck <b>💾 Spara inspelning</b>. <b>Kalibrera</b> en gång per dator/hörlurar så hamnar inspelningarna rätt från början.
+      </div>
+    </div>
+    <p id="loadingNote" hidden></p>
+  </div>
+
+  <div class="card static" style="margin-top:1.5rem;">
+    <h2 style="margin:0 0 0.3rem; font-size:1.15rem;">Mina inspelningar</h2>
+    <p class="hint" style="margin:0 0 0.7rem;">🔒 Privat = bara du · 👥 Körledningen = du och admin · 🌍 Alla = hela kören (i Studio för låten).</p>
+    <div class="recs" id="myRecs"><span class="hint">Laddar…</span></div>
+  </div>
+</div>
+
+<div id="toast" style="position:fixed; bottom:1.5rem; right:1.5rem; background:var(--accent); color:#111317; padding:0.7rem 1.2rem; border-radius:0.6rem; font-weight:600; box-shadow:var(--card-shadow); z-index:999; display:none;"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/audio-edit.js"></script>
+<script src="/js/wave-timeline.js"></script>
+<script src="/js/track-edit-panel.js"></script>
+<script>
+const STEMS_BUCKET = 'heavy-voices-stems', REC_BUCKET = 'heavy-voices-recordings';
+const FIXED_STEMS = [
+  { col: 'stem_backtrack_path', label: 'Backtrack' }, { col: 'stem_sopran_path', label: 'Sopran' },
+  { col: 'stem_alt_path', label: 'Alt' }, { col: 'stem_tenor_path', label: 'Tenor' }, { col: 'stem_bas_path', label: 'Bas' },
+];
+const STEM_COLORS = ['#7d8796', '#60a5fa', '#c084fc', '#34d399', '#f472b6', '#facc15', '#fb923c', '#a3e635'];
+const REC_COLOR = '#ef4444', REC_OTHER = '#fca5a5';
+const VIS = { private: '🔒 Privat', leaders: '👥 Körledningen', all: '🌍 Alla' };
+const MUTE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>';
+
+let me = null, isAdmin = false, songs = [], song = null, names = {};
+let tracks = [];   // spår: { kind:'stem'|'rec', key, label, color, clip, peaks, offsetMs, locked, readOnly, vol, muted, solo, … }
+let active = null, sel = null, takeNo = 0;
+let audioCtx = null, sources = [], playing = false, startCtxTime = 0, startPos = 0, pausedPos = 0, raf = null, loadToken = 0;
+let mic = null;    // { stream, src, proc, analyser }
+let rec = null;    // pågående inspelning { chunks, startCtx, songStart, track }
+let lines = [];
+
+// ---------- hjälpare ----------
+const fmt = WaveTimeline.fmt;
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function toast(msg, ms = 3000) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
+function applyPartMeta(items, meta, keyOf) {
+  const m = meta || {}, labels = m.labels || {}, order = m.order || [];
+  items.forEach(it => { const k = keyOf(it); if (labels[k]) it.label = labels[k]; });
+  const pos = it => { const i = order.indexOf(keyOf(it)); return i === -1 ? 1e6 : i; };
+  return items.map((it, i) => ({ it, i })).sort((a, b) => (pos(a.it) - pos(b.it)) || (a.i - b.i)).map(x => x.it);
+}
+function stemListFor(s) {
+  const list = FIXED_STEMS.filter(f => s[f.col]).map(f => ({ key: f.col, label: f.label, path: s[f.col] }));
+  (s.extra_stems || []).forEach(ex => list.push({ key: ex.id, label: ex.label, path: ex.path }));
+  return applyPartMeta(list, s.stem_meta, it => it.key);
+}
+function getCtx() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
+async function ensureCtx() { getCtx(); if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} } }
+const offS = t => (t.offsetMs || 0) / 1000;
+const tDur = t => t.clip ? AudioEdit.duration(t.clip) : 0;
+const isAccomp = t => t.key === 'stem_backtrack_path' || /instrument|karaoke|playback|komp|backing|\bfull\b/i.test(t.label || '');
+const unsaved = () => tracks.some(t => t.kind === 'rec' && t.mine && (t.edited || !t.id || t.offsetMs !== t.savedOffsetMs));
+function safeName(s) { return String(s || 'inspelning').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.\-]+/g, '_').slice(0, 60) || 'inspelning'; }
+async function signed(bucket, path) {
+  const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 3600);
+  if (error) throw error; return data.signedUrl;
+}
+async function loadClip(bucket, path) {
+  const resp = await fetch(await signed(bucket, path));
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  return AudioEdit.fromBuffer(await getCtx().decodeAudioData(await resp.arrayBuffer()));
+}
+
+// ---------- uppspelning ----------
+function duration() { return Math.max(1, ...tracks.map(t => offS(t) + tDur(t)), rec ? positionNow() : 0); }
+function positionNow() { return playing ? startPos + (audioCtx.currentTime - startCtxTime) : pausedPos; }
+function position() { return positionNow(); }
+function audible(t) { const anySolo = tracks.some(x => x.solo); return anySolo ? t.solo : !t.muted; }
+function gainOf(t) { return audible(t) ? (t.vol ?? 1) : 0; }
+function stopSources() { sources.forEach(({ src }) => { try { src.stop(); } catch (e) {} try { src.disconnect(); } catch (e) {} }); sources = []; }
+function startAt(pos) {
+  stopSources();
+  const when = audioCtx.currentTime + 0.06;
+  startCtxTime = when; startPos = pos;
+  tracks.forEach(t => {
+    if (!t.buffer || t === (rec && rec.track)) return;
+    const inFile = pos - offS(t);
+    if (inFile >= t.buffer.duration) return;
+    const src = audioCtx.createBufferSource(); src.buffer = t.buffer;
+    const g = audioCtx.createGain(); g.gain.value = gainOf(t);
+    src.connect(g); g.connect(audioCtx.destination);
+    if (inFile >= 0) src.start(when, inFile); else src.start(when - inFile, 0);
+    sources.push({ t, src, gain: g });
+  });
+  if (document.getElementById('optClick').checked) scheduleClicks(when, pos);
+  playing = true;
+  document.getElementById('playBtn').textContent = '⏸︎';
+  cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+}
+function pause() {
+  if (rec) stopRecording();
+  if (!playing) return;
+  pausedPos = position(); stopSources(); playing = false;
+  cancelAnimationFrame(raf);
+  document.getElementById('playBtn').textContent = '▶︎';
+  tick();
+}
+function seek(p) { p = Math.max(0, Math.min(p, duration())); if (rec) return; if (playing) startAt(p); else { pausedPos = p; tick(); } }
+function applyGains() { sources.forEach(({ t, gain }) => { if (t) gain.gain.value = gainOf(t); }); }
+function restartIfPlaying() { if (playing && !rec) startAt(position()); }
+function loop() { tick(); if (playing) raf = requestAnimationFrame(loop); }
+function tick() {
+  let p = position();
+  if (playing && !rec && p >= duration()) { pause(); pausedPos = 0; p = 0; }
+  document.getElementById('curTime').textContent = fmt(p, true);
+  const dt = '/ ' + fmt(duration()); if (tick._d !== dt) { tick._d = dt; document.getElementById('durTime').textContent = dt; }
+  if (rec) { rec.track.liveUntil = p; tl.drawTrack(rec.track); }
+  tl.tick(playing);
+  renderLyric(p);
+}
+// klick på låtens slag (songs.bpm / beat_offset / beats_per_bar)
+function scheduleClicks(when, pos) {
+  const bpm = Number(song && song.bpm); if (!(bpm >= 20)) return;
+  const per = 60 / bpm, off = Number(song.beat_offset) || 0, bpb = Math.max(1, Number(song.beats_per_bar) || 4);
+  const out = audioCtx.createGain(); out.gain.value = 0.4; out.connect(audioCtx.destination); sources.push({ src: out });
+  for (let k = Math.ceil((pos - off) / per), n = 0; n < 4000; k++, n++) {
+    const t = off + k * per; if (t > duration()) break;
+    const st = when + (t - pos), one = ((k % bpb) + bpb) % bpb === 0;
+    const osc = audioCtx.createOscillator(); osc.type = 'square'; osc.frequency.value = one ? 1760 : 1175;
+    const g = audioCtx.createGain(); g.gain.setValueAtTime(0, st); g.gain.linearRampToValueAtTime(one ? 0.9 : 0.55, st + 0.002); g.gain.exponentialRampToValueAtTime(0.001, st + 0.05);
+    osc.connect(g); g.connect(out); osc.start(st); osc.stop(st + 0.06); sources.push({ src: osc });
+  }
+}
+
+// ---------- sångtext (låtens gemensamma tidslinje) ----------
+function parseLrc(lrc) {
+  const out = [];
+  (lrc || '').split(/\r?\n/).forEach(line => {
+    const tags = []; let rest = line, m;
+    while ((m = rest.match(/^\s*\[(\d+):(\d+(?:[.:]\d+)?)\]/))) { tags.push(parseInt(m[1], 10) * 60 + parseFloat(m[2].replace(':', '.'))); rest = rest.slice(m[0].length); }
+    if (!tags.length) return;
+    const text = rest.replace(/<\d+:\d+(?:\.\d+)?>/g, '').replace(/\[[SATB]{1,4}[↑↓]\]|\[\/\]/g, '').trim();
+    tags.forEach(t => out.push({ time: t, text }));
+  });
+  return out.sort((a, b) => a.time - b.time);
+}
+let lyIdx = -2;
+function renderLyric(p) {
+  if (!lines.length) return;
+  let i = -1; for (let k = 0; k < lines.length; k++) { if (lines[k].time <= p) i = k; else break; }
+  if (i === lyIdx) return; lyIdx = i;
+  const now = i >= 0 ? lines[i] : null, next = lines.slice(i + 1).find(x => x.text);
+  document.getElementById('lyNow').textContent = now && now.text ? now.text : ' ';
+  document.getElementById('lyNext').textContent = next ? next.text : '';
+}
+
+// ---------- tidslinje + redigering (delade moduler) ----------
+const tl = WaveTimeline.create(document.getElementById('tl'), {
+  getTracks: () => tracks, getDuration: duration, getPosition: position,
+  isAudible: audible, isActive: t => t === active,
+  onSeek: seek,
+  onOffset: (t, ms, live) => { if (t.locked) return; t.offsetMs = Math.round(ms); renderMs(t); tl.drawTrack(t); if (!live) { restartIfPlaying(); updateRecTools(); } },
+  onActive: t => setActive(t),
+  onSelection: s => { sel = s; panel.selInfo(); },
+  onView: () => { document.getElementById('zoomVal').textContent = tl.spanLabel(); },
+  renderHead,
+});
+const panel = TrackEditPanel.mount(document.getElementById('panel'), {
+  getTrack: () => active, getSelection: () => sel, getPosition: position, toast,
+  onEdit: applyEdit, onUndo: undo, onOriginal: original,
+  canUndo: t => !!(t && t.undo && t.undo.length), isEdited: t => !!(t && t.edited),
+  extraRows: `
+    <div class="tool-row" id="recRow1">
+      <span class="k">Inspelning</span>
+      <input type="text" id="recTitle" maxlength="80" placeholder="Namn, t.ex. Ters över refrängen">
+      <select id="recVis"><option value="private">${VIS.private}</option><option value="leaders">${VIS.leaders}</option><option value="all">${VIS.all}</option></select>
+      <button type="button" id="recSave">💾 Spara inspelning</button>
+      <span class="status" id="recStatus"></span>
+    </div>
+    <div class="tool-row" id="recRow2">
+      <span class="k">Fil</span>
+      <select id="fmt"><option value="mp3">MP3</option><option value="wav">WAV</option></select>
+      <button type="button" class="btn-outline" id="dlVoice" title="Ladda ner det valda spåret">⬇ Bara spåret</button>
+      <button type="button" class="btn-outline" id="dlMix" title="Ladda ner allt som hörs just nu, mixat till en fil">⬇ Mix av det som hörs</button>
+      <button type="button" class="btn-outline" id="recDelete">🗑 Ta bort</button>
+      <button type="button" class="btn-outline" id="toStem" hidden title="Lägg inspelningen som ett nytt spår i låten (syns för alla)">➕ Gör till stämfil i låten</button>
+    </div>`,
+});
+function renderMs(t) { if (t._ms) t._ms.textContent = (t.offsetMs >= 0 ? '+' : '') + t.offsetMs + ' ms'; }
+function renderHead(t, head) {
+  const tags = t.kind === 'rec'
+    ? (t.mine ? `<span class="tag mine">${t.id ? VIS[t.visibility] : 'ny tagning'}</span>` : `<span class="tag">${esc(names[t.memberId] || 'Någon')} · ${VIS[t.visibility]}</span>`) +
+      ((t.mine && (t.edited || !t.id)) ? '<span class="tag edit">osparad</span>' : '')
+    : '';
+  head.innerHTML = `
+    <span class="t-name" title="Välj spåret"><i style="background:${t.color}"></i>${esc(t.label)}${tags}</span>
+    <span class="t-ctrl">
+      ${t.kind === 'rec' ? '<span class="ms" title="Var inspelningen ligger i låten"></span>' : ''}
+      <input type="range" min="0" max="1.5" step="0.05" value="${t.vol ?? 1}" title="Volym" aria-label="Volym för ${esc(t.label)}">
+      <button class="btn-outline muteBtn ${t.muted ? 'on' : ''}" title="Tysta">${MUTE_SVG}</button>
+      <button class="btn-outline soloBtn ${t.solo ? 'on' : ''}" title="Solo">S</button>
+    </span>`;
+  t._ms = head.querySelector('.ms'); renderMs(t);
+  head.querySelector('.t-name').addEventListener('click', () => setActive(t));
+  head.querySelector('input[type=range]').addEventListener('input', e => { t.vol = Number(e.target.value); applyGains(); });
+  head.querySelector('.muteBtn').addEventListener('click', e => { t.muted = !t.muted; e.currentTarget.classList.toggle('on', t.muted); applyGains(); tl.drawTrack(t); });
+  head.querySelector('.soloBtn').addEventListener('click', e => { t.solo = !t.solo; e.currentTarget.classList.toggle('on', t.solo); applyGains(); tracks.forEach(tl.drawTrack); });
+}
+function setActive(t) {
+  active = t; tl.setActiveRow(); panel.refresh(); updateRecTools();
+}
+function updateRecTools() {
+  const t = active, isRec = !!(t && t.kind === 'rec'), mine = isRec && t.mine;
+  document.getElementById('recRow1').hidden = !mine;
+  ['recDelete'].forEach(id => { document.getElementById(id).hidden = !isRec || !(mine || (isAdmin && t.id)); });
+  document.getElementById('toStem').hidden = !(isAdmin && isRec);
+  document.getElementById('dlVoice').disabled = !(t && t.clip);
+  if (mine) {
+    const ti = document.getElementById('recTitle');
+    if (document.activeElement !== ti) ti.value = t.label;
+    document.getElementById('recVis').value = t.visibility || 'private';
+    const dirty = t.edited || !t.id || t.offsetMs !== t.savedOffsetMs || t.label !== t.savedTitle || t.visibility !== t.savedVis;
+    document.getElementById('recSave').disabled = !dirty;
+    document.getElementById('recStatus').textContent = !t.id ? 'Inte sparad än' : dirty ? 'Osparade ändringar' : 'Sparad ✓';
+  }
+}
+function setPeaks(t) { t.buffer = AudioEdit.toBuffer(getCtx(), t.clip); t.peaks = AudioEdit.peaks(t.clip); }
+function applyEdit(t, clip, newOffsetMs, note) {
+  if (t.readOnly) return;
+  t.undo.push({ clip: t.clip, offsetMs: t.offsetMs }); if (t.undo.length > 10) t.undo.shift();
+  t.clip = clip; setPeaks(t); t.edited = true;
+  if (newOffsetMs != null) t.offsetMs = newOffsetMs;
+  tl.selection = null; sel = null;
+  tl.render(); setActive(t); restartIfPlaying();
+  panel.status(note + ' – osparat', true);
+}
+function undo(t) {
+  if (!t || !t.undo || !t.undo.length) return;
+  const u = t.undo.pop(); t.clip = u.clip; t.offsetMs = u.offsetMs; setPeaks(t); t.edited = t.clip !== t.orig;
+  tl.render(); setActive(t); restartIfPlaying(); panel.status('Ångrat');
+}
+function original(t) {
+  t.undo.push({ clip: t.clip, offsetMs: t.offsetMs });
+  t.clip = t.orig; t.offsetMs = t.savedOffsetMs; setPeaks(t); t.edited = false;
+  tl.render(); setActive(t); restartIfPlaying(); panel.status('Tillbaka till originalet');
+}
+
+// ---------- mikrofon och inspelning ----------
+async function openMic() {
+  if (mic) return mic;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('Webbläsaren saknar stöd för mikrofon (kräver https)');
+  await ensureCtx();
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+  const src = audioCtx.createMediaStreamSource(stream);
+  const proc = audioCtx.createScriptProcessor(4096, 1, 1);
+  const sink = audioCtx.createGain(); sink.gain.value = 0;
+  src.connect(proc); proc.connect(sink); sink.connect(audioCtx.destination);
+  const meter = document.getElementById('meter');
+  proc.onaudioprocess = e => {
+    const d = e.inputBuffer.getChannelData(0);
+    let pk = 0; for (let i = 0; i < d.length; i += 8) pk = Math.max(pk, Math.abs(d[i]));
+    meter.style.width = Math.min(100, Math.round(Math.sqrt(pk) * 100)) + '%';
+    const sink2 = mic && mic.capture;
+    if (sink2) sink2(new Float32Array(d), audioCtx.currentTime - d.length / audioCtx.sampleRate);
+  };
+  mic = { stream, src, proc, capture: null };
+  return mic;
+}
+function latencySec() {
+  const v = Number(document.getElementById('latency').value);
+  if (v >= 0 && document.getElementById('latency').value !== '') return v / 1000;
+  return (audioCtx.outputLatency || 0) + (audioCtx.baseLatency || 0) + 0.02;
+}
+async function startRecording() {
+  if (rec) return;
+  try { await openMic(); } catch (e) {
+    toast(e && e.name === 'NotAllowedError' ? 'Mikrofonen är blockerad – tillåt den för heavyvoices.se i webbläsarens inställningar' : 'Kunde inte starta mikrofonen: ' + (e.message || e), 6000);
+    return;
+  }
+  const pre = Number(document.getElementById('preRoll').value) || 0;
+  const from = Math.max(0, position() - (playing ? 0 : pre));
+  const t = { kind: 'rec', key: 'take-' + (++takeNo), label: 'Tagning ' + takeNo, color: REC_COLOR, mine: true, memberId: me.id,
+    clip: null, peaks: null, offsetMs: 0, savedOffsetMs: null, visibility: 'private', undo: [], edited: false, vol: 1, loadingText: '● Spelar in…' };
+  tracks.push(t);
+  rec = { chunks: [], firstCtx: null, track: t };
+  mic.capture = (d, ctxT) => { if (rec.firstCtx == null) rec.firstCtx = ctxT; rec.chunks.push(d); };
+  if (!playing) startAt(from); else startAt(position());
+  rec.songAtCtx = { ctx: startCtxTime, pos: startPos };
+  tl.render(); setActive(t);
+  const b = document.getElementById('recBtn'); b.classList.add('on'); b.textContent = '⏹ Stoppa';
+}
+function stopRecording() {
+  if (!rec) return;
+  const r = rec; rec = null; mic.capture = null;
+  const b = document.getElementById('recBtn'); b.classList.remove('on'); b.textContent = '⏺ Spela in';
+  const t = r.track; t.liveUntil = null; t.loadingText = null;
+  const n = r.chunks.reduce((a, c) => a + c.length, 0);
+  if (!n || r.firstCtx == null) { tracks = tracks.filter(x => x !== t); tl.render(); toast('Ingen inspelning – kom mikrofonen igång?'); return; }
+  const data = new Float32Array(n); let o = 0; r.chunks.forEach(c => { data.set(c, o); o += c.length; });
+  t.clip = t.orig = { sampleRate: audioCtx.sampleRate, channels: [data] };
+  // var i låten första inspelade samplet hör hemma: låttiden när det spelades in, minus fördröjningen
+  const songT = r.songAtCtx.pos + (r.firstCtx - r.songAtCtx.ctx) - latencySec();
+  if (songT < 0) { t.clip = AudioEdit.crop(t.clip, -songT, AudioEdit.duration(t.clip)); t.orig = t.clip; t.offsetMs = 0; }
+  else t.offsetMs = Math.round(songT * 1000);
+  setPeaks(t);
+  tl.render(); setActive(t);
+  toast(`${t.label} klar – lyssna, flytta/klipp och spara`);
+}
+
+// ---------- kalibrering: klappa i takt med 8 klick ----------
+async function calibrate() {
+  const st = document.getElementById('calibStatus');
+  try { await openMic(); } catch (e) { st.textContent = 'Mikrofonen gick inte att starta'; return; }
+  if (playing) pause();
+  const chunks = []; let firstCtx = null;
+  mic.capture = (d, ctxT) => { if (firstCtx == null) firstCtx = ctxT; chunks.push(d); };
+  const when = audioCtx.currentTime + 0.8, per = 0.6, N = 8, clicks = [];
+  for (let i = 0; i < N; i++) {
+    const t0 = when + i * per; clicks.push(t0);
+    const osc = audioCtx.createOscillator(); osc.type = 'square'; osc.frequency.value = i === 0 ? 1760 : 1175;
+    const g = audioCtx.createGain(); g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.5, t0 + 0.002); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.06);
+    osc.connect(g); g.connect(audioCtx.destination); osc.start(t0); osc.stop(t0 + 0.08);
+  }
+  st.textContent = 'Klappa i takt med klicken…';
+  await new Promise(r => setTimeout(r, (0.8 + N * per + 0.6) * 1000));
+  mic.capture = null;
+  const n = chunks.reduce((a, c) => a + c.length, 0), x = new Float32Array(n); let o = 0; chunks.forEach(c => { x.set(c, o); o += c.length; });
+  const sr = audioCtx.sampleRate, hop = Math.round(sr / 1000), m = Math.floor(n / hop), env = new Float32Array(m);
+  for (let i = 0; i < m; i++) { let s = 0; for (let j = 0; j < hop; j++) { const v = x[i * hop + j]; s += v * v; } env[i] = Math.sqrt(s / hop); }
+  const delays = [];
+  clicks.forEach(ct => {
+    const c = Math.round((ct - firstCtx) * 1000);   // klicket i inspelningens ms
+    let best = 0, bi = -1;
+    for (let i = Math.max(1, c - 100); i < Math.min(m - 1, c + 450); i++) { const d = env[i] - env[i - 1]; if (d > best) { best = d; bi = i; } }
+    if (bi >= 0 && best > 0.02) delays.push(bi - c);
+  });
+  if (delays.length < 4) { st.textContent = `Hörde bara ${delays.length} av ${N} klapp – försök igen och klappa tydligare.`; return; }
+  delays.sort((a, b) => a - b);
+  // klappen ska ligga jämnt efter klicken – annars var det brus eller sång, inte klapp i takt
+  const q1 = delays[Math.floor(delays.length * 0.25)], q3 = delays[Math.floor(delays.length * 0.75)];
+  const ms = Math.round(delays[Math.floor(delays.length / 2)]);
+  if (q3 - q1 > 60 || ms < 0 || ms > 500) { st.textContent = 'Klappen kom ojämnt i förhållande till klicken – försök igen, i lugn takt och i tyst rum.'; return; }
+  document.getElementById('latency').value = ms;
+  try { localStorage.setItem('hv-rec-latency', String(ms)); } catch (e) {}
+  st.textContent = `Klart: ${ms} ms (${delays.length} av ${N} klapp hörda). Sparat för den här webbläsaren.`;
+}
+
+// ---------- spara / ladda ner / ta bort ----------
+async function encodeTrack(clip) {
+  if (document.getElementById('fmt').value === 'wav') return { blob: AudioEdit.encodeWav(clip), ext: 'wav', type: 'audio/wav' };
+  const blob = await AudioEdit.encodeMp3(clip, clip.channels.length > 1 ? 192 : 160, p => setRecStatus(`Kodar… ${Math.round(p * 100)} %`));
+  return { blob, ext: 'mp3', type: 'audio/mpeg' };
+}
+function setRecStatus(msg) { document.getElementById('recStatus').textContent = msg || ''; }
+function download(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+document.getElementById('recTitle').addEventListener('input', e => { if (active && active.mine) { active.label = e.target.value.trim() || 'Inspelning'; updateRecTools(); } });
+document.getElementById('recTitle').addEventListener('change', () => tl.render());
+document.getElementById('recVis').addEventListener('change', e => { if (active && active.mine) { active.visibility = e.target.value; updateRecTools(); } });
+document.getElementById('recSave').addEventListener('click', async () => {
+  const t = active; if (!t || !t.mine || !t.clip) return;
+  const btn = document.getElementById('recSave'); btn.disabled = true;
+  try {
+    const row = { title: t.label, offset_ms: t.offsetMs, visibility: t.visibility, duration: Math.round(tDur(t) * 100) / 100, song_id: song.id, updated_at: new Date().toISOString() };
+    let oldPath = null;
+    if (!t.id || t.edited) {
+      const id = t.id || crypto.randomUUID();
+      const { blob, type } = await encodeTrack(t.clip);
+      const path = `${me.id}/${id}-${Date.now().toString(36)}.${type === 'audio/wav' ? 'wav' : 'mp3'}`;
+      setRecStatus(`Laddar upp ${(blob.size / 1048576).toFixed(1)} MB…`);
+      const { error } = await supabaseClient.storage.from(REC_BUCKET).upload(path, blob, { contentType: type });
+      if (error) throw error;
+      oldPath = t.path; row.path = path; t.path = path;
+      if (!t.id) { row.id = id; const { error: e2 } = await supabaseClient.from('recordings').insert(row); if (e2) throw e2; t.id = id; }
+      else { const { error: e2 } = await supabaseClient.from('recordings').update(row).eq('id', t.id); if (e2) throw e2; }
+      if (oldPath) supabaseClient.storage.from(REC_BUCKET).remove([oldPath]);
+    } else {
+      const { error } = await supabaseClient.from('recordings').update(row).eq('id', t.id); if (error) throw error;
+    }
+    t.orig = t.clip; t.edited = false; t.undo = []; t.savedOffsetMs = t.offsetMs; t.savedTitle = t.label; t.savedVis = t.visibility;
+    tl.render(); setActive(t); loadMyRecs();
+    toast(`”${t.label}” sparad – ${VIS[t.visibility]}`);
+  } catch (e) { setRecStatus('Kunde inte spara: ' + (e.message || e)); btn.disabled = false; }
+});
+document.getElementById('dlVoice').addEventListener('click', async () => {
+  const t = active; if (!t || !t.clip) return;
+  try { const { blob, ext } = await encodeTrack(t.clip); download(blob, `${safeName(song.title)}-${safeName(t.label)}.${ext}`); setRecStatus(''); }
+  catch (e) { toast('Kunde inte skapa filen: ' + (e.message || e)); }
+});
+document.getElementById('dlMix').addEventListener('click', async () => {
+  const parts = tracks.filter(t => t.clip && gainOf(t) > 0).map(t => ({ clip: t.clip, offsetSec: offS(t), gain: gainOf(t) }));
+  if (!parts.length) { toast('Inget spår hörs – slå på något först'); return; }
+  setRecStatus('Mixar…'); await new Promise(r => setTimeout(r, 30));
+  try {
+    const mix = AudioEdit.mixdown(parts, getCtx().sampleRate, 0);
+    const { blob, ext } = await encodeTrack(mix); download(blob, `${safeName(song.title)}-mix.${ext}`); setRecStatus('');
+  } catch (e) { toast('Kunde inte mixa: ' + (e.message || e)); }
+});
+document.getElementById('recDelete').addEventListener('click', async () => {
+  const t = active; if (!t || t.kind !== 'rec') return;
+  if (!confirm(t.id ? `Ta bort ”${t.label}” för gott?` : `Släppa ${t.label}?`)) return;
+  if (t.id) {
+    const { error } = await supabaseClient.from('recordings').delete().eq('id', t.id);
+    if (error) { toast('Kunde inte ta bort: ' + error.message); return; }
+    if (t.path) supabaseClient.storage.from(REC_BUCKET).remove([t.path]);
+    loadMyRecs();
+  }
+  tracks = tracks.filter(x => x !== t); active = tracks.find(x => x.kind === 'rec' && x.mine) || tracks[0] || null;
+  tl.render(); if (active) setActive(active); restartIfPlaying();
+});
+// admin: lägg inspelningen som nytt spår i låten (heavy-voices-stems + extra_stems + stem_offsets)
+document.getElementById('toStem').addEventListener('click', async () => {
+  const t = active; if (!isAdmin || !t || !t.clip) return;
+  const label = prompt('Namn på spåret i låten:', t.label); if (!label) return;
+  try {
+    toast('Skapar stämfil…');
+    const { blob, ext, type } = await encodeTrack(t.clip);
+    const id = crypto.randomUUID(), path = `${song.id}/stem_${id}__${safeName(label)}.${ext}`;
+    const { error } = await supabaseClient.storage.from(STEMS_BUCKET).upload(path, blob, { contentType: type });
+    if (error) throw error;
+    const extra = [...(song.extra_stems || []), { id, label, path }];
+    const offsets = { ...(song.stem_offsets || {}) }; if (t.offsetMs) offsets[id] = t.offsetMs;
+    const { error: e2 } = await supabaseClient.from('songs').update({ extra_stems: extra, stem_offsets: offsets }).eq('id', song.id);
+    if (e2) throw e2;
+    song.extra_stems = extra; song.stem_offsets = offsets;
+    toast(`”${label}” finns nu som spår i låten – notanalysera den i Röstövning`, 6000);
+  } catch (e) { toast('Kunde inte skapa stämfil: ' + (e.message || e), 6000); }
+});
+
+// ---------- mina inspelningar ----------
+async function loadMyRecs() {
+  const box = document.getElementById('myRecs');
+  const { data, error } = await supabaseClient.from('recordings').select('*').eq('member_id', me.id).order('created_at', { ascending: false });
+  if (error) { box.innerHTML = `<span class="hint">Kunde inte hämta: ${esc(error.message)}</span>`; return; }
+  if (!data || !data.length) { box.innerHTML = '<span class="hint">Inga sparade inspelningar än.</span>'; return; }
+  const titles = Object.fromEntries(songs.map(s => [String(s.id), s.title]));
+  box.innerHTML = data.map(r => `<div class="rec-row"><div><b>${esc(r.title)}<span class="vis ${r.visibility}">${VIS[r.visibility]}</span></b>
+    <small>${esc(titles[r.song_id] || 'Låt saknas')} · ${new Date(r.created_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })} · ${fmt(r.duration)}</small></div>
+    <button type="button" class="btn-outline" data-song="${r.song_id || ''}" data-id="${r.id}">Öppna</button></div>`).join('');
+  box.querySelectorAll('button[data-id]').forEach(b => b.addEventListener('click', async () => {
+    if (!b.dataset.song) return;
+    const sel = document.getElementById('songSelect');
+    if (String(song && song.id) !== b.dataset.song) { if (unsaved() && !confirm('Du har osparade inspelningar. Byta låt ändå?')) return; sel.value = b.dataset.song; await loadSong(b.dataset.song); }
+    const t = tracks.find(x => x.id === b.dataset.id);
+    if (t) { setActive(t); document.getElementById('studio').scrollIntoView({ behavior: 'smooth' }); }
+  }));
+}
+
+// ---------- ladda låt ----------
+async function loadSong(id) {
+  const my = ++loadToken;
+  if (rec) stopRecording();
+  pause(); pausedPos = 0; sel = null; active = null; tracks = [];
+  song = songs.find(s => String(s.id) === String(id)) || null;
+  document.getElementById('studio').hidden = true;
+  if (!song) return;
+  history.replaceState(null, '', '?song=' + encodeURIComponent(id));
+  const note = document.getElementById('loadingNote'); note.hidden = false; note.textContent = 'Laddar låtens spår…';
+  getCtx();
+  const offs = song.stem_offsets || {};
+  const stemDefs = stemListFor(song);
+  const { data: recs } = await supabaseClient.from('recordings').select('*').eq('song_id', song.id).order('created_at');
+  if (my !== loadToken) return;
+  const ids = [...new Set((recs || []).map(r => r.member_id))].filter(x => !names[x]);
+  if (ids.length) { const { data: ms } = await supabaseClient.from('members').select('id, name').in('id', ids); (ms || []).forEach(m => { names[m.id] = m.name; }); }
+  let done = 0; const total = stemDefs.length + (recs || []).length;
+  const prog = () => { note.textContent = `Laddar låtens spår… ${++done}/${total}`; };
+  try {
+    const stemTracks = await Promise.all(stemDefs.map(async (s, i) => {
+      const clip = await loadClip(STEMS_BUCKET, s.path); prog();
+      return { kind: 'stem', key: s.key, label: s.label, color: STEM_COLORS[i % STEM_COLORS.length], clip, offsetMs: Math.round(Number(offs[s.key]) || 0),
+        locked: true, readOnly: true, vol: 1, muted: false, solo: false };
+    }));
+    const recTracks = (await Promise.all((recs || []).map(async r => {
+      try {
+        const clip = await loadClip(REC_BUCKET, r.path); prog();
+        const mine = r.member_id === me.id;
+        return { kind: 'rec', id: r.id, key: 'rec-' + r.id, label: r.title, path: r.path, memberId: r.member_id, mine, visibility: r.visibility,
+          color: mine ? REC_COLOR : REC_OTHER, clip, orig: clip, offsetMs: r.offset_ms, savedOffsetMs: r.offset_ms, savedTitle: r.title, savedVis: r.visibility,
+          locked: !mine, readOnly: !mine, undo: [], edited: false, vol: 1, muted: !mine, solo: false };
+      } catch (e) { prog(); return null; }
+    }))).filter(Boolean);
+    if (my !== loadToken) return;
+    tracks = [...stemTracks, ...recTracks];
+  } catch (e) { if (my === loadToken) note.textContent = 'Kunde inte ladda spåren: ' + (e.message || e); return; }
+  tracks.forEach(setPeaks);
+  // första gången: komp + (helst) en sångstämma hörs, fulla mixen tyst om det finns ett komp
+  const hasBacking = tracks.some(t => t.kind === 'stem' && isAccomp(t) && !/\bfull\b/i.test(t.label));
+  tracks.forEach(t => { if (t.kind === 'stem' && hasBacking && /\bfull\b/i.test(t.label)) t.muted = true; });
+  note.hidden = true;
+  lines = parseLrc(song.lyrics_lrc || ''); lyIdx = -2;
+  document.getElementById('lyric').hidden = !lines.some(l => l.text);
+  document.getElementById('clickOpt').hidden = !(Number(song.bpm) >= 20);
+  document.getElementById('studio').hidden = false;
+  takeNo = tracks.filter(t => t.kind === 'rec' && t.mine).length;
+  active = tracks.find(t => t.kind === 'rec' && t.mine) || tracks[0];
+  tl.render(); setActive(active);
+  requestAnimationFrame(() => { tl.fit(); tick(); });
+}
+
+// ---------- händelser ----------
+document.getElementById('songSelect').addEventListener('change', e => {
+  if (unsaved() && !confirm('Du har osparade inspelningar. Byta låt ändå?')) { e.target.value = song ? song.id : ''; return; }
+  loadSong(e.target.value);
+});
+document.getElementById('playBtn').addEventListener('click', async () => {
+  if (!tracks.length) return; await ensureCtx();
+  if (rec) { stopRecording(); pause(); return; }
+  if (playing) pause(); else startAt(pausedPos >= duration() ? 0 : pausedPos);
+});
+document.getElementById('recBtn').addEventListener('click', async () => {
+  if (!song) return;
+  if (rec) { stopRecording(); pause(); return; }
+  await ensureCtx(); startRecording();
+});
+document.getElementById('backBtn').addEventListener('click', () => seek(position() - 5));
+const setTool = t => {
+  tl.setTool(t);
+  document.getElementById('toolMove').setAttribute('aria-pressed', String(t === 'move'));
+  document.getElementById('toolSelect').setAttribute('aria-pressed', String(t === 'select'));
+};
+document.getElementById('toolMove').addEventListener('click', () => setTool('move'));
+document.getElementById('toolSelect').addEventListener('click', () => setTool('select'));
+document.getElementById('zoomIn').addEventListener('click', () => tl.zoom(2));
+document.getElementById('zoomOut').addEventListener('click', () => tl.zoom(0.5));
+document.getElementById('zoomFit').addEventListener('click', () => tl.fit());
+document.getElementById('markBtn').addEventListener('click', () => tl.addMarker(position()));
+document.getElementById('calibBtn').addEventListener('click', () => { const c = document.getElementById('calib'); c.hidden = !c.hidden; });
+document.getElementById('calibGo').addEventListener('click', async () => { await ensureCtx(); calibrate(); });
+document.getElementById('latency').addEventListener('change', e => { try { localStorage.setItem('hv-rec-latency', String(Math.round(Number(e.target.value) || 0))); } catch (x) {} });
+document.getElementById('optClick').addEventListener('change', restartIfPlaying);
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, select, textarea')) return;
+  if (e.code === 'Space' && !e.target.matches('button')) { e.preventDefault(); document.getElementById('playBtn').click(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(active); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'r' || e.key === 'R') { document.getElementById('recBtn').click(); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') { if (sel) { e.preventDefault(); panel.cut(); } return; }
+  if (e.key === 'm' || e.key === 'M') { tl.addMarker(position()); return; }
+  if (e.key === '+') { tl.zoom(2); return; }
+  if (e.key === '-') { tl.zoom(0.5); return; }
+  if (e.key === 'Escape') { tl.selection = null; sel = null; panel.selInfo(); }
+});
+window.addEventListener('beforeunload', e => { if (rec || unsaved()) { e.preventDefault(); e.returnValue = ''; } });
+
+(async () => {
+  const member = await requireAuth();
+  if (!member) return;
+  me = member; isAdmin = member.role === 'admin';
+  try { const v = localStorage.getItem('hv-rec-latency'); if (v != null) document.getElementById('latency').value = v; } catch (e) {}
+  const { data, error } = await supabaseClient.from('songs').select('*').order('title');
+  const sel = document.getElementById('songSelect');
+  if (error) { sel.innerHTML = `<option>Fel: ${esc(error.message)}</option>`; return; }
+  songs = (data || []).filter(s => (s.published !== false || isAdmin) && stemListFor(s).length);
+  loadMyRecs();
+  if (!songs.length) { sel.innerHTML = '<option value="">Inga låtar med stämfiler än</option>'; return; }
+  sel.innerHTML = '<option value="">Välj låt…</option>' + songs.map(s => `<option value="${s.id}">${esc(s.title)}</option>`).join('');
+  const pre = new URLSearchParams(location.search).get('song');
+  if (pre && songs.some(s => String(s.id) === pre)) { sel.value = pre; loadSong(pre); }
+})();
+</script>
+</body>
+</html>

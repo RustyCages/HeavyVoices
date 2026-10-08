@@ -92,6 +92,36 @@
     return { sampleRate: sr, channels: out.map(ch => ch.slice(0, outLen)) };
   }
 
+  // höj/sänk så att starkaste toppen hamnar på target (0.89 ≈ −1 dBFS). null om spåret är tyst.
+  function normalize(c, target = 0.89) {
+    let pk = 0;
+    c.channels.forEach(ch => { for (let i = 0; i < ch.length; i++) { const v = Math.abs(ch[i]); if (v > pk) pk = v; } });
+    if (pk < 1e-4) return null;
+    const g = target / pk;
+    return map(c, ch => { const o = new Float32Array(ch.length); for (let i = 0; i < ch.length; i++) o[i] = ch[i] * g; return o; });
+  }
+  // mixa ihop spår: [{ clip, offsetSec, gain }] → ett stereoklipp från tid 0 (eller start) till sista spårets slut
+  function mixdown(parts, sampleRate, start = 0) {
+    parts = parts.filter(p => p.clip && (p.gain ?? 1) > 0);
+    if (!parts.length) return null;
+    const end = Math.max(...parts.map(p => p.offsetSec + dur(p.clip)));
+    const n = Math.max(1, Math.round((end - start) * sampleRate));
+    const L = new Float32Array(n), R = new Float32Array(n);
+    parts.forEach(p => {
+      const ratio = p.clip.sampleRate / sampleRate, g = p.gain ?? 1;
+      const a = p.clip.channels[0], b = p.clip.channels[1] || a, len0 = a.length;
+      const o0 = Math.round((p.offsetSec - start) * sampleRate);
+      for (let i = Math.max(0, o0); i < n; i++) {
+        const j = Math.floor((i - o0) * ratio);
+        if (j >= len0) break;
+        L[i] += a[j] * g; R[i] += b[j] * g;
+      }
+    });
+    let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(L[i]), Math.abs(R[i]));
+    if (pk > 0.98) { const g = 0.98 / pk; for (let i = 0; i < n; i++) { L[i] *= g; R[i] *= g; } }   // klipp aldrig
+    return { sampleRate, channels: [L, R] };
+  }
+
   // Vågformstoppar: min/max per hink (rate hinkar per sekund), båda kanalerna ihop
   function peaks(c, rate = 200) {
     const hop = Math.max(1, Math.round(c.sampleRate / rate)), n = Math.ceil(len(c) / hop);
@@ -153,5 +183,5 @@
     return new Blob(parts, { type: 'audio/mpeg' });
   }
 
-  root.AudioEdit = { fromBuffer, toBuffer, duration: dur, cut, crop, insertSilence, fadeEdges, timeStretch, peaks, encodeWav, encodeMp3, loadLame };
+  root.AudioEdit = { fromBuffer, toBuffer, duration: dur, cut, crop, insertSilence, fadeEdges, timeStretch, normalize, mixdown, peaks, encodeWav, encodeMp3, loadLame };
 })(typeof window !== 'undefined' ? window : globalThis);

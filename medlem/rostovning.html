@@ -3205,8 +3205,12 @@ document.getElementById('partyResult').addEventListener('click', e => { if (e.ta
   document.querySelectorAll(isAdmin ? '.member-only' : '.admin-only').forEach(el => el.remove());
   if (isAdmin) document.getElementById('advSettings').classList.add('open');
   if (!isAdmin) document.querySelector('#stemArea .bulk').remove();
-  if (isAdmin && /\/admin\//.test(document.referrer)) {
-    const b = document.getElementById('backLink'); b.href = '/admin/latar.html'; b.innerHTML = '&larr; Tillbaka till låtar';
+  if (isAdmin) {
+    // admin: tillbaka dit man kom från (adminmenyn eller en adminsida, t.ex. låtar)
+    const b = document.getElementById('backLink');
+    const ref = (document.referrer.match(/^https?:\/\/[^/]+(\/admin\/[^/?#]+\.html)/) || [])[1];
+    if (new URLSearchParams(location.search).get('from') === 'admin') b.href = '/admin/';
+    else if (ref) b.href = ref;
   }
   const { data: me } = await supabaseClient.from('members').select('stamma').eq('id', member.id).single();
   const st = String((me && me.stamma) || '').toLowerCase();

@@ -1019,7 +1019,7 @@ window.addEventListener('beforeunload', e => { if (rec || unsaved()) { e.prevent
   const member = await requireAuth();
   if (!member) return;
   me = member; isAdmin = member.role === 'admin';
-  if (isAdmin && /\/admin\//.test(document.referrer)) document.getElementById('backLink').href = '/admin/';
+  if (isAdmin && (new URLSearchParams(location.search).get('from') === 'admin' || /\/admin\/[^/?#]+\.html/.test(document.referrer))) document.getElementById('backLink').href = '/admin/';
   try { const v = localStorage.getItem('hv-rec-latency'); if (v != null) document.getElementById('latency').value = v; } catch (e) {}
   const { data, error } = await supabaseClient.from('songs').select('*').order('title');
   const sel = document.getElementById('songSelect');

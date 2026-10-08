@@ -44,6 +44,9 @@ body {
   padding-block: 20px 40px;
   min-height: 100%;
 }
+@keyframes pgIn { from { opacity: 0; } to { opacity: 1; } }
+body { animation: pgIn .4s ease-out; }
+@media (prefers-reduced-motion: reduce) { body { animation: none; } }
 .back-btn-g { align-self: flex-start; display: inline-flex; align-items: center; gap: .4rem; padding: .45rem 1rem; margin-bottom: -6px; border: 1px solid rgba(255,255,255,.14); border-radius: .5rem; color: #f3f4f6; text-decoration: none; font-size: .875rem; background: rgba(255,255,255,.04); transition: all .2s ease; }
 .back-btn-g:hover { border-color: #E5A968; color: #E5A968; background: rgba(229,169,104,.08); }
 .wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
@@ -825,6 +828,20 @@ if (fixedGuide && GUIDES[fixedGuide]) {
   if (g === 'admin') b.href = '/admin/';
   else if (g === 'registrera') b.href = '/logga-in.html';
   else b.href = '/medlem/';
+  // mjuk utton när man lämnar guiden
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.addEventListener('click', function (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      var a = e.target.closest && e.target.closest('a[href]');
+      if (!a || a.target === '_blank' || a.hasAttribute('download')) return;
+      var u; try { u = new URL(a.href, location.href); } catch (_) { return; }
+      if (u.origin !== location.origin || (u.pathname === location.pathname && u.search === location.search)) return;
+      e.preventDefault();
+      document.body.style.transition = 'opacity .22s ease-in'; document.body.style.opacity = '0';
+      setTimeout(function () { location.href = u.href; }, 230);
+    });
+    window.addEventListener('pageshow', function (e) { if (e.persisted) { document.body.style.transition = ''; document.body.style.opacity = ''; } });
+  }
 })();
 </script>
 </body>

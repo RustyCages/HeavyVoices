@@ -225,6 +225,10 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .mic-cta { margin-top: 1rem; display: grid; gap: 0.6rem; }
   .mic-btn { width: 100%; padding: 1rem 1.2rem; font-size: 1.15rem; font-weight: 700; border-radius: 0.8rem; background: var(--accent); color: #111317; border: 2px solid var(--accent); box-shadow: 0 0 0 4px rgba(229,169,104,0.2); cursor: pointer; justify-content: center; }
   .mic-btn:hover { filter: brightness(1.08); }
+  .calib { display: grid; gap: 0.5rem; padding: 0.7rem 0.8rem; border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(0,0,0,0.2); font-size: 0.85rem; }
+  .calib .row { display: flex; flex-wrap: wrap; gap: 0.4rem 0.7rem; align-items: center; }
+  .calib input { width: 5rem; margin: 0; padding: 0.3rem 0.4rem; }
+  #calibBtn { justify-self: start; font-size: 0.85rem; padding: 0.4rem 0.8rem; }
 
   /* advanced settings */
   .adv-toggle { font-size: 0.85rem; padding: 0.45rem 0.9rem; }
@@ -588,6 +592,15 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
     <div class="mic-cta">
       <p class="set-warn">🎧 <b>Hörlurar är nästan ett krav.</b> Utan hörlurar hör mikrofonen musiken i högtalaren och räknar den som din sång.</p>
       <button type="button" class="mic-btn" id="micBtn" title="Sjung med i mikrofonen">🎤 Sjung med</button>
+      <button type="button" class="btn-outline" id="calibBtn" title="Mät fördröjningen i din telefon/hörlurar så att din röst hamnar i takt med notbanan">🎯 Kalibrera</button>
+      <div class="calib" id="calib" hidden>
+        <div>Sätt i hörlurarna, tryck <b>Starta</b> och <b>klappa (eller säg ”ta”) i takt med de 8 klicken</b>. Då rättas fördröjningen till så att din röst hamnar rätt mot notbanan. Du behöver bara göra det en gång per telefon eller dator.</div>
+        <div class="row">
+          <button type="button" id="calibGo">Starta</button>
+          <span>Fördröjning <input type="number" id="latency" step="1" min="0" max="800"> ms</span>
+          <span class="hint" style="margin:0;" id="calibStatus"></span>
+        </div>
+      </div>
     </div>
 
     <!-- Advanced settings (dolt för medlemmar per default) -->
@@ -1853,8 +1866,15 @@ function renderWithRow() {
 }
 
 // ---------- sjung med ----------
+function savedLatency() {
+  try { const v = localStorage.getItem('hv-rec-latency'); if (v != null && v !== '' && Number(v) >= 0) return Number(v) / 1000; } catch (e) {}
+  return null;
+}
 function micLatency() {
-  // tiden tills sångaren hör ljudet + halva analysfönstret
+  // kalibrerad fördröjning (delas med Studio) + halva analysfönstret
+  const c = savedLatency();
+  if (c != null) return c + 0.045;
+  // annars: tiden tills sångaren hör ljudet + halva analysfönstret
   return (audioCtx.outputLatency || 0) + (audioCtx.baseLatency || 0) + 0.045;
 }
 
@@ -2319,6 +2339,65 @@ function detectTempo(buf) {
 
 // ---------- händelser ----------
 document.getElementById('micBtn').addEventListener('click', toggleMic);
+
+// ---------- kalibrering: klappa i takt med 8 klick (samma som i Studio, sparas i samma inställning) ----------
+async function calibrate() {
+  const st = document.getElementById('calibStatus');
+  if (mic) stopMic();
+  if (playing) pause();
+  await ensureCtx();
+  let stream, src, proc, sink;
+  const chunks = []; let firstCtx = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+  } catch (e) { st.textContent = 'Mikrofonen gick inte att starta'; return; }
+  src = audioCtx.createMediaStreamSource(stream);
+  proc = audioCtx.createScriptProcessor(4096, 1, 1);
+  sink = audioCtx.createGain(); sink.gain.value = 0;
+  src.connect(proc); proc.connect(sink); sink.connect(audioCtx.destination);
+  proc.onaudioprocess = e => {
+    const d = e.inputBuffer.getChannelData(0);
+    if (firstCtx == null) firstCtx = audioCtx.currentTime - d.length / audioCtx.sampleRate;
+    chunks.push(new Float32Array(d));
+  };
+  const when = audioCtx.currentTime + 0.8, per = 0.6, N = 8, clicks = [];
+  for (let i = 0; i < N; i++) {
+    const t0 = when + i * per; clicks.push(t0);
+    const osc = audioCtx.createOscillator(); osc.type = 'square'; osc.frequency.value = i === 0 ? 1760 : 1175;
+    const g = audioCtx.createGain(); g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.5, t0 + 0.002); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.06);
+    osc.connect(g); g.connect(audioCtx.destination); osc.start(t0); osc.stop(t0 + 0.08);
+  }
+  st.textContent = 'Klappa i takt med klicken…';
+  await new Promise(r => setTimeout(r, (0.8 + N * per + 0.6) * 1000));
+  proc.onaudioprocess = null; try { src.disconnect(); proc.disconnect(); sink.disconnect(); } catch (e) {}
+  stream.getTracks().forEach(t => t.stop());
+  const n = chunks.reduce((a, c) => a + c.length, 0), x = new Float32Array(n); let o = 0; chunks.forEach(c => { x.set(c, o); o += c.length; });
+  const sr = audioCtx.sampleRate, hop = Math.round(sr / 1000), m = Math.floor(n / hop), env = new Float32Array(m);
+  for (let i = 0; i < m; i++) { let s = 0; for (let j = 0; j < hop; j++) { const v = x[i * hop + j]; s += v * v; } env[i] = Math.sqrt(s / hop); }
+  const delays = [];
+  clicks.forEach(ct => {
+    const c = Math.round((ct - firstCtx) * 1000);
+    let best = 0, bi = -1;
+    for (let i = Math.max(1, c - 100); i < Math.min(m - 1, c + 450); i++) { const d = env[i] - env[i - 1]; if (d > best) { best = d; bi = i; } }
+    if (bi >= 0 && best > 0.02) delays.push(bi - c);
+  });
+  if (delays.length < 4) { st.textContent = `Hörde bara ${delays.length} av ${N} klapp – försök igen och klappa tydligare.`; return; }
+  delays.sort((a, b) => a - b);
+  const q1 = delays[Math.floor(delays.length * 0.25)], q3 = delays[Math.floor(delays.length * 0.75)];
+  const ms = Math.round(delays[Math.floor(delays.length / 2)]);
+  if (q3 - q1 > 60 || ms < 0 || ms > 500) { st.textContent = 'Klappen kom ojämnt i förhållande till klicken – försök igen, i lugn takt och i tyst rum.'; return; }
+  document.getElementById('latency').value = ms;
+  try { localStorage.setItem('hv-rec-latency', String(ms)); } catch (e) {}
+  st.textContent = `Klart: ${ms} ms (${delays.length} av ${N} klapp hörda). Sparat för den här webbläsaren.`;
+}
+document.getElementById('calibBtn').addEventListener('click', () => { const c = document.getElementById('calib'); c.hidden = !c.hidden; });
+document.getElementById('calibGo').addEventListener('click', () => { calibrate(); });
+document.getElementById('latency').addEventListener('change', e => {
+  const v = Math.max(0, Math.min(800, Math.round(Number(e.target.value) || 0)));
+  try { localStorage.setItem('hv-rec-latency', String(v)); } catch (_) {}
+});
+(() => { const v = savedLatency(); if (v != null) document.getElementById('latency').value = Math.round(v * 1000); })();
+
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSession(); });
 window.addEventListener('pagehide', flushSession);
 document.querySelectorAll('.prog-tabs button').forEach(b => b.addEventListener('click', () => { progScope = b.dataset.scope; renderProgress(); }));

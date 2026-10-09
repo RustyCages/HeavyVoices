@@ -625,7 +625,8 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         <summary>Så redigerar du texten</summary>
         <div class="help-grid">
           <section><h4>Textraden</h4><ul>
-            <li>Sången ligger i <b>textrutor</b> i en egen rad under noterna. Rutorna har egen tid och påverkar inte notblocken.</li>
+            <li>Sången ligger i <b>textrutor</b> i en egen rad under noterna (bara synlig när du redigerar text). Rutorna har egen tid och påverkar inte notblocken.</li>
+            <li>Medlemmarna ser texten som en liten vägledning <b>ovanför noten</b> där varje ruta börjar – raden som sjungs lyser i guld.</li>
             <li>Noterna går inte att flytta i textläget – dra i notfältet för att spola.</li>
             <li>Första gången fördelas textraderna automatiskt i rutor efter noterna – sedan justerar du för hand.</li>
           </ul></section>
@@ -642,7 +643,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
             <li><b>↺ Fördela texten</b> börjar om automatiskt och ersätter det du gjort för hand.</li>
           </ul></section>
         </div>
-        <p class="help-foot">Medlemmarna ser texten i textraden under noterna först när du trycker <b>💾 Spara</b>.</p>
+        <p class="help-foot">Medlemmarna ser ändringarna först när du trycker <b>💾 Spara</b>.</p>
       </details>
     </div>
     <div class="karaoke" id="karaoke" hidden aria-live="off">
@@ -1233,9 +1234,9 @@ function drawRoll() {
   const span = Number(document.getElementById('optZoom').value);
   const pos = position();
   const t0 = viewStart(pos, span);
-  // textraden längst ner (sångtexten i egna textrutor), notfältet ovanför
+  // sångtexten: som liten vägledning ovanför notblocken. Textraden längst ner visas bara när admin redigerar texten.
   const bxs = lyricBoxes();
-  const LH = (bxs.length || (editMode && textMode)) ? Math.round(30 * dpr) : 0;
+  const LH = (editMode && textMode) ? Math.round(30 * dpr) : 0;
   const H = c.height - LH;
   let [lo, hi] = rollRange(t0, span);
   const vz = vZoom(span);
@@ -1373,6 +1374,29 @@ function drawRoll() {
     }
     ctx.shadowBlur = 0;
   });
+
+  // texten som vägledning: varje textruta ovanför noten den börjar på (aktuell ruta i guld)
+  if (bxs.length) {
+    const fs = Math.max(10 * dpr, Math.min(12 * dpr, rowH * 0.9));
+    ctx.font = `600 ${fs}px DM Sans, sans-serif`; ctx.textBaseline = 'bottom';
+    ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 3 * dpr;
+    const editT = editMode && textMode;
+    bxs.forEach((b, bi) => {
+      if (!b.w || b.t + b.d < t0 - 2 || b.t > t0 + span) return;
+      const n = p.notes.find(q => q.t <= b.t + 0.05 && q.t + q.d > b.t + 0.02) || p.notes.find(q => q.t >= b.t && q.t < b.t + b.d);
+      if (!n) return;
+      const nx = Math.max(x(b.t), x(n.t)), top = y(n.n + boxHalf);
+      const nxt = bxs[bi + 1];
+      const room = Math.max(Math.max(3, n.d * pxs), (nxt ? x(nxt.t) : nx + 200 * dpr) - nx) - 4 * dpr;
+      const t = fitText(ctx, b.w, Math.max(30 * dpr, room));
+      if (!t) return;
+      const active = pos >= b.t && pos < b.t + b.d;
+      const ty = top - fs - 4 * dpr < 0 ? top + rowH * boxHalf * 2 + fs + 3 * dpr : top - 3 * dpr;
+      ctx.fillStyle = active ? '#fde68a' : editT ? 'rgba(253,230,138,0.45)' : 'rgba(255,255,255,0.62)';
+      ctx.fillText(t, nx + 2 * dpr, ty);
+    });
+    ctx.shadowBlur = 0;
+  }
 
   // din röst: tjock vit linje
   // i noterna: tjock vit linje. Mellan noterna: tunn och svag (andning, glid). Inga lodräta streck vid hopp.

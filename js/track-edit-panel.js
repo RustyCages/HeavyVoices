@@ -56,6 +56,14 @@
         <button type="button" class="btn-outline" data-a="bake" title="Gör förskjutningen till en del av filen: tystnad läggs till eller början klipps bort, och förskjutningen blir 0">⇥ Baka in förskjutningen</button>
       </div>
       <div class="tool-row desktop-only" data-g="edit">
+        <span class="k">Volym</span>
+        <button type="button" class="btn-outline" data-a="volDown" title="Sänk 3 dB">−</button>
+        <input type="number" data-r="db" value="3" min="-30" max="24" step="0.5" title="Ändring i decibel: +6 dB ≈ dubbelt så starkt, −6 dB ≈ hälften"> dB
+        <button type="button" class="btn-outline" data-a="volUp" title="Höj 3 dB">+</button>
+        <button type="button" class="btn-outline" data-a="volAll" title="Ändra volymen på hela spåret med angivet antal dB">🔊 Hela spåret</button>
+        <button type="button" class="btn-outline" data-a="volSel" title="Ändra volymen bara på det markerade, med mjuka övergångar">🔉 Det markerade</button>
+      </div>
+      <div class="tool-row desktop-only" data-g="edit">
         <span class="k">Ljud</span>
         <input type="number" data-r="pct" value="100" min="50" max="200" step="0.1"> %
         <span class="status">eller BPM</span> <input type="number" data-r="bpmFrom" min="30" max="300" step="0.1" placeholder="nu"> → <input type="number" data-r="bpmTo" min="30" max="300" step="0.1" placeholder="ska bli">
@@ -79,6 +87,16 @@
       const tr = o.getTrack(), s = o.getSelection();
       if (!s || s.track !== tr || Math.abs(s.b - s.a) < 0.01) { toast('Markera först ett område i det valda spåret (▭ Markera och dra)'); return null; }
       return [fileT(tr, Math.min(s.a, s.b)), fileT(tr, Math.max(s.a, s.b))];
+    }
+    const dbVal = () => {
+      const v = Number($('[data-r=db]').value);
+      if (!isFinite(v) || v === 0 || v < -30 || v > 24) { toast('Ange en ändring mellan −30 och +24 dB (t.ex. 3 för starkare, −3 för svagare)'); return null; }
+      return v;
+    };
+    const stepDb = d => { const i = $('[data-r=db]'); i.value = Math.max(-30, Math.min(24, (Number(i.value) || 0) + d)); };
+    function volApply(tr, c, note) {
+      o.onEdit(tr, c, null, note);
+      if (c.peak > 1) status(note + ` – varning: ljudet slår i taket (${(20 * Math.log10(c.peak)).toFixed(1)} dB för högt) och kan låta sprucket. Ångra och välj mindre höjning.`, true);
     }
     const sil = () => Math.max(0.01, Math.min(60, Number($('[data-r=sil]').value) || 0.5));
     const act = {
@@ -138,6 +156,14 @@
         const label = mode === 'insert' ? 'infogat' : mode === 'mix' ? 'lagt ovanpå' : 'inklistrat (ersatt)';
         o.onEdit(tr, AudioEdit.paste(clip, at, clipboard.clip, mode), newOff,
           `${clipboard.len.toFixed(2)} s från ${clipboard.from} ${label} vid ${fmt(o.getPosition(), true)}`);
+      },
+      volDown() { stepDb(-3); },
+      volUp() { stepDb(3); },
+      volAll() { const tr = o.getTrack(), db = dbVal(); if (db == null) return; volApply(tr, AudioEdit.gain(tr.clip, db), `Volym ${db > 0 ? '+' : ''}${db} dB på hela spåret`); },
+      volSel() {
+        const r = needSel(); if (!r) return; const db = dbVal(); if (db == null) return;
+        const tr = o.getTrack();
+        volApply(tr, AudioEdit.gain(tr.clip, db, r[0], r[1]), `Volym ${db > 0 ? '+' : ''}${db} dB på ${(r[1] - r[0]).toFixed(2)} s`);
       },
       undo() { o.onUndo(o.getTrack()); },
       orig() { const tr = o.getTrack(); if (confirm(`Släppa alla ändringar i ${tr.label} och gå tillbaka till hur filen var?`)) o.onOriginal(tr); },

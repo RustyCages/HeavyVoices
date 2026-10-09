@@ -34,6 +34,24 @@
     const i = idx(c, at), n = Math.max(0, Math.round(seconds * c.sampleRate));
     return map(c, ch => { const o = new Float32Array(ch.length + n); o.set(ch.subarray(0, i)); o.set(ch.subarray(i), i + n); return o; });
   }
+  // ändra volymen med db decibel – på hela klippet, eller bara [a, b) sekunder med mjuka övergångar (inga klick)
+  function gain(c, db, a = 0, b = Infinity) {
+    const g = Math.pow(10, db / 20), sr = c.sampleRate, n = len(c);
+    const i0 = Math.max(0, Math.round(Math.min(a, b) * sr)), i1 = Math.min(n, Math.round(Math.max(a, b) * sr));
+    const whole = i0 === 0 && i1 === n, ramp = whole ? 0 : Math.min(Math.round(0.012 * sr), Math.floor((i1 - i0) / 2));
+    let peak = 0;
+    const out = map(c, ch => {
+      const o = ch.slice();
+      for (let i = i0; i < i1; i++) {
+        let k = g;
+        if (ramp) { const e = Math.min(i - i0, i1 - 1 - i); if (e < ramp) k = 1 + (g - 1) * (e / ramp); }
+        o[i] = ch[i] * k; const v = Math.abs(o[i]); if (v > peak) peak = v;
+      }
+      return o;
+    });
+    out.peak = peak;   // > 1 = kommer att klippa (distorsion)
+    return out;
+  }
   // anpassa en bit ljud till målets samplingsfrekvens och antal kanaler
   function conform(part, sr, nch) {
     let c = part;
@@ -219,5 +237,5 @@
     return new Blob(parts, { type: 'audio/mpeg' });
   }
 
-  root.AudioEdit = { fromBuffer, toBuffer, duration: dur, cut, crop, insertSilence, paste, conform, fadeEdges, timeStretch, normalize, mixdown, peaks, encodeWav, encodeMp3, loadLame };
+  root.AudioEdit = { fromBuffer, toBuffer, duration: dur, cut, crop, insertSilence, paste, conform, gain, fadeEdges, timeStretch, normalize, mixdown, peaks, encodeWav, encodeMp3, loadLame };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -301,5 +301,20 @@
     return o;
   }
 
-  root.VoiceTools = { pitchShift, scaleShift, diatonicShift, renderVoice, transposeNotes, clean, curveF0, toMono16k, VOWELS };
+  // realtid (Röstövningens referenston): en PeriodicWave per vokal och ton – formanterna ligger still när tonen byts
+  const waveCache = new WeakMap();
+  function voiceWave(ctx, midi, vowel) {
+    let m = waveCache.get(ctx); if (!m) { m = new Map(); waveCache.set(ctx, m); }
+    const r = Math.round(midi), k = vowel + '|' + r;
+    if (m.has(k)) return m.get(k);
+    const fs = r >= 62 ? 1.14 : r >= 55 ? 1.06 : 1;
+    const form = (VOWELS[vowel] || VOWELS.oo).map(([F, B, A]) => [F * fs, B * fs, A]);
+    const f0 = hz(r), nh = Math.max(1, Math.min(64, Math.floor(Math.min(ctx.sampleRate * 0.45, 5200) / f0)));
+    const real = new Float32Array(nh + 1), imag = new Float32Array(nh + 1);
+    for (let h = 1; h <= nh; h++) imag[h] = envelope(h * f0, form) / Math.sqrt(h);
+    const w = ctx.createPeriodicWave(real, imag);
+    m.set(k, w); return w;
+  }
+
+  root.VoiceTools = { pitchShift, scaleShift, diatonicShift, renderVoice, transposeNotes, clean, curveF0, toMono16k, voiceWave, VOWELS };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -198,6 +198,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .with-wrap .chips label small { color: var(--text-muted); font-size: 0.75rem; }
   .tempo-info { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.9rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
   .tempo-info { font-size: 1rem; }
+  .tone-voice { width: auto; margin: 0; padding: 0.2rem 0.4rem; font-size: 0.82rem; }
   .vol { display: inline-flex; align-items: center; gap: 0.2rem; }
   .vol button { width: 1.7rem; height: 1.7rem; padding: 0; justify-content: center; font-size: 1rem; line-height: 1; border-radius: 0.4rem; }
   .vol-v { min-width: 1.3rem; text-align: center; font-size: 0.85rem; font-variant-numeric: tabular-nums; color: var(--text-muted); }
@@ -410,7 +411,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
       <div id="withWrap" class="with-wrap" hidden><div class="field-k">Sjung till <small>det här hör du i hörlurarna</small></div><div class="chips" id="withRow"></div></div>
       <div class="practice-controls">
         <span class="tempo-info" id="tempoInfo" hidden title="Låtens tempo">♩ <b id="tempoVal"></b> BPM</span>
-        <span class="opt"><label><input type="checkbox" id="optTone" checked> Referenston</label><span class="vol" data-vol="tone" role="group" aria-label="Referenstonens volym"><button type="button" class="btn-outline" data-d="-1" aria-label="Sänk referenstonen">−</button><span class="vol-v"></span><button type="button" class="btn-outline" data-d="1" aria-label="Höj referenstonen">+</button></span><button type="button" class="help" data-help="tone" aria-label="Vad är referenston?">?</button></span>
+        <span class="opt"><label><input type="checkbox" id="optTone" checked> Referenston</label><span class="vol" data-vol="tone" role="group" aria-label="Referenstonens volym"><button type="button" class="btn-outline" data-d="-1" aria-label="Sänk referenstonen">−</button><span class="vol-v"></span><button type="button" class="btn-outline" data-d="1" aria-label="Höj referenstonen">+</button></span><select id="toneVoice" class="tone-voice" title="Hur referenstonen låter" aria-label="Referenstonens ljud"><option value="pip">Pip</option><option value="oo">Ooh</option><option value="aa">Aah</option><option value="mm">Mmm</option></select><button type="button" class="help" data-help="tone" aria-label="Vad är referenston?">?</button></span>
         <span class="opt" id="optClickWrap" hidden><label><input type="checkbox" id="optClick"> Klick</label><span class="vol" data-vol="click" role="group" aria-label="Klickets volym"><button type="button" class="btn-outline" data-d="-1" aria-label="Sänk klicket">−</button><span class="vol-v"></span><button type="button" class="btn-outline" data-d="1" aria-label="Höj klicket">+</button></span><button type="button" class="help" data-help="click" aria-label="Vad är klick?">?</button></span>
         <span class="opt diff"><label for="optTol">Svårighetsgrad</label>
           <select id="optTol">
@@ -724,6 +725,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/pitch-analyze.js"></script>
+<script src="/js/voice-tools.js"></script>
 <script src="/js/note-io.js"></script>
 <script src="/js/bg-video.js"></script>
 <script src="/js/bg-video-admin.js"></script>
@@ -765,6 +767,7 @@ let lastTarget = null;   // senaste noten (för oktav mellan noterna)
 let unsaved = false;     // nya sångdata sedan senaste sparning
 let sessions = [];       // mina sparade övningar
 let showAllStems = false;  // admin: visa även Instrumental/Full/Backtrack i stämlistan
+let ghostToneOn = (() => { try { return localStorage.getItem('hv-ghost-tone') === '1'; } catch (e) { return false; } })();
 let ghosts = new Set();  // andra stämmor som visas som färgade block i notbanan (bara för att titta)
 const GHOST_COLORS = ['#60a5fa', '#c084fc', '#34d399', '#f472b6', '#facc15', '#fb923c'];
 // spår som inte är en sångstämma att sjunga (döljs i stämvalet för medlemmar)
@@ -1220,11 +1223,19 @@ function renderGhostRow() {
   if (row.hidden) return;
   document.getElementById('ghostChips').innerHTML =
     `<label class="me" title="Stämman du sjunger – mikrofonen och referenstonen följer den"><i class="swatch" style="background: rgba(229,169,104,0.45); border: 1px solid var(--accent);"></i>${esc(current.label)} 🎤</label>` +
-    cands.map(st => `<label><input type="checkbox" data-gk="${esc(st.key)}" ${ghosts.has(st.key) ? 'checked' : ''}><i class="swatch" style="background:${ghostColor(st)}"></i>${esc(st.label)}</label>`).join('');
+    cands.map(st => `<label><input type="checkbox" data-gk="${esc(st.key)}" ${ghosts.has(st.key) ? 'checked' : ''}><i class="swatch" style="background:${ghostColor(st)}"></i>${esc(st.label)}</label>`).join('') +
+    `<label class="ghost-tone" title="Referenstonen sjunger även de stämmor du har bockat i – lite svagare – så att du hör harmonin"><input type="checkbox" id="optGhostTone" ${ghostToneOn ? 'checked' : ''}> 🎵 Referenstonen sjunger dem också</label>`;
+  document.getElementById('optGhostTone').addEventListener('change', e => {
+    ghostToneOn = e.target.checked;
+    try { localStorage.setItem('hv-ghost-tone', ghostToneOn ? '1' : '0'); } catch (x) {}
+    if (ghostToneOn && !document.getElementById('optTone').checked) document.getElementById('optTone').checked = true;
+    if (playing) startAt(position());
+  });
   document.querySelectorAll('#ghostChips [data-gk]').forEach(inp => inp.addEventListener('change', () => {
     if (inp.checked) ghosts.add(inp.dataset.gk); else ghosts.delete(inp.dataset.gk);
     current._rr = null; viewLo = null;
     tick();
+    if (ghostToneOn && playing) startAt(position());   // referenstonen sjunger de visade stämmorna
   }));
 }
 
@@ -1949,26 +1960,39 @@ function startAt(pos) {
 const VOL = { tone: 5, click: 5 }, volOut = { tone: null, click: null };
 const volGain = k => (k === 'tone' ? 0.18 : 0.5) * Math.pow(VOL[k] / 5, 1.6);
 function scheduleTones(when, pos) {
+  const voice = document.getElementById('toneVoice').value, sung = voice !== 'pip' && window.VoiceTools;
   const out = audioCtx.createGain(); out.gain.value = volGain('tone'); volOut.tone = out;
-  const lp = audioCtx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2200;
+  const lp = audioCtx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = sung ? 5000 : 2200;
   lp.connect(out); out.connect(audioCtx.destination);
   nodes.push(out, lp);
-  current.pitch.notes.forEach(n => {
+  // sjungande ton: lätt vibrato (ett gemensamt LFO på alla toner)
+  let vib = null;
+  if (sung) {
+    const lfo = audioCtx.createOscillator(); lfo.frequency.value = 5.6;
+    vib = audioCtx.createGain(); vib.gain.value = 16;   // ± cent
+    lfo.connect(vib); lfo.start(when); nodes.push(lfo, vib);
+  }
+  // din stämma, och (om valt) de stämmor som visas i notbanan – lite svagare
+  const parts = [{ notes: current.pitch.notes, g: 1 }];
+  if (document.getElementById('optGhostTone') && document.getElementById('optGhostTone').checked) ghostList().forEach(st => parts.push({ notes: ghostNotes(st), g: 0.6 }));
+  const att = sung ? 0.06 : 0.02, rel = sung ? 0.09 : 0.04;
+  parts.forEach(({ notes, g: pg }) => notes.forEach(n => {
     const end = n.t + n.d;
     if (end <= pos) return;
     const st = when + Math.max(0, n.t - pos), en = when + (end - pos);
     const osc = audioCtx.createOscillator();
-    osc.type = 'triangle';
+    if (sung) { osc.setPeriodicWave(VoiceTools.voiceWave(audioCtx, n.n, voice)); vib.connect(osc.detune); }
+    else osc.type = 'triangle';
     osc.frequency.value = 440 * Math.pow(2, (n.n - 69) / 12);
     const g = audioCtx.createGain();
     g.gain.setValueAtTime(0, st);
-    g.gain.linearRampToValueAtTime(1, st + 0.02);
-    g.gain.setValueAtTime(1, Math.max(st + 0.02, en - 0.04));
+    g.gain.linearRampToValueAtTime(pg, st + att);
+    g.gain.setValueAtTime(pg, Math.max(st + att, en - rel));
     g.gain.linearRampToValueAtTime(0, en);
     osc.connect(g); g.connect(lp);
     osc.start(st); osc.stop(en + 0.02);
     nodes.push(osc);
-  });
+  }));
 }
 
 // klick (metronom) på låtens slag – songs.bpm / beat_offset / beats_per_bar
@@ -2780,7 +2804,7 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
   const TEXTS = {
     click: '<p><b>Klick</b></p><p>Ett metronomklick på låtens slag, med lite högre ton på första slaget i takten. Bra när du övar rytmen eller sjunger utan komp.</p>',
     ghost: '<p><b>Visa i notbanan</b></p><p>Bocka i andra stämmor så syns deras noter som färgade, streckade block bakom dina – bra för att se hur stämmorna går ihop.</p><p>Det är bara för att titta: <b>mikrofonen och referenstonen följer alltid stämman du valt</b> (märkt 🎤). Vill du öva en annan stämma väljer du den under <b>Stämma</b>.</p>',
-    tone: '<p><b>Referenston</b></p><p>Ett enkelt pip som spelar exakt de noter du ska sjunga. Bra för att höra tonerna tydligt, utan text och utan andra röster. Stäng av när du kan stämman.</p>',
+    tone: '<p><b>Referenston</b></p><p>Spelar exakt de noter du ska sjunga. Bra för att höra tonerna tydligt, utan text och utan andra röster. Välj ljud i listan: <b>Pip</b>, eller en sjungande röst – <b>Ooh</b>, <b>Aah</b> eller <b>Mmm</b>. Visar du fler stämmor i notbanan kan referenstonen sjunga dem också (bocka i <b>🎵 Referenstonen sjunger dem också</b>) – då hör du hur stämmorna låter ihop. Stäng av när du kan stämman.</p>',
     visa: '<p><b>Visa</b></p><p><b>Anpassa höjden efter tonerna</b><br>Notbanan zoomar i höjdled så att just de toner som syns nu fyller rutan. Noterna blir större och lättare att se, men banan rör sig lite när låten spelas. Av = hela låtens tonomfång syns hela tiden.</p><p><b>Slå ihop noter per textrad</b><br>Små, korta toner slås ihop till färre och längre noter, en per textrad där det går. Det blir lugnare att följa. Av = du ser alla noter precis som notanalysen hittade dem. Gäller inte noter som körledningen förberett.</p>',
     oktav: '<p><b>Godkänn annan oktav</b></p><p>På = det räknas som träff även om du sjunger en eller två oktaver högre eller lägre än noten. Bra om du t.ex. är bas och övar på tenorstämman.</p><p>Av = du måste sjunga i exakt rätt läge för att få grönt.</p>',
     tol: '<p><b>Svårighetsgrad</b></p><p>Hur nära noten du måste ligga för att det ska bli grönt. 100 cent = en halvton.</p><p><b>Nybörjare</b> ±100 cent – mycket förlåtande.<br><b>Lätt</b> ±75 cent – bra att börja med.<br><b>Normal</b> ±50 cent – en kvarts ton fel går bra.<br><b>Svår</b> ±30 cent – för dig som vill finslipa.</p>',
@@ -2829,6 +2853,15 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
       // ändras direkt medan det spelar
       if (volOut[k] && audioCtx) volOut[k].gain.setTargetAtTime(volGain(k), audioCtx.currentTime, 0.02);
     }));
+  });
+})();
+(() => {
+  const tv = document.getElementById('toneVoice');
+  try { const v = localStorage.getItem('hv-tone-voice'); if (v && tv.querySelector(`option[value="${v}"]`)) tv.value = v; } catch (e) {}
+  tv.addEventListener('change', () => {
+    try { localStorage.setItem('hv-tone-voice', tv.value); } catch (e) {}
+    if (!document.getElementById('optTone').checked) document.getElementById('optTone').checked = true;
+    if (playing) startAt(position());
   });
 })();
 ['optStem', 'optTone', 'optClick'].forEach(id => document.getElementById(id).addEventListener('change', () => { if (playing) startAt(position()); }));

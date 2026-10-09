@@ -1,5 +1,5 @@
 // Redigeringsverktyg för ett valt spår – används av Stämsynk och Studio.
-// Klipp (ta bort / beskär markerat), tystnad, baka in förskjutning, tempo (utan tonhöjdsändring),
+// Klipp (ta bort / beskär markerat), kopiera/klistra in mellan spår, tystnad, baka in förskjutning, tempo (utan tonhöjdsändring),
 // normalisera, ångra och original. Själva ändringen görs av sidan via onEdit.
 //
 //   const panel = TrackEditPanel.mount(el, {
@@ -21,6 +21,7 @@
   .tep .status { font-size: 0.82rem; color: var(--text-muted); }
   .tep .status.warn { color: #facc15; }`;
   let cssDone = false;
+  let clipboard = null;   // { clip, from, len } – delas mellan alla spår på sidan
   const fmt = (s, t) => (root.WaveTimeline ? root.WaveTimeline.fmt(s, t) : String(s));
 
   function mount(el, o) {
@@ -28,13 +29,25 @@
     el.classList.add('tep');
     el.innerHTML = `
       <h3>Valt spår: <span class="tep-name">–</span> <span class="status" data-r="info"></span></h3>
-      <div class="tool-row" data-g="edit">
+      <div class="tool-row desktop-only" data-g="edit">
         <span class="k">Klipp</span>
         <button type="button" class="btn-outline" data-a="cut" title="Ta bort det markerade (Delete)">✂ Ta bort markerat</button>
         <button type="button" class="btn-outline" data-a="crop" title="Behåll bara det markerade">⌗ Beskär till markerat</button>
         <span class="status" data-r="sel">Markera ett område med ▭ Markera</span>
       </div>
-      <div class="tool-row" data-g="edit">
+      <p class="desktop-note">✂ Klipp, kopiera, tystnad och tempo visas bara på dator. <button type="button" class="btn-outline" data-device-show>Visa ändå</button></p>
+      <div class="tool-row desktop-only">
+        <span class="k">Kopiera</span>
+        <button type="button" class="btn-outline" data-a="copy" title="Kopiera det markerade (Ctrl+C) – det går att markera i vilket spår som helst">⎘ Kopiera markerat</button>
+        <select data-r="pmode" title="Hur biten läggs in i det valda spåret">
+          <option value="replace">Ersätt</option>
+          <option value="insert">Infoga</option>
+          <option value="mix">Lägg ovanpå</option>
+        </select>
+        <button type="button" class="btn-outline" data-a="paste" title="Klistra in i det valda spåret där spelhuvudet står (Ctrl+V)">📋 Klistra in vid spelhuvudet</button>
+        <span class="status" data-r="clip">Inget kopierat</span>
+      </div>
+      <div class="tool-row desktop-only" data-g="edit">
         <span class="k">Tystnad</span>
         <input type="number" data-r="sil" value="0.5" min="0.01" max="60" step="0.05"> s
         <button type="button" class="btn-outline" data-a="silStart">i början</button>
@@ -42,14 +55,14 @@
         <button type="button" class="btn-outline" data-a="silEnd">i slutet</button>
         <button type="button" class="btn-outline" data-a="bake" title="Gör förskjutningen till en del av filen: tystnad läggs till eller början klipps bort, och förskjutningen blir 0">⇥ Baka in förskjutningen</button>
       </div>
-      <div class="tool-row" data-g="edit">
+      <div class="tool-row desktop-only" data-g="edit">
         <span class="k">Ljud</span>
         <input type="number" data-r="pct" value="100" min="50" max="200" step="0.1"> %
         <span class="status">eller BPM</span> <input type="number" data-r="bpmFrom" min="30" max="300" step="0.1" placeholder="nu"> → <input type="number" data-r="bpmTo" min="30" max="300" step="0.1" placeholder="ska bli">
         <button type="button" class="btn-outline" data-a="tempo" title="Ändrar tempot utan att ändra tonhöjden">⏱ Ändra tempo</button>
         <button type="button" class="btn-outline" data-a="norm" title="Höj volymen så att den starkaste toppen hamnar strax under max">📶 Normalisera</button>
       </div>
-      <div class="tool-row" data-g="edit">
+      <div class="tool-row desktop-only" data-g="edit">
         <span class="k">Ändringar</span>
         <button type="button" class="btn-outline" data-a="undo" title="Ångra (Ctrl+Z)">↶ Ångra</button>
         <button type="button" class="btn-outline" data-a="orig" title="Tillbaka till filen som den var">⟲ Original</button>
@@ -103,6 +116,29 @@
         if (!c) { toast('Spåret är tyst – inget att normalisera'); return; }
         o.onEdit(tr, c, null, 'Normaliserat');
       },
+      copy() {
+        const s = o.getSelection(), tr = s && s.track;
+        if (!s || !tr || !tr.clip || Math.abs(s.b - s.a) < 0.01) { toast('Markera först ett område (▭ Markera och dra) i spåret du vill kopiera från'); return; }
+        const a = fileT(tr, Math.min(s.a, s.b)), b = fileT(tr, Math.max(s.a, s.b));
+        if (b - a < 0.01) { toast('Markeringen ligger utanför spårets ljud'); return; }
+        clipboard = { clip: AudioEdit.crop(tr.clip, a, b), from: tr.label, len: b - a };
+        clipInfo();
+        status(`Kopierat ${(b - a).toFixed(2)} s från ${tr.label} – klicka i spåret du vill klistra in i, ställ spelhuvudet och tryck Klistra in`);
+        refresh();
+      },
+      paste() {
+        const tr = o.getTrack();
+        if (!clipboard) { toast('Kopiera först en bit (markera och ⎘ Kopiera markerat)'); return; }
+        if (!tr || !tr.clip || tr.readOnly) { toast('Välj ett spår som går att ändra – klicka i det'); return; }
+        const mode = $('[data-r=pmode]').value;
+        let clip = tr.clip, at = o.getPosition() - offS(tr), newOff = null;
+        if (at < 0) {   // före spårets början: förläng spåret bakåt så att biten hamnar rätt i låten
+          clip = AudioEdit.insertSilence(clip, 0, -at); newOff = Math.round((tr.offsetMs || 0) + at * 1000); at = 0;
+        }
+        const label = mode === 'insert' ? 'infogat' : mode === 'mix' ? 'lagt ovanpå' : 'inklistrat (ersatt)';
+        o.onEdit(tr, AudioEdit.paste(clip, at, clipboard.clip, mode), newOff,
+          `${clipboard.len.toFixed(2)} s från ${clipboard.from} ${label} vid ${fmt(o.getPosition(), true)}`);
+      },
       undo() { o.onUndo(o.getTrack()); },
       orig() { const tr = o.getTrack(); if (confirm(`Släppa alla ändringar i ${tr.label} och gå tillbaka till hur filen var?`)) o.onOriginal(tr); },
     };
@@ -111,6 +147,9 @@
       const a = Number($('[data-r=bpmFrom]').value), b = Number($('[data-r=bpmTo]').value);
       if (a > 0 && b > 0) $('[data-r=pct]').value = Math.round(b / a * 10000) / 100;
     }));
+    function clipInfo() {
+      $('[data-r=clip]').textContent = clipboard ? `Kopierat: ${clipboard.len.toFixed(2)} s från ${clipboard.from}` : 'Inget kopierat';
+    }
     function selInfo() {
       const s = o.getSelection(), e = $('[data-r=sel]');
       if (!s || Math.abs(s.b - s.a) < 0.005) { e.textContent = 'Välj ▭ Markera och dra i ett spår'; return; }
@@ -122,6 +161,9 @@
       $('.tep-name').textContent = tr ? tr.label : '–';
       $('[data-r=info]').textContent = tr && tr.clip ? `${fmt(dur(tr), true)} · ${tr.clip.sampleRate} Hz · ${tr.clip.channels.length === 2 ? 'stereo' : 'mono'}${tr.readOnly ? ' · kan inte ändras här' : ''}` : '';
       el.querySelectorAll('[data-g=edit] button, [data-g=edit] input').forEach(b => { b.disabled = !editable; });
+      $('[data-a=paste]').disabled = !editable || !clipboard;
+      $('[data-r=pmode]').disabled = !editable;
+      clipInfo();
       if (editable) {
         $('[data-a=undo]').disabled = !(o.canUndo && o.canUndo(tr));
         $('[data-a=orig]').disabled = !(o.isEdited && o.isEdited(tr)) && !(o.canUndo && o.canUndo(tr));
@@ -129,7 +171,7 @@
       }
       selInfo();
     }
-    return { el, refresh, status, selInfo, cut: () => act.cut() };
+    return { el, refresh, status, selInfo, cut: () => act.cut(), copy: () => act.copy(), paste: () => act.paste() };
   }
   root.TrackEditPanel = { mount };
 })(window);

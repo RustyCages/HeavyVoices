@@ -34,6 +34,42 @@
     const i = idx(c, at), n = Math.max(0, Math.round(seconds * c.sampleRate));
     return map(c, ch => { const o = new Float32Array(ch.length + n); o.set(ch.subarray(0, i)); o.set(ch.subarray(i), i + n); return o; });
   }
+  // anpassa en bit ljud till målets samplingsfrekvens och antal kanaler
+  function conform(part, sr, nch) {
+    let c = part;
+    if (c.sampleRate !== sr) {
+      const r = c.sampleRate / sr, n = Math.max(1, Math.round(len(c) / r));
+      c = { sampleRate: sr, channels: c.channels.map(ch => {
+        const o = new Float32Array(n);
+        for (let i = 0; i < n; i++) { const x = i * r, i0 = Math.floor(x), f = x - i0; o[i] = (ch[i0] || 0) * (1 - f) + (ch[i0 + 1] || 0) * f; }
+        return o;
+      }) };
+    }
+    if (c.channels.length !== nch) {
+      if (nch === 1) { const a = c.channels[0], b = c.channels[1] || a, m = new Float32Array(a.length); for (let i = 0; i < a.length; i++) m[i] = (a[i] + b[i]) * 0.5; c = { sampleRate: sr, channels: [m] }; }
+      else c = { sampleRate: sr, channels: [c.channels[0], (c.channels[1] || c.channels[0]).slice()] };
+    }
+    return c;
+  }
+  // klistra in part vid sekunder at. mode: 'replace' = skriv över, 'insert' = infoga (resten flyttas), 'mix' = lägg ovanpå
+  function paste(c, at, part, mode = 'replace') {
+    const p = conform(part, c.sampleRate, c.channels.length), i = Math.max(0, Math.round(at * c.sampleRate)), n = len(p);
+    const out = map(c, (ch, k) => {
+      const src = p.channels[k];
+      if (mode === 'insert') {
+        const o = new Float32Array(Math.max(ch.length, i) + n);
+        o.set(ch.subarray(0, Math.min(i, ch.length))); o.set(src, i);
+        if (i < ch.length) o.set(ch.subarray(i), i + n);
+        return o;
+      }
+      const o = new Float32Array(Math.max(ch.length, i + n)); o.set(ch);
+      if (mode === 'mix') { for (let j = 0; j < n; j++) o[i + j] += src[j]; }
+      else o.set(src, i);
+      return o;
+    });
+    if (mode !== 'mix') { fadeEdges(out, at, 4); fadeEdges(out, at + n / c.sampleRate, 4); }
+    return out;
+  }
   // mjuk in-/uttoning vid snitt så det inte klickar
   function fadeEdges(c, at, ms = 6) {
     const i = idx(c, at), n = Math.round(ms / 1000 * c.sampleRate);
@@ -183,5 +219,5 @@
     return new Blob(parts, { type: 'audio/mpeg' });
   }
 
-  root.AudioEdit = { fromBuffer, toBuffer, duration: dur, cut, crop, insertSilence, fadeEdges, timeStretch, normalize, mixdown, peaks, encodeWav, encodeMp3, loadLame };
+  root.AudioEdit = { fromBuffer, toBuffer, duration: dur, cut, crop, insertSilence, paste, conform, fadeEdges, timeStretch, normalize, mixdown, peaks, encodeWav, encodeMp3, loadLame };
 })(typeof window !== 'undefined' ? window : globalThis);

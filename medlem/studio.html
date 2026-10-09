@@ -6,8 +6,11 @@
 <title>Studio — Heavy Voices</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
+<script src="/js/device.js"></script>
 <style>
   .card.static:hover { transform: none; border-color: var(--border); box-shadow: var(--card-shadow); }
+  /* studion är byggd för dator: använd hela bredden */
+  .container { max-width: 1800px; }
   .hint { font-size: 0.85rem; color: var(--text-muted); margin: 0.25rem 0 1rem; }
   .field-k { display: block; margin: 0 0 0.35rem; font-family: 'Roboto Condensed', sans-serif; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); }
   .title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
@@ -128,13 +131,13 @@
       <li><div><b>Kalibrera – en gång per dator eller telefon</b><p>Tryck <b>🎯 Kalibrera</b> och sedan <b>Starta</b>. Klappa i takt med de 8 klicken. Sidan mäter hur lång fördröjning dina hörlurar har, så att inspelningen hamnar i takt. Värdet sparas, så du behöver bara göra om det om du byter hörlurar.</p></div></li>
       <li><div><b>Spela in</b><p>Klicka i tidslinjen där du vill börja och tryck <b>⏺ Spela in</b>. Låten börjar spela – med <b>Inräkning</b> startar den 2 sekunder före, så du hinner komma in. Sjung! Tryck <b>⏹ Stoppa</b> (eller mellanslag) när du är klar. Den gröna mätaren visar att mikrofonen hör dig.</p></div></li>
       <li><div><b>Lyssna</b><p>Din tagning dyker upp som ett rött spår. Tryck ▶ och lyssna tillsammans med låten. Inte nöjd? Spela in en gång till – varje försök blir ett eget spår, och du kan ta bort de du inte vill ha med <b>🗑 Ta bort</b>.</p></div></li>
-      <li><div><b>Putsa (om du vill)</b><p>Ligger inspelningen lite fel i tid? Välj <b>↔ Flytta</b> och dra det röda spåret i sidled. Vill du ta bort ett harkel eller en tyst början? Välj <b>▭ Markera</b>, dra över biten och tryck <b>✂ Ta bort markerat</b>. <b>📶 Normalisera</b> gör en svag inspelning starkare. <b>↶ Ångra</b> tar tillbaka.</p></div></li>
+      <li><div><b>Putsa (om du vill)</b><p>Ligger inspelningen lite fel i tid? Välj <b>↔ Flytta</b> och dra det röda spåret i sidled. Vill du ta bort ett harkel eller en tyst början? Välj <b>▭ Markera</b>, dra över biten och tryck <b>✂ Ta bort markerat</b>. Vill du använda en bra bit igen – t.ex. en refräng – markera den, tryck <b>⎘ Kopiera markerat</b>, klicka i spåret du vill lägga den i, ställ spelhuvudet och tryck <b>📋 Klistra in</b> (<b>Ersätt</b> skriver över, <b>Infoga</b> skjuter resten framåt, <b>Lägg ovanpå</b> mixar ihop). <b>📶 Normalisera</b> gör en svag inspelning starkare. <b>↶ Ångra</b> tar tillbaka.</p></div></li>
       <li><div><b>Spara</b><p>Skriv ett namn, till exempel ”Ters över refrängen”, välj vem som får höra den och tryck <b>💾 Spara inspelning</b>. Den hamnar under <b>Mina inspelningar</b> längst ner på sidan.</p></div></li>
     </ol>
     <h3>Vem hör min inspelning?</h3>
     <p class="g-p">🔒 <b>Privat</b> – bara du. 👥 <b>Körledningen</b> – du och körledningen, bra när du vill visa en idé. 🌍 <b>Alla</b> – hela kören kan lyssna på den i Studio. Du kan ändra valet när du vill och spara igen.</p>
     <div class="tips">
-      <b>Tips:</b> Sjung in en stämma i taget och lyssna på den tillsammans med originalstämman. Sänk låtens volym eller tysta sångspåren om du vill höra dig själv tydligare. <b>⬇ Mix av det som hörs</b> laddar ner allt som är påslaget som en ljudfil – bra att skicka till någon. Kortkommandon på dator: <b>R</b> = spela in, <b>mellanslag</b> = spela/stoppa, <b>Ctrl+Z</b> = ångra.
+      <b>Tips:</b> Sjung in en stämma i taget och lyssna på den tillsammans med originalstämman. Sänk låtens volym eller tysta sångspåren om du vill höra dig själv tydligare. <b>⬇ Mix av det som hörs</b> laddar ner allt som är påslaget som en ljudfil – bra att skicka till någon. Kortkommandon på dator: <b>R</b> = spela in, <b>mellanslag</b> = spela/stoppa, <b>Ctrl+Z</b> = ångra, <b>Ctrl+C / Ctrl+V</b> = kopiera markerat / klistra in vid spelhuvudet.
     </div>
   </div>
 
@@ -166,7 +169,7 @@
       <div class="transport" style="margin-top:0">
         <div class="seg" role="group" aria-label="Verktyg">
           <button type="button" id="toolMove" aria-pressed="true" title="Dra en inspelning i sidled för att flytta den">↔ Flytta</button>
-          <button type="button" id="toolSelect" aria-pressed="false" title="Dra i en inspelning för att markera ett område att klippa">▭ Markera</button>
+          <button type="button" id="toolSelect" class="desktop-only" aria-pressed="false" title="Dra i ett spår för att markera ett område att klippa eller kopiera">▭ Markera</button>
         </div>
         <button class="btn-outline" id="markBtn" title="Sätt en markör vid spelhuvudet (M)">⚑ Markör</button>
         <span class="sp"></span>
@@ -996,6 +999,8 @@ document.addEventListener('keydown', e => {
   if (e.target.matches('input, select, textarea')) return;
   if (e.code === 'Space' && !e.target.matches('button')) { e.preventDefault(); document.getElementById('playBtn').click(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(active); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && sel) { e.preventDefault(); panel.copy(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') { e.preventDefault(); panel.paste(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'r' || e.key === 'R') { document.getElementById('recBtn').click(); return; }
   if (e.key === 'Delete' || e.key === 'Backspace') { if (sel) { e.preventDefault(); panel.cut(); } return; }

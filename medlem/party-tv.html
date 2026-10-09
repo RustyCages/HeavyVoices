@@ -62,6 +62,19 @@
   .seg button:disabled { opacity: 0.4; }
   .note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.8rem; }
   @media (max-width: 640px) { .cabinet { grid-template-columns: 1fr; } .panel { grid-template-rows: none; grid-template-columns: auto auto 1fr auto; align-items: center; } .grille { min-height: 2.4rem; } .klabel { margin: 0; } }
+  .tv-photo { position: relative; width: min(100%, 980px); }
+  .tv-photo img { display: block; width: 100%; height: auto; position: relative; z-index: 2; pointer-events: none; user-select: none; }
+  .tv-photo .screen { position: absolute; aspect-ratio: auto; z-index: 3; }
+  .tv-photo.behind .screen { z-index: 1; }
+  .frame-admin { margin-top: 1.4rem; width: min(100%, 760px); padding: 0.9rem 1rem; border-radius: 0.9rem; border: 1px dashed rgba(229,169,104,0.35); background: rgba(0,0,0,0.25); font-size: 0.9rem; }
+  .frame-admin summary { cursor: pointer; }
+  .frame-admin p { margin: 0.5rem 0; font-size: 0.82rem; }
+  .fa-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 0.5rem 0; }
+  .fa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.5rem; }
+  .fa-grid label { display: grid; gap: 0.2rem; font-size: 0.8rem; color: var(--text-muted); }
+  .fa-grid input[type=number] { margin: 0; padding: 0.4rem 0.5rem; }
+  .fa-check { grid-column: 1 / -1; display: flex !important; align-items: center; gap: 0.5rem; }
+  .fa-check input { width: auto; margin: 0; }
   #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 2100; display: none; max-width: calc(100vw - 3rem); }
 </style>
 </head>
@@ -74,7 +87,8 @@
     <p class="party-sub">Slumpade hårdrocksvideor dygnet runt. Vrid på kanalratten för nästa video.</p>
 
     <div class="tv-stage">
-      <div class="tv">
+      <div class="tv-photo" id="tvPhoto" hidden><img id="tvImg" alt="TV"></div>
+      <div class="tv" id="tvDrawn">
         <div class="ant"><i></i></div>
         <div class="cabinet">
           <div class="bezel">
@@ -101,6 +115,7 @@
         <div class="legs"><i></i><i></i></div>
       </div>
       <div class="ctrls">
+        <span id="photoBtns" hidden style="display:contents"><button type="button" id="pwrBtn2">⏻ Ström</button><button type="button" id="chBtn2">📺 Nästa kanal</button></span>
         <div class="seg" id="segSrc">
           <button type="button" data-v="mix" aria-pressed="true">🎲 Blandat</button>
           <button type="button" data-v="clip" aria-pressed="false">⚡ 30 s-klipp</button>
@@ -109,6 +124,23 @@
         <button type="button" class="btn-outline" id="fullBtn">⛶ Helskärm</button>
       </div>
       <p class="note" id="note">Klipp från iTunes/Apple Music · hela videor från YouTube</p>
+      <details class="frame-admin" id="frameAdmin" hidden>
+        <summary><b>🖼 Egen TV-bild</b> <span class="text-muted">– byt den ritade TV:n mot ett riktigt foto</span></summary>
+        <p class="text-muted">Ladda upp ett foto av en TV (PNG med genomskinlig skärm blir snyggast, men vanliga JPG fungerar också). Justera sedan var skärmen sitter – videon visas direkt så att du ser resultatet.</p>
+        <div class="fa-row">
+          <label class="btn btn-outline" style="cursor:pointer">⬆ Välj bild<input type="file" id="faFile" accept="image/png,image/jpeg,image/webp" hidden></label>
+          <button type="button" class="btn-outline" id="faRemove">🗑 Ta bort bilden</button>
+        </div>
+        <div class="fa-grid">
+          <label>Vänster % <input type="number" id="faL" step="0.5" min="0" max="100"></label>
+          <label>Topp % <input type="number" id="faT" step="0.5" min="0" max="100"></label>
+          <label>Bredd % <input type="number" id="faW" step="0.5" min="1" max="100"></label>
+          <label>Höjd % <input type="number" id="faH" step="0.5" min="1" max="100"></label>
+          <label>Hörn % <input type="number" id="faR" step="1" min="0" max="50"></label>
+          <label class="fa-check"><input type="checkbox" id="faBehind"> Skärmen är genomskinlig i bilden (videon bakom)</label>
+        </div>
+        <div class="fa-row"><button type="button" id="faSave">💾 Spara</button><span class="text-muted" id="faStatus"></span></div>
+      </details>
     </div>
   </section>
 </div>
@@ -302,10 +334,84 @@ $('segSrc').querySelectorAll('button').forEach(b => b.addEventListener('click', 
 $('fullBtn').addEventListener('click', () => { const s = $('screen'); if (document.fullscreenElement) document.exitFullscreen(); else if (s.requestFullscreen) s.requestFullscreen().catch(() => {}); });
 document.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { if (on) next(); } else if (e.code === 'Space') { e.preventDefault(); power(); } });
 
+
+// ---------- egen TV-bild (Storage: heavy-voices-stems/party/tv-frame/) ----------
+const FRAME_DIR = 'party/tv-frame', BUCKET = 'heavy-voices-stems';
+let frame = null;   // { img (sökväg), l, t, w, h, r, behind }
+const DEF_FRAME = { l: 12, t: 14, w: 58, h: 62, r: 8, behind: false };
+async function signed(path) { const { data } = await supabaseClient.storage.from(BUCKET).createSignedUrl(path, 3600 * 6); return data ? data.signedUrl : null; }
+function applyFrame(imgUrl) {
+  const photo = $('tvPhoto'), scr = $('screen');
+  if (!frame || !frame.img) {
+    photo.hidden = true; $('tvDrawn').hidden = false; $('photoBtns').hidden = true;
+    if (scr.parentElement !== document.querySelector('.bezel')) document.querySelector('.bezel').appendChild(scr);
+    Object.assign(scr.style, { left: '', top: '', width: '', height: '', borderRadius: '' });
+    return;
+  }
+  if (imgUrl) $('tvImg').src = imgUrl;
+  photo.hidden = false; $('tvDrawn').hidden = true; $('photoBtns').hidden = false;
+  photo.classList.toggle('behind', !!frame.behind);
+  if (scr.parentElement !== photo) photo.appendChild(scr);
+  Object.assign(scr.style, { left: frame.l + '%', top: frame.t + '%', width: frame.w + '%', height: frame.h + '%', borderRadius: frame.r + '% / ' + frame.r + '%' });
+}
+async function loadFrame() {
+  try {
+    const { data } = await supabaseClient.storage.from(BUCKET).list(FRAME_DIR, { limit: 20 });
+    const cfg = (data || []).find(f => f.name === 'config.json');
+    if (!cfg) return;
+    const url = await signed(FRAME_DIR + '/config.json');
+    frame = await (await fetch(url, { cache: 'no-store' })).json();
+    if (frame && frame.img) applyFrame(await signed(frame.img));
+  } catch (e) { frame = null; }
+}
+function fillFrameForm() {
+  const f = frame || DEF_FRAME;
+  $('faL').value = f.l; $('faT').value = f.t; $('faW').value = f.w; $('faH').value = f.h; $('faR').value = f.r; $('faBehind').checked = !!f.behind;
+}
+function readForm() { return { l: +$('faL').value || 0, t: +$('faT').value || 0, w: +$('faW').value || 50, h: +$('faH').value || 50, r: +$('faR').value || 0, behind: $('faBehind').checked }; }
+function setupFrameAdmin() {
+  $('frameAdmin').hidden = false; fillFrameForm();
+  ['faL', 'faT', 'faW', 'faH', 'faR', 'faBehind'].forEach(id => $(id).addEventListener('input', () => { if (frame && frame.img) { Object.assign(frame, readForm()); applyFrame(); } }));
+  $('faFile').addEventListener('change', async e => {
+    const file = e.target.files[0]; if (!file) return;
+    if (file.size > 15 * 1048576) { toast('Bilden är större än 15 MB'); return; }
+    $('faStatus').textContent = 'Laddar upp…';
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z]/g, '');
+    const path = `${FRAME_DIR}/tv-${Date.now()}.${ext}`;
+    const { error } = await supabaseClient.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+    if (error) { $('faStatus').textContent = ''; toast('Uppladdningen misslyckades: ' + error.message, 6000); return; }
+    const old = frame && frame.img;
+    frame = Object.assign({}, frame || DEF_FRAME, readForm(), { img: path });
+    applyFrame(await signed(path));
+    await saveFrame(old);
+  });
+  $('faSave').addEventListener('click', () => saveFrame());
+  $('faRemove').addEventListener('click', async () => {
+    if (!frame || !frame.img || !confirm('Ta bort TV-bilden och använda den ritade TV:n igen?')) return;
+    await supabaseClient.storage.from(BUCKET).remove([frame.img, FRAME_DIR + '/config.json']);
+    frame = null; applyFrame(); toast('Den ritade TV:n är tillbaka');
+  });
+}
+async function saveFrame(oldImg) {
+  if (!frame || !frame.img) { toast('Välj en bild först'); return; }
+  Object.assign(frame, readForm());
+  $('faStatus').textContent = 'Sparar…';
+  const blob = new Blob([JSON.stringify(frame)], { type: 'application/json' });
+  const { error } = await supabaseClient.storage.from(BUCKET).upload(FRAME_DIR + '/config.json', blob, { contentType: 'application/json', upsert: true });
+  $('faStatus').textContent = '';
+  if (error) { toast('Kunde inte spara: ' + error.message, 6000); return; }
+  if (oldImg && oldImg !== frame.img) supabaseClient.storage.from(BUCKET).remove([oldImg]);
+  toast('💾 TV-bilden är sparad');
+}
+$('pwrBtn2').addEventListener('click', () => $('pwrKnob').click());
+$('chBtn2').addEventListener('click', () => $('chKnob').click());
+
 (async () => {
   const acc = await requirePartyAccess();
   if (!acc) return;
   document.documentElement.classList.remove('gate');
+  await loadFrame();
+  if (acc.isAdmin) setupFrameAdmin();
 })();
 </script>
 </body>

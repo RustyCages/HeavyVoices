@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b0c10">
+<title>Mobilspel — Heavy Voices</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/party.css">
+<style>
+  /* Mobilsidan för Ritleken och Mimleken. Inget konto krävs. */
+  .wrap { max-width: 560px; margin: 0 auto; padding: 0.8rem 0.8rem calc(1rem + env(safe-area-inset-bottom)); min-height: 100dvh; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.6rem; }
+  .top img { height: 28px; width: auto; }
+  .me { font-size: 0.85rem; color: var(--text-muted); text-align: right; }
+  .me b { color: var(--accent); }
+  .center { display: grid; align-content: center; justify-items: center; gap: 1rem; text-align: center; min-height: 70dvh; }
+  .center h1 { margin: 0; font-size: clamp(2rem, 9vw, 3rem); text-transform: uppercase; text-shadow: var(--party-glow); }
+  .center p { margin: 0; color: var(--text-muted); }
+  .join { display: grid; gap: 0.8rem; width: 100%; }
+  .join input { font-size: 1.2rem; padding: 0.9rem 1rem; text-align: center; margin: 0; }
+  .join input#code { font-family: 'Roboto Condensed', sans-serif; font-size: 2rem; letter-spacing: 0.3em; }
+  .join button { font-size: 1.2rem; padding: 0.95rem; border-radius: 0.8rem; }
+  .big { font-size: clamp(3rem, 16vw, 5rem); line-height: 1; }
+  .word { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(2.2rem, 11vw, 3.6rem); text-transform: uppercase; color: var(--accent); text-shadow: var(--party-glow); line-height: 1.05; }
+  .pill { display: inline-block; padding: 0.4rem 1rem; border-radius: 999px; background: rgba(255,255,255,0.08); font-weight: 600; }
+  .head { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 1.2rem; text-transform: uppercase; margin: 0 0 0.4rem; display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+  .head .w { color: var(--accent); }
+  .timer { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; margin-bottom: 0.5rem; }
+  .timer > div { height: 100%; width: 100%; background: linear-gradient(90deg, var(--party-hot), var(--accent)); transform-origin: left; }
+  .choices { display: grid; gap: 0.7rem; width: 100%; }
+  .choices button { font-size: 1.4rem; padding: 1.1rem; border-radius: 0.9rem; font-family: 'Roboto Condensed', sans-serif; text-transform: uppercase; }
+  /* rita */
+  .pad { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 0.8rem; overflow: hidden; background: #fff; touch-action: none; box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
+  .pad canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .tools { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; margin-top: 0.6rem; }
+  .sw { width: 2.1rem; height: 2.1rem; border-radius: 50%; padding: 0; border: 3px solid rgba(255,255,255,0.25); }
+  .sw[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+  .sz { width: 2.4rem; height: 2.4rem; padding: 0; border-radius: 50%; background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: #fff; }
+  .sz i { display: block; border-radius: 50%; background: #fff; margin: auto; }
+  .sz[aria-pressed="true"] { border-color: var(--accent); background: rgba(229,169,104,0.25); }
+  .tools .act { margin-left: auto; display: flex; gap: 0.4rem; }
+  .tools .act button { padding: 0.5rem 0.75rem; font-size: 0.95rem; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid var(--border); }
+  /* gissa */
+  .guess { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
+  .guess input { flex: 1; margin: 0; font-size: 1.15rem; padding: 0.85rem 1rem; }
+  .guess button { font-size: 1.1rem; padding: 0.85rem 1.1rem; }
+  .hint { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.3em; color: var(--accent); text-align: center; margin: 0.4rem 0; }
+  .fb { text-align: center; min-height: 1.5rem; font-weight: 700; margin-top: 0.5rem; }
+  .fb.ok { color: #4ade80; } .fb.near { color: #facc15; } .fb.no { color: var(--text-muted); font-weight: 400; }
+  .bigbtn { width: 100%; font-size: 1.2rem; padding: 1rem; border-radius: 0.9rem; }
+  .err { color: #f87171 !important; }
+  .spin { width: 2.4rem; height: 2.4rem; border-radius: 50%; border: 4px solid rgba(255,255,255,0.12); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="party-page">
+<div class="wrap">
+  <div class="top">
+    <picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" width="480" height="220"></picture>
+    <div class="me" id="me"></div>
+  </div>
+  <main id="screen"></main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/party.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+let pid = store.get('hv-quiz-pid');
+if (!pid) { pid = 'p' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); store.set('hv-quiz-pid', pid); }
+let name = store.get('hv-quiz-name') || '';
+let code = (new URLSearchParams(location.search).get('kod') || '').replace(/\D/g, '').slice(0, 4);
+let ch = null, last = null, lastSeen = 0, renderKey = '', deadline = {}, raf = null, endShown = false;
+
+function render(html) { $('screen').innerHTML = html; }
+function renderMe() {
+  const me = last && (last.players || []).find(p => p.pid === pid);
+  $('me').innerHTML = name && ch ? `${esc(name)}${me ? ` · <b>${me.score}</b> p` : ''}` : '';
+}
+
+// ---------- gå med ----------
+function joinForm(msg) {
+  render(`<div class="center"><h1>Mobil<span style="color:var(--accent)">spel</span></h1>
+    <p>Skriv koden som syns på storbildsskärmen.</p>
+    <form class="join" id="jf">
+      <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Kod" value="${esc(code)}" autocomplete="off" aria-label="Kod">
+      <input id="nm" maxlength="24" placeholder="Ditt namn" value="${esc(name)}" autocomplete="nickname" aria-label="Ditt namn">
+      <button type="submit">🎉 Gå med</button>
+      ${msg ? `<p class="err">${esc(msg)}</p>` : ''}
+    </form></div>`);
+  $('jf').addEventListener('submit', e => {
+    e.preventDefault();
+    const c = $('code').value.replace(/\D/g, ''), n = $('nm').value.trim();
+    if (c.length !== 4) { joinForm('Koden har fyra siffror.'); return; }
+    if (!n) { joinForm('Skriv ditt namn.'); return; }
+    code = c; name = n.slice(0, 24); store.set('hv-quiz-name', name);
+    history.replaceState(null, '', '?kod=' + code);
+    connect();
+  });
+}
+function connect() {
+  if (ch) supabaseClient.removeChannel(ch);
+  last = null; lastSeen = 0; renderKey = '';
+  render('<div class="center"><div class="spin"></div><p>Ansluter…</p></div>');
+  ch = supabaseClient.channel('hvgame-' + code, { config: { broadcast: { self: false }, presence: { key: pid } } });
+  ch.on('broadcast', { event: 'state' }, ({ payload }) => onState(payload || {}));
+  ch.on('broadcast', { event: 'feedback' }, ({ payload }) => onFeedback(payload || {}));
+  ch.on('broadcast', { event: 'stroke' }, ({ payload }) => { if (viewer && payload && payload.s) { viewer.strokes.push(payload.s); viewer.draw(payload.s); } });
+  ch.on('broadcast', { event: 'canvas' }, ({ payload }) => { if (viewer && payload) { if (payload.op === 'clear') viewer.strokes = []; else viewer.strokes.pop(); viewer.redraw(); } });
+  ch.subscribe(async status => {
+    if (status === 'SUBSCRIBED') {
+      await ch.track({ name });
+      ch.send({ type: 'broadcast', event: 'hello', payload: { pid } });
+      setTimeout(() => { if (!lastSeen) joinForm(`Hittar inget spel med koden ${code}. Kolla koden på skärmen.`); }, 6000);
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') joinForm('Kunde inte ansluta. Kolla nätet och försök igen.');
+  });
+}
+const send = (event, payload) => ch && ch.send({ type: 'broadcast', event, payload: Object.assign({ pid }, payload) });
+
+function timerBar(s) {
+  cancelAnimationFrame(raf);
+  if (s.remainMs == null) return '';
+  const k = s.phase + s.turn;
+  if (deadline[k] == null) deadline[k] = performance.now() + s.remainMs;
+  const step = () => {
+    const bar = $('tbar'); if (!bar) return;
+    bar.style.transform = `scaleX(${Math.max(0, deadline[k] - performance.now()) / (s.timeMs || 1)})`;
+    raf = requestAnimationFrame(step);
+  };
+  setTimeout(() => { raf = requestAnimationFrame(step); }, 0);
+  return '<div class="timer"><div id="tbar"></div></div>';
+}
+
+// ---------- rityta ----------
+let viewer = null;   // gissarnas kopia av teckningen
+function makeCanvas(el) {
+  const c = el.querySelector('canvas'), x = c.getContext('2d');
+  const fit = () => { const r = c.getBoundingClientRect(); c.width = Math.round(r.width * devicePixelRatio); c.height = Math.round(r.height * devicePixelRatio); };
+  fit();
+  const api = {
+    c, strokes: [],
+    draw(s) {
+      const p = s.pts; if (!p || !p.length) return;
+      x.strokeStyle = x.fillStyle = s.c; x.lineWidth = Math.max(1, s.w * c.width); x.lineCap = x.lineJoin = 'round';
+      if (p.length === 1) { x.beginPath(); x.arc(p[0][0] * c.width, p[0][1] * c.height, x.lineWidth / 2, 0, 6.283); x.fill(); return; }
+      x.beginPath(); x.moveTo(p[0][0] * c.width, p[0][1] * c.height);
+      for (let i = 1; i < p.length; i++) x.lineTo(p[i][0] * c.width, p[i][1] * c.height);
+      x.stroke();
+    },
+    redraw() { x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); api.strokes.forEach(api.draw); },
+  };
+  api.redraw();
+  return api;
+}
+const COLORS = ['#111111', '#e11d48', '#f97316', '#facc15', '#22c55e', '#3b82f6', '#a855f7', '#8b5a2b', '#ffffff'];
+const SIZES = [0.006, 0.014, 0.03];
+function drawerUI(s) {
+  render(`<div class="head"><span>🎨 Rita!</span><span class="w">${esc(s.word)}</span></div>${timerBar(s)}
+    <div class="pad" id="pad"><canvas></canvas></div>
+    <div class="tools">
+      ${COLORS.map((c, i) => `<button type="button" class="sw" data-c="${c}" aria-pressed="${i === 0}" style="background:${c}" aria-label="Färg"></button>`).join('')}
+    </div>
+    <div class="tools">
+      ${SIZES.map((w, i) => `<button type="button" class="sz" data-w="${w}" aria-pressed="${i === 1}" aria-label="Penselstorlek"><i style="width:${6 + i * 7}px;height:${6 + i * 7}px"></i></button>`).join('')}
+      <span class="act"><button type="button" id="undoBtn">↶ Ångra</button><button type="button" id="clearBtn">🗑 Rensa</button></span>
+    </div>
+    <p class="text-muted" style="text-align:center;font-size:0.85rem;margin-top:0.6rem">Inga bokstäver eller siffror – bara bilder! 😉</p>`);
+  const pad = makeCanvas($('pad'));
+  let color = COLORS[0], width = SIZES[1], cur = null, pend = [], last = null, flushT = null, sid = 0;
+  document.querySelectorAll('.sw').forEach(b => b.addEventListener('click', () => { color = b.dataset.c; document.querySelectorAll('.sw').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
+  document.querySelectorAll('.sz').forEach(b => b.addEventListener('click', () => { width = +b.dataset.w; document.querySelectorAll('.sz').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
+  const pos = e => { const r = pad.c.getBoundingClientRect(); return [Math.round(((e.clientX - r.left) / r.width) * 1000) / 1000, Math.round(((e.clientY - r.top) / r.height) * 1000) / 1000]; };
+  const flush = () => {
+    flushT = null;
+    if (!cur || !pend.length) return;
+    const seg = { id: cur.id, c: cur.c, w: cur.w, pts: last ? [last, ...pend] : pend.slice() };
+    last = pend[pend.length - 1]; pend = [];
+    send('stroke', { s: seg });
+  };
+  pad.c.addEventListener('pointerdown', e => {
+    e.preventDefault(); pad.c.setPointerCapture(e.pointerId);
+    cur = { id: pid + '-' + (++sid), c: color, w: width, pts: [pos(e)] };
+    pad.strokes.push(cur); pend = [cur.pts[0]]; last = null;
+    pad.draw({ c: cur.c, w: cur.w, pts: [cur.pts[0]] });
+    flush();
+  });
+  pad.c.addEventListener('pointermove', e => {
+    if (!cur) return;
+    const p = pos(e), prev = cur.pts[cur.pts.length - 1];
+    if (Math.abs(p[0] - prev[0]) + Math.abs(p[1] - prev[1]) < 0.003) return;
+    cur.pts.push(p); pend.push(p);
+    pad.draw({ c: cur.c, w: cur.w, pts: [prev, p] });
+    if (!flushT) flushT = setTimeout(flush, 60);
+  });
+  const up = () => { if (!cur) return; clearTimeout(flushT); flush(); cur = null; last = null; };
+  pad.c.addEventListener('pointerup', up); pad.c.addEventListener('pointercancel', up); pad.c.addEventListener('pointerleave', up);
+  $('undoBtn').addEventListener('click', () => { pad.strokes.pop(); pad.redraw(); send('canvas', { op: 'undo' }); });
+  $('clearBtn').addEventListener('click', () => { pad.strokes = []; pad.redraw(); send('canvas', { op: 'clear' }); });
+}
+function guesserUI(s, drawerName, me) {
+  render(`<div class="head"><span>🔎 Gissa vad ${esc(drawerName)} ritar</span></div>${timerBar(s)}
+    <div class="pad" id="view"><canvas></canvas></div>
+    <div class="hint" id="hint">${esc(s.hint || '')}</div>
+    ${me && me.ok ? '<div class="fb ok">✅ Du har gissat rätt! Vänta på de andra…</div>'
+      : `<form class="guess" id="gf"><input id="g" placeholder="Din gissning…" autocomplete="off" autocapitalize="off" enterkeyhint="send"><button type="submit">➤</button></form><div class="fb" id="fb"></div>`}`);
+  viewer = makeCanvas($('view'));
+  const f = $('gf');
+  if (f) f.addEventListener('submit', e => {
+    e.preventDefault();
+    const v = $('g').value.trim(); if (!v) return;
+    send('guess', { text: v.slice(0, 60) });
+    $('g').value = ''; const fb = $('fb'); fb.className = 'fb no'; fb.textContent = `"${v}" – nej…`;
+  });
+}
+function onFeedback(m) {
+  if (m.pid !== pid) return;
+  const fb = $('fb');
+  if (m.kind === 'ok') { PartyFX.confetti(100, false); if (navigator.vibrate) navigator.vibrate([60, 40, 60]); if (fb) { fb.className = 'fb ok'; fb.textContent = `✅ Rätt! +${m.pts} poäng`; } const f = $('gf'); if (f) f.remove(); }
+  else if (m.kind === 'near' && fb) { fb.className = 'fb near'; fb.textContent = '🔥 Väldigt nära!'; if (navigator.vibrate) navigator.vibrate(40); }
+}
+
+// ---------- läget från storbilden ----------
+function onState(s) {
+  lastSeen = Date.now();
+  if (s.phase === 'closed') { render('<div class="center"><div class="big">👋</div><h1>Spelet är avslutat</h1><p>Tack för att du var med!</p></div>'); renderKey = 'closed'; return; }
+  last = s; renderMe();
+  const me = (s.players || []).find(p => p.pid === pid) || {};
+  const iAmUp = s.drawer === pid;
+  const drawerName = ((s.players || []).find(p => p.pid === s.drawer) || {}).name || '';
+  // rita bara om när något viktigt ändrats (inte på varje hjärtslag)
+  const key = [s.game, s.phase, s.turn, s.drawer, iAmUp && s.game === 'mime' ? s.word : '', me.ok, s.phase === 'lobby' ? (s.players || []).length : ''].join('|');
+  if (key === renderKey) { const h = $('hint'); if (h && s.hint != null) h.textContent = s.hint; return; }
+  renderKey = key;
+  if (s.phase !== 'draw') viewer = null;
+
+  if (s.phase === 'lobby') {
+    endShown = false;
+    render(`<div class="center"><div class="big">🎉</div><h1>Du är med!</h1><p>Hej ${esc(name)} – vänta tills spelet startar.</p>
+      <span class="pill">${s.game === 'mime' ? '🎭 Mimleken' : '🎨 Ritleken'} · 👥 ${(s.players || []).filter(p => p.on).length} spelare</span>
+      <p><a href="#" id="rename">Byt namn</a></p></div>`);
+    $('rename').addEventListener('click', e => { e.preventDefault(); if (ch) supabaseClient.removeChannel(ch); ch = null; renderMe(); joinForm(); });
+    return;
+  }
+  if (s.phase === 'choose') {
+    if (iAmUp) {
+      render(`<div class="center"><h1>Din tur att rita!</h1><p>Välj ett ord:</p>${timerBar(s)}
+        <div class="choices">${(s.choices || []).map((w, i) => `<button type="button" data-i="${i}">${esc(w)}</button>`).join('')}</div></div>`);
+      document.querySelectorAll('.choices button').forEach(b => b.addEventListener('click', () => { send('pick', { idx: +b.dataset.i }); render('<div class="center"><div class="spin"></div></div>'); }));
+    } else render(`<div class="center"><div class="big">🎨</div><h1>${esc(drawerName)}</h1><p>väljer ett ord… gör dig redo att gissa!</p></div>`);
+    return;
+  }
+  if (s.phase === 'draw') { if (iAmUp) drawerUI(s); else guesserUI(s, drawerName, me); return; }
+  if (s.phase === 'mime') {
+    if (iAmUp) {
+      render(`<div class="center"><p>Mima det här – utan ord och ljud!</p><div class="word">${esc(s.word)}</div>${timerBar(s)}
+        <button type="button" class="bigbtn btn-outline" id="skipBtn">⏭ Byt ord</button>
+        <p style="font-size:0.85rem">När någon gissar rätt trycker frågeledaren på deras namn – då får du ett nytt ord.</p></div>`);
+      $('skipBtn').addEventListener('click', () => send('skip', {}));
+    } else render(`<div class="center"><div class="big">🎭</div><h1>${esc(drawerName)} mimar</h1><p>Gissa högt! Frågeledaren delar ut poängen.</p>${timerBar(s)}</div>`);
+    return;
+  }
+  if (s.phase === 'reveal') {
+    cancelAnimationFrame(raf);
+    render(`<div class="center"><p>Ordet var</p><div class="word">${esc(s.word || '')}</div>
+      <span class="pill">${me.ok ? '✅ Du gissade rätt' : iAmUp ? 'Bra ritat/mimat! 🙌' : 'Nästa tur strax…'} · ${me.score || 0} p</span></div>`);
+    return;
+  }
+  if (s.phase === 'end') {
+    if (endShown) return; endShown = true;
+    const ranked = (s.players || []).slice().sort((a, b) => b.score - a.score);
+    const rank = ranked.findIndex(p => p.pid === pid) + 1;
+    const won = rank === 1 && (me.score || 0) > 0;
+    if (won) PartyMedia.celebrate(); else if (rank && rank <= 3) PartyFX.confetti(200, true);
+    render(`<div class="center"><div class="big">${['🥇', '🥈', '🥉'][rank - 1] || '🎸'}</div><h1>${won ? 'Du vann!' : rank ? 'Plats ' + rank : 'Slut!'}</h1>
+      <span class="pill">${me.score || 0} poäng · ${ranked.length} spelare</span>
+      <p>Vinnare: <b style="color:var(--accent)">${esc(ranked[0] ? ranked[0].name : '')}</b></p></div>`);
+  }
+}
+
+setInterval(() => { if (ch && lastSeen && Date.now() - lastSeen > 9000) { lastSeen = Date.now(); send('hello', {}); } }, 3000);
+(async () => {
+  if (!name) { try { const m = await getCurrentMember(); if (m && m.name) name = m.name.split(' ')[0]; } catch (e) {} }
+  if (code && name) connect(); else joinForm();
+})();
+</script>
+</body>
+</html>

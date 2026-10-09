@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobilspel — Party Mode</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/party.css">
+<style>html.gate body { visibility: hidden; }</style>
+<script>document.documentElement.classList.add('gate');</script>
+<style>
+  /* Mobilspel: Ritleken (rita & gissa) och Mimleken (charader). Storbilden är värd, alla spelar på /spel.html */
+  .box { padding: 1rem 1.1rem; border-radius: 0.9rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
+  .box h3 { margin: 0 0 0.6rem; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); }
+  .box p { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--text-muted); }
+  .setup { display: grid; gap: 1.2rem; max-width: 760px; }
+  .seg { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
+  .seg button { background: rgba(255,255,255,0.06); color: #d1d5db; border: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
+  .start-btn { font-size: 1.25rem; padding: 0.9rem 2rem; border-radius: 0.8rem; justify-self: start; }
+  .lobby { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2rem; align-items: start; margin-top: 1rem; }
+  @media (max-width: 760px) { .lobby { grid-template-columns: 1fr; } }
+  .qr { background: #fff; border-radius: 1rem; padding: 0.8rem; line-height: 0; width: min(78vw, 340px); }
+  .qr svg { width: 100%; height: auto; }
+  .join-how { font-size: 1.1rem; color: var(--text-muted); margin: 0 0 0.4rem; }
+  .join-url { font-size: clamp(1.1rem, 2.6vw, 1.6rem); font-weight: 700; color: #fff; word-break: break-all; }
+  .join-code { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(3.5rem, 11vw, 6.5rem); letter-spacing: 0.12em; line-height: 1; color: var(--accent); text-shadow: var(--party-glow); margin: 0.3rem 0 1rem; }
+  .players { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.8rem 0 1.4rem; min-height: 2.5rem; }
+  .players span { padding: 0.4rem 0.9rem; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid var(--border); font-weight: 600; animation: intro-pop 0.5s cubic-bezier(.2,1.6,.4,1) both; }
+  .players span.off { opacity: 0.4; }
+
+  /* spelvy */
+  .game { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1.2rem; margin-top: 0.6rem; }
+  @media (max-width: 900px) { .game { grid-template-columns: 1fr; } }
+  .stagebox { display: grid; gap: 0.7rem; align-content: start; }
+  .turnline { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .turnline h2 { margin: 0; font-size: clamp(1.4rem, 3.4vw, 2.2rem); text-transform: uppercase; }
+  .hint { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(1.4rem, 3.4vw, 2.2rem); letter-spacing: 0.35em; color: var(--accent); }
+  .timer { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  .timer > div { height: 100%; width: 100%; background: linear-gradient(90deg, var(--party-hot), var(--accent)); transform-origin: left; }
+  .canvas-wrap { position: relative; aspect-ratio: 4 / 3; width: min(100%, calc(68vh * 4 / 3)); margin: 0 auto; border-radius: 0.9rem; overflow: hidden; background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .canvas-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 1rem; background: rgba(11,12,16,0.82); color: #fff; }
+  .overlay .big { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(2rem, 6vw, 4rem); text-transform: uppercase; line-height: 1.05; text-shadow: var(--party-glow); }
+  .overlay p { color: var(--text-muted); margin: 0.6rem 0 0; font-size: 1.1rem; }
+  .side { display: grid; gap: 0.8rem; align-content: start; }
+  .board { display: grid; gap: 0.4rem; }
+  .board div { display: grid; grid-template-columns: 1.8rem minmax(0, 1fr) auto auto; gap: 0.5rem; align-items: center; padding: 0.45rem 0.7rem; border-radius: 0.6rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); font-weight: 600; }
+  .board div.act { border-color: var(--accent); background: rgba(229,169,104,0.14); }
+  .board div.ok { border-color: #4ade80; background: rgba(74,222,128,0.12); }
+  .board b { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .board .off { opacity: 0.45; }
+  .feed { display: grid; gap: 0.3rem; max-height: 280px; overflow-y: auto; font-size: 0.9rem; padding: 0.6rem; border-radius: 0.7rem; background: rgba(0,0,0,0.25); }
+  .feed div { color: var(--text-muted); } .feed b { color: var(--text); } .feed .ok { color: #4ade80; } .feed .near { color: #facc15; }
+  .acts { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  /* mimleken */
+  .mime-stage { display: grid; place-items: center; text-align: center; gap: 0.8rem; padding: 2rem 1rem; border-radius: 1rem; background: linear-gradient(135deg, rgba(255,61,90,0.15), rgba(168,85,247,0.14)); border: 1px solid rgba(229,169,104,0.25); min-height: 18rem; }
+  .mime-stage .who { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(2rem, 6vw, 3.6rem); text-transform: uppercase; text-shadow: var(--party-glow); }
+  .mime-stage .clock { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: clamp(3rem, 10vw, 6rem); color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1; }
+  .award { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+  .award button { font-size: 1rem; padding: 0.6rem 1rem; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid var(--border); }
+  .award button:hover { background: rgba(74,222,128,0.25); border-color: #4ade80; }
+  .winner { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; text-transform: uppercase; font-size: clamp(2.2rem, 8vw, 4.5rem); line-height: 1; color: #fff; text-shadow: var(--party-glow); margin: 0.5rem 0 1rem; animation: intro-pop 0.8s cubic-bezier(.2,1.6,.4,1) both; }
+  .podium { display: grid; gap: 0.5rem; max-width: 560px; }
+  .podium div { display: flex; justify-content: space-between; padding: 0.7rem 1rem; border-radius: 0.7rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border); font-weight: 600; font-size: 1.1rem; }
+  .podium div:first-child { border-color: var(--accent); background: rgba(229,169,104,0.14); font-size: 1.4rem; }
+  .podium b { color: var(--accent); }
+  #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 2100; display: none; max-width: calc(100vw - 3rem); }
+</style>
+</head>
+<body class="party-page">
+<header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+
+<div class="container">
+  <!-- meny -->
+  <section id="menu">
+    <a href="/medlem/party.html" class="back-btn">&larr; Party</a>
+    <h1 class="party-title">Mobil<span class="hot">spel</span></h1>
+    <p class="party-sub">Spel där alla är med på sin egen mobil – storbildsskärmen visar spelet.</p>
+    <div class="party-tiles">
+      <button type="button" class="party-tile" data-game="draw"><span class="emo">🎨</span><h3>Ritleken</h3><p>En ritar på mobilen, alla andra gissar. Snabbast rätt vinner poäng – och den som ritar får poäng för varje rätt gissning.</p></button>
+      <button type="button" class="party-tile" data-game="mime"><span class="emo">🎭</span><h3>Mimleken</h3><p>Charader! Mobilen visar ett ord för den som mimar, resten gissar högt. Frågeledaren trycker vem som gissade rätt.</p></button>
+      <a class="party-tile" href="/medlem/party-quiz.html"><span class="emo">🧠</span><h3>Rockquiz</h3><p>Svara A–D på mobilen. Snabbt svar ger mer poäng.</p></a>
+      <a class="party-tile" href="/medlem/party-tidslinje.html"><span class="emo">🕰️</span><h3>Tidslinjen</h3><p>Placera låtarna rätt i tiden – alla samtidigt eller i turordning.</p></a>
+    </div>
+  </section>
+
+  <!-- inställningar -->
+  <section id="setup" hidden>
+    <button type="button" class="back-btn" id="setupBack" style="border:0">&larr; Mobilspel</button>
+    <h1 class="party-title" id="setupTitle"></h1>
+    <div class="setup">
+      <div class="box"><h3>Antal varv</h3><div class="seg" id="segRounds"><button type="button" data-v="1" aria-pressed="true">1</button><button type="button" data-v="2" aria-pressed="false">2</button><button type="button" data-v="3" aria-pressed="false">3</button></div><p>Ett varv = alla har fått rita/mima en gång.</p></div>
+      <div class="box"><h3>Tid per tur</h3><div class="seg" id="segTime"><button type="button" data-v="60" aria-pressed="false">60 s</button><button type="button" data-v="80" aria-pressed="true">80 s</button><button type="button" data-v="100" aria-pressed="false">100 s</button></div></div>
+      <button type="button" class="start-btn" id="openBtn">📱 Öppna för spelare</button>
+    </div>
+  </section>
+
+  <!-- lobby -->
+  <section id="lobby" hidden>
+    <div class="party-top"><button type="button" class="btn-outline" id="lobbyCancel">✕ Avbryt</button><span class="text-muted" id="lobbyGame"></span></div>
+    <div class="lobby">
+      <div class="qr" id="qr"></div>
+      <div>
+        <p class="join-how">Skanna QR-koden eller gå till</p>
+        <div class="join-url" id="joinUrl"></div>
+        <p class="join-how" style="margin-top:1rem">och skriv in koden</p>
+        <div class="join-code" id="joinCode"></div>
+        <h3 style="margin:0">👥 <span id="playerCount">0</span> spelare</h3>
+        <div class="players" id="players"></div>
+        <button type="button" class="start-btn" id="goBtn" disabled>🎉 Starta</button>
+        <p class="text-muted" style="font-size:0.85rem;margin-top:0.6rem">Minst 2 spelare behövs.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ritleken -->
+  <section id="draw" hidden>
+    <div class="party-top"><button type="button" class="btn-outline" id="drawQuit">✕ Avsluta</button><span class="text-muted" id="drawInfo"></span></div>
+    <div class="game">
+      <div class="stagebox">
+        <div class="turnline"><h2 id="drawWho"></h2><span class="hint" id="hint"></span></div>
+        <div class="timer" id="dTimerWrap"><div id="dTimer"></div></div>
+        <div class="canvas-wrap"><canvas id="cv" width="1200" height="900"></canvas><div class="overlay" id="dOverlay"></div></div>
+      </div>
+      <div class="side">
+        <div class="board" id="dBoard"></div>
+        <div class="feed" id="feed"></div>
+        <div class="acts"><button type="button" class="btn-outline" id="dSkip">⏭ Hoppa över turen</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mimleken -->
+  <section id="mime" hidden>
+    <div class="party-top"><button type="button" class="btn-outline" id="mimeQuit">✕ Avsluta</button><span class="text-muted" id="mimeInfo"></span></div>
+    <div class="game">
+      <div class="mime-stage" id="mimeStage"></div>
+      <div class="side"><div class="board" id="mBoard"></div><div class="acts"><button type="button" class="btn-outline" id="mNext">⏭ Nästa mimare</button></div></div>
+    </div>
+  </section>
+
+  <!-- resultat -->
+  <section id="result" hidden>
+    <div class="winner" id="winner"></div>
+    <div class="podium" id="podium"></div>
+    <div class="acts" style="margin-top:1.4rem"><button type="button" id="againBtn">🔁 Spela igen</button><button type="button" class="btn-outline" id="menuBtn">Mobilspel</button></div>
+  </section>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/party.js"></script>
+<script src="/js/party-words.js"></script>
+<script src="/js/vendor/qrcode.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function toast(msg, ms = 4000) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const SECTIONS = ['menu', 'setup', 'lobby', 'draw', 'mime', 'result'];
+function show(id) {
+  SECTIONS.forEach(s => $(s).hidden = s !== id);
+  if (['menu', 'setup', 'lobby'].includes(id)) PartyMedia.lobbyMusic(true); else if (id !== 'result') PartyMedia.lobbyMusic(false);
+}
+const GAMES = { draw: { name: '🎨 Ritleken' }, mime: { name: '🎭 Mimleken' } };
+let game = 'draw', rounds = 1, turnSec = 80;
+
+// ---------- meny & inställningar ----------
+document.querySelectorAll('[data-game]').forEach(b => b.addEventListener('click', () => {
+  game = b.dataset.game;
+  $('setupTitle').innerHTML = game === 'draw' ? 'Rit<span class="hot">leken</span>' : 'Mim<span class="hot">leken</span>';
+  show('setup');
+}));
+$('setupBack').addEventListener('click', () => show('menu'));
+[['segRounds', v => rounds = v], ['segTime', v => turnSec = v]].forEach(([id, set]) => $(id).querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+  $(id).querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); set(+b.dataset.v);
+})));
+
+// ---------- rum (Supabase Realtime) ----------
+let rt = null, code = '', phase = 'idle', players = new Map(), order = [], beat = null;
+let turn = 0, totalTurns = 0, drawer = null, choices = [], word = '', correct = new Set(), tEnd = 0, timerRaf = null, revealed = [], usedWords = new Set();
+let strokes = [];   // [{id, c, w, pts:[[x,y],…]}]
+const online = () => [...players.values()].filter(p => p.on);
+const pname = pid => (players.get(pid) || {}).name || '?';
+
+function closeRoom() {
+  clearInterval(beat); beat = null; cancelAnimationFrame(timerRaf); clearTimeout(nextTimer);
+  if (rt) { try { rt.send({ type: 'broadcast', event: 'state', payload: { phase: 'closed' } }); } catch (e) {} supabaseClient.removeChannel(rt); }
+  rt = null; phase = 'idle';
+}
+function openRoom() {
+  closeRoom(); PartyFX.unlockAudio();
+  code = String(Math.floor(1000 + Math.random() * 9000));
+  players = new Map(); order = []; phase = 'lobby';
+  rt = supabaseClient.channel('hvgame-' + code, { config: { broadcast: { self: false }, presence: { key: 'host' } } });
+  rt.on('presence', { event: 'sync' }, syncPresence);
+  rt.on('broadcast', { event: 'hello' }, () => sendState());
+  rt.on('broadcast', { event: 'pick' }, ({ payload }) => onPick(payload || {}));
+  rt.on('broadcast', { event: 'stroke' }, ({ payload }) => onStroke(payload || {}));
+  rt.on('broadcast', { event: 'canvas' }, ({ payload }) => onCanvas(payload || {}));
+  rt.on('broadcast', { event: 'guess' }, ({ payload }) => onGuess(payload || {}));
+  rt.on('broadcast', { event: 'skip' }, ({ payload }) => onMimeSkip(payload || {}));
+  rt.subscribe(st => { if (st === 'SUBSCRIBED') sendState(); else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') toast('Kunde inte ansluta till realtid – kontrollera nätet', 5000); });
+  beat = setInterval(sendState, 2500);
+  const url = location.origin + '/spel.html?kod=' + code;
+  try { const qr = window.qrcode(0, 'M'); qr.addData(url); qr.make(); $('qr').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true }); } catch (e) { $('qr').hidden = true; }
+  $('joinUrl').textContent = location.host + '/spel.html';
+  $('joinCode').textContent = code;
+  $('lobbyGame').textContent = GAMES[game].name;
+  renderLobby(); show('lobby');
+}
+function syncPresence() {
+  const st = rt.presenceState();
+  players.forEach(p => p.on = false);
+  Object.entries(st).forEach(([pid, metas]) => {
+    if (pid === 'host' || !metas.length) return;
+    let p = players.get(pid);
+    if (!p) { p = { pid, name: 'Spelare', score: 0, on: true }; players.set(pid, p); order.push(pid); }
+    p.name = String(metas[0].name || 'Spelare').slice(0, 24); p.on = true;
+  });
+  renderLobby(); renderBoards();
+  if (phase === 'draw' && drawer && !(players.get(drawer) || {}).on) { addFeed(`<b>${esc(pname(drawer))}</b> lämnade – nästa tur`); endTurn(); }
+}
+function renderLobby() {
+  const list = [...players.values()];
+  $('playerCount').textContent = online().length;
+  $('players').innerHTML = list.length ? list.map(p => `<span class="${p.on ? '' : 'off'}">${esc(p.name)}</span>`).join('') : '<span class="text-muted" style="background:none;border:0;animation:none;font-weight:400">Väntar på spelare…</span>';
+  $('goBtn').disabled = online().length < 2;
+}
+function sendState() {
+  if (!rt) return;
+  const p = { game, phase, code, turn, totalTurns, drawer,
+    players: [...players.values()].map(x => ({ pid: x.pid, name: x.name, score: x.score, on: x.on, ok: correct.has(x.pid) })) };
+  if (phase === 'choose') { p.choices = choices; p.remainMs = Math.max(0, tEnd - performance.now()); p.timeMs = 12000; }
+  if (phase === 'draw' || phase === 'mime') { p.remainMs = Math.max(0, tEnd - performance.now()); p.timeMs = turnSec * 1000; p.hint = hintText(); p.len = word.length; }
+  if (phase === 'draw' || phase === 'mime') p.word = word;    // visas bara på ritarens/mimarens mobil
+  if (phase === 'reveal' || phase === 'end') p.word = word;
+  rt.send({ type: 'broadcast', event: 'state', payload: p });
+}
+function startTimer(ms, onEnd) {
+  cancelAnimationFrame(timerRaf);
+  tEnd = performance.now() + ms;
+  const bar = game === 'draw' ? $('dTimer') : null;
+  const step = () => {
+    const left = Math.max(0, tEnd - performance.now());
+    if (bar) bar.style.transform = `scaleX(${left / ms})`;
+    if (game === 'mime' && phase === 'mime') { const c = document.querySelector('#mimeStage .clock'); if (c) c.textContent = Math.ceil(left / 1000); }
+    if (game === 'draw' && phase === 'draw') maybeHint(left / ms);
+    if (left <= 0) { onEnd(); return; }
+    timerRaf = requestAnimationFrame(step);
+  };
+  timerRaf = requestAnimationFrame(step);
+}
+function nextPlayer() {
+  // turordning: varje spelare i tur och ordning (hoppar över den som inte är med)
+  for (let k = 0; k < order.length; k++) {
+    const pid = order[(turn - 1 + k) % order.length];
+    if ((players.get(pid) || {}).on) return pid;
+  }
+  return null;
+}
+function pickWords(list, n) {
+  let pool = list.filter(w => !usedWords.has(w));
+  if (pool.length < n) { usedWords.clear(); pool = list.slice(); }
+  return shuffle(pool).slice(0, n);
+}
+
+// ---------- start ----------
+function startGame() {
+  players.forEach(p => { p.score = 0; });
+  order = order.filter(pid => (players.get(pid) || {}).on);
+  totalTurns = rounds * order.length; turn = 0;
+  $('drawInfo').textContent = $('mimeInfo').textContent = `Kod ${code}`;
+  nextTurn();
+}
+let nextTimer = null;
+function nextTurn() {
+  clearTimeout(nextTimer);
+  turn++;
+  if (turn > totalTurns) { finish(); return; }
+  drawer = nextPlayer();
+  if (!drawer) { finish(); return; }
+  correct = new Set(); revealed = []; strokes = []; word = '';
+  if (game === 'draw') {
+    show('draw'); clearCanvas();
+    phase = 'choose'; choices = pickWords(window.DRAW_WORDS, 3);
+    $('drawWho').innerHTML = `🎨 <span style="color:var(--accent)">${esc(pname(drawer))}</span> ritar`;
+    $('hint').textContent = '';
+    overlay(`<div><div class="big">${esc(pname(drawer))}</div><p>väljer ett ord på sin mobil…</p></div>`);
+    $('feed').innerHTML = '';
+    startTimer(12000, () => onPick({ pid: drawer, idx: Math.floor(Math.random() * 3), auto: true }));
+  } else {
+    show('mime');
+    phase = 'mime'; word = pickWords(window.MIME_WORDS, 1)[0]; usedWords.add(word);
+    renderMime();
+    startTimer(turnSec * 1000, endTurn);
+  }
+  renderBoards(); sendState();
+}
+function finish() {
+  phase = 'end'; cancelAnimationFrame(timerRaf);
+  const ranked = [...players.values()].sort((a, b) => b.score - a.score);
+  const top = ranked.filter(p => p.score === ranked[0].score && p.score > 0);
+  $('winner').textContent = top.length ? `🏆 ${top.map(p => p.name).join(' & ')} vinner!` : 'Tack för att ni spelade!';
+  $('podium').innerHTML = ranked.map((p, i) => `<div><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${esc(p.name)}</span><b>${p.score}</b></div>`).join('');
+  show('result'); sendState();
+  PartyMedia.celebrate();
+}
+function renderBoards() {
+  const ranked = [...players.values()].sort((a, b) => b.score - a.score);
+  const html = ranked.map((p, i) => `<div class="${p.pid === drawer ? 'act' : correct.has(p.pid) ? 'ok' : ''}"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'}</span><span class="${p.on ? '' : 'off'}">${esc(p.name)}</span><span>${p.pid === drawer ? (game === 'draw' ? '🎨' : '🎭') : correct.has(p.pid) ? '✅' : ''}</span><b>${p.score}</b></div>`).join('');
+  $('dBoard').innerHTML = html; $('mBoard').innerHTML = html;
+}
+
+// ---------- Ritleken ----------
+const cv = $('cv'), cx = cv.getContext('2d');
+function clearCanvas() { cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); }
+function drawSeg(s) {
+  const pts = s.pts; if (!pts || !pts.length) return;
+  cx.strokeStyle = s.c; cx.fillStyle = s.c; cx.lineWidth = Math.max(1, s.w * cv.width); cx.lineCap = 'round'; cx.lineJoin = 'round';
+  if (pts.length === 1) { cx.beginPath(); cx.arc(pts[0][0] * cv.width, pts[0][1] * cv.height, cx.lineWidth / 2, 0, 6.283); cx.fill(); return; }
+  cx.beginPath(); cx.moveTo(pts[0][0] * cv.width, pts[0][1] * cv.height);
+  for (let i = 1; i < pts.length; i++) cx.lineTo(pts[i][0] * cv.width, pts[i][1] * cv.height);
+  cx.stroke();
+}
+function redraw() { clearCanvas(); strokes.forEach(drawSeg); }
+function overlay(html) { const o = $('dOverlay'); o.innerHTML = html || ''; o.hidden = !html; }
+function onPick(m) {
+  if (phase !== 'choose' || m.pid !== drawer) return;
+  const i = Math.max(0, Math.min(choices.length - 1, Number(m.idx) || 0));
+  word = choices[i]; usedWords.add(word);
+  phase = 'draw'; overlay('');
+  addFeed(`<b>${esc(pname(drawer))}</b> ritar nu – gissa på mobilen! ✏️`);
+  startTimer(turnSec * 1000, endTurn);
+  renderBoards(); sendState();
+}
+function onStroke(m) {
+  if (phase !== 'draw' || m.pid !== drawer || !m.s) return;
+  const s = m.s;
+  let st = strokes.find(x => x.id === s.id);
+  if (!st) { st = { id: s.id, c: s.c, w: s.w, pts: [] }; strokes.push(st); }
+  st.pts.push(...s.pts);
+  drawSeg(s);
+}
+function onCanvas(m) {
+  if (m.pid !== drawer) return;
+  if (m.op === 'clear') strokes = [];
+  else if (m.op === 'undo') strokes.pop();
+  redraw();
+}
+const normWord = t => String(t || '').toLowerCase().normalize('NFC').replace(/[^a-z0-9åäöéüæø]+/g, '');
+function lev(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+function onGuess(m) {
+  if (phase !== 'draw' || !m.pid || m.pid === drawer || correct.has(m.pid)) return;
+  const p = players.get(m.pid); if (!p) return;
+  const g = normWord(m.text), w = normWord(word);
+  if (!g) return;
+  if (g === w) {
+    correct.add(m.pid);
+    const left = Math.max(0, tEnd - performance.now()) / (turnSec * 1000);
+    const pts = Math.round(50 + 100 * left) + (correct.size === 1 ? 20 : 0);
+    p.score += pts;
+    const d = players.get(drawer); if (d) d.score += 25;
+    addFeed(`<span class="ok">✅ <b>${esc(p.name)}</b> gissade rätt! +${pts}</span>`);
+    rt.send({ type: 'broadcast', event: 'feedback', payload: { pid: m.pid, kind: 'ok', pts } });
+    PartyFX.confetti(60, false);
+    renderBoards(); sendState();
+    const guessers = online().filter(x => x.pid !== drawer);
+    if (guessers.every(x => correct.has(x.pid))) setTimeout(endTurn, 900);
+  } else if (w.length >= 4 && lev(g, w) <= 1) {
+    rt.send({ type: 'broadcast', event: 'feedback', payload: { pid: m.pid, kind: 'near' } });
+    addFeed(`<span class="near">🔥 <b>${esc(p.name)}</b> är väldigt nära!</span>`);
+  } else addFeed(`<b>${esc(p.name)}</b>: ${esc(String(m.text).slice(0, 40))}`);
+}
+function hintText() {
+  if (!word) return '';
+  return [...word].map((ch, i) => ch === ' ' ? '  ' : revealed.includes(i) ? ch.toUpperCase() : '_').join(' ');
+}
+function maybeHint(frac) {
+  // avslöja bokstäver när halva och tre fjärdedelar av tiden gått
+  const want = frac < 0.25 ? 2 : frac < 0.5 ? 1 : 0;
+  const letters = [...word].map((c, i) => c !== ' ' ? i : -1).filter(i => i >= 0 && !revealed.includes(i));
+  if (revealed.length < want && letters.length > 2) { revealed.push(letters[Math.floor(Math.random() * letters.length)]); sendState(); }
+  $('hint').textContent = hintText();
+}
+function addFeed(html) { const f = $('feed'); f.insertAdjacentHTML('afterbegin', `<div>${html}</div>`); while (f.children.length > 40) f.lastChild.remove(); }
+function endTurn() {
+  if (!(phase === 'draw' || phase === 'choose' || phase === 'mime')) return;
+  cancelAnimationFrame(timerRaf);
+  phase = 'reveal';
+  if (game === 'draw') {
+    overlay(`<div><p>Ordet var</p><div class="big">${esc(word || '–')}</div><p>${correct.size} av ${online().filter(x => x.pid !== drawer).length} gissade rätt</p></div>`);
+    $('hint').textContent = (word || '').toUpperCase();
+  } else renderMime();
+  renderBoards(); sendState();
+  nextTimer = setTimeout(nextTurn, 6000);
+}
+$('dSkip').addEventListener('click', () => { if (phase === 'reveal') nextTurn(); else endTurn(); });
+
+// ---------- Mimleken ----------
+function renderMime() {
+  const others = online().filter(p => p.pid !== drawer);
+  if (phase === 'mime') {
+    $('mimeStage').innerHTML = `<div class="text-muted">Tur ${turn} av ${totalTurns}</div>
+      <div class="who">🎭 ${esc(pname(drawer))} mimar</div><div class="clock">${turnSec}</div>
+      <p class="text-muted" style="margin:0">Gissa högt! Tryck på den som gissade rätt:</p>
+      <div class="award">${others.map(p => `<button type="button" data-pid="${p.pid}">✅ ${esc(p.name)}</button>`).join('')}</div>`;
+    $('mimeStage').querySelectorAll('[data-pid]').forEach(b => b.addEventListener('click', () => award(b.dataset.pid)));
+  } else {
+    $('mimeStage').innerHTML = `<div class="text-muted">Ordet var</div><div class="who">${esc(word)}</div><p class="text-muted">Nästa mimare strax…</p>`;
+  }
+}
+function award(pid) {
+  if (phase !== 'mime') return;
+  const p = players.get(pid), d = players.get(drawer);
+  if (p) p.score += 100; if (d) d.score += 50;
+  PartyFX.confetti(70, false);
+  toast(`✅ ${pname(pid)} gissade "${word}"!`, 2500);
+  // nytt ord till samma mimare så länge tiden räcker
+  word = pickWords(window.MIME_WORDS, 1)[0]; usedWords.add(word);
+  renderBoards(); sendState();
+}
+function onMimeSkip(m) {
+  if (phase !== 'mime' || m.pid !== drawer) return;
+  word = pickWords(window.MIME_WORDS, 1)[0]; usedWords.add(word);
+  sendState();
+}
+$('mNext').addEventListener('click', () => { if (phase === 'reveal') nextTurn(); else endTurn(); });
+
+// ---------- knappar ----------
+$('openBtn').addEventListener('click', openRoom);
+$('goBtn').addEventListener('click', startGame);
+$('lobbyCancel').addEventListener('click', () => { closeRoom(); show('setup'); });
+[$('drawQuit'), $('mimeQuit')].forEach(b => b.addEventListener('click', () => { if (confirm('Avsluta spelet?')) { closeRoom(); show('menu'); } }));
+$('againBtn').addEventListener('click', () => { if (!rt) { show('setup'); return; } phase = 'lobby'; correct = new Set(); drawer = null; renderLobby(); show('lobby'); sendState(); });
+$('menuBtn').addEventListener('click', () => { closeRoom(); show('menu'); });
+window.addEventListener('beforeunload', closeRoom);
+
+(async () => {
+  const acc = await requirePartyAccess();
+  if (!acc) return;
+  document.documentElement.classList.remove('gate');
+  PartyMedia.lobbyMusic(true);
+})();
+</script>
+</body>
+</html>

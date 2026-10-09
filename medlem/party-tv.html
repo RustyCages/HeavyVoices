@@ -91,7 +91,7 @@
     <p class="party-sub">Slumpade hårdrocksvideor dygnet runt. Vrid på kanalratten för nästa video.</p>
 
     <div class="tv-stage">
-      <div class="tv-photo" id="tvPhoto" hidden><img id="tvImg" alt="TV"><button type="button" class="hot builtin" id="hotTune" title="Vrid – nästa kanal" aria-label="Nästa kanal" style="left:78.5%;top:27.5%;width:7.4%;height:13.5%"></button><button type="button" class="hot builtin" id="hotPower" title="Ström" aria-label="Ström på/av" style="left:75.9%;top:73.8%;width:4.2%;height:7.4%"></button><button type="button" class="hot builtin" id="hotVol" title="Ljud av/på" aria-label="Ljud av/på" style="left:78.5%;top:10.5%;width:7.4%;height:13.5%"></button></div>
+      <div class="tv-photo" id="tvPhoto" hidden><img id="tvImg" alt="TV"><button type="button" class="hot builtin" id="hotTune" title="Vrid – nästa kanal" aria-label="Nästa kanal" style="left:79.06%;top:27.2%;width:7.35%;height:13.5%"></button><button type="button" class="hot builtin" id="hotPower" title="Ström" aria-label="Ström på/av" style="left:76.2%;top:73.7%;width:4.2%;height:7.4%"></button><button type="button" class="hot builtin" id="hotVol" title="Ljud av/på" aria-label="Ljud av/på" style="left:79.06%;top:10.3%;width:7.35%;height:13.5%"></button></div>
       <div class="tv" id="tvDrawn">
         <div class="ant"><i></i></div>
         <div class="cabinet">
@@ -343,7 +343,7 @@ document.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key 
 const FRAME_DIR = 'party/tv-frame', BUCKET = 'heavy-voices-stems';
 let frame = null;   // { img (sökväg), l, t, w, h, r, behind }
 // Standard: fotot av Luxor-TV:n (images/party/tv.webp) med urklippt, genomskinlig skärm
-const BUILTIN_FRAME = { builtin: true, img: '/images/party/tv.webp', l: 28.75, t: 13.2, w: 42.6, h: 64.6, r: 9, behind: true };
+const BUILTIN_FRAME = { builtin: true, img: '/images/party/tv.webp', l: 26.72, t: 13.2, w: 44.63, h: 64.73, r: 9, behind: true };
 const DEF_FRAME = { l: 12, t: 14, w: 58, h: 62, r: 8, behind: false };
 async function signed(path) { const { data } = await supabaseClient.storage.from(BUCKET).createSignedUrl(path, 3600 * 6); return data ? data.signedUrl : null; }
 function applyFrame(imgUrl) {

@@ -7,10 +7,11 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/party.css">
+<link rel="stylesheet" href="/css/party-games.css">
 <style>html.gate body { visibility: hidden; }</style>
 <script>document.documentElement.classList.add('gate');</script>
 <style>
-  /* Mobilspel: Ritleken (rita & gissa) och Mimleken (charader). Storbilden är värd, alla spelar på /spel.html */
+  /* Mobilspel: Ritleken, Mimleken + spelen i js/games/*.js. Storbilden är värd, alla spelar på /spel.html */
   .box { padding: 1rem 1.1rem; border-radius: 0.9rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
   .box h3 { margin: 0 0 0.6rem; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); }
   .box p { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--text-muted); }
@@ -78,21 +79,14 @@
     <a href="/medlem/party.html" class="back-btn">&larr; Party</a>
     <h1 class="party-title">Mobil<span class="hot">spel</span></h1>
     <p class="party-sub">Spel där alla är med på sin egen mobil – storbildsskärmen visar spelet.</p>
-    <div class="party-tiles">
-      <button type="button" class="party-tile" data-game="draw"><span class="emo">🎨</span><h3>Ritleken</h3><p>En ritar på mobilen, alla andra gissar. Snabbast rätt vinner poäng – och den som ritar får poäng för varje rätt gissning.</p></button>
-      <button type="button" class="party-tile" data-game="mime"><span class="emo">🎭</span><h3>Mimleken</h3><p>Charader! Mobilen visar ett ord för den som mimar, resten gissar högt. Frågeledaren trycker vem som gissade rätt.</p></button>
-    </div>
+    <div class="party-tiles" id="gameTiles"></div>
   </section>
 
   <!-- inställningar -->
   <section id="setup" hidden>
     <button type="button" class="back-btn" id="setupBack" style="border:0">&larr; Mobilspel</button>
     <h1 class="party-title" id="setupTitle"></h1>
-    <div class="setup">
-      <div class="box"><h3>Antal varv</h3><div class="seg" id="segRounds"><button type="button" data-v="1" aria-pressed="true">1</button><button type="button" data-v="2" aria-pressed="false">2</button><button type="button" data-v="3" aria-pressed="false">3</button></div><p>Ett varv = alla har fått rita/mima en gång.</p></div>
-      <div class="box"><h3>Tid per tur</h3><div class="seg" id="segTime"><button type="button" data-v="60" aria-pressed="false">60 s</button><button type="button" data-v="80" aria-pressed="true">80 s</button><button type="button" data-v="100" aria-pressed="false">100 s</button></div></div>
-      <button type="button" class="start-btn" id="openBtn">📱 Öppna för spelare</button>
-    </div>
+    <div class="setup" id="setupBody"></div>
   </section>
 
   <!-- lobby -->
@@ -108,7 +102,7 @@
         <h3 style="margin:0">👥 <span id="playerCount">0</span> spelare</h3>
         <div class="players" id="players"></div>
         <button type="button" class="start-btn" id="goBtn" disabled>🎉 Starta</button>
-        <p class="text-muted" style="font-size:0.85rem;margin-top:0.6rem">Minst 2 spelare behövs.</p>
+        <p class="text-muted" style="font-size:0.85rem;margin-top:0.6rem" id="minNote">Minst 2 spelare behövs.</p>
       </div>
     </div>
   </section>
@@ -139,6 +133,9 @@
     </div>
   </section>
 
+  <!-- spelen i js/games/*.js får varsin sektion här (skapas av skriptet) -->
+  <div id="plugSections"></div>
+
   <!-- resultat -->
   <section id="result" hidden>
     <div class="winner" id="winner"></div>
@@ -154,29 +151,76 @@
 <script src="/js/party.js"></script>
 <script src="/js/party-words.js"></script>
 <script src="/js/vendor/qrcode.js"></script>
+<script src="/js/party-quiz-questions.js"></script>
+<script src="/js/party-music.js"></script>
+<script src="/js/pitch-analyze.js"></script>
+<script src="/js/games/bingo.js"></script>
+<script src="/js/games/yatzy.js"></script>
+<script src="/js/games/buzz.js"></script>
+<script src="/js/games/bluff.js"></script>
+<script src="/js/games/who.js"></script>
+<script src="/js/games/race.js"></script>
+<script src="/js/games/hero.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 function toast(msg, ms = 4000) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const ROUND_OPTS = [
+  { key: 'rounds', label: 'Antal varv', values: [[1, '1'], [2, '2'], [3, '3']], def: 1, help: 'Ett varv = alla har fått rita/mima en gång.' },
+  { key: 'time', label: 'Tid per tur', values: [[60, '60 s'], [80, '80 s'], [100, '100 s']], def: 80 },
+];
+const GAMES = {
+  draw: { id: 'draw', emo: '🎨', name: '🎨 Ritleken', title: 'Rit<span class="hot">leken</span>', opts: ROUND_OPTS, minPlayers: 2,
+    desc: 'En ritar på mobilen, alla andra gissar. Snabbast rätt vinner poäng – och den som ritar får poäng för varje rätt gissning.' },
+  mime: { id: 'mime', emo: '🎭', name: '🎭 Mimleken', title: 'Mim<span class="hot">leken</span>', opts: ROUND_OPTS, minPlayers: 2,
+    desc: 'Charader! Mobilen visar ett ord för den som mimar, resten gissar högt. Frågeledaren trycker vem som gissade rätt.' },
+};
+Object.values(window.HVGames || {}).forEach(g => { GAMES[g.id] = g; });
+const plug = () => (window.HVGames || {})[game] || null;     // spelet om det är ett av js/games/*.js
 const SECTIONS = ['menu', 'setup', 'lobby', 'draw', 'mime', 'result'];
 function show(id) {
-  SECTIONS.forEach(s => $(s).hidden = s !== id);
-  if (['menu', 'setup', 'lobby'].includes(id)) PartyMedia.lobbyMusic(true); else if (id !== 'result') PartyMedia.lobbyMusic(false);
+  const all = SECTIONS.concat(Object.keys(window.HVGames || {}).map(k => 'g-' + k));
+  all.forEach(s => { const el = $(s); if (el) el.hidden = s !== id; });
+  const p = plug();
+  if (['menu', 'setup', 'lobby'].includes(id)) PartyMedia.lobbyMusic(true);
+  else if (id.startsWith('g-') && p && p.bgMusic) PartyMedia.lobbyMusic(true);
+  else if (id !== 'result') PartyMedia.lobbyMusic(false);
 }
-const GAMES = { draw: { name: '🎨 Ritleken' }, mime: { name: '🎭 Mimleken' } };
-let game = 'draw', rounds = 1, turnSec = 80;
+let game = 'draw', rounds = 1, turnSec = 80, optv = {};
 
 // ---------- meny & inställningar ----------
-document.querySelectorAll('[data-game]').forEach(b => b.addEventListener('click', () => {
-  game = b.dataset.game;
-  $('setupTitle').innerHTML = game === 'draw' ? 'Rit<span class="hot">leken</span>' : 'Mim<span class="hot">leken</span>';
-  show('setup');
-}));
+$('gameTiles').innerHTML = Object.values(GAMES).map(g => `<button type="button" class="party-tile" data-game="${g.id}"><span class="emo">${g.emo}</span><h3>${esc(g.name.replace(/^\S+\s/, ''))}</h3><p>${esc(g.desc)}</p></button>`).join('');
+$('plugSections').innerHTML = Object.keys(window.HVGames || {}).map(k => `<section id="g-${k}" hidden>
+    <div class="party-top"><button type="button" class="btn-outline" data-quit>✕ Avsluta</button><span class="text-muted">${esc(GAMES[k].name)} · Kod <span class="gcode"></span></span></div>
+    <div class="gbody"></div></section>`).join('');
+document.querySelectorAll('[data-game]').forEach(b => b.addEventListener('click', () => { game = b.dataset.game; renderSetup(); show('setup'); }));
+function renderSetup() {
+  const g = GAMES[game];
+  $('setupTitle').innerHTML = g.title;
+  (g.opts || []).forEach(o => { if (optv[game + ':' + o.key] == null) optv[game + ':' + o.key] = o.def; });
+  $('setupBody').innerHTML = (g.opts || []).map(o => `<div class="box"><h3>${esc(o.label)}</h3><div class="seg" data-k="${o.key}">${o.values.map(([v, l]) =>
+    `<button type="button" data-v="${esc(v)}" aria-pressed="${String(v) === String(optv[game + ':' + o.key])}">${esc(l)}</button>`).join('')}</div>${o.help ? `<p>${esc(o.help)}</p>` : ''}</div>`).join('')
+    + '<div id="setupExtra" class="setup"></div><button type="button" class="start-btn" id="openBtn">📱 Öppna för spelare</button>';
+  $('setupBody').querySelectorAll('.seg').forEach(seg => seg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    const v = b.dataset.v; optv[game + ':' + seg.dataset.k] = /^-?\d+(\.\d+)?$/.test(v) ? +v : v;
+  })));
+  $('openBtn').addEventListener('click', () => {
+    const p = plug();
+    if (p && p.host.canOpen && !p.host.canOpen(gameOpts())) return;
+    openRoom();
+  });
+  const p = plug();
+  if (p && p.host.setup) p.host.setup($('setupExtra'), gameOpts, H);
+}
+// valen för det aktuella spelet som { key: värde }
+function gameOpts() {
+  const o = {};
+  Object.keys(optv).forEach(k => { const [g, key] = k.split(':'); if (g === game) o[key] = optv[k]; });
+  return o;
+}
 $('setupBack').addEventListener('click', () => show('menu'));
-[['segRounds', v => rounds = v], ['segTime', v => turnSec = v]].forEach(([id, set]) => $(id).querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
-  $(id).querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); set(+b.dataset.v);
-})));
 
 // ---------- rum (Supabase Realtime) ----------
 let rt = null, code = '', phase = 'idle', players = new Map(), order = [], beat = null;
@@ -189,6 +233,7 @@ function closeRoom() {
   clearInterval(beat); beat = null; cancelAnimationFrame(timerRaf); clearTimeout(nextTimer);
   if (rt) { try { rt.send({ type: 'broadcast', event: 'state', payload: { phase: 'closed' } }); } catch (e) {} supabaseClient.removeChannel(rt); }
   rt = null; phase = 'idle';
+  const p = plug(); if (p && p.host.stop) p.host.stop();
 }
 function openRoom() {
   closeRoom(); PartyFX.unlockAudio();
@@ -202,6 +247,7 @@ function openRoom() {
   rt.on('broadcast', { event: 'canvas' }, ({ payload }) => onCanvas(payload || {}));
   rt.on('broadcast', { event: 'guess' }, ({ payload }) => onGuess(payload || {}));
   rt.on('broadcast', { event: 'skip' }, ({ payload }) => onMimeSkip(payload || {}));
+  rt.on('broadcast', { event: 'act' }, ({ payload }) => { const p = plug(); if (p && payload && payload.pid) p.host.onAct(payload); });
   rt.subscribe(st => { if (st === 'SUBSCRIBED') sendState(); else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') toast('Kunde inte ansluta till realtid – kontrollera nätet', 5000); });
   beat = setInterval(sendState, 2500);
   const url = location.origin + '/spel.html?kod=' + code;
@@ -209,6 +255,10 @@ function openRoom() {
   $('joinUrl').textContent = location.host + '/spel.html';
   $('joinCode').textContent = code;
   $('lobbyGame').textContent = GAMES[game].name;
+  if (!plug()) { const o = gameOpts(); rounds = o.rounds || 1; turnSec = o.time || 80; }
+  $('minNote').textContent = `Minst ${GAMES[game].minPlayers || 2} spelare behövs.`;
+  document.querySelectorAll('.gcode').forEach(el => el.textContent = code);
+  const p = plug(); if (p && p.host.lobby) p.host.lobby(gameOpts(), H);
   renderLobby(); show('lobby');
 }
 function syncPresence() {
@@ -221,13 +271,14 @@ function syncPresence() {
     p.name = String(metas[0].name || 'Spelare').slice(0, 24); p.on = true;
   });
   renderLobby(); renderBoards();
+  { const p = plug(); if (p && phase === 'play' && p.host.onPresence) p.host.onPresence(); }
   if (phase === 'draw' && drawer && !(players.get(drawer) || {}).on) { addFeed(`<b>${esc(pname(drawer))}</b> lämnade – nästa tur`); endTurn(); }
 }
 function renderLobby() {
   const list = [...players.values()];
   $('playerCount').textContent = online().length;
   $('players').innerHTML = list.length ? list.map(p => `<span class="${p.on ? '' : 'off'}">${esc(p.name)}</span>`).join('') : '<span class="text-muted" style="background:none;border:0;animation:none;font-weight:400">Väntar på spelare…</span>';
-  $('goBtn').disabled = online().length < 2;
+  $('goBtn').disabled = online().length < (GAMES[game].minPlayers || 2);
 }
 function sendState() {
   if (!rt) return;
@@ -237,6 +288,7 @@ function sendState() {
   if (phase === 'draw' || phase === 'mime') { p.remainMs = Math.max(0, tEnd - performance.now()); p.timeMs = turnSec * 1000; p.hint = hintText(); p.len = word.length; }
   if (phase === 'draw' || phase === 'mime') p.word = word;    // visas bara på ritarens/mimarens mobil
   if (phase === 'reveal' || phase === 'end') p.word = word;
+  if (phase === 'play' && plug()) Object.assign(p, plug().host.state());
   rt.send({ type: 'broadcast', event: 'state', payload: p });
 }
 function startTimer(ms, onEnd) {
@@ -271,6 +323,8 @@ function pickWords(list, n) {
 function startGame() {
   players.forEach(p => { p.score = 0; });
   order = order.filter(pid => (players.get(pid) || {}).on);
+  const pl = plug();
+  if (pl) { phase = 'play'; turn = 0; drawer = null; show('g-' + game); H.el.innerHTML = ''; pl.host.start(gameOpts(), H); sendState(); return; }
   totalTurns = rounds * order.length; turn = 0;
   $('drawInfo').textContent = $('mimeInfo').textContent = `Kod ${code}`;
   nextTurn();
@@ -300,6 +354,7 @@ function nextTurn() {
   renderBoards(); sendState();
 }
 function finish() {
+  { const p = plug(); if (p && p.host.stop) p.host.stop(); }
   phase = 'end'; cancelAnimationFrame(timerRaf);
   const ranked = [...players.values()].sort((a, b) => b.score - a.score);
   const top = ranked.filter(p => p.score === ranked[0].score && p.score > 0);
@@ -434,12 +489,40 @@ function onMimeSkip(m) {
 }
 $('mNext').addEventListener('click', () => { if (phase === 'reveal') nextTurn(); else endTurn(); });
 
+// ---------- värd-API för spelen i js/games/*.js ----------
+const H = {
+  get players() { return players; }, get order() { return order; }, get code() { return code; },
+  get el() { return document.querySelector('#g-' + game + ' .gbody'); },
+  online, pname, esc, toast, shuffle,
+  sendState, finish,
+  msg(payload) { if (rt) rt.send({ type: 'broadcast', event: 'msg', payload }); },
+  confetti(n, rain) { PartyFX.confetti(n, rain); },
+  // poänglista (samma stil som Ritleken); mark(p) → { cls, icon }
+  board(el, mark) {
+    const ranked = [...players.values()].sort((a, b) => b.score - a.score);
+    el.innerHTML = '<div class="board">' + ranked.map((p, i) => { const m = (mark && mark(p)) || {};
+      return `<div class="${m.cls || ''}"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'}</span><span class="${p.on ? '' : 'off'}">${esc(p.name)}</span><span>${m.icon || ''}</span><b>${p.score}</b></div>`; }).join('') + '</div>';
+  },
+  // nedräkning som kan pausas: onTick(andel kvar, ms kvar), onEnd()
+  timer(ms, onTick, onEnd) {
+    let left = ms, last = performance.now(), run = true, raf = 0, dead = false;
+    const step = () => {
+      if (dead) return;
+      const now = performance.now(); if (run) left -= now - last; last = now;
+      if (onTick) onTick(Math.max(0, left) / ms, Math.max(0, left));
+      if (left <= 0) { dead = true; onEnd && onEnd(); return; }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return { pause() { run = false; }, resume() { last = performance.now(); run = true; }, stop() { dead = true; cancelAnimationFrame(raf); }, get left() { return Math.max(0, left); }, get ms() { return ms; }, get running() { return run && !dead; } };
+  },
+};
+
 // ---------- knappar ----------
-$('openBtn').addEventListener('click', openRoom);
 $('goBtn').addEventListener('click', startGame);
-$('lobbyCancel').addEventListener('click', () => { closeRoom(); show('setup'); });
-[$('drawQuit'), $('mimeQuit')].forEach(b => b.addEventListener('click', () => { if (confirm('Avsluta spelet?')) { closeRoom(); show('menu'); } }));
-$('againBtn').addEventListener('click', () => { if (!rt) { show('setup'); return; } phase = 'lobby'; correct = new Set(); drawer = null; renderLobby(); show('lobby'); sendState(); });
+$('lobbyCancel').addEventListener('click', () => { closeRoom(); renderSetup(); show('setup'); });
+[$('drawQuit'), $('mimeQuit'), ...document.querySelectorAll('[data-quit]')].forEach(b => b.addEventListener('click', () => { if (confirm('Avsluta spelet?')) { closeRoom(); show('menu'); } }));
+$('againBtn').addEventListener('click', () => { if (!rt) { renderSetup(); show('setup'); return; } phase = 'lobby'; { const p = plug(); if (p && p.host.lobby) p.host.lobby(gameOpts(), H); } correct = new Set(); drawer = null; renderLobby(); show('lobby'); sendState(); });
 $('menuBtn').addEventListener('click', () => { closeRoom(); show('menu'); });
 window.addEventListener('beforeunload', closeRoom);
 

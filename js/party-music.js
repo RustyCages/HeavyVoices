@@ -106,29 +106,43 @@
         if (!dz || !(await canPlay(dz))) return null;
         song.url = dz;
       }
+      if (opts.noYear) return song;
       const y = await mbYear(song);
       if (y && y < song.year) song.year = y;
       return song;
     }
-    async function fill(target) {
-      if (filling) return; filling = true;
+    // opts.parallel: flera hämtare samtidigt (snabbare när många låtar behövs på en gång)
+    let workers = 0;
+    async function worker() {
+      workers++;
       try {
-        while (ready.length < target && failures < 25) {
+        while (ready.length + pending < goal && failures < 25) {
           if (!artists.length) artists = shuffle(root.ROCK_ARTISTS || []);
           const artist = artists.pop();
-          let songs = [];
-          try { songs = await artistSongs(artist); } catch (e) { failures++; continue; }
-          // en låt per artist och varv – bland de mest populära
-          const cand = shuffle(songs.slice(0, 10).filter(s => !seen.has(s.id)))[0];
-          if (!cand) continue;
-          seen.add(cand.id);
-          const s = await prepare({ ...cand });
-          if (!s) { failures++; continue; }
+          pending++;
+          let s = null;
+          try {
+            let songs = [];
+            try { songs = await artistSongs(artist); } catch (e) { failures++; continue; }
+            // en låt per artist och varv – bland de mest populära
+            const cand = shuffle(songs.slice(0, 10).filter(x => !seen.has(x.id) && !seenTitle.has(norm(x.title))))[0];
+            if (!cand) continue;
+            seen.add(cand.id); seenTitle.add(norm(cand.title));
+            s = await prepare({ ...cand });
+            if (!s) { failures++; continue; }
+          } finally { pending--; }
           failures = 0;
           ready.push(s);
           while (waiters.length && ready.length) waiters.shift()(ready.shift());
         }
-      } finally { filling = false; }
+      } finally { workers--; }
+    }
+    let pending = 0, goal = 0;
+    const seenTitle = new Set();
+    function fill(target) {
+      goal = target;
+      const want = Math.max(1, opts.parallel || 1);
+      while (workers < want && ready.length + pending < goal) worker();
     }
     return {
       // nästa låt (väntar om kön är tom)
@@ -141,6 +155,19 @@
         return p;
       },
       warm(n) { fill(n); },
+      // tar n låtar på en gång (väntar tills alla finns)
+      async take(n, onProgress) {
+        fill(n);
+        const t0 = Date.now();
+        while (ready.length < n) {
+          if (onProgress) onProgress(ready.length, n);
+          if (failures >= 25 && !workers) break;
+          if (Date.now() - t0 > 120000) break;
+          if (!workers) fill(n);
+          await new Promise(r => setTimeout(r, 300));
+        }
+        return ready.splice(0, n);
+      },
       get size() { return ready.length; },
       get seen() { return [...seen]; },
     };

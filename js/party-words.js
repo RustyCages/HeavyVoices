@@ -32,3 +32,25 @@ window.MIME_WORDS = [
   'Äta spaghetti', 'Äta stark chili', 'Blåsa upp en ballong', 'Öppna en present', 'Bygga en snögubbe', 'Kasta snöboll',
   'Gå på lina', 'Trollkarl', 'Mumie', 'Zombie', 'Vampyr', 'Superhjälte', 'Astronaut', 'Pirat', 'Cowboy', 'Ninja',
 ];
+
+// Vem i rummet …? – "Vem skulle mest troligt …"
+window.WHO_PROMPTS = [
+  'glömma texten mitt i en låt på scen', 'börja headbanga under en ballad', 'sjunga i duschen så att grannarna klagar',
+  'bli rockstjärna på riktigt', 'komma för sent till repet', 'ha flest låtar på sin spellista som ingen annan känner till',
+  'starta ett eget band imorgon', 'stagedive på nästa spelning', 'sjunga fel stämma utan att märka det',
+  'kunna alla texter till ABBA utantill', 'ta med fel noter till konserten', 'vara den sista som går hem från festen',
+  'spela luftgitarr i bilen vid rödljus', 'tatuera in kören', 'bli kompis med sångaren i sitt favoritband backstage',
+  'dansa på bordet före midnatt', 'ha ett hemligt guilty pleasure-band', 'få ett skrattanfall mitt i en tyst del',
+  'sova på bussen till spelningen', 'sjunga karaoke helt ensam', 'köpa en skinnjacka för dyra pengar',
+  'bli igenkänd på stan', 'skriva kärleksbrev till en rockstjärna', 'sjunga högre än alla andra tillsammans',
+  'öva hemma varje dag', 'tappa rösten efter en fest', 'gå på flest konserter i år', 'kunna spela trummor på allt',
+  'prata med sina växter', 'gråta till en powerballad', 'bära solglasögon inomhus', 'vinna en luftgitarr-VM',
+  'tycka att 80-talet var bäst', 'få hela publiken att sjunga med', 'hitta på egna ord när den glömmer texten',
+  'ha flest konsertbiljetter sparade i en låda', 'bjuda hem hela kören på efterfest', 'dirigera kören bakom dirigentens rygg',
+  'säga "en gång till!" efter sista låten', 'starta ett moshpit i en kyrka', 'åka på turné med ett band',
+  'ha ett eget artistnamn redan', 'somna på soffan under festen', 'ringa in till radion och önska en låt',
+  'bli kär i någon på en spelning', 'äta upp allt fikat på repet', 'ha på sig glitter en vanlig tisdag',
+  'kunna sjunga baklänges', 'hamna på storbildsskärmen på en hockeymatch', 'vara bäst på att imitera kända sångare',
+  'dyka upp utklädd utan att det är maskerad', 'bli först att hålla tal på festen', 'ta flest selfies under kvällen',
+  'köra fel väg till spelningen', 'ha mest bakgrundsröster i sitt huvud', 'skriva en hit över en natt',
+];

@@ -162,7 +162,16 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .copy-shift input { width: 4.5rem; margin: 0; padding: 0.3rem 0.5rem; }
   .edit-status { font-size: 0.8rem; color: var(--text-muted); }
   .edit-status.dirty { color: #facc15; }
-  .edit-help { margin: 0; font-size: 0.8rem; }
+  .edit-help { margin: 0.4rem 0 0; font-size: 0.82rem; color: var(--text-muted); border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(255,255,255,0.02); }
+  .edit-help > summary { cursor: pointer; padding: 0.5rem 0.75rem; font-weight: 600; color: var(--text); list-style: none; }
+  .edit-help > summary::-webkit-details-marker { display: none; }
+  .edit-help > summary::before { content: '▸'; display: inline-block; width: 1rem; color: var(--accent); transition: transform 0.2s; }
+  .edit-help[open] > summary::before { transform: rotate(90deg); }
+  .edit-help .help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.4rem 1.2rem; padding: 0 0.85rem 0.3rem; }
+  .edit-help h4 { margin: 0.35rem 0 0.25rem; font-size: 0.85rem; color: var(--accent); }
+  .edit-help ul { margin: 0; padding-left: 1.05rem; display: flex; flex-direction: column; gap: 0.2rem; line-height: 1.45; }
+  .edit-help b { color: var(--text); font-weight: 600; }
+  .edit-help .help-foot { margin: 0.35rem 0.85rem 0.7rem; }
   /* knappraden överst, utfällda paneler under den i full bredd */
   .edit-bar { display: flex !important; flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
   .edit-bar > button { order: 1; }
@@ -423,7 +432,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
     <div class="ghost-row" id="ghostRow" hidden><span class="field-k">Visa i notbanan</span><div class="chips" id="ghostChips"></div><button type="button" class="help" data-help="ghost" aria-label="Vad är Visa i notbanan?">?</button></div>
     <div class="canvas-wrap">
       <canvas id="overview" title="Hela låten – klicka för att hoppa"></canvas>
-      <canvas id="roll" title="Klicka för att spela/pausa – dra i sidled för att spola"></canvas>
+      <canvas id="roll" title="Dra i sidled för att spola – spela/pausa med ▶ eller mellanslag"></canvas>
       <div class="score-overlay" id="micPanel" hidden>
         <div title="Andel av tiden i noterna som du träffat"><span>Träff</span><b id="micHit">–</b></div>
         <div title="Noter där du träffat minst 60 % av tiden"><span>Noter</span><b id="micNotes">–</b></div>
@@ -448,6 +457,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
     </div>
     <div class="edit-bar admin-only">
       <button type="button" class="btn-outline toggle-btn" id="editToggle" aria-expanded="false" aria-controls="editTools">✎ Redigera noter</button>
+      <button type="button" class="btn-outline toggle-btn" id="textEditToggle" aria-expanded="false" aria-controls="textTools" title="Lägg, flytta och dela texten på noterna">Aa Redigera text</button>
       <button type="button" class="btn-outline toggle-btn" id="copyAnalysisBtn" aria-expanded="false" aria-controls="copyPanel" title="Lägg samma noter på andra stämmor">⎘ Kopiera notanalys</button>
       <button type="button" class="btn-outline toggle-btn" id="tempoBtn" aria-expanded="false" aria-controls="tempoPanel" title="Ställ in låtens tempo (BPM) och var takten börjar – ger taktstreck och klick">🥁 Tempo &amp; klick</button>
       <div class="copy-panel tempo-panel" id="tempoPanel" hidden>
@@ -534,12 +544,6 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         <button type="button" class="btn-outline" data-op="selall" title="Markera alla noter (Ctrl+A)">▦ Markera alla</button>
         <button type="button" class="btn-outline" data-op="copy" title="Kopiera markerade noter (Ctrl+C)">⎘ Kopiera</button>
         <button type="button" class="btn-outline" data-op="paste" title="Klistra in vid spelhuvudet (Ctrl+V)">📋 Klistra in</button>
-        <span class="word-edit" title="Texten som sjungs på den valda noten. Medlemmarna ser den i notblocket.">
-          <label>Text <input type="text" id="noteWord" maxlength="80" placeholder="välj en not" disabled></label>
-          <button type="button" class="btn-outline" data-op="wprev" title="Flytta första ordet till noten före">⟵ ord</button>
-          <button type="button" class="btn-outline" data-op="wnext" title="Flytta sista ordet till noten efter">ord ⟶</button>
-          <button type="button" class="btn-outline" data-op="wauto" title="Fördela textraderna automatiskt på noterna igen – ersätter det du flyttat för hand">↺ Fördela texten</button>
-        </span>
         <button type="button" class="btn-outline toggle-btn" id="harmBtn" aria-expanded="false" aria-controls="harmPanel" title="Flytta markerade noter i tonarten, rätta till tonarten eller skapa en harmonistämma">🎼 Tonart &amp; harmoni</button>
         <button type="button" data-op="save">💾 Spara noter</button>
         <span class="edit-status" id="editStatus"></span>
@@ -574,7 +578,70 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
           <div class="edit-tools"><button type="button" class="btn-outline" id="harmCopy">⎘ Lägg i vald stämma</button><span class="edit-status" id="harmStatus"></span></div>
         </div>
       </div>
-      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av), och noter som ligger kant i kant, och noter över/under i tonhöjd som delar samma kant, <b>följer med</b> när du drar ut en kant. <b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter; <b>Ctrl+C / Ctrl+V</b> kopierar och klistrar in vid spelhuvudet (praktiskt för upprepade refränger). Shift+↑↓ flyttar en oktav. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. <b>Mellanslag</b> spelar/pausar, dra i tom yta för att spola. <b>Text:</b> orden fördelas automatiskt på noterna i varje textrad (gula ord ovanför blocken). <b>Rita:</b> dra i en nots högra kant upp eller ner till andra toner så ritas nya noter längs vägen (dubbelklick i tom yta = ny not att börja från). <b>Dubbelklicka</b> på en not för att skriva texten direkt på blocket (<b>Tab</b> = nästa not), eller <b>dra ett gult ord</b>: släpp det <b>mellan orden</b> ovanför ett block (en gul markör visar var), i <b>kanten</b> av ett block för att lägga det först/sist, eller <b>inne i blocket</b> för att dela blocket just där – ordet börjar då den nya delen. Bara ordet du drar flyttas. <b>S / ✂ Dela</b> delar noten vid strecket och texten på samma ställe; hamnar strecket mitt i ett ord får första delen <b>...</b> efter sig (Slå ihop sätter ihop ordet igen). Fältet <b>Text</b> och <b>⟵ ord / ord ⟶</b> gör samma sak för vald not. Medlemmarna får de sparade noterna och orden precis som de är.</p>
+      <details class="edit-help" id="editHelp" hidden>
+        <summary>Så redigerar du noterna</summary>
+        <div class="help-grid">
+          <section><h4>Välja och flytta</h4><ul>
+            <li><b>Klicka</b> på en not för att välja den. Klick i notfältet startar inte låten – spela/pausa med <b>▶</b> eller <b>mellanslag</b>.</li>
+            <li><b>Dra</b> noten i sidled (tid) eller höjdled (ton). Dra i <b>kanterna</b> för att ändra längden.</li>
+            <li>Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av). Noter kant i kant följer med när du drar ut en kant.</li>
+            <li><b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter. Dra i tom yta (utan Shift) för att spola.</li>
+          </ul></section>
+          <section><h4>Rita nya noter</h4><ul>
+            <li><b>Dubbelklicka</b> i tom yta så sätts en ny not där (eller <b>＋ Ny not</b> / <b>N</b> vid strecket).</li>
+            <li>Ta tag i notens <b>högra kant</b> och dra den över notfältet – upp eller ner till andra toner – så <b>ritas</b> nya noter längs vägen, som att rita melodin med pennan.</li>
+            <li>Dra tillbaka för att sudda det du nyss ritat.</li>
+          </ul></section>
+          <section><h4>Dela, slå ihop, kopiera</h4><ul>
+            <li><b>✂ Dela</b> (S) delar noten där <b>strecket</b> (spelhuvudet) står. <b>⊕ Slå ihop</b> (M) slår ihop vald not med nästa.</li>
+            <li><b>Ctrl+C / Ctrl+V</b> kopierar markerade noter och klistrar in vid strecket – praktiskt för upprepade refränger.</li>
+            <li><b>🎼 Tonart &amp; harmoni</b> flyttar markerade noter i tonarten eller gör en harmonistämma.</li>
+          </ul></section>
+          <section><h4>Tangenter</h4><ul>
+            <li><b>↑ ↓</b> ton · <b>Shift+↑ ↓</b> oktav · <b>← →</b> flytta · <b>Shift+← →</b> längd</li>
+            <li><b>N</b> ny · <b>S</b> dela · <b>M</b> slå ihop · <b>Delete</b> ta bort · <b>Ctrl+Z</b> ångra · <b>Ctrl+A</b> markera alla</li>
+          </ul></section>
+        </div>
+        <p class="help-foot">Texten på noterna redigerar du under <b>Aa Redigera text</b>. Inget syns för medlemmarna förrän du trycker <b>💾 Spara noter</b>.</p>
+      </details>
+      <div class="edit-tools" id="textTools" hidden>
+        <label class="edit-voice" title="Byt stämma vars text du redigerar">Text för <select id="textVoice"></select></label>
+        <button type="button" class="btn-outline" data-op="undo" title="Ångra (Ctrl+Z)">↶ Ångra</button>
+        <span class="word-edit" title="Texten som sjungs på den valda noten. Medlemmarna ser den i notblocket.">
+          <label>Text <input type="text" id="noteWord" maxlength="80" placeholder="välj en not" disabled></label>
+          <button type="button" class="btn-outline" data-op="wprev" title="Flytta första ordet till noten före">⟵ ord</button>
+          <button type="button" class="btn-outline" data-op="wnext" title="Flytta sista ordet till noten efter">ord ⟶</button>
+        </span>
+        <button type="button" class="btn-outline" data-op="split" title="Dela noten och texten vid strecket (S)">✂ Dela vid strecket</button>
+        <button type="button" class="btn-outline" data-op="merge" title="Slå ihop vald not med nästa – ett delat ord sätts ihop igen (M)">⊕ Slå ihop</button>
+        <button type="button" class="btn-outline" data-op="wauto" title="Fördela textraderna automatiskt på noterna igen – ersätter det du flyttat för hand">↺ Fördela texten</button>
+        <button type="button" data-op="save">💾 Spara</button>
+        <span class="edit-status" id="textStatus"></span>
+      </div>
+      <details class="edit-help" id="textHelp" hidden>
+        <summary>Så redigerar du texten</summary>
+        <div class="help-grid">
+          <section><h4>Skriva text</h4><ul>
+            <li><b>Klicka</b> på en not för att välja den och skriv i fältet <b>Text</b>.</li>
+            <li><b>Dubbelklicka</b> på en not för att skriva direkt på blocket. <b>Tab</b> hoppar till nästa not, <b>Shift+Tab</b> till föregående, <b>Enter</b> klar.</li>
+            <li>Första gången fördelas textraderna automatiskt på noterna – sedan justerar du för hand.</li>
+          </ul></section>
+          <section><h4>Flytta ord</h4><ul>
+            <li>Ta tag i ett <b>gult ord</b> och dra det. Bara det ordet flyttas.</li>
+            <li>Släpp det <b>mellan orden</b> ovanför ett block – en gul markör visar var det hamnar.</li>
+            <li>Släpp det i <b>kanten</b> av ett block för att lägga det först eller sist.</li>
+            <li>Släpp det <b>inne i ett block</b> så delas blocket just där och ordet börjar den nya delen.</li>
+            <li><b>⟵ ord / ord ⟶</b> flyttar första/sista ordet på vald not till grannen.</li>
+          </ul></section>
+          <section><h4>Dela och sätta ihop</h4><ul>
+            <li><b>✂ Dela vid strecket</b> (S) delar noten <b>och texten</b> där strecket korsar den.</li>
+            <li>Hamnar strecket mitt i ett ord får första delen <b>...</b> efter sig, t.ex. <i>lju...</i> | <i>set</i>.</li>
+            <li><b>⊕ Slå ihop</b> (M) sätter ihop noterna och ordet igen.</li>
+            <li><b>↺ Fördela texten</b> börjar om automatiskt och ersätter det du gjort för hand.</li>
+          </ul></section>
+        </div>
+        <p class="help-foot">Noterna (ton och tid) ändras inte här, utom när du delar eller slår ihop. Medlemmarna ser orden först när du trycker <b>💾 Spara</b>.</p>
+      </details>
     </div>
     <div class="karaoke" id="karaoke" hidden aria-live="off">
       <div class="k-now" id="kNow">&nbsp;</div>
@@ -1209,7 +1276,7 @@ function drawRoll() {
       ctx.fillStyle = 'rgba(255,255,255,0.65)'; ctx.textBaseline = 'middle';
       ctx.fillText(nm(n.n), nx + 6 * dpr, top + h / 2, nw - 8 * dpr);
     }
-    if (lmap[ni]) labels.push([lmap[ni], ni, nx, nw, top, h, null, p.notes, editMode]);
+    if (lmap[ni]) labels.push([lmap[ni], ni, nx, nw, top, h, null, p.notes, editMode && textMode]);
   });
 
   if (editMode && rangeBand) {
@@ -1520,13 +1587,12 @@ function applyMerge(st) {
 }
 
 // ---------- admin: redigera noter ----------
-let editMode = false, sel = -1, undoStack = [], dirty = false, rollGeom = null;
+let editMode = false, textMode = false, sel = -1, undoStack = [], dirty = false, rollGeom = null;
 let multi = new Set(), rband = null, rangeBand = null, noteClip = null;   // flerval, område-markering, kopierade noter
 const eNotes = () => current.pitch.notes;
 function editStatus(msg) {
-  const el = document.getElementById('editStatus');
-  el.textContent = msg || (dirty ? 'Osparade ändringar' : (current && current.pitchBase.edited ? 'Sparat' : 'Inte sparat än – medlemmar ser notanalysen'));
-  el.classList.toggle('dirty', dirty);
+  const txt = msg || (dirty ? 'Osparade ändringar' : (current && current.pitchBase.edited ? 'Sparat' : 'Inte sparat än – medlemmar ser notanalysen'));
+  ['editStatus', 'textStatus'].forEach(id => { const el = document.getElementById(id); if (!el) return; el.textContent = txt; el.classList.toggle('dirty', dirty); });
 }
 function snapshot() { undoStack.push(JSON.stringify(eNotes())); if (undoStack.length > 80) undoStack.shift(); dirty = true; editStatus(); }
 function afterEdit(selObj) {
@@ -1544,23 +1610,32 @@ function afterEdit(selObj) {
   if (voice.length) recomputeStats();
   tick();
 }
-function setEditMode(on) {
+// text = true: redigera texten (ord på noterna), annars noterna. Byte mellan dem behåller ändringarna.
+function setEditMode(on, text = false) {
+  if (on && editMode) { textMode = !!text; applyEditUi(); return; }
   if (!on && dirty && !confirm('Du har osparade ändringar i noterna. Släppa dem?')) return;
   if (!on && dirty) { current.pitch = current.pitchBase; applyMerge(current); dirty = false; }
   closeWordEditor();
-  editMode = on; sel = -1; multi = new Set(); rangeBand = null;
+  editMode = on; textMode = on && !!text; sel = -1; multi = new Set(); rangeBand = null;
   if (on) {
     // arbeta på en kopia av det som visas just nu
     current.pitch = { ...current.pitch, notes: current.pitch.notes.map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}) })) };
     undoStack = [];
   }
-  document.getElementById('editToggle').setAttribute('aria-expanded', String(on));
-  if (on) fillEditVoice();
-  document.getElementById('editTools').hidden = !on;
-  if (!on) { const hp = document.getElementById('harmPanel'); if (hp) { hp.hidden = true; document.getElementById('harmBtn').setAttribute('aria-expanded', 'false'); } }
-  document.getElementById('editHelp').hidden = !on;
-  document.getElementById('roll').classList.toggle('editing', on);
+  applyEditUi();
+}
+function applyEditUi() {
+  const notesOn = editMode && !textMode, textOn = editMode && textMode;
+  if (!textOn) closeWordEditor();
+  if (editMode) fillEditVoice();
+  document.getElementById('editTools').hidden = !notesOn;
+  document.getElementById('textTools').hidden = !textOn;
+  document.getElementById('editHelp').hidden = !notesOn;
+  document.getElementById('textHelp').hidden = !textOn;
+  if (!notesOn) { const hp = document.getElementById('harmPanel'); if (hp) { hp.hidden = true; document.getElementById('harmBtn').setAttribute('aria-expanded', 'false'); } }
+  document.getElementById('roll').classList.toggle('editing', editMode);
   editStatus();
+  syncWordInput();
   if (current) tick();
 }
 function analysisPitchAt(t) {
@@ -2158,9 +2233,10 @@ function penMove(segs, pm, pt) {
 
 // ---------- admin: redigera alla stämmor ----------
 function fillEditVoice() {
-  const sel = document.getElementById('editVoice'); if (!sel || !current) return;
-  sel.innerHTML = stems.filter(st => singable(st) || st === current).map(st =>
+  if (!current) return;
+  const html = stems.filter(st => singable(st) || st === current).map(st =>
     `<option value="${esc(st.key)}" ${st === current ? 'selected' : ''} ${st.pitch ? '' : 'disabled'}>${esc(st.label)}${st.pitch ? '' : ' (inte analyserad)'}</option>`).join('');
+  ['editVoice', 'textVoice'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
 }
 // byt stämma utan att lämna redigeringen: samma ställe i låten, förra stämman syns kvar som färgade block
 async function switchEditStem(st) {
@@ -2170,17 +2246,17 @@ async function switchEditStem(st) {
     else if (!confirm('Släppa ändringarna i ' + current.label + '?')) { fillEditVoice(); return; }
     else { dirty = false; }
   }
-  const prev = current, g = position() + stemOffSec();
+  const prev = current, g = position() + stemOffSec(), wasText = textMode;
   setEditMode(false);
   if (editMode) return;
   showStem(st);
   ghosts.add(prev.key); renderGhostRow();
   pausedPos = Math.max(0, Math.min(durationOf(), g - stemOffSec()));
   current._rr = null; viewLo = null;
-  setEditMode(true);
+  setEditMode(true, wasText);
   editStatus(`Redigerar nu ${st.label}`);
 }
-document.getElementById('editVoice')?.addEventListener('change', e => switchEditStem(stems.find(st => st.key === e.target.value)));
+['editVoice', 'textVoice'].forEach(id => document.getElementById(id)?.addEventListener('change', e => switchEditStem(stems.find(st => st.key === e.target.value))));
 let ghostRects = [];
 function hitGhost(cx, cy) {
   for (let i = ghostRects.length - 1; i >= 0; i--) { const r = ghostRects[i]; if (cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1) return r.st; }
@@ -2645,6 +2721,9 @@ document.getElementById('overview').addEventListener('click', e => {
         wdrag = { from: wr.ni, wi: wr.wi, words, text: words[wr.wi], x: e.clientX, y: e.clientY, cx, cy, moved: false, over: null, mode: null };
         c.setPointerCapture(e.pointerId); tick(); return;
       }
+      if (h && textMode) {   // textläget: klick väljer noten, noterna går inte att flytta här
+        sel = h.i; multi = new Set([eNotes()[h.i]]); tick(); return;
+      }
       if (h) {
         const ns = eNotes(), n = ns[h.i];
         if (e.shiftKey) { if (multi.has(n)) multi.delete(n); else multi.add(n); sel = h.i; tick(); return; }
@@ -2764,27 +2843,26 @@ document.getElementById('overview').addEventListener('click', e => {
     }
     if (startX == null) return; startX = null; c.classList.remove('dragging');
     if (scrubbed) { if (wasPlaying) play(); return; }
-    // klick (utan att dra): spela/pausa – utom i redigeringsläget, där klick väljer noter (använd mellanslag)
-    if (editMode) return;
-    if (playing) pause(); else play();
+    // klick (utan att dra) gör ingenting – spela/pausa med ▶-knappen eller mellanslag
   };
   c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
   // dubbelklick på en not (eller dess ord): skriv texten direkt på blocket
   c.addEventListener('dblclick', e => {
     if (!editMode || !current) return;
     const [cx, cy] = cxy(e), wr = hitWord(cx, cy), h = wr ? { i: wr.ni } : hitNote(cx, cy);
-    if (h) { e.preventDefault(); openWordEditor(h.i); return; }
-    if (hitGhost(cx, cy) || !rollGeom) return;
+    if (h) { if (textMode) { e.preventDefault(); openWordEditor(h.i); } return; }
+    if (textMode || hitGhost(cx, cy) || !rollGeom) return;
     // dubbelklick i tom yta: ny not där – dra sedan i dess högra kant för att rita vidare
     const g = rollGeom, nn = { t: Math.max(0, Math.round((g.t0 + cx / g.pxs) * 100) / 100), d: 0.3, n: Math.round(g.lo + (g.H - cy) / g.rowH) };
     snapshot(); eNotes().push(nn); afterEdit(nn);
     editStatus('Ny not – dra i högra kanten för att förlänga eller rita vidare till andra toner');
   });
 })();
-document.getElementById('editToggle')?.addEventListener('click', () => setEditMode(!editMode));
+document.getElementById('editToggle')?.addEventListener('click', () => setEditMode(!(editMode && !textMode), false));
+document.getElementById('textEditToggle')?.addEventListener('click', () => setEditMode(!(editMode && textMode), true));
 // Admin-knapparna fälls ut som paneler – bara en öppen åt gången
 (() => {
-  const ACC = [['editToggle', 'editTools'], ['copyAnalysisBtn', 'copyPanel'], ['tempoBtn', 'tempoPanel'], ['vidBtn', 'vidPanel'], ['xferBtn', 'xferPanel']]
+  const ACC = [['editToggle', 'editTools'], ['textEditToggle', 'textTools'], ['copyAnalysisBtn', 'copyPanel'], ['tempoBtn', 'tempoPanel'], ['vidBtn', 'vidPanel'], ['xferBtn', 'xferPanel']]
     .map(([b, p]) => [document.getElementById(b), document.getElementById(p)]).filter(([b, p]) => b && p);
   // knappens markering följer alltid panelen (även när panelen stängs på annat sätt)
   ACC.forEach(([b, p]) => new MutationObserver(() => b.setAttribute('aria-expanded', String(!p.hidden))).observe(p, { attributes: true, attributeFilter: ['hidden'] }));
@@ -2792,7 +2870,11 @@ document.getElementById('editToggle')?.addEventListener('click', () => setEditMo
     if (btn.getAttribute('aria-expanded') === 'true') return;   // stänger sig själv
     for (const [b, p] of ACC) {
       if (b === btn || p.hidden) continue;
-      if (b.id === 'editToggle') { setEditMode(false); if (editMode) { e.stopImmediatePropagation(); return; } }   // osparat och avbrutet
+      const isEdit = id => id === 'editToggle' || id === 'textEditToggle';
+      if (isEdit(b.id)) {
+        if (isEdit(btn.id)) continue;   // byte noter ⇄ text sköts av knappen själv, ändringarna behålls
+        setEditMode(false); if (editMode) { e.stopImmediatePropagation(); return; }   // osparat och avbrutet
+      }
       else p.hidden = true;
     }
   }, true));
@@ -3202,12 +3284,17 @@ document.getElementById('copyGo')?.addEventListener('click', async () => {
   renderRows();
   toast(`Noterna kopierade till ${ok} stämm${ok === 1 ? 'a' : 'or'}${sh ? ` (${sh > 0 ? '+' : ''}${sh} halvtoner)` : ''}`);
 });
-document.querySelectorAll('#editTools [data-op]').forEach(b => b.addEventListener('click', () => editOp(b.dataset.op)));
+document.querySelectorAll('#editTools [data-op], #textTools [data-op]').forEach(b => b.addEventListener('click', () => editOp(b.dataset.op)));
 window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 document.addEventListener('keydown', e => {
   if (!editMode || !current || e.target.matches('input, select, textarea')) return;
   const k = e.key.toLowerCase(), n = eNotes()[sel];
   if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); editOp('undo'); return; }
+  if (textMode) {   // textläget: bara dela, slå ihop och avmarkera
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (k === 's') editOp('split'); else if (k === 'm') editOp('merge'); else if (k === 'escape') { sel = -1; multi = new Set(); tick(); }
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && k === 'c') { e.preventDefault(); editOp('copy'); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'v') { e.preventDefault(); editOp('paste'); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'a') { e.preventDefault(); editOp('selall'); return; }

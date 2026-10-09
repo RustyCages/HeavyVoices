@@ -526,7 +526,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         <label class="edit-voice" title="Byt stämma att redigera – eller klicka på en färgad stämma i notbanan">Redigerar <select id="editVoice"></select></label>
         <button type="button" class="btn-outline" data-op="undo" title="Ångra (Ctrl+Z)">↶ Ångra</button>
         <button type="button" class="btn-outline" data-op="merge" title="Slå ihop vald not med nästa (M)">⊕ Slå ihop</button>
-        <button type="button" class="btn-outline" data-op="split" title="Dela vald not vid spelhuvudet (S)">✂ Dela</button>
+        <button type="button" class="btn-outline" data-op="split" title="Dela noten vid strecket/spelhuvudet (S) – texten delas på samma ställe">✂ Dela</button>
         <button type="button" class="btn-outline" data-op="add" title="Ny not vid spelhuvudet (N)">＋ Ny not</button>
         <button type="button" class="btn-outline" data-op="del" title="Ta bort vald not (Delete)">🗑 Ta bort</button>
         <button type="button" class="btn-outline" data-op="fit" title="Slå ihop och anpassa alla noter efter textraderna">≡ Anpassa till texten</button>
@@ -538,7 +538,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
           <label>Text <input type="text" id="noteWord" maxlength="80" placeholder="välj en not" disabled></label>
           <button type="button" class="btn-outline" data-op="wprev" title="Flytta första ordet till noten före">⟵ ord</button>
           <button type="button" class="btn-outline" data-op="wnext" title="Flytta sista ordet till noten efter">ord ⟶</button>
-          <button type="button" class="btn-outline" data-op="wauto" title="Fördela textraderna automatiskt på noterna igen">↺ Fördela texten</button>
+          <button type="button" class="btn-outline" data-op="wauto" title="Fördela textraderna automatiskt på noterna igen – ersätter det du flyttat för hand">↺ Fördela texten</button>
         </span>
         <button type="button" class="btn-outline toggle-btn" id="harmBtn" aria-expanded="false" aria-controls="harmPanel" title="Flytta markerade noter i tonarten, rätta till tonarten eller skapa en harmonistämma">🎼 Tonart &amp; harmoni</button>
         <button type="button" data-op="save">💾 Spara noter</button>
@@ -574,7 +574,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
           <div class="edit-tools"><button type="button" class="btn-outline" id="harmCopy">⎘ Lägg i vald stämma</button><span class="edit-status" id="harmStatus"></span></div>
         </div>
       </div>
-      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av), och noter som ligger kant i kant, och noter över/under i tonhöjd som delar samma kant, <b>följer med</b> när du drar ut en kant. <b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter; <b>Ctrl+C / Ctrl+V</b> kopierar och klistrar in vid spelhuvudet (praktiskt för upprepade refränger). Shift+↑↓ flyttar en oktav. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. <b>Mellanslag</b> spelar/pausar, dra i tom yta för att spola. <b>Text:</b> orden fördelas automatiskt på noterna i varje textrad (gula ord ovanför blocken). <b>Rita:</b> dra i en nots högra kant upp eller ner till andra toner så ritas nya noter längs vägen (dubbelklick i tom yta = ny not att börja från). <b>Dubbelklicka</b> på en not för att skriva texten direkt på blocket (<b>Tab</b> = nästa not), eller <b>dra ett gult ord</b> till en annan not så det hamnar på rätt upp- och nergång. Fältet <b>Text</b> och <b>⟵ ord / ord ⟶</b> gör samma sak för vald not. Medlemmarna får de sparade noterna och orden precis som de är.</p>
+      <p class="hint edit-help" id="editHelp" hidden>Klicka på en not för att välja den. <b>Dra</b> den i sidled (tid) eller höjdled (ton), dra i <b>kanterna</b> för att ändra längd. Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av), och noter som ligger kant i kant, och noter över/under i tonhöjd som delar samma kant, <b>följer med</b> när du drar ut en kant. <b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter; <b>Ctrl+C / Ctrl+V</b> kopierar och klistrar in vid spelhuvudet (praktiskt för upprepade refränger). Shift+↑↓ flyttar en oktav. Tangenter: ↑↓ ton, ←→ flytta, Shift+←→ längd, M slå ihop, S dela, N ny, Delete ta bort, Ctrl+Z ångra. <b>Mellanslag</b> spelar/pausar, dra i tom yta för att spola. <b>Text:</b> orden fördelas automatiskt på noterna i varje textrad (gula ord ovanför blocken). <b>Rita:</b> dra i en nots högra kant upp eller ner till andra toner så ritas nya noter längs vägen (dubbelklick i tom yta = ny not att börja från). <b>Dubbelklicka</b> på en not för att skriva texten direkt på blocket (<b>Tab</b> = nästa not), eller <b>dra ett gult ord</b>: släpp det <b>mellan orden</b> ovanför ett block (en gul markör visar var), i <b>kanten</b> av ett block för att lägga det först/sist, eller <b>inne i blocket</b> för att dela blocket just där – ordet börjar då den nya delen. Bara ordet du drar flyttas. <b>S / ✂ Dela</b> delar noten vid strecket och texten på samma ställe; hamnar strecket mitt i ett ord får första delen <b>...</b> efter sig (Slå ihop sätter ihop ordet igen). Fältet <b>Text</b> och <b>⟵ ord / ord ⟶</b> gör samma sak för vald not. Medlemmarna får de sparade noterna och orden precis som de är.</p>
     </div>
     <div class="karaoke" id="karaoke" hidden aria-live="off">
       <div class="k-now" id="kNow">&nbsp;</div>
@@ -1152,7 +1152,7 @@ function drawRoll() {
   const boxHalf = Math.max(0.45, tolSemi);
   const r = Math.min(8 * dpr, rowH * boxHalf);
   rollGeom = { t0, pxs, lo, H, rowH, boxHalf, dpr };
-  wordRects = []; ghostRects = [];
+  wordRects = []; ghostRects = []; labelPos = {};
   const labels = [];   // [text, index, x, bredd, topp, höjd, färg?, noter?] – ritas efter tonkurvan så linjen inte stryker över texten
   // andra stämmor (bara att titta på): färgade block bakom din stämma
   ghostList().forEach(gs => {
@@ -1244,6 +1244,7 @@ function drawRoll() {
     const inside = !above && nw >= 28 * dpr && h >= fs * 2 + 4 * dpr ? fitText(ctx, label, nw - 10 * dpr) : '';
     if (inside && (inside === label || inside.length >= 6)) {
       ctx.fillStyle = col || 'rgba(255,255,255,0.95)'; ctx.textBaseline = 'bottom'; ctx.fillText(inside, nx + 5 * dpr, top + h - 2 * dpr);
+      if (!col) labelPos[ni] = { tx: nx + 5 * dpr, font: ctx.font, label };
     } else {
       const nxt = list[ni + 1];
       const room = Math.max(nw, (nxt ? x(nxt.t) - nx : 80 * dpr) - 4 * dpr, 40 * dpr);
@@ -1251,6 +1252,7 @@ function drawRoll() {
       if (t) {
         const tx = nx + 2 * dpr, ty = top - 2 * dpr;
         ctx.fillStyle = col || (above ? '#fde68a' : 'rgba(255,255,255,0.88)'); ctx.textBaseline = 'bottom'; ctx.fillText(t, tx, ty);
+        if (!col) labelPos[ni] = { tx, font: ctx.font, label };
         if (above) {   // admin: varje ord går att ta tag i och dra till en annan not
           const full = label.split(' ');
           let acc = '';
@@ -1329,17 +1331,39 @@ function drawRoll() {
     }
   }
 
-  // admin drar ett ord till en annan not
+  // admin drar ett ord: in i texten på ett block, först/sist i ett block, eller dela blocket där ordet släpps
   if (wdrag && wdrag.moved) {
     const ns = p.notes, tg = wdrag.over != null ? ns[wdrag.over] : null;
-    if (tg && wdrag.over !== wdrag.from) {
-      ctx.strokeStyle = '#fde68a'; ctx.lineWidth = 2.5 * dpr; ctx.setLineDash([4 * dpr, 3 * dpr]);
-      ctx.beginPath(); ctx.roundRect(x(tg.t) - 3 * dpr, y(tg.n + boxHalf) - 3 * dpr, Math.max(3, tg.d * pxs) + 6 * dpr, rowH * boxHalf * 2 + 6 * dpr, r); ctx.stroke();
-      ctx.setLineDash([]);
+    let hint = '';
+    if (tg) {
+      const bx = x(tg.t), bw = Math.max(3, tg.d * pxs), by = y(tg.n + boxHalf), bh = rowH * boxHalf * 2;
+      ctx.strokeStyle = '#fde68a'; ctx.lineWidth = 2.5 * dpr;
+      if (wdrag.mode === 'split') {
+        const sx = x(wdrag.t);
+        ctx.setLineDash([4 * dpr, 3 * dpr]);
+        ctx.beginPath(); ctx.roundRect(sx, by - 3 * dpr, bx + bw - sx + 3 * dpr, bh + 6 * dpr, r); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.lineWidth = 3 * dpr; ctx.beginPath(); ctx.moveTo(sx, by - 10 * dpr); ctx.lineTo(sx, by + bh + 10 * dpr); ctx.stroke();
+        hint = '  ✂ dela blocket här';
+      } else if (wdrag.mode === 'text' && wdrag.caretX != null) {
+        ctx.lineWidth = 3 * dpr; ctx.beginPath(); ctx.moveTo(wdrag.caretX, by - 22 * dpr); ctx.lineTo(wdrag.caretX, by - 2 * dpr); ctx.stroke();
+        hint = '';
+      } else {
+        ctx.setLineDash([4 * dpr, 3 * dpr]);
+        ctx.beginPath(); ctx.roundRect(bx - 3 * dpr, by - 3 * dpr, bw + 6 * dpr, bh + 6 * dpr, r); ctx.stroke();
+        ctx.setLineDash([]);
+        hint = wdrag.mode === 'start' ? '  ⇤ först i blocket' : '  sist i blocket ⇥';
+      }
     }
     ctx.font = `700 ${14 * dpr}px DM Sans, sans-serif`; ctx.textBaseline = 'bottom';
     ctx.fillStyle = '#fde68a'; ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4 * dpr;
-    ctx.fillText(wdrag.text, wdrag.cx + 8 * dpr, wdrag.cy - 6 * dpr); ctx.shadowBlur = 0;
+    ctx.fillText(wdrag.text, wdrag.cx + 8 * dpr, wdrag.cy - 6 * dpr);
+    if (hint) {
+      const tw = ctx.measureText(wdrag.text).width;
+      ctx.font = `600 ${11 * dpr}px DM Sans, sans-serif`; ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillText(hint, wdrag.cx + 8 * dpr + tw, wdrag.cy - 7 * dpr);
+    }
+    ctx.shadowBlur = 0;
   }
 
   // stämapparat uppe till höger när micken är på
@@ -1612,7 +1636,31 @@ function editOp(op) {
   }
   if (op === 'wauto') {
     if (!kLines.some(x => x.text)) { toast('Låten har ingen synkad text'); return; }
+    if (hasWords(ns) && !confirm('Fördela texten automatiskt igen?\n\nAlla ord du har flyttat eller delat för hand ersätts med den automatiska fördelningen. (Ctrl+Z ångrar.)')) return;
     snapshot(); const m = autoWords(ns, kLines, stemOffSec()); ns.forEach((x, i) => { if (m[i]) x.w = m[i]; else delete x.w; }); afterEdit(n || null); toast('Texten fördelad på noterna – justera med ⟵ ⟶ och spara'); return;
+  }
+  if (op === 'split') {
+    // vald not, annars noten som strecket (spelhuvudet) står i
+    let i = sel, m = n;
+    if (!m || pos <= m.t + 0.05 || pos >= m.t + m.d - 0.05) { i = ns.findIndex(x => pos > x.t + 0.05 && pos < x.t + x.d - 0.05); m = ns[i]; }
+    if (!m) { toast('Ställ strecket (spelhuvudet) inne i en not för att dela den'); return; }
+    snapshot(); ensureWords();
+    const nn = { t: pos, d: m.t + m.d - pos, n: m.n };
+    if (m.w) {
+      // dela texten där strecket korsar den (så som den syns), annars i proportion till tiden
+      const cx = charXs(i), g = rollGeom;
+      let k;
+      if (cx && cx.label === m.w && g) {
+        const px = (pos - g.t0) * g.pxs;
+        k = 0; cx.xs.forEach((xx, j) => { if (Math.abs(xx - px) < Math.abs(cx.xs[k] - px)) k = j; });
+      } else k = Math.round(m.w.length * (pos - m.t) / m.d);
+      const [a, b] = splitText(m.w, k);
+      if (a) m.w = a; else delete m.w;
+      if (b) nn.w = b;
+    }
+    m.d = pos - m.t; ns.push(nn); afterEdit(nn);
+    editStatus((m.w || nn.w) ? `Delad vid strecket: "${m.w || ''}" | "${nn.w || ''}" – osparat` : 'Noten delad vid strecket – osparat');
+    return;
   }
   if (!n) { toast('Välj en not först (klicka på den)'); return; }
   if (op === 'wprev' || op === 'wnext') {
@@ -1630,11 +1678,10 @@ function editOp(op) {
   if (op === 'merge') {
     const m = ns[sel + 1]; if (!m) return;
     snapshot(); const keep = m.d > n.d ? m.n : n.n;
-    n.d = m.t + m.d - n.t; n.n = keep; if (m.w) n.w = [n.w, m.w].filter(Boolean).join(' '); ns.splice(sel + 1, 1); afterEdit(n); return;
-  }
-  if (op === 'split') {
-    if (pos <= n.t + 0.05 || pos >= n.t + n.d - 0.05) { toast('Ställ spelhuvudet inne i den valda noten för att dela den'); return; }
-    snapshot(); const nn = { t: pos, d: n.t + n.d - pos, n: n.n }; n.d = pos - n.t; ns.push(nn); afterEdit(nn); return;
+    n.d = m.t + m.d - n.t; n.n = keep;
+    // "lju..." + "us" blir "ljuus" igen
+    if (m.w) n.w = n.w && /(\.\.\.|…)$/.test(n.w) ? n.w.replace(/(\.\.\.|…)$/, '') + m.w : [n.w, m.w].filter(Boolean).join(' ');
+    ns.splice(sel + 1, 1); afterEdit(n); return;
   }
 }
 function hitNote(cx, cy) {
@@ -2146,18 +2193,80 @@ function hitWord(cx, cy) {
   for (let i = wordRects.length - 1; i >= 0; i--) { const r = wordRects[i]; if (cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1) return r; }
   return null;
 }
-// flytta ett ord (och orden på rätt sida om det, så ordningen behålls) till en annan not
-function moveWord(from, wi, to) {
+let labelPos = {};   // var notens text ritades senast: { tx, font, label } (canvas-pixlar)
+const splitWords = str => (str || '').split(/\s+/).filter(Boolean);
+// x-position (canvas-pixlar) för varje teckengräns i notens text, så som den ritades
+function charXs(ni) {
+  const L = labelPos[ni]; if (!L) return null;
+  const ctx = document.getElementById('roll').getContext('2d');
+  ctx.save(); ctx.font = L.font;
+  const xs = []; for (let k = 0; k <= L.label.length; k++) xs.push(L.tx + ctx.measureText(L.label.slice(0, k)).width);
+  ctx.restore();
+  return { xs, label: L.label };
+}
+// hur många av notens ord som ligger till vänster om x, och var en markör mellan orden ska ritas
+function wordGap(ni, px) {
+  const words = splitWords(lyricMap()[ni]), cx = charXs(ni);
+  if (!cx || cx.label !== words.join(' ')) return { k: px > 0 ? words.length : 0, caretX: null };
+  let k = 0, at = 0;
+  words.forEach((w, i) => { if ((cx.xs[at] + cx.xs[at + w.length]) / 2 < px) k = i + 1; at += w.length + 1; });
+  let pos = 0; for (let i = 0; i < k; i++) pos += words[i].length + 1;
+  const caretX = k >= words.length ? cx.xs[cx.xs.length - 1] + 3 : cx.xs[Math.min(pos, cx.xs.length - 1)] - 3;
+  return { k, caretX };
+}
+// dela en text vid tecken k. Delas ett ord får första delen "..." efter sig.
+function splitText(text, k) {
+  let a = text.slice(0, k), b = text.slice(k);
+  const midWord = /\S$/.test(a) && /^\S/.test(b);
+  a = a.trim(); b = b.trim();
+  if (midWord && a && b) a = a.replace(/(\.\.\.|…)$/, '') + '...';
+  return [a, b];
+}
+// var släpps ett draget ord? text = mellan orden ovanför blocket, start/end = först/sist, split = dela blocket där
+function wordTarget(cx, cy) {
+  const d = window.devicePixelRatio || 1, g = rollGeom;
+  const hb = hitNote(cx, cy);
+  if (hb && g) {
+    const n = eNotes()[hb.i], nx = (n.t - g.t0) * g.pxs, nw = n.d * g.pxs;
+    const edge = Math.max(8 * d, Math.min(nw * 0.12, 18 * d));
+    const t = Math.round((g.t0 + cx / g.pxs) * 100) / 100;
+    if (cx > nx + edge && cx < nx + nw - edge && t - n.t >= 0.08 && n.t + n.d - t >= 0.08) {
+      return { over: hb.i, mode: 'split', t, k: wordGap(hb.i, cx).k };
+    }
+    return { over: hb.i, mode: cx < nx + nw / 2 ? 'start' : 'end' };
+  }
+  const hl = hitNote(cx, cy + 22 * d);
+  if (hl) { const gp = wordGap(hl.i, cx); return { over: hl.i, mode: 'text', k: gp.k, caretX: gp.caretX }; }
+  return { over: null };
+}
+// flytta ETT ord dit det släpptes (övriga ord ligger kvar där de är)
+function dropWord(w) {
+  const ns = eNotes(), src = ns[w.from], dst = ns[w.over];
+  if (!src || !dst) { tick(); return; }
   snapshot(); ensureWords();
-  const ns = eNotes(), src = ns[from], dst = ns[to];
-  const words = (src.w || '').split(/\s+/).filter(Boolean);
-  if (!words.length) return;
-  let moving, keep;
-  if (to > from) { moving = words.slice(wi); keep = words.slice(0, wi); dst.w = [...moving, ...(dst.w ? [dst.w] : [])].join(' '); }
-  else { moving = words.slice(0, wi + 1); keep = words.slice(wi + 1); dst.w = [...(dst.w ? [dst.w] : []), ...moving].join(' '); }
-  if (keep.length) src.w = keep.join(' '); else delete src.w;
-  afterEdit(dst);
-  editStatus(`"${moving.join(' ')}" flyttat – osparat`);
+  const sw = splitWords(src.w), word = sw[w.wi];
+  if (!word) { afterEdit(dst); return; }
+  sw.splice(w.wi, 1);
+  if (sw.length) src.w = sw.join(' '); else delete src.w;
+  const dw = splitWords(dst.w);
+  const adj = k => (src === dst && k > w.wi) ? k - 1 : k;
+  let target = dst, msg;
+  if (w.mode === 'split') {
+    const k = Math.max(0, Math.min(adj(w.k), dw.length));
+    const left = dw.slice(0, k), right = [word, ...dw.slice(k)];
+    const nn = { t: w.t, d: dst.t + dst.d - w.t, n: dst.n, w: right.join(' ') };
+    dst.d = w.t - dst.t;
+    if (left.length) dst.w = left.join(' '); else delete dst.w;
+    ns.push(nn); target = nn;
+    msg = `Blocket delat – "${word}" börjar den nya delen`;
+  } else {
+    const k = w.mode === 'start' ? 0 : w.mode === 'end' ? dw.length : adj(w.k);
+    dw.splice(Math.max(0, Math.min(k, dw.length)), 0, word);
+    dst.w = dw.join(' ');
+    msg = `"${word}" flyttat`;
+  }
+  afterEdit(target);
+  editStatus(msg + ' – osparat');
 }
 function closeWordEditor() { const el = wordEd; wordEd = null; if (el) el.remove(); }
 function openWordEditor(i) {
@@ -2533,7 +2642,7 @@ document.getElementById('overview').addEventListener('click', e => {
       if (wr) {   // ta tag i ett ord ovanför blocket
         const words = (lyricMap()[wr.ni] || '').split(' ');
         sel = wr.ni; multi = new Set([eNotes()[wr.ni]]);
-        wdrag = { from: wr.ni, wi: wr.wi, words, text: words[wr.wi], x: e.clientX, y: e.clientY, cx, cy, moved: false, over: null };
+        wdrag = { from: wr.ni, wi: wr.wi, words, text: words[wr.wi], x: e.clientX, y: e.clientY, cx, cy, moved: false, over: null, mode: null };
         c.setPointerCapture(e.pointerId); tick(); return;
       }
       if (h) {
@@ -2567,8 +2676,8 @@ document.getElementById('overview').addEventListener('click', e => {
       if (!wdrag.moved && Math.abs(e.clientX - wdrag.x) < 4 && Math.abs(e.clientY - wdrag.y) < 4) return;
       wdrag.moved = true;
       [wdrag.cx, wdrag.cy] = cxy(e);
-      const h = hitNote(wdrag.cx, wdrag.cy) || hitNote(wdrag.cx, wdrag.cy + 22 * (window.devicePixelRatio || 1));
-      wdrag.over = h ? h.i : null;
+      const tg = wordTarget(wdrag.cx, wdrag.cy);
+      wdrag.over = tg.over; wdrag.mode = tg.mode || null; wdrag.t = tg.t; wdrag.k = tg.k; wdrag.caretX = tg.caretX;
       c.style.cursor = 'grabbing';
       tick(); return;
     }
@@ -2635,7 +2744,7 @@ document.getElementById('overview').addEventListener('click', e => {
   const end = () => {
     if (wdrag) {
       const w = wdrag; wdrag = null; c.style.cursor = '';
-      if (w.moved && w.over != null && w.over !== w.from) moveWord(w.from, w.wi, w.over);
+      if (w.moved && w.over != null) dropWord(w);
       else tick();
       return;
     }

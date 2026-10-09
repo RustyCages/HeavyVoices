@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<title>Bergsprängaren — Party Mode</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&family=VT323&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/party.css">
+<style>html.gate body { visibility: hidden; }</style>
+<script>document.documentElement.classList.add('gate');</script>
+<style>
+  /* Bergsprängaren: radio (riktiga hårdrockskanaler) + jukebox (slumpade låtar) */
+  .bb-stage { display: grid; justify-items: center; margin-top: 2.2rem; }
+  .bb { position: relative; width: min(100%, 980px); }
+  .handle { position: absolute; top: -2rem; left: 18%; right: 18%; height: 2.6rem; border: 0.7rem solid #2a2a2a; border-bottom: 0; border-radius: 1.6rem 1.6rem 0 0; box-shadow: inset 0 2px 0 rgba(255,255,255,0.15); }
+  .body { position: relative; display: grid; grid-template-columns: 1fr minmax(0, 1.35fr) 1fr; gap: clamp(0.5rem, 2vw, 1.4rem); align-items: center; padding: clamp(0.8rem, 2.4vw, 1.6rem);
+    border-radius: 1.4rem;
+    background: linear-gradient(180deg, #d9d9d9 0%, #b9b9b9 6%, #8d8d8d 7%, #a8a8a8 50%, #7b7b7b 100%);
+    box-shadow: inset 0 2px 0 #fff, inset 0 -5px 10px rgba(0,0,0,0.45), 0 30px 60px -20px rgba(0,0,0,0.9); }
+  .body::before { content: 'HEAVY VOICES · STEREO'; position: absolute; top: 0.45rem; left: 1.4rem; font: 700 0.7rem 'Roboto Condensed', sans-serif; letter-spacing: 0.25em; color: #3a3a3a; }
+  .speaker { aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; position: relative;
+    background: radial-gradient(circle, #1a1a1a 0 58%, #555 59% 61%, #1a1a1a 62% 66%, #444 67% 70%, #222 71%); box-shadow: inset 0 0 0 0.5rem #9a9a9a, inset 0 0 0 0.7rem #666, 0 3px 6px rgba(0,0,0,0.4); }
+  .speaker::before { content: ''; position: absolute; inset: 14%; border-radius: 50%; background: repeating-radial-gradient(circle, #2b2b2b 0 3px, #161616 3px 6px); }
+  .cone { position: relative; width: 34%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #777, #2a2a2a 60%, #111); box-shadow: 0 0 0 0.35rem #0c0c0c, 0 0 18px rgba(0,0,0,0.8); }
+  .bb.playing .cone { animation: thump 0.46s ease-in-out infinite; }
+  .bb.playing .speaker:nth-child(3) .cone { animation-delay: -0.23s; }
+  @keyframes thump { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.09); } }
+  .middle { display: grid; gap: 0.7rem; }
+  .lcd { font-family: 'VT323', monospace; background: linear-gradient(180deg, #9fbf6a, #7ea04a); color: #142200; border-radius: 0.5rem; padding: 0.5rem 0.75rem; box-shadow: inset 0 2px 6px rgba(0,0,0,0.45); overflow: hidden; }
+  .lcd .row1 { display: flex; justify-content: space-between; font-size: 1.05rem; opacity: 0.85; }
+  .lcd .row2 { font-size: clamp(1.25rem, 3vw, 1.8rem); white-space: nowrap; overflow: hidden; }
+  .lcd .row2 span { display: inline-block; padding-left: 100%; animation: marquee 14s linear infinite; }
+  .lcd .row2 span.static { padding-left: 0; animation: none; }
+  @keyframes marquee { to { transform: translateX(-100%); } }
+  .dial { position: relative; height: 2.1rem; border-radius: 0.4rem; background: linear-gradient(#141414, #262626); box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; }
+  .dial .scale { position: absolute; inset: 0.4rem 0.6rem; display: flex; justify-content: space-between; font: 0.62rem 'Roboto Condensed', sans-serif; color: #c9b27a; }
+  .dial .needle { position: absolute; top: 0.2rem; bottom: 0.2rem; width: 3px; background: #ff3d3d; box-shadow: 0 0 6px #f33; left: 10%; transition: left 0.6s cubic-bezier(.2,1.2,.4,1); }
+  .deck { position: relative; height: clamp(4.2rem, 10vw, 6rem); border-radius: 0.5rem; background: linear-gradient(#2a2a2a, #111); box-shadow: inset 0 2px 6px rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: space-around; padding: 0 12%; }
+  .deck::before { content: ''; position: absolute; inset: 22% 8%; border-radius: 0.3rem; background: linear-gradient(#e8e0d0, #c9bfa9); opacity: 0.9; }
+  .reel { position: relative; width: clamp(2rem, 5vw, 3rem); aspect-ratio: 1; border-radius: 50%; background: conic-gradient(#222 0 30deg, #888 30deg 60deg, #222 60deg 150deg, #888 150deg 180deg, #222 180deg 270deg, #888 270deg 300deg, #222 300deg); box-shadow: 0 0 0 0.35rem #3a2a1a; }
+  .bb.playing .reel { animation: spin 1.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .eqbars { display: flex; gap: 3px; height: 1.6rem; align-items: flex-end; justify-content: center; }
+  .eqbars i { width: 6px; height: 15%; border-radius: 1px; background: linear-gradient(to top, #2f2, #ff0 70%, #f33); }
+  .bb.playing .eqbars i { animation: eqb 0.9s ease-in-out infinite; }
+  @keyframes eqb { 0%, 100% { height: 15%; } 50% { height: 100%; } }
+  .btns { display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap; }
+  .btns button { min-width: 3rem; padding: 0.6rem 0.8rem; font-size: 1.05rem; border-radius: 0.35rem; color: #111; background: linear-gradient(#f2f2f2, #b5b5b5); box-shadow: 0 3px 0 #6d6d6d, 0 4px 6px rgba(0,0,0,0.4); border: 0; }
+  .btns button:active { transform: translateY(3px); box-shadow: 0 0 0 #6d6d6d; }
+  .btns button[aria-pressed="true"] { background: linear-gradient(#ffcf8a, var(--accent)); }
+  .vol { display: flex; align-items: center; gap: 0.5rem; font: 700 0.75rem 'Roboto Condensed', sans-serif; color: #2a2a2a; }
+  .vol input { margin: 0; padding: 0; accent-color: #333; }
+  .info { text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: 1.1rem; }
+  .info b { color: var(--text); }
+  .stations { margin-top: 1.4rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem; }
+  .stations button { justify-content: flex-start; text-align: left; background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid var(--border); padding: 0.55rem 0.75rem; font-weight: 500; }
+  .stations button[aria-current="true"] { border-color: var(--accent); background: rgba(229,169,104,0.15); }
+  .stations small { color: var(--text-muted); margin-left: auto; }
+  @media (max-width: 700px) {
+    .body { grid-template-columns: 1fr 1fr; }
+    .middle { grid-column: 1 / -1; grid-row: 1; }
+    .handle { left: 25%; right: 25%; }
+  }
+  #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 2100; display: none; max-width: calc(100vw - 3rem); }
+</style>
+</head>
+<body class="party-page">
+<header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+<div class="container">
+  <section>
+    <div class="party-top"><a href="/medlem/party.html" class="back-btn">&larr; Party</a></div>
+    <h1 class="party-title">Bergs<span class="hot">prängaren</span></h1>
+    <p class="party-sub">Skruva upp! Riktiga hårdrockskanaler på radion – eller jukeboxen som slumpar låtar.</p>
+
+    <div class="bb-stage">
+      <div class="bb" id="bb">
+        <div class="handle"></div>
+        <div class="body">
+          <div class="speaker"><div class="cone"></div></div>
+          <div class="middle">
+            <div class="lcd"><div class="row1"><span id="lcdMode">RADIO</span><span id="lcdInfo">--</span></div><div class="row2"><span id="lcdText" class="static">TRYCK ▶</span></div></div>
+            <div class="dial"><div class="scale"><span>88</span><span>92</span><span>96</span><span>100</span><span>104</span><span>108</span></div><div class="needle" id="needle"></div></div>
+            <div class="deck"><span class="reel"></span><span class="reel"></span></div>
+            <div class="eqbars" id="eq"></div>
+            <div class="btns">
+              <button type="button" id="modeRadio" aria-pressed="true" title="Radio">📻</button>
+              <button type="button" id="modeJuke" aria-pressed="false" title="Jukebox">💿</button>
+              <button type="button" id="prevBtn" title="Föregående">⏮</button>
+              <button type="button" id="playBtn" title="Spela/pausa">▶</button>
+              <button type="button" id="nextBtn" title="Nästa">⏭</button>
+            </div>
+            <label class="vol">VOLYM <input type="range" id="vol" min="0" max="1" step="0.05" value="0.9"></label>
+          </div>
+          <div class="speaker"><div class="cone"></div></div>
+        </div>
+      </div>
+      <p class="info" id="info"></p>
+    </div>
+    <div class="stations" id="stations" hidden></div>
+    <p class="info" style="font-size:0.75rem">Radiokanaler via radio-browser.info · jukebox-låtar (30 s) från iTunes/Apple Music</p>
+  </section>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/party.js"></script>
+<script src="/js/party-quiz-questions.js"></script>
+<script src="/js/party-music.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function toast(msg, ms = 4000) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
+$('eq').innerHTML = Array.from({ length: 14 }, (_, i) => `<i style="animation-delay:${-(i * 137 % 900)}ms"></i>`).join('');
+
+const audio = new Audio(); audio.preload = 'none';
+let mode = 'radio', stations = [], si = 0, feed = null, hist = [], hi = -1, playing = false, loadingStations = null;
+
+function setLcd(text, info) {
+  const t = $('lcdText'); t.textContent = text; t.className = text.length > 22 ? '' : 'static';
+  if (info != null) $('lcdInfo').textContent = info;
+}
+function setPlaying(p) { playing = p; $('bb').classList.toggle('playing', p); $('playBtn').textContent = p ? '⏸' : '▶'; }
+audio.addEventListener('playing', () => setPlaying(true));
+audio.addEventListener('pause', () => setPlaying(false));
+audio.addEventListener('ended', () => { if (mode === 'juke') next(); });
+audio.addEventListener('error', () => {
+  if (!audio.src) return;
+  if (mode === 'radio') { toast('Kanalen svarade inte – byter'); stations.splice(si, 1); if (stations.length) tune(si % stations.length); }
+  else next();
+});
+$('vol').addEventListener('input', e => { audio.volume = +e.target.value; });
+
+// ---------- radio: riktiga kanaler från radio-browser.info ----------
+const RB = ['https://de1.api.radio-browser.info', 'https://nl1.api.radio-browser.info', 'https://at1.api.radio-browser.info'];
+async function rb(path) {
+  for (const host of RB) {
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 7000);
+      const r = await fetch(host + path, { signal: ctl.signal }); clearTimeout(t);
+      if (r.ok) return await r.json();
+    } catch (e) {}
+  }
+  throw new Error('radio-browser svarar inte');
+}
+function loadStations() {
+  if (loadingStations) return loadingStations;
+  loadingStations = (async () => {
+    const tags = ['hard rock', 'heavy metal', 'classic rock', 'metal', '80s rock'];
+    const lists = await Promise.allSettled(tags.map(t => rb(`/json/stations/bytag/${encodeURIComponent(t)}?hidebroken=true&order=votes&reverse=true&limit=40`)));
+    const seen = new Set(), out = [];
+    lists.forEach(l => (l.status === 'fulfilled' ? l.value : []).forEach(s => {
+      const url = s.url_resolved || s.url;
+      const key = (s.name || '').trim().toLowerCase();
+      // bara https (sidan är https) och vanliga ljudformat
+      if (!url || !/^https:/i.test(url) || !key || seen.has(key) || /\.m3u8|\.pls|\.m3u/i.test(url) || (s.codec && !/mp3|aac|ogg|opus/i.test(s.codec))) return;
+      seen.add(key);
+      out.push({ name: s.name.trim(), url, country: s.countrycode || s.country || '', bitrate: s.bitrate || 0, votes: s.votes || 0, uuid: s.stationuuid });
+    }));
+    stations = out.sort((a, b) => b.votes - a.votes).slice(0, 40);
+    renderStations();
+    if (!stations.length) throw new Error('Hittade inga kanaler');
+  })();
+  return loadingStations;
+}
+function renderStations() {
+  const box = $('stations');
+  box.hidden = mode !== 'radio' || !stations.length;
+  box.innerHTML = stations.map((s, i) => `<button type="button" data-i="${i}" aria-current="${i === si && mode === 'radio'}">📻 ${esc(s.name)}<small>${esc(s.country)}${s.bitrate ? ' · ' + s.bitrate + 'k' : ''}</small></button>`).join('');
+  box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => tune(+b.dataset.i)));
+}
+function tune(i) {
+  if (!stations.length) return;
+  si = (i + stations.length) % stations.length;
+  const s = stations[si];
+  $('needle').style.left = (6 + 88 * si / Math.max(1, stations.length - 1)) + '%';
+  setLcd(s.name.toUpperCase(), (s.country || '') + (s.bitrate ? ' ' + s.bitrate + 'K' : ''));
+  $('info').innerHTML = `Lyssnar på <b>${esc(s.name)}</b>${s.country ? ' (' + esc(s.country) + ')' : ''}`;
+  audio.src = s.url; audio.play().catch(() => setPlaying(false));
+  renderStations();
+  // radio-browser vill gärna veta vilka kanaler som spelas (räknar popularitet)
+  if (s.uuid) rb('/json/url/' + s.uuid).catch(() => {});
+}
+
+// ---------- jukebox: slumpade låtar (30 s) ----------
+async function next() {
+  if (mode === 'radio') { tune(si + 1); return; }
+  if (hi < hist.length - 1) { hi++; playSong(hist[hi]); return; }
+  setLcd('LETAR LÅT…', '');
+  try { const s = await feed.next(); hist.push(s); hi = hist.length - 1; playSong(s); }
+  catch (e) { setLcd('INGEN SIGNAL', ''); toast(e.message || 'Kunde inte hämta låtar'); }
+}
+function prev() {
+  if (mode === 'radio') { tune(si - 1); return; }
+  if (hi > 0) { hi--; playSong(hist[hi]); } else audio.currentTime = 0;
+}
+function playSong(s) {
+  setLcd(`${s.artist} – ${s.title}`.toUpperCase(), String(s.year || ''));
+  $('info').innerHTML = `<b>${esc(s.artist)}</b> – ${esc(s.title)}${s.year ? ' (' + s.year + ')' : ''}`;
+  $('needle').style.left = (6 + Math.random() * 88) + '%';
+  audio.src = s.url; audio.play().catch(() => setPlaying(false));
+  feed.warm(3);
+}
+
+async function setMode(m) {
+  mode = m;
+  $('modeRadio').setAttribute('aria-pressed', String(m === 'radio'));
+  $('modeJuke').setAttribute('aria-pressed', String(m === 'juke'));
+  $('lcdMode').textContent = m === 'radio' ? 'RADIO' : 'JUKEBOX';
+  audio.pause();
+  renderStations();
+  if (m === 'radio') {
+    setLcd('SÖKER KANALER…', '');
+    try { await loadStations(); if (mode === 'radio') tune(si); }
+    catch (e) { setLcd('INGEN SIGNAL', ''); toast('Hittade inga radiokanaler – prova jukeboxen'); }
+  } else {
+    if (!feed) feed = PartyMusic.createFeed({ ahead: 3 });
+    next();
+  }
+}
+$('modeRadio').addEventListener('click', () => setMode('radio'));
+$('modeJuke').addEventListener('click', () => setMode('juke'));
+$('nextBtn').addEventListener('click', next);
+$('prevBtn').addEventListener('click', prev);
+$('playBtn').addEventListener('click', () => {
+  if (!audio.src) { setMode(mode); return; }
+  if (audio.paused) {
+    // radio: hoppa till "live" igen i stället för att fortsätta från bufferten
+    if (mode === 'radio') { tune(si); return; }
+    audio.play().catch(() => {});
+  } else audio.pause();
+});
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); $('playBtn').click(); }
+  else if (e.key === 'ArrowRight') next(); else if (e.key === 'ArrowLeft') prev();
+});
+
+(async () => {
+  const acc = await requirePartyAccess();
+  if (!acc) return;
+  document.documentElement.classList.remove('gate');
+  loadStations().catch(() => {});   // hämta kanallistan i förväg
+})();
+</script>
+</body>
+</html>

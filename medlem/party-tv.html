@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<title>Rock-TV — Party Mode</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&family=VT323&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/party.css">
+<style>html.gate body { visibility: hidden; }</style>
+<script>document.documentElement.classList.add('gate');</script>
+<style>
+  /* Rock-TV: en gammal tjock-TV som slumpar hårdrocksvideor (iTunes-klipp + YouTube) */
+  .tv-stage { display: grid; justify-items: center; margin-top: 0.5rem; }
+  .tv { position: relative; width: min(100%, 960px); padding-top: 3.2rem; }
+  /* antenn (kaninöron) */
+  .ant { position: absolute; top: 0.2rem; left: 50%; width: 0; height: 0; }
+  .ant::before, .ant::after { content: ''; position: absolute; bottom: -3.4rem; width: 4px; height: 5.2rem; background: linear-gradient(#ddd, #777); border-radius: 2px; transform-origin: bottom center; }
+  .ant::before { transform: rotate(-32deg); } .ant::after { transform: rotate(28deg); }
+  .ant i { position: absolute; top: 2.6rem; left: -1.6rem; width: 3.2rem; height: 1.2rem; border-radius: 1.6rem 1.6rem 0.3rem 0.3rem; background: radial-gradient(circle at 50% 30%, #555, #1a1a1a); }
+  .cabinet { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) clamp(5rem, 15%, 9rem); gap: clamp(0.6rem, 2vw, 1.4rem); padding: clamp(0.8rem, 2.4vw, 1.6rem);
+    border-radius: 1.6rem;
+    background:
+      repeating-linear-gradient(92deg, rgba(0,0,0,0.0) 0 6px, rgba(0,0,0,0.08) 6px 7px, rgba(255,255,255,0.03) 7px 13px),
+      linear-gradient(160deg, #8a5a30, #5c3518 55%, #3d220e);
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.25), inset 0 -6px 14px rgba(0,0,0,0.5), 0 30px 60px -20px rgba(0,0,0,0.9); }
+  .bezel { position: relative; padding: clamp(0.6rem, 1.8vw, 1.2rem); border-radius: 1.2rem; background: linear-gradient(145deg, #2b2b2b, #0e0e0e); box-shadow: inset 0 2px 4px rgba(255,255,255,0.15), inset 0 -3px 8px rgba(0,0,0,0.8); }
+  .screen { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #050505; border-radius: 14% / 11%; box-shadow: inset 0 0 40px rgba(0,0,0,0.9); }
+  .screen video, .screen iframe, .screen #ytHost { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; object-fit: cover; background: #000; }
+  .screen #ytHost iframe { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* glas: scanlines, vinjett och reflex */
+  .glass { position: absolute; inset: 0; pointer-events: none; z-index: 3;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.65) 100%),
+      linear-gradient(130deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.03) 30%, transparent 45%); }
+  .screen.off .glass { background: radial-gradient(ellipse at center, rgba(40,40,40,0.4), #000 70%); }
+  #noise { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; opacity: 0; transition: opacity 0.15s; image-rendering: pixelated; }
+  #noise.on { opacity: 1; }
+  .osd { position: absolute; top: 6%; right: 7%; z-index: 4; font-family: 'VT323', monospace; font-size: clamp(1.4rem, 4vw, 2.6rem); color: #6dff6d; text-shadow: 0 0 6px #2f2; opacity: 0; transition: opacity 0.3s; }
+  .osd.on { opacity: 1; }
+  .caption { position: absolute; left: 6%; right: 6%; bottom: 7%; z-index: 4; font-family: 'VT323', monospace; font-size: clamp(1rem, 2.6vw, 1.6rem); color: #fff; text-shadow: 0 0 4px #000, 0 0 8px #000; opacity: 0; transition: opacity 0.6s; }
+  .caption.on { opacity: 1; }
+  .msg { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; text-align: center; padding: 1rem; font-family: 'VT323', monospace; font-size: clamp(1.3rem, 3.4vw, 2rem); color: #9f9; text-shadow: 0 0 6px #2f2; }
+  /* kontrollpanel */
+  .panel { display: grid; grid-template-rows: auto auto 1fr auto; gap: 0.9rem; justify-items: center; padding: 0.6rem 0.2rem; border-radius: 0.8rem; background: linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.4)); box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+  .knob { width: clamp(3.2rem, 9vw, 5rem); aspect-ratio: 1; border-radius: 50%; padding: 0; border: 0; cursor: pointer; position: relative;
+    background: radial-gradient(circle at 35% 30%, #f3f3f3, #9a9a9a 45%, #4a4a4a 75%); box-shadow: 0 4px 10px rgba(0,0,0,0.6), inset 0 -3px 6px rgba(0,0,0,0.4); transition: transform 0.35s cubic-bezier(.2,1.4,.4,1); }
+  .knob::after { content: ''; position: absolute; top: 8%; left: 50%; width: 4px; height: 34%; margin-left: -2px; background: #222; border-radius: 2px; }
+  .knob:hover { box-shadow: 0 4px 14px rgba(229,169,104,0.5), inset 0 -3px 6px rgba(0,0,0,0.4); background: radial-gradient(circle at 35% 30%, #fff, #a5a5a5 45%, #4a4a4a 75%); }
+  .klabel { font-family: 'VT323', monospace; font-size: 1rem; color: #e8d3b0; letter-spacing: 0.08em; margin-top: -0.6rem; }
+  .grille { width: 100%; align-self: stretch; min-height: 3rem; border-radius: 0.5rem; background: repeating-linear-gradient(0deg, #1c120a 0 3px, #3b2614 3px 6px); box-shadow: inset 0 0 8px rgba(0,0,0,0.6); }
+  .power { width: 1rem; height: 1rem; border-radius: 50%; background: #3a0000; box-shadow: inset 0 0 3px #000; }
+  .power.on { background: #ff3030; box-shadow: 0 0 10px #f33, inset 0 0 3px #800; }
+  .legs { display: flex; justify-content: space-between; width: 86%; margin: 0 auto; }
+  .legs i { width: 1.4rem; height: 1.6rem; background: linear-gradient(#3d220e, #1c0f05); clip-path: polygon(15% 0, 85% 0, 100% 100%, 0 100%); }
+  .ctrls { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; margin-top: 1rem; align-items: center; }
+  .seg { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
+  .seg button { background: rgba(255,255,255,0.06); color: #d1d5db; border: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
+  .seg button:disabled { opacity: 0.4; }
+  .note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.8rem; }
+  @media (max-width: 640px) { .cabinet { grid-template-columns: 1fr; } .panel { grid-template-rows: none; grid-template-columns: auto auto 1fr auto; align-items: center; } .grille { min-height: 2.4rem; } .klabel { margin: 0; } }
+  #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 2100; display: none; max-width: calc(100vw - 3rem); }
+</style>
+</head>
+<body class="party-page">
+<header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+<div class="container">
+  <section>
+    <div class="party-top"><a href="/medlem/party.html" class="back-btn">&larr; Party</a></div>
+    <h1 class="party-title">Rock<span class="hot">-TV</span></h1>
+    <p class="party-sub">Slumpade hårdrocksvideor dygnet runt. Vrid på kanalratten för nästa video.</p>
+
+    <div class="tv-stage">
+      <div class="tv">
+        <div class="ant"><i></i></div>
+        <div class="cabinet">
+          <div class="bezel">
+            <div class="screen off" id="screen">
+              <div id="ytHost"></div>
+              <video id="vid" playsinline></video>
+              <canvas id="noise" width="160" height="120"></canvas>
+              <div class="glass"></div>
+              <div class="osd" id="osd">CH 01</div>
+              <div class="caption" id="cap"></div>
+              <div class="msg" id="msg">▶ TRYCK PÅ STRÖMBRYTAREN</div>
+            </div>
+          </div>
+          <div class="panel">
+            <button type="button" class="knob" id="chKnob" title="Nästa kanal (→)" aria-label="Nästa kanal"></button>
+            <span class="klabel">KANAL</span>
+            <div class="grille"></div>
+            <div style="display:grid;justify-items:center;gap:0.4rem">
+              <button type="button" class="knob" id="pwrKnob" title="Ström på/av" aria-label="Ström på/av" style="width:clamp(2.4rem,6vw,3.4rem)"></button>
+              <span class="power" id="led"></span>
+            </div>
+          </div>
+        </div>
+        <div class="legs"><i></i><i></i></div>
+      </div>
+      <div class="ctrls">
+        <div class="seg" id="segSrc">
+          <button type="button" data-v="mix" aria-pressed="true">🎲 Blandat</button>
+          <button type="button" data-v="clip" aria-pressed="false">⚡ 30 s-klipp</button>
+          <button type="button" data-v="yt" aria-pressed="false">📺 Hela videor</button>
+        </div>
+        <button type="button" class="btn-outline" id="fullBtn">⛶ Helskärm</button>
+      </div>
+      <p class="note" id="note">Klipp från iTunes/Apple Music · hela videor från YouTube</p>
+    </div>
+  </section>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/party.js"></script>
+<script src="/js/party-quiz-questions.js"></script>
+<script src="/js/party-music.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+function toast(msg, ms = 4000) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
+const shuffle = PartyMusic.shuffle, norm = PartyMusic.norm;
+const vid = $('vid');
+let on = false, ch = 0, src = 'mix', ytOk = null, ytPlayer = null, ytReady = null, busy = false, artists = [];
+const seen = new Set();
+
+// ---------- brus vid kanalbyte ----------
+const nc = $('noise'), nx = nc.getContext('2d'); let nRaf = null;
+function noise(ms = 700) {
+  nc.classList.add('on');
+  const img = nx.createImageData(nc.width, nc.height);
+  const end = performance.now() + ms;
+  const step = () => {
+    for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255 | 0; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+    nx.putImageData(img, 0, 0);
+    if (performance.now() < end) nRaf = requestAnimationFrame(step); else nc.classList.remove('on');
+  };
+  cancelAnimationFrame(nRaf); step();
+  // lite brusljud
+  try {
+    const ac = noise.ac || (noise.ac = new (window.AudioContext || window.webkitAudioContext)());
+    const b = ac.createBuffer(1, ac.sampleRate * ms / 1000, ac.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.12;
+    const s = ac.createBufferSource(); s.buffer = b; s.connect(ac.destination); s.start();
+  } catch (e) {}
+}
+function osd(txt) { const o = $('osd'); o.textContent = txt; o.classList.add('on'); clearTimeout(osd._t); osd._t = setTimeout(() => o.classList.remove('on'), 2500); }
+function caption(txt) { const c = $('cap'); c.textContent = txt; c.classList.add('on'); clearTimeout(caption._t); caption._t = setTimeout(() => c.classList.remove('on'), 7000); }
+
+// ---------- källor ----------
+function nextArtist() { if (!artists.length) artists = shuffle(window.ROCK_ARTISTS || []); return artists.pop(); }
+// iTunes: musikvideor med 30 s förhandsvisning
+const vidCache = new Map();
+function jsonp(url, ms = 8000) {
+  return new Promise((res, rej) => {
+    const cb = '__tv' + Math.random().toString(36).slice(2), sc = document.createElement('script');
+    const done = () => { delete window[cb]; sc.remove(); clearTimeout(t); };
+    const t = setTimeout(() => { done(); rej(new Error('timeout')); }, ms);
+    window[cb] = d => { done(); res(d); };
+    sc.onerror = () => { done(); rej(new Error('load')); };
+    sc.src = url + '&callback=' + cb; document.head.appendChild(sc);
+  });
+}
+async function itunesVideo() {
+  for (let tries = 0; tries < 6; tries++) {
+    const a = nextArtist();
+    let list = vidCache.get(a);
+    if (!list) {
+      try {
+        const d = await jsonp('https://itunes.apple.com/search?' + new URLSearchParams({ term: a, entity: 'musicVideo', attribute: 'artistTerm', limit: '25', country: 'se' }));
+        list = (d.results || []).filter(r => r.previewUrl && norm(r.artistName).startsWith(norm(a)) && !/\b(live|interview|behind the scenes|making of)\b/i.test(r.trackName));
+      } catch (e) { list = []; }
+      vidCache.set(a, list);
+    }
+    const v = shuffle(list).find(x => !seen.has('it' + x.trackId));
+    if (v) { seen.add('it' + v.trackId); return { kind: 'clip', url: v.previewUrl, title: v.trackName, artist: v.artistName, year: (v.releaseDate || '').slice(0, 4) }; }
+  }
+  return null;
+}
+// YouTube: hela musikvideor via Edge Function youtube-search (raw-läge)
+const ytCache = new Map();
+async function youtubeVideo() {
+  if (ytOk === false) return null;
+  for (let tries = 0; tries < 3; tries++) {
+    const a = nextArtist();
+    let list = ytCache.get(a);
+    if (!list) {
+      try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/youtube-search`, {
+          method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ q: `${a} official music video`, raw: true }),
+        });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok || out.error || out.raw !== true) { ytOk = false; updateSrcButtons(); return null; }   // gammal version av funktionen / ingen nyckel / kvoten slut
+        ytOk = true;
+        list = (out.items || []).filter(x => !/karaoke|lyrics?|cover|reaction|live at|full (album|concert)|instrumental/i.test(x.title));
+      } catch (e) { ytOk = false; updateSrcButtons(); return null; }
+      ytCache.set(a, list);
+    }
+    const v = shuffle(list).find(x => !seen.has('yt' + x.id));
+    if (v) { seen.add('yt' + v.id); return { kind: 'yt', id: v.id, title: v.title, artist: v.channel }; }
+  }
+  return null;
+}
+function updateSrcButtons() {
+  const b = $('segSrc').querySelector('[data-v="yt"]');
+  if (ytOk === false) {
+    b.disabled = true; b.title = 'YouTube-sökningen behöver uppdateras (Edge Function youtube-search)';
+    if (src === 'yt') { src = 'clip'; markSrc(); }
+    $('note').textContent = 'Klipp från iTunes/Apple Music · hela YouTube-videor kräver att Edge Function youtube-search är uppdaterad';
+  }
+}
+function markSrc() { $('segSrc').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === src))); }
+
+// ---------- YouTube-spelaren (IFrame API, för att veta när videon är slut) ----------
+function loadYt() {
+  if (ytReady) return ytReady;
+  ytReady = new Promise(res => {
+    window.onYouTubeIframeAPIReady = () => res();
+    const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s);
+    setTimeout(res, 8000);
+  });
+  return ytReady;
+}
+async function playYt(v) {
+  await loadYt();
+  if (!window.YT || !YT.Player) throw new Error('YouTube gick inte att ladda');
+  $('ytHost').style.display = 'block';
+  if (!ytPlayer) {
+    await new Promise((res, rej) => {
+      ytPlayer = new YT.Player('ytHost', {
+        videoId: v.id, host: 'https://www.youtube-nocookie.com',
+        playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, iv_load_policy: 3 },
+        events: {
+          onReady: () => res(),
+          onStateChange: e => { if (e.data === YT.PlayerState.ENDED && on) next(); },
+          onError: () => { if (on) next(); },
+        },
+      });
+      setTimeout(res, 8000);
+    });
+  } else ytPlayer.loadVideoById(v.id);
+  try { ytPlayer.unMute(); ytPlayer.setVolume(100); ytPlayer.playVideo(); } catch (e) {}
+}
+
+// ---------- kanalbyte ----------
+async function next() {
+  if (!on || busy) return;
+  busy = true;
+  ch = ch % 99 + 1;
+  $('chKnob').style.transform = `rotate(${ch * 33}deg)`;
+  noise(900); osd('CH ' + String(ch).padStart(2, '0'));
+  $('msg').hidden = true;
+  vid.pause();
+  try { if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo(); } catch (e) {}
+  let v = null;
+  const wantYt = src === 'yt' || (src === 'mix' && ytOk !== false && Math.random() < 0.5);
+  if (wantYt) v = await youtubeVideo();
+  if (!v && src !== 'yt') v = await itunesVideo();
+  if (!v && src === 'yt') v = await itunesVideo();
+  busy = false;
+  if (!on) return;
+  if (!v) { $('msg').hidden = false; $('msg').textContent = 'INGEN SIGNAL – KOLLA NÄTET'; return; }
+  try {
+    if (v.kind === 'yt') {
+      vid.style.display = 'none';
+      await playYt(v);
+    } else {
+      $('ytHost').style.display = 'none';
+      vid.style.display = 'block';
+      vid.src = v.url; vid.currentTime = 0;
+      await vid.play();
+    }
+    caption(`${v.artist} – ${v.title}${v.year ? ' (' + v.year + ')' : ''}`);
+  } catch (e) { setTimeout(next, 400); }
+}
+vid.addEventListener('ended', () => { if (on) next(); });
+vid.addEventListener('error', () => { if (on && vid.src) setTimeout(next, 300); });
+
+function power() {
+  on = !on;
+  $('led').classList.toggle('on', on);
+  $('screen').classList.toggle('off', !on);
+  $('pwrKnob').style.transform = on ? 'rotate(90deg)' : '';
+  if (on) { PartyMedia.lobbyMusic(false); next(); }
+  else {
+    vid.pause(); vid.removeAttribute('src'); vid.load();
+    try { if (ytPlayer) ytPlayer.stopVideo(); } catch (e) {}
+    $('cap').classList.remove('on');
+    $('msg').hidden = false; $('msg').textContent = '▶ TRYCK PÅ STRÖMBRYTAREN';
+  }
+}
+$('pwrKnob').addEventListener('click', power);
+$('chKnob').addEventListener('click', () => { if (!on) power(); else next(); });
+$('msg').addEventListener('click', () => { if (!on) power(); });
+$('segSrc').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { src = b.dataset.v; markSrc(); if (on) next(); }));
+$('fullBtn').addEventListener('click', () => { const s = $('screen'); if (document.fullscreenElement) document.exitFullscreen(); else if (s.requestFullscreen) s.requestFullscreen().catch(() => {}); });
+document.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { if (on) next(); } else if (e.code === 'Space') { e.preventDefault(); power(); } });
+
+(async () => {
+  const acc = await requirePartyAccess();
+  if (!acc) return;
+  document.documentElement.classList.remove('gate');
+})();
+</script>
+</body>
+</html>

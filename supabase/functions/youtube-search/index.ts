@@ -2,7 +2,8 @@
 // Söker karaokevideor på YouTube åt Party Mode (medlem/party.html).
 // API-nyckeln får inte ligga i webbläsaren, så sökningen går via den här funktionen.
 //
-// Body:    { q: string }            ("karaoke" läggs till automatiskt om det saknas)
+// Body:    { q: string, raw?: boolean }  ("karaoke" läggs till om det saknas – utom när raw: true,
+//          som Rock-TV använder för vanliga musikvideor; då söks bara i kategorin Musik)
 // Svar:    { items: [{ id, title, channel, thumb }] }   eller { error, code? }
 // Secrets: YOUTUBE_API_KEY  (Google Cloud → YouTube Data API v3 → API-nyckel)
 //
@@ -46,11 +47,13 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return json({ error: "Ogiltig JSON" }, 400); }
   let q = String(body?.q ?? "").trim().slice(0, 120);
   if (!q) return json({ items: [] });
-  if (!/karaoke|instrumental|backing/i.test(q)) q += " karaoke";
+  const raw = body?.raw === true;
+  if (!raw && !/karaoke|instrumental|backing/i.test(q)) q += " karaoke";
 
   const url = "https://www.googleapis.com/youtube/v3/search?" + new URLSearchParams({
     part: "snippet", type: "video", videoEmbeddable: "true", maxResults: "15",
     safeSearch: "none", q, key,
+    ...(raw ? { videoCategoryId: "10" } : {}),
   });
   const res = await fetch(url);
   const data = await res.json().catch(() => ({}));
@@ -64,5 +67,5 @@ Deno.serve(async (req) => {
     channel: decode(it.snippet?.channelTitle || ""),
     thumb: it.snippet?.thumbnails?.medium?.url || it.snippet?.thumbnails?.default?.url || "",
   }));
-  return json({ items });
+  return json({ items, raw });
 });

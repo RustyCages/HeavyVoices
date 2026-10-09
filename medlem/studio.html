@@ -10,7 +10,7 @@
 <style>
   .card.static:hover { transform: none; border-color: var(--border); box-shadow: var(--card-shadow); }
   /* studion är byggd för dator: använd hela bredden */
-  .container { max-width: none; }
+  html .container, html.app-wide .container { max-width: none; }   /* studion är byggd för dator: hela bredden (slår app-wide) */
   .hint { font-size: 0.85rem; color: var(--text-muted); margin: 0.25rem 0 1rem; }
   .field-k { display: block; margin: 0 0 0.35rem; font-family: 'Roboto Condensed', sans-serif; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); }
   .title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }

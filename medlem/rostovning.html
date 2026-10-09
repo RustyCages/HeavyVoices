@@ -586,7 +586,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
             <li><b>Zoom +/−</b> (eller <b>Ctrl+scroll</b>) zoomar både på bredden och höjden.</li>
             <li><b>Dra</b> noten i sidled (tid) eller höjdled (ton). Dra i <b>kanterna</b> för att ändra längden.</li>
             <li>Kanterna <b>snappar</b> mot andra noter (håll <b>Alt</b> för att stänga av). Noter kant i kant följer med när du drar ut en kant.</li>
-            <li><b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter. Dra i tom yta (utan Shift) för att spola.</li>
+            <li><b>Shift+klick</b> eller <b>Shift+dra</b> i tom yta markerar flera noter. Dra <b>i sidled</b> i tom yta för att spola, <b>uppåt/nedåt</b> för att flytta notfältet i höjdled.</li>
           </ul></section>
           <section><h4>Rita nya noter</h4><ul>
             <li><b>Dubbelklicka</b> i tom yta så sätts en ny not där (eller <b>＋ Ny not</b> / <b>N</b> vid strecket).</li>
@@ -627,7 +627,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
           <section><h4>Textraden</h4><ul>
             <li>Sången ligger i <b>textrutor</b> i en egen rad under noterna (bara synlig när du redigerar text). Rutorna har egen tid och påverkar inte notblocken.</li>
             <li>Medlemmarna ser texten som en liten vägledning <b>ovanför noten</b> där varje ruta börjar – raden som sjungs lyser i guld.</li>
-            <li>Noterna går inte att flytta i textläget – dra i notfältet för att spola.</li>
+            <li>Noterna går inte att flytta i textläget – dra i sidled i notfältet för att spola, uppåt/nedåt för att flytta det i höjdled.</li>
             <li>Första gången fördelas textraderna automatiskt i rutor efter noterna – sedan justerar du för hand.</li>
           </ul></section>
           <section><h4>Skriva och flytta</h4><ul>
@@ -1089,7 +1089,7 @@ function drawOverview() {
 function viewStart(pos, span) { return Math.max(0, pos - span * 0.3); }
 // inzoomat: färre halvtoner på höjden också, så blocken blir större åt båda hållen
 function vZoom(span) { return span <= 2 ? 2.6 : span <= 3 ? 2.1 : span <= 5 ? 1.5 : 1; }
-let viewC = null;
+let viewC = null, editPan = null;   // editPan: notfältets mitt (halvton) när admin redigerar
 function pitchCenter(span, lo, hi) {
   if (window.__noteDrag || bdrag) return viewC ?? (lo + hi) / 2;   // stå still medan man drar
   const pos = position();
@@ -1238,9 +1238,18 @@ function drawRoll() {
   const bxs = lyricBoxes();
   const LH = (editMode && textMode) ? Math.round(30 * dpr) : 0;
   const H = c.height - LH;
-  let [lo, hi] = rollRange(t0, span);
   const vz = vZoom(span);
-  if (vz > 1) { const cm = pitchCenter(span, lo, hi), half = Math.max(3.5, (hi - lo) / vz / 2); lo = cm - half; hi = cm + half; }
+  let lo, hi;
+  if (editMode) {
+    // redigering: notfältet ligger still i höjdled – dra uppåt/nedåt i tom yta för att flytta det
+    const [l0, h0] = songRange(), half = Math.max(3.5, (h0 - l0) / vz / 2);
+    if (editPan == null) editPan = rollGeom && rollGeom.rowH ? rollGeom.lo + rollGeom.H / rollGeom.rowH / 2 : (l0 + h0) / 2;
+    editPan = Math.max(l0 + half - 6, Math.min(h0 - half + 6, editPan));
+    lo = editPan - half; hi = editPan + half;
+  } else {
+    [lo, hi] = rollRange(t0, span);
+    if (vz > 1) { const cm = pitchCenter(span, lo, hi), half = Math.max(3.5, (hi - lo) / vz / 2); lo = cm - half; hi = cm + half; }
+  }
   const pxs = W / span;
   const rowH = H / (hi - lo);
   const x = t => (t - t0) * pxs;
@@ -1711,6 +1720,7 @@ function setEditMode(on, text = false) {
 }
 function applyEditUi() {
   const notesOn = editMode && !textMode, textOn = editMode && textMode;
+  if (!editMode) editPan = null;
   if (!textOn) closeWordEditor();
   if (editMode) fillEditVoice();
   document.getElementById('editTools').hidden = !notesOn;
@@ -2313,7 +2323,7 @@ async function switchEditStem(st) {
   showStem(st);
   ghosts.add(prev.key); renderGhostRow();
   pausedPos = Math.max(0, Math.min(durationOf(), g - stemOffSec()));
-  current._rr = null; viewLo = null;
+  current._rr = null; viewLo = null; editPan = null;
   setEditMode(true, wasText);
   editStatus(`Redigerar nu ${st.label}`);
 }
@@ -2832,7 +2842,7 @@ document.getElementById('overview').addEventListener('click', e => {
 // dra i notbanan för att spola
 (() => {
   const c = document.getElementById('roll');
-  let startX = null, startT = 0, wasPlaying = false, scrubbed = false;
+  let startX = null, startY = 0, startT = 0, wasPlaying = false, scrubbed = false, panning = null;
   let drag = null;
   const cxy = e => { const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1; return [(e.clientX - r.left) * d, (e.clientY - r.top) * d]; };
   c.addEventListener('pointerdown', e => {
@@ -2879,7 +2889,7 @@ document.getElementById('overview').addEventListener('click', e => {
       }
       sel = -1; multi = new Set(); tick();
     }
-    startX = e.clientX; startT = position(); wasPlaying = playing; scrubbed = false;
+    startX = e.clientX; startY = e.clientY; startT = position(); wasPlaying = playing; scrubbed = false; panning = null;
     c.setPointerCapture(e.pointerId); c.classList.add('dragging');
   });
   c.addEventListener('pointermove', e => {
@@ -2959,6 +2969,13 @@ document.getElementById('overview').addEventListener('click', e => {
       else { const h = hitNote(cx, cy); c.style.cursor = h ? (h.zone === 'move' ? 'move' : 'ew-resize') : hitGhost(cx, cy) ? 'pointer' : 'grab'; }
     }
     if (startX == null) return;
+    // redigering: dra uppåt/nedåt i tom yta flyttar notfältet i höjdled
+    if (editMode && !scrubbed && rollGeom && (panning || (Math.abs(e.clientY - startY) > 6 && Math.abs(e.clientY - startY) > Math.abs(e.clientX - startX)))) {
+      if (!panning) panning = { c: editPan ?? (rollGeom.lo + rollGeom.H / rollGeom.rowH / 2), y: e.clientY };
+      editPan = panning.c + (e.clientY - panning.y) * (window.devicePixelRatio || 1) / rollGeom.rowH;
+      c.style.cursor = 'ns-resize';
+      tick(); return;
+    }
     if (!scrubbed && Math.abs(e.clientX - startX) < 6) return;   // litet darr räknas som klick
     if (!scrubbed && playing) { pause(); startT = position(); }
     scrubbed = true;
@@ -2992,6 +3009,7 @@ document.getElementById('overview').addEventListener('click', e => {
       return;
     }
     if (startX == null) return; startX = null; c.classList.remove('dragging');
+    if (panning) { panning = null; c.style.cursor = ''; return; }
     if (scrubbed) { if (wasPlaying) play(); return; }
     // klick (utan att dra) gör ingenting – spela/pausa med ▶-knappen eller mellanslag
   };

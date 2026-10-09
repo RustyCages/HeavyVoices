@@ -61,6 +61,7 @@
   .t-ctrl .ms { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 4.2rem; text-align: right; }
 
   /* adminläge: låtens egna spår (synk, stämfiler) */
+  .vt { display: grid; gap: 0.55rem; padding: 0.6rem 0 0.2rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
   .admin-sync { margin-top: 1rem; padding: 0.8rem 0.9rem; border: 1px dashed rgba(229,169,104,0.5); border-radius: 0.6rem; display: grid; gap: 0.5rem; }
   .admin-sync .k { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
   .admin-sync .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; font-size: 0.85rem; }
@@ -132,6 +133,7 @@
       <li><div><b>Spela in</b><p>Klicka i tidslinjen där du vill börja och tryck <b>⏺ Spela in</b>. Låten börjar spela – med <b>Inräkning</b> startar den 2 sekunder före, så du hinner komma in. Sjung! Tryck <b>⏹ Stoppa</b> (eller mellanslag) när du är klar. Den gröna mätaren visar att mikrofonen hör dig.</p></div></li>
       <li><div><b>Lyssna</b><p>Din tagning dyker upp som ett rött spår. Tryck ▶ och lyssna tillsammans med låten. Inte nöjd? Spela in en gång till – varje försök blir ett eget spår, och du kan ta bort de du inte vill ha med <b>🗑 Ta bort</b>.</p></div></li>
       <li><div><b>Putsa (om du vill)</b><p>Ligger inspelningen lite fel i tid? Slå på <b>↔ Flytta</b> och dra det röda spåret i sidled – klicka på Flytta igen när du är klar, så kan inget hamna ur synk av misstag. Utan valt verktyg drar du i spåren för att bläddra i låten (eller Shift + mushjulet). Vill du ta bort ett harkel eller en tyst början? Välj <b>▭ Markera</b>, dra över biten och tryck <b>✂ Ta bort markerat</b>. Vill du använda en bra bit igen – t.ex. en refräng – markera den, tryck <b>⎘ Kopiera markerat</b>, klicka i spåret du vill lägga den i, ställ spelhuvudet och tryck <b>📋 Klistra in</b> (<b>Ersätt</b> skriver över, <b>Infoga</b> skjuter resten framåt, <b>Lägg ovanpå</b> mixar ihop). <b>📶 Normalisera</b> gör en svag inspelning starkare, och under <b>Volym</b> höjer eller sänker du hela spåret eller bara det markerade (t.ex. +3 dB). <b>↶ Ångra</b> tar tillbaka.</p></div></li>
+      <li><div><b>Röstverktyg (på dator)</b><p><b>🎵 Tonhöjd</b>: markera en fras och gör ett nytt spår med ny tonhöjd – välj <b>halvtoner</b> (allt flyttas lika mycket) eller <b>steg i tonarten</b> (t.ex. <i>ters över</i>, så som en stämma sjungs). Tempot ändras inte. Bäst upp till ungefär 4–5 halvtoner, längre än så låter det lätt konstlat. <b>🎹 Syntröst</b>: en datorröst som sjunger ”ooh”, ”aah” eller ”mmm” på en stämmas noter från Röstövning – samma toner eller som en stämma över/under. Bra för att höra hur en harmoni låter innan någon sjungit in den. <b>🧽 Rengör</b>: behåller tonen som sjungs och dämpar andra stämmor och brus – välj <i>Bara brus</i> om du bara vill ta bort sus från din inspelning.</p></div></li>
       <li><div><b>Spara</b><p>Skriv ett namn, till exempel ”Ters över refrängen”, välj vem som får höra den och tryck <b>💾 Spara inspelning</b>. Den hamnar under <b>Mina inspelningar</b> längst ner på sidan.</p></div></li>
     </ol>
     <h3>Vem hör min inspelning?</h3>
@@ -216,6 +218,8 @@
 <script src="/js/audio-edit.js"></script>
 <script src="/js/wave-timeline.js"></script>
 <script src="/js/track-edit-panel.js"></script>
+<script src="/js/pitch-analyze.js"></script>
+<script src="/js/voice-tools.js"></script>
 <script>
 const STEMS_BUCKET = 'heavy-voices-stems', REC_BUCKET = 'heavy-voices-recordings';
 const FIXED_STEMS = [
@@ -381,6 +385,32 @@ const panel = TrackEditPanel.mount(document.getElementById('panel'), {
   onEdit: applyEdit, onUndo: undo, onOriginal: original,
   canUndo: t => !!(t && t.undo && t.undo.length), isEdited: t => !!(t && t.edited),
   extraRows: `
+    <div class="vt desktop-only" id="vtBox">
+      <div class="tool-row"><span class="k">Röstverktyg</span><span class="status">Gäller det markerade i valt spår – eller hela spåret om inget är markerat. Tonhöjd och syntröst blir nya spår; Rengör ändrar dina egna spår direkt (går att ångra), annars blir det ett nytt spår.</span></div>
+      <div class="tool-row">
+        <span class="k">Tonhöjd</span>
+        <select id="psMode" title="Halvtoner flyttar allt lika mycket. Steg i tonarten flyttar varje ton inom tonarten – en ters blir stor eller liten beroende på tonen, som när man sjunger en stämma."><option value="semi">Halvtoner</option><option value="key">Steg i tonarten</option></select>
+        <select id="psAmt"></select>
+        <button type="button" class="btn-outline" id="psGo" title="Kopierar det markerade (eller hela spåret) till ett nytt spår med ny tonhöjd – tempot ändras inte">🎵 Nytt spår med ny tonhöjd</button>
+        <span class="status" id="psInfo"></span>
+      </div>
+      <div class="tool-row">
+        <span class="k">Syntröst</span>
+        <select id="syFrom" title="Vilken stämmas noter (notanalysen från Röstövning) som ska sjungas"></select>
+        <select id="syInt" title="Sjung noterna som de är, eller som en stämma över/under i tonarten"></select>
+        <select id="syVowel" title="Vokal"><option value="oo">”Ooh”</option><option value="aa">”Aah”</option><option value="mm">”Mmm” (nynna)</option></select>
+        <select id="syVoices"><option value="3">Kör (3 röster)</option><option value="1">1 röst</option></select>
+        <button type="button" class="btn-outline" id="syGo" title="Skapar ett nytt spår där en syntetisk röst sjunger noterna – i det markerade tidsområdet eller hela låten">🎹 Skapa syntröst</button>
+      </div>
+      <div class="tool-row">
+        <span class="k">Rengör</span>
+        <select id="clMode"><option value="both">Andra stämmor + brus</option><option value="pitch">Bara andra stämmor</option><option value="noise">Bara brus</option></select>
+        <label class="status" for="clFollow">följ tonen i</label> <select id="clFollow" title="Rengöraren behåller tonen (och dess övertoner) som den här notanalysen följer och dämpar allt annat"></select>
+        <label class="status" for="clStr">styrka</label> <input type="range" id="clStr" min="0" max="1" step="0.1" value="0.6" style="width:6rem">
+        <button type="button" class="btn-outline" id="clGo" title="Rengör det valda spåret (det markerade eller hela). Egna spår ändras direkt (går att ångra), annars blir det ett nytt spår.">🧽 Rengör</button>
+      </div>
+      <div class="tool-row"><span class="k"></span><span class="status" id="vtStatus"></span></div>
+    </div>
     <div class="tool-row" id="recRow1">
       <span class="k">Inspelning</span>
       <input type="text" id="recTitle" maxlength="80" placeholder="Namn, t.ex. Ters över refrängen">
@@ -477,6 +507,133 @@ function original(t) {
   t.clip = t.orig; t.offsetMs = t.savedOffsetMs; setPeaks(t); t.edited = false;
   tl.render(); setActive(t); restartIfPlaying(); updateSaveState(); panel.status('Tillbaka till originalet');
 }
+
+// ---------- röstverktyg: tonhöjd, syntröst, rengöring ----------
+let pitchByKey = {}, vtBusy = false, genNo = 0;
+const STEP_NAMES = { 1: 'sekund', 2: 'ters', 3: 'kvart', 4: 'kvint', 5: 'sext', 6: 'septim', 7: 'oktav' };
+const stepLabel = k => k === 0 ? 'Samma toner' : `${STEP_NAMES[Math.abs(k)]} ${k > 0 ? 'över' : 'under'}`;
+function vtStatus(msg, warn) { const e = document.getElementById('vtStatus'); e.textContent = msg || ''; e.classList.toggle('warn', !!warn); }
+function songKey() {
+  const all = [].concat(...Object.values(pitchByKey).map(p => p.notes || []));
+  return all.length >= 8 ? PitchAnalyze.detectKey(all) : null;
+}
+function fillPsAmt() {
+  const mode = document.getElementById('psMode').value, el = document.getElementById('psAmt');
+  const opts = [];
+  if (mode === 'semi') for (let k = 12; k >= -12; k--) { if (k) opts.push(`<option value="${k}" ${k === 3 ? 'selected' : ''}>${k > 0 ? '+' : '−'}${Math.abs(k)} halvton${Math.abs(k) > 1 ? 'er' : ''}${Math.abs(k) === 12 ? ' (oktav)' : ''}</option>`); }
+  else for (let k = 7; k >= -7; k--) { if (k) opts.push(`<option value="${k}" ${k === 2 ? 'selected' : ''}>${stepLabel(k)}</option>`); }
+  el.innerHTML = opts.join('');
+  const key = songKey();
+  document.getElementById('psInfo').textContent = mode === 'key' ? (key ? `Tonart: ${key.name}` : 'Tonarten okänd – gör notanalys i Röstövning först') : '';
+}
+function fillVtSelects() {
+  const withPitch = tracks.filter(t => t.kind === 'stem' && pitchByKey[t.key]);
+  document.getElementById('syFrom').innerHTML = withPitch.length
+    ? withPitch.map(t => `<option value="${esc(t.key)}">Noter: ${esc(t.label)}</option>`).join('')
+    : '<option value="">Ingen notanalys än</option>';
+  document.getElementById('syGo').disabled = !withPitch.length;
+  document.getElementById('syInt').innerHTML = [0, 2, -2, 3, 4, -3, -4, -5, 7, -7].map(k => `<option value="${k}">${stepLabel(k)}</option>`).join('');
+  document.getElementById('clFollow').innerHTML = '<option value="self">spåret självt</option>' + withPitch.map(t => `<option value="${esc(t.key)}">${esc(t.label)} (notanalys)</option>`).join('');
+  fillPsAmt();
+}
+// det som ska bearbetas: markerat område i valt spår, annars hela spåret (sekunder i spårets fil)
+function vtRange(t) {
+  if (sel && sel.track === t && Math.abs(sel.b - sel.a) > 0.05) {
+    const a = Math.max(0, Math.min(sel.a, sel.b) - offS(t)), b = Math.min(tDur(t), Math.max(sel.a, sel.b) - offS(t));
+    if (b - a > 0.05) return [a, b, true];
+  }
+  return [0, tDur(t), false];
+}
+// tonanalys för ett spår i spårets egen tid: sparad notanalys (stämma) eller räknas fram nu
+async function analysisFor(t) {
+  if (t.kind === 'stem' && pitchByKey[t.key] && !t.edited) return pitchByKey[t.key];
+  if (t._an && t._an.clip === t.clip) return t._an.res;
+  vtStatus(`Analyserar tonerna i ${t.label}…`);
+  const res = await PitchAnalyze.analyze(VoiceTools.toMono16k(t.clip), PitchAnalyze.rangeForLabel(t.label),
+    p => vtStatus(`Analyserar tonerna i ${t.label}… ${Math.round(p * 100)} %`));
+  t._an = { clip: t.clip, res };
+  return res;
+}
+function addGenTrack(label, clip, offsetMs) {
+  const t = { kind: 'rec', key: 'gen-' + (++genNo), label, color: REC_COLOR, mine: true, memberId: me.id,
+    clip, orig: clip, offsetMs: Math.round(offsetMs), savedOffsetMs: null, visibility: 'private', undo: [], edited: false, vol: 1, muted: false, solo: false };
+  setPeaks(t); tracks.push(t);
+  tl.selection = null; sel = null;
+  tl.render(); setActive(t); restartIfPlaying(); updateSaveState();
+  return t;
+}
+async function vtRun(btn, fn) {
+  if (vtBusy) { toast('Vänta – ett röstverktyg arbetar redan'); return; }
+  vtBusy = true; const b = document.getElementById(btn); b.disabled = true;
+  await new Promise(r => setTimeout(r, 30));
+  try { await fn(); } catch (e) { console.error(e); vtStatus('Det gick inte: ' + (e.message || e), true); }
+  vtBusy = false; b.disabled = false;
+}
+async function pitchToTrack() {
+  const t = active; if (!t || !t.clip) { toast('Välj ett spår först'); return; }
+  const [a, b] = vtRange(t), mode = document.getElementById('psMode').value, amt = Number(document.getElementById('psAmt').value);
+  const part = AudioEdit.crop(t.clip, a, b);
+  let out, name;
+  if (mode === 'semi') {
+    vtStatus('Ändrar tonhöjden…'); await new Promise(r => setTimeout(r, 20));
+    out = VoiceTools.pitchShift(part, amt); name = `${amt > 0 ? '+' : '−'}${Math.abs(amt)} halvton${Math.abs(amt) > 1 ? 'er' : ''}`;
+  } else {
+    const an = await analysisFor(t), key = songKey() || PitchAnalyze.detectKey(an.notes);
+    const notes = (an.notes || []).filter(n => n.t + n.d > a && n.t < b).map(n => ({ ...n, t: n.t - a }));
+    if (!notes.length) { vtStatus('Hittade inga toner att flytta i det markerade', true); return; }
+    out = await VoiceTools.diatonicShift(part, notes, key, amt, p => vtStatus(`Flyttar tonerna… ${Math.round(p * 100)} %`));
+    name = stepLabel(amt) + (key ? ` i ${key.name}` : '');
+  }
+  addGenTrack(`${t.label} ${name}`, out, (offS(t) + a) * 1000);
+  vtStatus(`Klart: nytt spår ”${t.label} ${name}” – lyssna, putsa och spara som inspelning`);
+}
+async function synthToTrack() {
+  const src = tracks.find(t => t.key === document.getElementById('syFrom').value), p = src && pitchByKey[src.key];
+  if (!p) { toast('Välj en stämma med notanalys'); return; }
+  const steps = Number(document.getElementById('syInt').value), vowel = document.getElementById('syVowel').value, voices = Number(document.getElementById('syVoices').value);
+  const off = offS(src);
+  let notes = VoiceTools.transposeNotes(p.notes, songKey(), steps, 0).map(n => ({ ...n, t: n.t + off }));   // låtens tid
+  if (sel && Math.abs(sel.b - sel.a) > 0.05) { const a = Math.min(sel.a, sel.b), b = Math.max(sel.a, sel.b); notes = notes.filter(n => n.t + n.d > a && n.t < b); }
+  if (!notes.length) { vtStatus('Inga noter i det markerade området', true); return; }
+  const t0 = Math.max(0, notes[0].t - 0.2);
+  const clip = await VoiceTools.renderVoice(notes.map(n => ({ ...n, t: n.t - t0 })), { sampleRate: getCtx().sampleRate, vowel, voices },
+    q => vtStatus(`Sjunger in syntrösten… ${Math.round(q * 100)} %`));
+  const vw = { oo: 'ooh', aa: 'aah', mm: 'mmm' }[vowel];
+  const label = `Syntröst ${src.label}${steps ? ' ' + stepLabel(steps) : ''} (${vw})`;
+  addGenTrack(label, clip, t0 * 1000);
+  vtStatus(`Klart: ”${label}” – ${notes.length} toner`);
+}
+async function cleanTrack() {
+  const t = active; if (!t || !t.clip) { toast('Välj spåret som ska rengöras'); return; }
+  const [a, b, partial] = vtRange(t), mode = document.getElementById('clMode').value, strength = Number(document.getElementById('clStr').value);
+  const follow = document.getElementById('clFollow').value;
+  let f0At = null;
+  if (mode !== 'noise') {
+    if (follow === 'self') {
+      const an = await analysisFor(t);
+      if (!an.midi || !an.midi.some(v => v > 0)) { vtStatus('Hittade ingen tydlig ton att följa – prova Bara brus', true); return; }
+      const f = VoiceTools.curveF0(an.midi, an.hop || 0.02); f0At = x => f(x + a);
+    } else {
+      const st = tracks.find(x => x.key === follow), p = pitchByKey[follow];
+      const f = VoiceTools.curveF0(p.midi || [], p.hop || 0.02), shift = offS(t) - offS(st);
+      f0At = x => f(x + a + shift);   // del-tid → låttid → stämmans filtid
+    }
+  }
+  const part = AudioEdit.crop(t.clip, a, b);
+  const out = await VoiceTools.clean(part, f0At, { mode, strength }, q => vtStatus(`Rengör… ${Math.round(q * 100)} %`));
+  const what = { both: 'andra stämmor + brus', pitch: 'andra stämmor', noise: 'brus' }[mode];
+  if (!t.readOnly) {
+    applyEdit(t, partial ? AudioEdit.paste(t.clip, a, out, 'replace') : out, null, `Rengjort (${what})${partial ? ' i det markerade' : ''}`);
+    vtStatus(`Klart – ${t.label} rengjort. Lyssna och jämför med ↶ Ångra.`);
+  } else {
+    addGenTrack(`${t.label} (rengjord)`, out, (offS(t) + a) * 1000);
+    vtStatus(`Klart: nytt spår ”${t.label} (rengjord)” – originalet är oförändrat`);
+  }
+}
+document.getElementById('psMode').addEventListener('change', fillPsAmt);
+document.getElementById('psGo').addEventListener('click', () => vtRun('psGo', pitchToTrack));
+document.getElementById('syGo').addEventListener('click', () => vtRun('syGo', synthToTrack));
+document.getElementById('clGo').addEventListener('click', () => vtRun('clGo', cleanTrack));
 
 // ---------- mikrofon och inspelning ----------
 async function openMic() {
@@ -916,8 +1073,18 @@ async function loadSong(id) {
   getCtx();
   const offs = song.stem_offsets || {};
   const stemDefs = stemListFor(song);
-  const { data: recs } = await supabaseClient.from('recordings').select('*').eq('song_id', song.id).order('created_at');
+  const [{ data: recs }, { data: pitchRows }] = await Promise.all([
+    supabaseClient.from('recordings').select('*').eq('song_id', song.id).order('created_at'),
+    supabaseClient.from('song_pitch').select('stem_key, data').eq('song_id', song.id),
+  ]);
   if (my !== loadToken) return;
+  pitchByKey = {};
+  (pitchRows || []).forEach(r => {
+    if (!r.data) return;
+    let q = PitchAnalyze.foldOctaves(r.data);
+    if (Array.isArray(r.data.edited_notes) && r.data.edited_notes.length) q = { ...q, notes: r.data.edited_notes.map(n => ({ t: n.t, d: n.d, n: n.n })) };
+    if (q && q.notes && q.notes.length) pitchByKey[r.stem_key] = { notes: q.notes, midi: q.midi || [], hop: q.hop || 0.02 };
+  });
   const ids = [...new Set((recs || []).map(r => r.member_id))].filter(x => !names[x]);
   if (ids.length) { const { data: ms } = await supabaseClient.from('members').select('id, name').in('id', ids); (ms || []).forEach(m => { names[m.id] = m.name; }); }
   let done = 0; const total = stemDefs.length + (recs || []).length;
@@ -960,6 +1127,7 @@ async function loadSong(id) {
     updateSaveState();
   }
   active = tracks.find(t => t.kind === 'rec' && t.mine) || tracks[0];
+  fillVtSelects(); vtStatus('');
   tl.render(); setActive(active);
   requestAnimationFrame(() => { tl.fit(); tick(); });
 }

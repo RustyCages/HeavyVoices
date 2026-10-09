@@ -57,6 +57,7 @@
   .t-ctrl button { width: 2rem; height: 2rem; padding: 0; justify-content: center; font-size: 0.75rem; font-weight: 700; }
   .t-ctrl button svg { width: 15px; height: 15px; }
   .t-ctrl .muteBtn.on { background: #ef4444; color: #fff; border-color: #ef4444; }
+  .t-ctrl .delBtn:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
   .t-ctrl .soloBtn.on { background: var(--accent); color: #111317; border-color: var(--accent); }
   .t-ctrl .ms { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 4.2rem; text-align: right; }
 
@@ -131,7 +132,7 @@
       <li><div><b>Välj låt</b><p>Låtens spår visas som vågformer, ett per rad. Med reglaget och knapparna till höger på varje rad bestämmer du vad du hör: volym, 🔇 tysta och <b>S</b> = bara det spåret.</p></div></li>
       <li><div><b>Kalibrera – en gång per dator eller telefon</b><p>Tryck <b>🎯 Kalibrera</b> och sedan <b>Starta</b>. Klappa i takt med de 8 klicken. Sidan mäter hur lång fördröjning dina hörlurar har, så att inspelningen hamnar i takt. Värdet sparas, så du behöver bara göra om det om du byter hörlurar.</p></div></li>
       <li><div><b>Spela in</b><p>Klicka i tidslinjen där du vill börja och tryck <b>⏺ Spela in</b>. Låten börjar spela – med <b>Inräkning</b> startar den 2 sekunder före, så du hinner komma in. Sjung! Tryck <b>⏹ Stoppa</b> (eller mellanslag) när du är klar. Den gröna mätaren visar att mikrofonen hör dig.</p></div></li>
-      <li><div><b>Lyssna</b><p>Din tagning dyker upp som ett rött spår. Tryck ▶ och lyssna tillsammans med låten. Inte nöjd? Spela in en gång till – varje försök blir ett eget spår, och du kan ta bort de du inte vill ha med <b>🗑 Ta bort</b>.</p></div></li>
+      <li><div><b>Lyssna</b><p>Din tagning dyker upp som ett rött spår. Tryck ▶ och lyssna tillsammans med låten. Inte nöjd? Spela in en gång till – varje försök blir ett eget spår, och du tar bort de du inte vill ha med papperskorgen 🗑 längst till höger på spårets rad. Vill du ha ett tomt spår att spela in eller klistra in i? Tryck <b>➕ Nytt tomt spår</b>, välj det och tryck <b>⏺ Spela in</b>.</p></div></li>
       <li><div><b>Putsa (om du vill)</b><p>Ligger inspelningen lite fel i tid? Slå på <b>↔ Flytta</b> och dra det röda spåret i sidled – klicka på Flytta igen när du är klar, så kan inget hamna ur synk av misstag. Utan valt verktyg drar du i spåren för att bläddra i låten (eller Shift + mushjulet). Vill du ta bort ett harkel eller en tyst början? Välj <b>▭ Markera</b>, dra över biten och tryck <b>✂ Ta bort markerat</b>. Vill du använda en bra bit igen – t.ex. en refräng – markera den, tryck <b>⎘ Kopiera markerat</b>, klicka i spåret du vill lägga den i, ställ spelhuvudet och tryck <b>📋 Klistra in</b> (<b>Ersätt</b> skriver över, <b>Infoga</b> skjuter resten framåt, <b>Lägg ovanpå</b> mixar ihop). <b>📶 Normalisera</b> gör en svag inspelning starkare, och under <b>Volym</b> höjer eller sänker du hela spåret eller bara det markerade (t.ex. +3 dB). <b>↶ Ångra</b> tar tillbaka.</p></div></li>
       <li><div><b>Röstverktyg (på dator)</b><p><b>🎵 Tonhöjd</b>: markera en fras och gör ett nytt spår med ny tonhöjd – välj <b>halvtoner</b> (allt flyttas lika mycket) eller <b>steg i tonarten</b> (t.ex. <i>ters över</i>, så som en stämma sjungs). Tempot ändras inte. Bäst upp till ungefär 4–5 halvtoner, längre än så låter det lätt konstlat. <b>🎹 Syntröst</b>: en datorröst som sjunger ”ooh”, ”aah” eller ”mmm” på en stämmas noter från Röstövning – samma toner eller som en stämma över/under. Bra för att höra hur en harmoni låter innan någon sjungit in den. <b>🧽 Rengör</b>: behåller tonen som sjungs och dämpar andra stämmor och brus – välj <i>Bara brus</i> om du bara vill ta bort sus från din inspelning. <b>🤖 AI-separera</b>: delar upp ett spår – t.ex. en inspelning av hela låten – i sång och komp (eller sång, trummor, bas, övrigt). Det körs på din egen dator och är gratis; första gången laddas en AI-modell ner, sedan går det fortare. Snabbast i Chrome eller Edge på en dator med grafikkort. Sången blir alla stämmor ihop – kör sedan <b>Rengör</b> på sångspåret för att lyfta fram en stämma.</p></div></li>
       <li><div><b>Spara</b><p>Skriv ett namn, till exempel ”Ters över refrängen”, välj vem som får höra den och tryck <b>💾 Spara inspelning</b>. Den hamnar under <b>Mina inspelningar</b> längst ner på sidan.</p></div></li>
@@ -174,6 +175,7 @@
           <button type="button" id="toolSelect" class="desktop-only" aria-pressed="false" title="Dra i ett spår för att markera ett område att klippa eller kopiera">▭ Markera</button>
         </div>
         <button class="btn-outline" id="markBtn" title="Sätt en markör vid spelhuvudet (M)">⚑ Markör</button>
+        <button class="btn-outline" id="newTrackBtn" title="Lägg till ett tomt spår att spela in eller klistra in i">➕ Nytt tomt spår</button>
         <span class="sp"></span>
         <div class="zoom" role="group" aria-label="Zoom">
           <button type="button" class="btn-outline" id="zoomOut" title="Zooma ut (−)">−</button>
@@ -229,6 +231,7 @@ const FIXED_STEMS = [
 const STEM_COLORS = ['#7d8796', '#60a5fa', '#c084fc', '#34d399', '#f472b6', '#facc15', '#fb923c', '#a3e635'];
 const REC_COLOR = '#ef4444', REC_OTHER = '#fca5a5';
 const VIS = { private: '🔒 Privat', leaders: '👥 Körledningen', all: '🌍 Alla' };
+const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>';
 const MUTE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>';
 
 let me = null, isAdmin = false, songs = [], song = null, names = {};
@@ -258,6 +261,8 @@ function getCtx() { if (!audioCtx) audioCtx = new (window.AudioContext || window
 async function ensureCtx() { getCtx(); if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} } }
 const offS = t => (t.offsetMs || 0) / 1000;
 const tDur = t => t.clip ? AudioEdit.duration(t.clip) : 0;
+const isEmpty = t => !!(t && t.clip && t.clip.channels[0].length <= 1);   // nytt tomt spår (inget inspelat/inklistrat än)
+const canDelete = t => t.kind === 'rec' ? (t.mine || (isAdmin && !!t.id)) : (isAdmin && t.kind === 'stem');
 const isAccomp = t => t.key === 'stem_backtrack_path' || /instrument|karaoke|playback|komp|backing|\bfull\b/i.test(t.label || '');
 const unsaved = () => tracks.some(t => (t.kind === 'rec' && t.mine && (t.edited || !t.id || t.offsetMs !== t.savedOffsetMs))
   || (t.kind === 'stem' && isAdmin && (t.edited || t.offsetMs !== t.savedOffsetMs)));
@@ -450,8 +455,8 @@ function renderMs(t) { if (t._ms) t._ms.textContent = (t.offsetMs >= 0 ? '+' : '
 function renderHead(t, head) {
   const adminStem = t.kind === 'stem' && isAdmin;
   const tags = t.kind === 'rec'
-    ? (t.mine ? `<span class="tag mine">${t.id ? VIS[t.visibility] : 'ny tagning'}</span>` : `<span class="tag">${esc(names[t.memberId] || 'Någon')} · ${VIS[t.visibility]}</span>`) +
-      ((t.mine && (t.edited || !t.id)) ? '<span class="tag edit">osparad</span>' : '')
+    ? (t.mine ? `<span class="tag mine">${t.id ? VIS[t.visibility] : isEmpty(t) ? 'tomt' : 'ny tagning'}</span>` : `<span class="tag">${esc(names[t.memberId] || 'Någon')} · ${VIS[t.visibility]}</span>`) +
+      ((t.mine && !isEmpty(t) && (t.edited || !t.id)) ? '<span class="tag edit">osparad</span>' : '')
     : (adminStem ? `<small>${esc(stemFilename(t.path))}</small>${t.key === document.getElementById('refSelect').value ? '<span class="tag ref">REF</span>' : ''}${t.edited ? '<span class="tag edit">ändrad – osparad</span>' : ''}` : '');
   head.innerHTML = `
     <span class="t-name" title="Välj spåret"><i style="background:${t.color}"></i>${esc(t.label)}${tags}</span>
@@ -461,6 +466,7 @@ function renderHead(t, head) {
       <input type="range" min="0" max="1.5" step="0.05" value="${t.vol ?? 1}" title="Volym" aria-label="Volym för ${esc(t.label)}">
       <button class="btn-outline muteBtn ${t.muted ? 'on' : ''}" title="Tysta">${MUTE_SVG}</button>
       <button class="btn-outline soloBtn ${t.solo ? 'on' : ''}" title="Solo">S</button>
+      ${canDelete(t) ? `<button class="btn-outline delBtn" title="${t.kind === 'stem' ? 'Ta bort spåret från låten' : 'Ta bort spåret'}" aria-label="Ta bort ${esc(t.label)}">${TRASH_SVG}</button>` : ''}
     </span>`;
   t._ms = head.querySelector('.ms'); renderMs(t);
   t._msIn = null;
@@ -475,6 +481,7 @@ function renderHead(t, head) {
   head.querySelector('input[type=range]').addEventListener('input', e => { t.vol = Number(e.target.value); applyGains(); });
   head.querySelector('.muteBtn').addEventListener('click', e => { t.muted = !t.muted; e.currentTarget.classList.toggle('on', t.muted); applyGains(); tl.drawTrack(t); });
   head.querySelector('.soloBtn').addEventListener('click', e => { t.solo = !t.solo; e.currentTarget.classList.toggle('on', t.solo); applyGains(); tracks.forEach(tl.drawTrack); });
+  const del = head.querySelector('.delBtn'); if (del) del.addEventListener('click', () => deleteTrack(t));
 }
 function setActive(t) {
   active = t; tl.setActiveRow(); panel.refresh(); updateRecTools();
@@ -487,14 +494,14 @@ function updateRecTools() {
   document.getElementById('recRow1').hidden = !mine;
   ['recDelete'].forEach(id => { document.getElementById(id).hidden = !isRec || !(mine || (isAdmin && t.id)); });
   document.getElementById('toStem').hidden = !(isAdmin && isRec);
-  document.getElementById('dlVoice').disabled = !(t && t.clip);
+  document.getElementById('dlVoice').disabled = !(t && t.clip) || isEmpty(t);
   if (mine) {
     const ti = document.getElementById('recTitle');
     if (document.activeElement !== ti) ti.value = t.label;
     document.getElementById('recVis').value = t.visibility || 'private';
     const dirty = t.edited || !t.id || t.offsetMs !== t.savedOffsetMs || t.label !== t.savedTitle || t.visibility !== t.savedVis;
-    document.getElementById('recSave').disabled = !dirty;
-    document.getElementById('recStatus').textContent = !t.id ? 'Inte sparad än' : dirty ? 'Osparade ändringar' : 'Sparad ✓';
+    document.getElementById('recSave').disabled = !dirty || isEmpty(t);
+    document.getElementById('recStatus').textContent = isEmpty(t) ? 'Tomt spår – spela in eller klistra in något först' : !t.id ? 'Inte sparad än' : dirty ? 'Osparade ändringar' : 'Sparad ✓';
   }
 }
 function setPeaks(t) { t.buffer = AudioEdit.toBuffer(getCtx(), t.clip); t.peaks = AudioEdit.peaks(t.clip); }
@@ -733,9 +740,14 @@ async function startRecording() {
   }
   const pre = Number(document.getElementById('preRoll').value) || 0;
   const from = Math.max(0, position() - (playing ? 0 : pre));
-  const t = { kind: 'rec', key: 'take-' + (++takeNo), label: 'Tagning ' + takeNo, color: REC_COLOR, mine: true, memberId: me.id,
-    clip: null, peaks: null, offsetMs: 0, savedOffsetMs: null, visibility: 'private', undo: [], edited: false, vol: 1, loadingText: '● Spelar in…' };
-  tracks.push(t);
+  let t;
+  if (isEmpty(active) && active.mine && !active.id) {   // valt tomt spår: spela in i det
+    t = active; t.clip = null; t.peaks = null; t.buffer = null; t.undo = []; t.loadingText = '● Spelar in…';
+  } else {
+    t = { kind: 'rec', key: 'take-' + (++takeNo), label: 'Tagning ' + takeNo, color: REC_COLOR, mine: true, memberId: me.id,
+      clip: null, peaks: null, offsetMs: 0, savedOffsetMs: null, visibility: 'private', undo: [], edited: false, vol: 1, loadingText: '● Spelar in…' };
+    tracks.push(t);
+  }
   rec = { chunks: [], firstCtx: null, track: t };
   mic.capture = (d, ctxT) => { if (rec.firstCtx == null) rec.firstCtx = ctxT; rec.chunks.push(d); };
   if (!playing) startAt(from); else startAt(position());
@@ -852,18 +864,49 @@ document.getElementById('dlMix').addEventListener('click', async () => {
     const { blob, ext } = await encodeTrack(mix); download(blob, `${safeName(song.title)}-mix.${ext}`); setRecStatus('');
   } catch (e) { toast('Kunde inte mixa: ' + (e.message || e)); }
 });
-document.getElementById('recDelete').addEventListener('click', async () => {
-  const t = active; if (!t || t.kind !== 'rec') return;
-  if (!confirm(t.id ? `Ta bort ”${t.label}” för gott?` : `Släppa ${t.label}?`)) return;
-  if (t.id) {
+document.getElementById('recDelete').addEventListener('click', () => { if (active) deleteTrack(active); });
+// ta bort ett spår: osparade försvinner direkt (tomma utan fråga), sparade inspelningar tas bort för gott,
+// och för admin kan ett av låtens spår tas bort från låten (filen ligger kvar i lagringen)
+async function deleteTrack(t) {
+  if (!t || !canDelete(t) || (rec && rec.track === t)) return;
+  if (t.kind === 'stem') {
+    if (!confirm(`Ta bort spåret ”${t.label}” från låten? Det försvinner för alla i Studio, Röstövning och Repertoar. (Ljudfilen sparas kvar och kan läggas tillbaka under Låtar.)`)) return;
+    const upd = {};
+    if (t.fixed) upd[t.key] = null;
+    else upd.extra_stems = (song.extra_stems || []).filter(x => x.id !== t.key);
+    const offs = { ...(song.stem_offsets || {}) }; delete offs[t.key]; upd.stem_offsets = offs;
+    const { error } = await supabaseClient.from('songs').update(upd).eq('id', song.id);
+    if (error) { toast('Kunde inte ta bort: ' + error.message); return; }
+    Object.assign(song, upd);
+  } else if (t.id) {
+    if (!confirm(`Ta bort inspelningen ”${t.label}” för gott?`)) return;
     const { error } = await supabaseClient.from('recordings').delete().eq('id', t.id);
     if (error) { toast('Kunde inte ta bort: ' + error.message); return; }
     if (t.path) supabaseClient.storage.from(REC_BUCKET).remove([t.path]);
     loadMyRecs();
-  }
-  tracks = tracks.filter(x => x !== t); active = tracks.find(x => x.kind === 'rec' && x.mine) || tracks[0] || null;
-  tl.render(); if (active) setActive(active); restartIfPlaying();
-});
+  } else if (!isEmpty(t) && !confirm(`Släppa ”${t.label}”? Den är inte sparad.`)) return;
+  if (sel && sel.track === t) { sel = null; tl.selection = null; }
+  const i = tracks.indexOf(t);
+  tracks = tracks.filter(x => x !== t);
+  if (active === t) active = tracks[Math.min(i, tracks.length - 1)] || null;
+  tl.render(); if (active) setActive(active); restartIfPlaying(); if (isAdmin) updateSaveState();
+  if (isAdmin && t.kind === 'stem') document.getElementById('refSelect').innerHTML = tracks.filter(x => x.kind === 'stem').map(x => `<option value="${esc(x.key)}">${esc(x.label)}</option>`).join('');
+  toast(`${t.label} borttaget`);
+}
+let emptyNo = 0;
+function newEmptyTrack() {
+  if (!song) return;
+  const t = { kind: 'rec', key: 'empty-' + (++emptyNo), label: 'Nytt spår ' + emptyNo, color: REC_COLOR, mine: true, memberId: me.id,
+    clip: { sampleRate: getCtx().sampleRate, channels: [new Float32Array(1)] }, offsetMs: 0, savedOffsetMs: null, visibility: 'private',
+    undo: [], edited: false, vol: 1, muted: false, solo: false };
+  t.orig = t.clip;
+  t.hint = () => isEmpty(t) ? 'Tomt spår – välj det och tryck ⏺ Spela in, eller klistra in här' : '';
+  setPeaks(t); tracks.push(t);
+  tl.render(); setActive(t);
+  t._row && t._row.scrollIntoView && t._row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  toast('Tomt spår tillagt – tryck ⏺ Spela in eller klistra in något');
+}
+document.getElementById('newTrackBtn').addEventListener('click', newEmptyTrack);
 // admin: lägg inspelningen som nytt spår i låten (heavy-voices-stems + extra_stems + stem_offsets)
 document.getElementById('toStem').addEventListener('click', async () => {
   const t = active; if (!isAdmin || !t || !t.clip) return;

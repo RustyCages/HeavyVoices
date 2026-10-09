@@ -110,6 +110,11 @@
         ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = `${12 * dpr}px DM Sans, sans-serif`; ctx.textBaseline = 'middle';
         ctx.fillText(tr.loadingText, 10 * dpr, mid);
       }
+      const hint = typeof tr.hint === 'function' ? tr.hint() : tr.hint;   // t.ex. "Tomt spår – …"
+      if (hint && !tr.loadingText) {
+        ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = `${12 * dpr}px DM Sans, sans-serif`; ctx.textBaseline = 'middle';
+        ctx.fillText(hint, 10 * dpr, mid - 10 * dpr);
+      }
       ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, mid, W, 1);
       markers.forEach(m => { ctx.fillStyle = 'rgba(250,204,21,0.6)'; ctx.fillRect(Math.round(xOf(m) * dpr), 0, dpr, H); });
       if (tr.liveUntil != null) {   // inspelning pågår: röd kant där den växer

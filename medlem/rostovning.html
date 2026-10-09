@@ -163,7 +163,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .copy-shift input { width: 4.5rem; margin: 0; padding: 0.3rem 0.5rem; }
   .edit-status { font-size: 0.8rem; color: var(--text-muted); }
   .edit-status.dirty { color: #facc15; }
-  html:not(.party-mode) .container { max-width: 1800px; }   /* röstövningen är byggd för dator: använd hela bredden */
+  html:not(.party-mode) .container { max-width: none; }   /* röstövningen är byggd för dator: använd hela bredden */
   .edit-help { margin: 0.4rem 0 0; font-size: 0.82rem; color: var(--text-muted); border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(255,255,255,0.02); }
   .edit-help > summary { cursor: pointer; padding: 0.5rem 0.75rem; font-weight: 600; color: var(--text); list-style: none; }
   .edit-help > summary::-webkit-details-marker { display: none; }

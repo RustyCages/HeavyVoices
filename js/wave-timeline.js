@@ -18,7 +18,9 @@
   .wt-track.active { background: rgba(229,169,104,0.05); }
   .wt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.7rem; padding: 0.45rem 0.1rem 0.3rem; }
   .wt-wave { display: block; width: 100%; height: 72px; touch-action: none; }
-  .wt.tool-move .wt-wave { cursor: grab; }
+  .wt.tool-pan .wt-wave { cursor: grab; }
+  .wt.tool-pan .wt-wave.dragging { cursor: grabbing; }
+  .wt.tool-move .wt-wave { cursor: ew-resize; }
   .wt.tool-move .wt-wave.locked { cursor: pointer; }
   .wt.tool-move .wt-wave.dragging { cursor: grabbing; }
   .wt.tool-select .wt-wave { cursor: text; }
@@ -35,11 +37,12 @@
 
   function create(rootEl, o) {
     if (!cssDone) { cssDone = true; const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st); }
-    rootEl.classList.add('wt', 'tool-move');
+    rootEl.classList.add('wt', 'tool-pan');
     rootEl.innerHTML = '<canvas class="wt-ruler" title="Klicka för att hoppa, dra för att bläddra"></canvas><div class="wt-tracks"></div><div class="wt-playhead"></div>';
     const ruler = rootEl.querySelector('.wt-ruler'), tracksEl = rootEl.querySelector('.wt-tracks'), ph = rootEl.querySelector('.wt-playhead');
     const view = { t0: 0, pps: 20 };
-    let tool = 'move', sel = null;
+    let tool = 'pan', sel = null;   // pan = inget verktyg valt: dra bläddrar i sidled
+    let userNav = 0;                 // senast användaren bläddrade själv – då följer vyn inte spelhuvudet en stund
     const markers = [];
     const tracks = () => o.getTracks() || [];
     const audible = t => (o.isAudible ? o.isAudible(t) : true);
@@ -126,7 +129,7 @@
       c.addEventListener('pointerdown', e => {
         const r = c.getBoundingClientRect(), x = e.clientX - r.left;
         if (o.onActive) o.onActive(tr);
-        drag = { x0: e.clientX, t: tOf(x), off: tr.offsetMs || 0, moved: false };
+        drag = { x0: e.clientX, t: tOf(x), off: tr.offsetMs || 0, t0: view.t0, moved: false };
         if (tool === 'select') { sel = { track: tr, a: drag.t, b: drag.t }; if (o.onSelection) o.onSelection(sel); }
         c.setPointerCapture(e.pointerId); c.classList.add('dragging');
       });
@@ -135,7 +138,8 @@
         const dx = e.clientX - drag.x0;
         if (!drag.moved && Math.abs(dx) < 3) return;
         drag.moved = true;
-        if (tool === 'move') { if (!tr.locked && o.onOffset) o.onOffset(tr, Math.round(drag.off + dx / view.pps * 1000), true); }
+        if (tool === 'pan') { view.t0 = drag.t0 - dx / view.pps; clampView(); userNav = performance.now(); draw(); }
+        else if (tool === 'move') { if (!tr.locked && o.onOffset) o.onOffset(tr, Math.round(drag.off + dx / view.pps * 1000), true); }
         else { const r = c.getBoundingClientRect(); sel.b = tOf(e.clientX - r.left); drawTrack(tr); if (o.onSelection) o.onSelection(sel); }
       });
       const end = () => {
@@ -170,7 +174,7 @@
       ruler.addEventListener('pointermove', e => {
         if (!d) return; const dx = e.clientX - d.x;
         if (!d.moved && Math.abs(dx) < 4) return;
-        d.moved = true; view.t0 = d.t0 - dx / view.pps; clampView(); draw();
+        d.moved = true; view.t0 = d.t0 - dx / view.pps; clampView(); userNav = performance.now(); draw();
       });
       ruler.addEventListener('pointerup', e => { if (d && !d.moved) o.onSeek(tOf(e.clientX - ruler.getBoundingClientRect().left)); d = null; });
     }
@@ -178,7 +182,13 @@
     rootEl.addEventListener('wheel', e => {
       const x = e.clientX - ruler.getBoundingClientRect().left;
       if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoom(e.deltaY < 0 ? 1.25 : 0.8, x); }
-      else if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) { e.preventDefault(); view.t0 += (e.deltaX || e.deltaY) / view.pps; clampView(); draw(); }
+      else if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault();
+        // ett hack på mushjulet = en lagom bit (aldrig mer än en femtedel av vyn), oavsett webbläsarens enhet
+        const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? width() : 1;
+        const px = Math.max(-width() / 5, Math.min(width() / 5, (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * unit));
+        view.t0 += px / view.pps; clampView(); userNav = performance.now(); draw();
+      }
     }, { passive: false });
     window.addEventListener('resize', () => draw());
 
@@ -195,10 +205,11 @@
     // följ spelhuvudet: bläddra en sida när det går utanför
     function tick(playing) {
       const p = o.getPosition(), span = width() / view.pps;
-      if (playing && (p > view.t0 + span * 0.95 || p < view.t0)) { view.t0 = p - span * 0.05; draw(); }
+      const browsing = performance.now() - userNav < 4000;   // låt användaren titta i lugn och ro
+      if (playing && !browsing && (p > view.t0 + span * 0.95 || p < view.t0)) { view.t0 = p - span * 0.05; draw(); }
       placePlayhead();
     }
-    function setTool(t) { tool = t; rootEl.classList.toggle('tool-move', t === 'move'); rootEl.classList.toggle('tool-select', t === 'select'); }
+    function setTool(t) { tool = t || 'pan'; ['pan', 'move', 'select'].forEach(k => rootEl.classList.toggle('tool-' + k, tool === k)); }
     const api = {
       el: rootEl, view, markers, render, draw, drawTrack, setActiveRow, zoom, fit, tick, setTool, spanLabel, xOf, tOf,
       get tool() { return tool; },

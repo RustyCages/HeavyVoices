@@ -102,3 +102,8 @@ body.party-page::after { right: 8vw; animation: party-sweep 11s ease-in-out infi
 @keyframes page-in { from { opacity: 0; transform: translateY(8px); } }
 .party-page .container > section:not([hidden]) { animation: page-in 0.38s ease both; }
 @media (prefers-reduced-motion: reduce) { .party-page .container > section:not([hidden]) { animation: none; } }
+
+/* slutskärm på mobilen: tillbaka-knappar */
+.end-acts { display: grid; gap: 0.6rem; width: 100%; max-width: 360px; margin: 1.4rem auto 0; }
+.end-acts .btn, .end-acts button { width: 100%; text-align: center; padding: 0.85rem; font-size: 1rem; border-radius: 0.8rem; }
+.end-hint { font-size: 0.8rem; color: var(--text-muted); text-align: center; margin: 0.6rem 0 0; }

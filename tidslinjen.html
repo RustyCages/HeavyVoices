@@ -166,7 +166,7 @@ function timerBar(s) {
 // ---------- läget från storbilden ----------
 function onState(s) {
   lastSeen = Date.now();
-  if (s.phase === 'closed') { render('<div class="center"><div class="big">👋</div><h1>Spelet är avslutat</h1><p>Tack för att du var med!</p></div>'); renderKey = 'closed'; return; }
+  if (s.phase === 'closed') { render('<div class="center"><div class="big">👋</div><h1>Spelet är avslutat</h1><p>Tack för att du var med!</p>' + partyEndButtons() + '</div>'); renderKey = 'closed'; return; }
   last = s; renderMe();
   const me = (s.players || []).find(p => p.pid === pid) || {};
   const key = [s.phase, s.round, s.active, me.placed, me.chal, s.phase === 'lobby' ? (s.players || []).length : ''].join('|');
@@ -257,12 +257,13 @@ function onState(s) {
       ${end ? `<div class="big">${won ? '🏆' : '🎸'}</div><div class="verdict ${won ? 'ok' : ''}">${won ? 'Du vann!' : 'Slut!'}</div><p class="sub">Vinnare: <b style="color:var(--accent)">${esc((s.winners || []).join(' & '))}</b></p>` : `<div class="verdict ${cls}">${verdict}</div>`}
       ${song ? `<div class="songcard"><span class="y">${song[0]}</span>${esc(song[1])}<small>${esc(song[2])}</small></div>` : ''}
       <span class="pill">Du har ${myCards.length} av ${s.goal} kort</span></div>
-      <div style="margin-top:1rem">${timeline(myCards, { newIdx: (r && (r.ok || r.stole)) ? newIdx : -1 })}</div>`);
+      <div style="margin-top:1rem">${timeline(myCards, { newIdx: (r && (r.ok || r.stole)) ? newIdx : -1 })}</div>${end ? partyEndButtons() : ''}`);
     return;
   }
 }
 
 // tappar vi kontakten med storbilden en stund
+document.addEventListener('hv-newgame', () => { if (ch) supabaseClient.removeChannel(ch); ch = null; last = null; renderKey = ''; lastSeen = 0; history.replaceState(null, '', location.pathname); joinForm(); });
 setInterval(() => {
   if (ch && lastSeen && Date.now() - lastSeen > 9000) { lastSeen = Date.now(); ch.send({ type: 'broadcast', event: 'hello', payload: { pid } }); }
 }, 3000);

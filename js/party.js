@@ -191,4 +191,13 @@ async function requirePartyAccess() {
   }
 
   root.PartyMedia = { load, lobbyMusic, celebrate };
+
+  // knappar på mobilens slutskärm (spel.html, spela.html, tidslinjen.html)
+  // "Nytt spel" skickar händelsen hv-newgame som sidan lyssnar på (lämna rummet → kodformuläret)
+  root.partyEndButtons = () => `<div class="end-acts"><button type="button" class="btn-outline" data-newgame>🎮 Nytt spel med ny kod</button><a class="btn btn-outline" href="/">🏠 Till Heavy Voices</a></div>
+    <p class="end-hint">Startar frågeledaren en ny omgång kommer du med automatiskt.</p>`;
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-newgame]');
+    if (b) { e.preventDefault(); document.dispatchEvent(new CustomEvent('hv-newgame')); }
+  });
 })(window);

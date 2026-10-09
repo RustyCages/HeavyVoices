@@ -256,7 +256,7 @@ const api = {
 // ---------- läget från storbilden ----------
 function onState(s) {
   lastSeen = Date.now();
-  if (s.phase === 'closed') { runCleanups(); render('<div class="center"><div class="big">👋</div><h1>Spelet är avslutat</h1><p>Tack för att du var med!</p></div>'); renderKey = 'closed'; return; }
+  if (s.phase === 'closed') { runCleanups(); render('<div class="center"><div class="big">👋</div><h1>Spelet är avslutat</h1><p>Tack för att du var med!</p>' + partyEndButtons() + '</div>'); renderKey = 'closed'; return; }
   last = s; renderMe();
   const me = (s.players || []).find(p => p.pid === pid) || {};
   const iAmUp = s.drawer === pid;
@@ -318,10 +318,11 @@ function onState(s) {
     if (won) PartyMedia.celebrate(); else if (rank && rank <= 3) PartyFX.confetti(200, true);
     render(`<div class="center"><div class="big">${['🥇', '🥈', '🥉'][rank - 1] || '🎸'}</div><h1>${won ? 'Du vann!' : rank ? 'Plats ' + rank : 'Slut!'}</h1>
       <span class="pill">${me.score || 0} poäng · ${ranked.length} spelare</span>
-      <p>Vinnare: <b style="color:var(--accent)">${esc(ranked[0] ? ranked[0].name : '')}</b></p></div>`);
+      <p>Vinnare: <b style="color:var(--accent)">${esc(ranked[0] ? ranked[0].name : '')}</b></p>${partyEndButtons()}</div>`);
   }
 }
 
+document.addEventListener('hv-newgame', () => { if (ch) supabaseClient.removeChannel(ch); ch = null; last = null; renderKey = ''; endShown = false; history.replaceState(null, '', location.pathname); joinForm(); });
 setInterval(() => { if (ch && lastSeen && Date.now() - lastSeen > 9000) { lastSeen = Date.now(); send('hello', {}); } }, 3000);
 (async () => {
   if (!name) { try { const m = await getCurrentMember(); if (m && m.name) name = m.name.split(' ')[0]; } catch (e) {} }

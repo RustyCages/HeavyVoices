@@ -117,7 +117,7 @@ function connect() {
 // ---------- läget från storbilden ----------
 function onState(s) {
   lastSeen = Date.now();
-  if (s.phase === 'closed') { render('<div class="big">👋</div><h1>Quizet är avslutat</h1><p>Tack för att du var med!</p>'); return; }
+  if (s.phase === 'closed') { render('<div class="big">👋</div><h1>Quizet är avslutat</h1><p>Tack för att du var med!</p>' + partyEndButtons()); return; }
   const prev = last; last = s; renderMe();
   if (s.phase === 'lobby') {
     myAns = {}; deadline = {}; endShown = false;
@@ -156,7 +156,7 @@ function onState(s) {
     if (r && r.rank === 1) PartyMedia.celebrate(); else if (r && r.rank <= 3) PartyFX.confetti(260, true);
     render(`<div class="big">${medal}</div><h1>${r ? (r.rank === 1 ? 'Du vann!' : 'Plats ' + r.rank) : 'Slut!'}</h1>
       ${r ? `<span class="pill">${r.score} poäng · ${s.of} spelare</span>` : ''}
-      <p>${s.board && s.board[0] ? `Vinnare: <b style="color:var(--accent)">${esc(s.board[0].name)}</b>` : ''}</p>`);
+      <p>${s.board && s.board[0] ? `Vinnare: <b style="color:var(--accent)">${esc(s.board[0].name)}</b>` : ''}</p>${partyEndButtons()}`);
   }
 }
 function questionScreen(s) {
@@ -192,6 +192,7 @@ function waitScreen(s) {
 }
 
 // tappar vi kontakten med storbilden en stund
+document.addEventListener('hv-newgame', () => { if (ch) supabaseClient.removeChannel(ch); ch = null; last = null; endShown = false; lastSeen = 0; history.replaceState(null, '', location.pathname); joinForm(); });
 setInterval(() => {
   if (ch && lastSeen && Date.now() - lastSeen > 9000 && last && last.phase !== 'end') {
     lastSeen = Date.now();

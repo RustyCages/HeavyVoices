@@ -206,7 +206,10 @@ let clipStop = null;
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 function toast(msg, ms = 3000) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-const show = id => ['setup', 'lobby', 'play', 'result'].forEach(s => document.getElementById(s).hidden = s !== id);
+const show = id => {
+  ['setup', 'lobby', 'play', 'result'].forEach(s => document.getElementById(s).hidden = s !== id);
+  if (id === 'setup' || id === 'lobby') PartyMedia.lobbyMusic(true); else if (id === 'play') PartyMedia.lobbyMusic(false);   // musik innan spelet
+};
 
 // ---------- lag ----------
 function renderTeams() {
@@ -551,7 +554,7 @@ function finish() {
     ? `<div>${scores[0] / questions.length >= 0.8 ? 'Rocklegend 🤘' : scores[0] / questions.length >= 0.5 ? 'Rockkännare 🎸' : 'Dags att lyssna mer på rock 😅'}<b>${Math.round(100 * scores[0] / questions.length)}%</b></div>`
     : order.map((x, k) => `<div><span>${['🥇', '🥈', '🥉', '🎸'][k]} ${esc(x.t)}</span><b>${x.s}</b></div>`).join('');
   show('result');
-  PartyFX.confetti(300, true);
+  PartyMedia.celebrate();
 }
 // ---------- mobilläge: Supabase Realtime (broadcast + presence, inga tabeller) ----------
 // Storbilden är "värd": den håller frågor och poäng och skickar läget till mobilerna (/spela.html).
@@ -667,7 +670,7 @@ function mobileFinish() {
   document.getElementById('winner').textContent = ranked.length ? `🏆 ${ranked[0].name} vinner!` : 'Ingen spelade 😅';
   document.getElementById('podium').innerHTML = ranked.slice(0, 10).map((x, k) => `<div><span>${['🥇', '🥈', '🥉'][k] || (k + 1) + '.'} ${esc(x.name)}</span><b>${x.score}</b></div>`).join('');
   show('result');
-  PartyFX.confetti(300, true);
+  PartyMedia.celebrate();
   sendState();
 }
 document.getElementById('goBtn').addEventListener('click', () => { PartyFX.unlockAudio(); show('play'); showQuestion(); });
@@ -720,6 +723,7 @@ document.addEventListener('keydown', e => {
   if (!acc) return;
   document.documentElement.classList.remove('gate');
   isAdmin = acc.isAdmin;
+  PartyMedia.lobbyMusic(true);
   teams = ['Lag 1', 'Lag 2'];
   renderTeams(); renderMode();
 })();

@@ -220,7 +220,10 @@ const COLORS = ['#E5A968', '#ff3d5a', '#60a5fa', '#4ade80', '#c084fc', '#facc15'
 const $ = id => document.getElementById(id);
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 function toast(msg, ms = 4000) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
-const show = id => ['setup', 'lobby', 'oplay', 'loading', 'play', 'result'].forEach(s => $(s).hidden = s !== id);
+const show = id => {
+  ['setup', 'lobby', 'oplay', 'loading', 'play', 'result'].forEach(s => $(s).hidden = s !== id);
+  if (id === 'setup' || id === 'lobby' || id === 'loading') PartyMedia.lobbyMusic(true); else if (id === 'play' || id === 'oplay') PartyMedia.lobbyMusic(false);
+};
 const SEEN_KEY = 'hv-timeline-seen';
 const getSeen = () => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '[]'); } catch (e) { return []; } };
 const saveSeen = ids => { try { localStorage.setItem(SEEN_KEY, JSON.stringify(ids.slice(-800))); } catch (e) {} };
@@ -339,7 +342,7 @@ function finish() {
   $('winner').innerHTML = `🏆 <span style="color:${w.color}">${esc(w.name)}</span> vinner!`;
   $('finalLines').innerHTML = teams.map(t => `<div><h4><span class="dot" style="background:${t.color}"></span> ${esc(t.name)} – ${t.cards.length} kort</h4><div class="mini">${t.cards.map(c => `<span title="${esc(c.title + ' – ' + c.artist)}">${c.year}</span>`).join('')}</div></div>`).join('');
   show('result');
-  PartyFX.confetti(320, true);
+  PartyMedia.celebrate();
 }
 
 const eqSync = () => { $('eq').classList.toggle('paused', audio.paused); $('oEq').classList.toggle('paused', audio.paused); };
@@ -572,7 +575,7 @@ function oFinish() {
   $('winner').innerHTML = `🏆 ${names.map(esc).join(' &amp; ')} ${names.length > 1 ? 'vinner!' : 'vinner!'}`;
   $('finalLines').innerHTML = [...oplayers.values()].sort((a, b) => b.cards.length - a.cards.length).map(p =>
     `<div><h4>${esc(p.name)} – ${p.cards.length} kort</h4><div class="mini">${p.cards.map(c => `<span title="${esc(c.title + ' – ' + c.artist)}">${c.year}</span>`).join('')}</div></div>`).join('');
-  show('result'); PartyFX.confetti(320, true);
+  show('result'); PartyMedia.celebrate();
   sendState();
 }
 function renderOTurn() {
@@ -645,6 +648,7 @@ window.addEventListener('beforeunload', closeRoom);
   if (!acc) return;
   document.documentElement.classList.remove('gate');
   renderTeams(); renderMode();
+  PartyMedia.lobbyMusic(true);
   // börja hämta låtar direkt så att starten går snabbare
   feed = PartyMusic.createFeed({ seen: getSeen(), ahead: 3 });
   feed.warm(teamNames.length + 2);

@@ -97,3 +97,8 @@ body.party-page::after { right: 8vw; animation: party-sweep 11s ease-in-out infi
 .view-head { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .view-head h2 { margin: 0; font-size: 1.7rem; text-transform: uppercase; letter-spacing: 0.03em; }
 .empty { color: var(--text-muted); padding: 1rem 0; }
+
+/* vyer inom Party-sidorna (flikar, inställningar → spel → resultat) tonar in mjukt */
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); } }
+.party-page .container > section:not([hidden]) { animation: page-in 0.38s ease both; }
+@media (prefers-reduced-motion: reduce) { .party-page .container > section:not([hidden]) { animation: none; } }

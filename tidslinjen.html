@@ -252,7 +252,7 @@ function onState(s) {
     const newIdx = song ? myCards.findIndex(c => c[0] === song[0] && c[1] === song[1]) : -1;
     const end = s.phase === 'end';
     const won = end && (s.winners || []).includes(name);
-    if (won) PartyFX.confetti(260, true);
+    if (won) PartyMedia.celebrate();
     render(`<div style="display:grid;gap:0.9rem;justify-items:center;text-align:center">
       ${end ? `<div class="big">${won ? '🏆' : '🎸'}</div><div class="verdict ${won ? 'ok' : ''}">${won ? 'Du vann!' : 'Slut!'}</div><p class="sub">Vinnare: <b style="color:var(--accent)">${esc((s.winners || []).join(' & '))}</b></p>` : `<div class="verdict ${cls}">${verdict}</div>`}
       ${song ? `<div class="songcard"><span class="y">${song[0]}</span>${esc(song[1])}<small>${esc(song[2])}</small></div>` : ''}

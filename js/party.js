@@ -16,6 +16,7 @@ async function requirePartyAccess() {
 
 (function (root) {
   let soundOn = true;
+  try { soundOn = localStorage.getItem('hv-party-sound') !== '0'; } catch (e) {}
   const COLORS = ['#E5A968', '#f0be86', '#ffffff', '#ff4d4d', '#ff8a3d', '#ffd166', '#c084fc', '#60a5fa'];
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   let canvas = null, ctx = null, W = 0, H = 0, dpr = 1, raf = null, last = 0;
@@ -80,4 +81,114 @@ async function requirePartyAccess() {
     stop() { confetti = []; },
   };
   root.PartyFX = PartyFX;
+})(window);
+
+// ---------- PartyMedia: uppladdad fyrverkerivideo, fyrverkeriljud och musik (Party-startsidans adminruta) ----------
+//  • PartyMedia.lobbyMusic(true/false): lugn musik i bakgrunden innan spelen startar
+//  • PartyMedia.celebrate(): när någon vinner – fyrverkerivideo, smällar, musik och konfetti
+// Filerna ligger i Storage (heavy-voices-stems/party/…) och kräver inloggning; gäster får bara konfetti.
+(function (root) {
+  const BUCKET = 'heavy-voices-stems';
+  const DIRS = { video: 'party/fireworks', sound: 'party/fireworks-sound', music: 'party/intro-music' };
+  const RE = { video: /\.(mp4|webm|mov|m4v)$/i, sound: /\.(mp3|m4a|aac|ogg|wav|webm)$/i, music: /\.(mp3|m4a|aac|ogg|wav|webm)$/i };
+  // iPhone/iPad låter inte sidan ändra volymen – där spelas ingen bakgrundsmusik
+  const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const BG_VOL = 0.25;
+  const urls = { video: [], sound: [], music: [] };
+  let loading = null;
+
+  function load() {
+    if (loading) return loading;
+    loading = (async () => {
+      const sb = typeof supabaseClient !== 'undefined' ? supabaseClient : null; if (!sb) return;
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) return;
+        await Promise.all(Object.keys(DIRS).map(async k => {
+          const { data, error } = await sb.storage.from(BUCKET).list(DIRS[k], { limit: 100 });
+          if (error) return;
+          const paths = (data || []).filter(f => f.id && RE[k].test(f.name) && Number((f.metadata && f.metadata.size) || 0) > 0).map(f => DIRS[k] + '/' + f.name);
+          if (!paths.length) return;
+          const { data: signed } = await sb.storage.from(BUCKET).createSignedUrls(paths, 3600 * 6);
+          urls[k] = (signed || []).map(x => x.signedUrl).filter(Boolean);
+        }));
+      } catch (e) { /* ingen media – bara konfetti */ }
+    })();
+    return loading;
+  }
+  const pick = k => urls[k].length ? urls[k][Math.floor(Math.random() * urls[k].length)] : null;
+  function ramp(a, to, ms, then) {
+    if (!a) return;
+    if (IOS) { if (to === 0) { a.pause(); if (then) then(); } return; }
+    const from = a.volume, t0 = performance.now();
+    const step = () => {
+      const k = Math.min(1, (performance.now() - t0) / ms);
+      a.volume = Math.max(0, Math.min(1, from + (to - from) * k));
+      if (k < 1) requestAnimationFrame(step); else if (then) then();
+    };
+    requestAnimationFrame(step);
+  }
+  // spela nu, eller vid första tryckningen om webbläsaren blockerar ljud
+  function playSoon(a, onStart) {
+    a.play().then(onStart).catch(() => {
+      const h = () => { window.removeEventListener('pointerdown', h, true); a.play().then(onStart).catch(() => {}); };
+      window.addEventListener('pointerdown', h, true);
+    });
+  }
+
+  let bg = null, bgWanted = false;
+  async function lobbyMusic(on) {
+    bgWanted = !!on;
+    if (!on) { if (bg) { const a = bg; bg = null; ramp(a, 0, 900, () => a.pause()); } return; }
+    if (show) show.close();   // tillbaka till start efter en vinst – fyrverkerierna tonas ut
+    if (bg || IOS || !root.PartyFX || !PartyFX.sound) return;
+    await load();
+    const u = pick('music');
+    if (!u || bg || !bgWanted) return;
+    const a = new Audio(u); a.loop = true; a.volume = 0; bg = a;
+    playSoon(a, () => { if (bg === a) ramp(a, BG_VOL, 1500); });
+  }
+
+  let show = null;
+  async function celebrate() {
+    if (root.PartyFX) PartyFX.confetti(320, true);
+    lobbyMusic(false);
+    await load();
+    if (show) show.close(true);
+    const sound = root.PartyFX ? PartyFX.sound : true;
+    const v = pick('video'), s = sound ? pick('sound') : null, m = sound ? pick('music') : null;
+    if (!v && !s && !m) return;
+    const audios = [];
+    if (s) { const a = new Audio(s); a.loop = true; a.volume = 0.9; audios.push(a); playSoon(a); }
+    if (m) { const a = new Audio(m); a.volume = 0.7; audios.push(a); playSoon(a); }
+    let wrap = null, btn = null;
+    if (v) {
+      wrap = document.createElement('div');
+      // videon ligger bakom sidans innehåll (som en bakgrund) så att vinnartexten syns ovanpå
+      Object.assign(wrap.style, { position: 'fixed', inset: '0', zIndex: '-1', pointerEvents: 'none', opacity: '0', transition: 'opacity 0.8s ease', background: '#000' });
+      wrap.innerHTML = `<video muted playsinline autoplay style="width:100%;height:100%;object-fit:cover"></video>`;
+      document.body.appendChild(wrap);
+      btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = '✕ Stäng fyrverkerierna';
+      btn.setAttribute('style', 'position:fixed;z-index:2100;top:max(0.8rem,env(safe-area-inset-top));right:0.8rem;background:rgba(0,0,0,0.6);color:#fff;border:1px solid rgba(255,255,255,0.25);padding:0.35rem 0.8rem;border-radius:999px;font-size:0.85rem');
+      document.body.appendChild(btn);
+      const vid = wrap.querySelector('video');
+      vid.src = v; vid.muted = true;
+      vid.play().then(() => { wrap.style.opacity = '1'; }).catch(() => { wrap.style.opacity = '1'; });
+      vid.addEventListener('ended', () => close());
+      btn.addEventListener('click', () => close());
+    }
+    let closed = false;
+    function close(now) {
+      if (closed) return; closed = true;
+      if (wrap) { wrap.style.opacity = '0'; const w = wrap; setTimeout(() => w.remove(), now ? 0 : 900); }
+      if (btn) btn.remove();
+      audios.forEach(a => ramp(a, 0, now ? 50 : 1500, () => a.pause()));
+      if (show && show.close === close) show = null;
+    }
+    show = { close };
+    if (!v) setTimeout(() => close(), 25000);   // bara ljud: tona ut efter en stund
+  }
+
+  root.PartyMedia = { load, lobbyMusic, celebrate };
 })(window);

@@ -3559,7 +3559,7 @@ function partyFinale() {
     ? 'Tryck på 🎤 Sjung med nästa gång så räknar mikrofonen dina poäng.'
     : `${song.title} – ${current.label} · ${ok}/${done} noter träffade`;
   document.getElementById('partyResult').hidden = false;
-  PartyFX.confetti(pct != null && pct >= 50 ? 260 : 140, false);
+  if (pct != null && pct >= 50) PartyMedia.celebrate(); else PartyFX.confetti(140, false);
 }
 document.getElementById('partyResult').addEventListener('click', e => { if (e.target.id === 'partyResult') e.currentTarget.hidden = true; });
 

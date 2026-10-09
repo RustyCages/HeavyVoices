@@ -153,7 +153,7 @@ function onState(s) {
     cancelAnimationFrame(raf);
     const r = (s.res || {})[pid];
     const medal = r ? (['🥇', '🥈', '🥉'][r.rank - 1] || '🎸') : '🎸';
-    if (r && r.rank <= 3) PartyFX.confetti(260, true);
+    if (r && r.rank === 1) PartyMedia.celebrate(); else if (r && r.rank <= 3) PartyFX.confetti(260, true);
     render(`<div class="big">${medal}</div><h1>${r ? (r.rank === 1 ? 'Du vann!' : 'Plats ' + r.rank) : 'Slut!'}</h1>
       ${r ? `<span class="pill">${r.score} poäng · ${s.of} spelare</span>` : ''}
       <p>${s.board && s.board[0] ? `Vinnare: <b style="color:var(--accent)">${esc(s.board[0].name)}</b>` : ''}</p>`);

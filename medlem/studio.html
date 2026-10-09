@@ -133,7 +133,7 @@
       <li><div><b>Spela in</b><p>Klicka i tidslinjen där du vill börja och tryck <b>⏺ Spela in</b>. Låten börjar spela – med <b>Inräkning</b> startar den 2 sekunder före, så du hinner komma in. Sjung! Tryck <b>⏹ Stoppa</b> (eller mellanslag) när du är klar. Den gröna mätaren visar att mikrofonen hör dig.</p></div></li>
       <li><div><b>Lyssna</b><p>Din tagning dyker upp som ett rött spår. Tryck ▶ och lyssna tillsammans med låten. Inte nöjd? Spela in en gång till – varje försök blir ett eget spår, och du kan ta bort de du inte vill ha med <b>🗑 Ta bort</b>.</p></div></li>
       <li><div><b>Putsa (om du vill)</b><p>Ligger inspelningen lite fel i tid? Slå på <b>↔ Flytta</b> och dra det röda spåret i sidled – klicka på Flytta igen när du är klar, så kan inget hamna ur synk av misstag. Utan valt verktyg drar du i spåren för att bläddra i låten (eller Shift + mushjulet). Vill du ta bort ett harkel eller en tyst början? Välj <b>▭ Markera</b>, dra över biten och tryck <b>✂ Ta bort markerat</b>. Vill du använda en bra bit igen – t.ex. en refräng – markera den, tryck <b>⎘ Kopiera markerat</b>, klicka i spåret du vill lägga den i, ställ spelhuvudet och tryck <b>📋 Klistra in</b> (<b>Ersätt</b> skriver över, <b>Infoga</b> skjuter resten framåt, <b>Lägg ovanpå</b> mixar ihop). <b>📶 Normalisera</b> gör en svag inspelning starkare, och under <b>Volym</b> höjer eller sänker du hela spåret eller bara det markerade (t.ex. +3 dB). <b>↶ Ångra</b> tar tillbaka.</p></div></li>
-      <li><div><b>Röstverktyg (på dator)</b><p><b>🎵 Tonhöjd</b>: markera en fras och gör ett nytt spår med ny tonhöjd – välj <b>halvtoner</b> (allt flyttas lika mycket) eller <b>steg i tonarten</b> (t.ex. <i>ters över</i>, så som en stämma sjungs). Tempot ändras inte. Bäst upp till ungefär 4–5 halvtoner, längre än så låter det lätt konstlat. <b>🎹 Syntröst</b>: en datorröst som sjunger ”ooh”, ”aah” eller ”mmm” på en stämmas noter från Röstövning – samma toner eller som en stämma över/under. Bra för att höra hur en harmoni låter innan någon sjungit in den. <b>🧽 Rengör</b>: behåller tonen som sjungs och dämpar andra stämmor och brus – välj <i>Bara brus</i> om du bara vill ta bort sus från din inspelning.</p></div></li>
+      <li><div><b>Röstverktyg (på dator)</b><p><b>🎵 Tonhöjd</b>: markera en fras och gör ett nytt spår med ny tonhöjd – välj <b>halvtoner</b> (allt flyttas lika mycket) eller <b>steg i tonarten</b> (t.ex. <i>ters över</i>, så som en stämma sjungs). Tempot ändras inte. Bäst upp till ungefär 4–5 halvtoner, längre än så låter det lätt konstlat. <b>🎹 Syntröst</b>: en datorröst som sjunger ”ooh”, ”aah” eller ”mmm” på en stämmas noter från Röstövning – samma toner eller som en stämma över/under. Bra för att höra hur en harmoni låter innan någon sjungit in den. <b>🧽 Rengör</b>: behåller tonen som sjungs och dämpar andra stämmor och brus – välj <i>Bara brus</i> om du bara vill ta bort sus från din inspelning. <b>🤖 AI-separera</b>: delar upp ett spår – t.ex. en inspelning av hela låten – i sång och komp (eller sång, trummor, bas, övrigt). Det körs på din egen dator och är gratis; första gången laddas en AI-modell ner, sedan går det fortare. Snabbast i Chrome eller Edge på en dator med grafikkort. Sången blir alla stämmor ihop – kör sedan <b>Rengör</b> på sångspåret för att lyfta fram en stämma.</p></div></li>
       <li><div><b>Spara</b><p>Skriv ett namn, till exempel ”Ters över refrängen”, välj vem som får höra den och tryck <b>💾 Spara inspelning</b>. Den hamnar under <b>Mina inspelningar</b> längst ner på sidan.</p></div></li>
     </ol>
     <h3>Vem hör min inspelning?</h3>
@@ -409,6 +409,16 @@ const panel = TrackEditPanel.mount(document.getElementById('panel'), {
         <label class="status" for="clStr">styrka</label> <input type="range" id="clStr" min="0" max="1" step="0.1" value="0.6" style="width:6rem">
         <button type="button" class="btn-outline" id="clGo" title="Rengör det valda spåret (det markerade eller hela). Egna spår ändras direkt (går att ångra), annars blir det ett nytt spår.">🧽 Rengör</button>
       </div>
+      <div class="tool-row">
+        <span class="k">AI-separera</span>
+        <select id="aiModel" title="Modellen laddas ner en gång och sparas sedan i webbläsaren">
+          <option value="htdemucs">Standard – sång, trummor, bas, övrigt (85 MB)</option>
+          <option value="melband_roformer_kim">Bäst på sång – sång / resten (470 MB, kräver bra grafikkort)</option>
+          <option value="scnet_small">Liten och snabb (27 MB)</option>
+        </select>
+        <select id="aiOut"><option value="2">Sång + komp</option><option value="all">Alla delar</option></select>
+        <button type="button" class="btn-outline" id="aiGo" title="Delar upp valt spår (det markerade eller hela) i sång och komp med AI. Körs på din dator – gratis, inget skickas iväg.">🤖 Separera valt spår</button>
+      </div>
       <div class="tool-row"><span class="k"></span><span class="status" id="vtStatus"></span></div>
     </div>
     <div class="tool-row" id="recRow1">
@@ -630,6 +640,60 @@ async function cleanTrack() {
     vtStatus(`Klart: nytt spår ”${t.label} (rengjord)” – originalet är oförändrat`);
   }
 }
+// ---------- AI-separering (unblend: Demucs/RoFormer i webbläsaren via ONNX, körs lokalt) ----------
+let aiSep = null;   // { model, sep } – behålls laddad mellan körningar
+const STEM_SV = { vocals: 'sång', drums: 'trummor', bass: 'bas', other: 'övrigt', guitar: 'gitarr', piano: 'piano' };
+async function aiSeparate() {
+  const t = active; if (!t || !t.clip) { toast('Välj spåret som ska separeras'); return; }
+  const model = document.getElementById('aiModel').value, outMode = document.getElementById('aiOut').value;
+  const hasGpu = !!navigator.gpu && !!(await navigator.gpu.requestAdapter().catch(() => null));
+  if (!hasGpu) {
+    if (model !== 'htdemucs' && model !== 'scnet_small') { vtStatus('Den modellen kräver ett grafikkort som webbläsaren kan använda (WebGPU, t.ex. Chrome eller Edge på dator). Välj Standard eller Liten.', true); return; }
+    if (!confirm('Webbläsaren kan inte använda grafikkortet (WebGPU), så separeringen körs på processorn. Det kan ta flera minuter per minut musik. Köra ändå?')) return;
+  }
+  const lib = await import('/js/vendor/unblend/index.js');
+  if (!aiSep || aiSep.model !== model) {
+    if (aiSep) { try { await aiSep.sep.unload(); } catch (e) {} aiSep = null; }
+    vtStatus('Laddar AI-modellen…');
+    const sep = await lib.Separator.load(model, {
+      backend: hasGpu ? 'webgpu' : 'wasm', precision: 'fp16',
+      wasmPaths: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/',
+      onProgress: (phase, loaded, total, source) => vtStatus(phase === 'compile' ? 'Förbereder AI-modellen…'
+        : source === 'cache' ? 'Läser AI-modellen från webbläsarens minne…'
+        : `Laddar ner AI-modellen (bara första gången)… ${Math.round(loaded / 1e6)} av ${Math.round(total / 1e6)} MB`),
+    }).catch(e => {
+      console.error(e);
+      throw new Error(e && e.stage === 'fetch' ? 'kunde inte ladda ner AI-modellen – kontrollera nätet och försök igen'
+        : 'AI-modellen gick inte att starta i den här webbläsaren – prova Chrome eller Edge på dator, eller en mindre modell');
+    });
+    aiSep = { model, sep };
+  }
+  const [a, b] = vtRange(t);
+  const part = AudioEdit.conform(AudioEdit.crop(t.clip, a, b), lib.SAMPLE_RATE, 2);
+  const n = part.channels[0].length;
+  const buf = new AudioBuffer({ length: n, numberOfChannels: 2, sampleRate: lib.SAMPLE_RATE });
+  buf.copyToChannel(part.channels[0], 0); buf.copyToChannel(part.channels[1], 1);
+  vtStatus(`Separerar med AI (${aiSep.sep.backend === 'webgpu' ? 'grafikkortet' : 'processorn'})… 0 %`);
+  let res;
+  try {
+    res = await aiSep.sep.separate(buf, { shifts: 1, onProgress: pr => vtStatus(`Separerar med AI (${aiSep.sep.backend === 'webgpu' ? 'grafikkortet' : 'processorn'})… ${Math.round((pr.fraction || 0) * 100)} %`) });
+  } catch (e) { aiSep = null; throw e; }   // en avbruten körning gör modellen oanvändbar – ladda om nästa gång
+  const toClip = il => { const L = new Float32Array(n), R = new Float32Array(n); for (let i = 0; i < n; i++) { L[i] = il[2 * i]; R[i] = il[2 * i + 1]; } return { sampleRate: lib.SAMPLE_RATE, channels: [L, R] }; };
+  const names = Object.keys(res.stems), off = (offS(t) + a) * 1000, made = [];
+  if (outMode === 'all' || !res.stems.vocals) {
+    names.forEach(k => { addGenTrack(`${t.label} – ${STEM_SV[k] || k} (AI)`, toClip(res.stems[k]), off); made.push(STEM_SV[k] || k); });
+  } else {
+    addGenTrack(`${t.label} – komp (AI)`, (() => {   // allt utom sången
+      const sum = new Float32Array(2 * n);
+      names.filter(k => k !== 'vocals').forEach(k => { const s2 = res.stems[k]; for (let i = 0; i < 2 * n; i++) sum[i] += s2[i]; });
+      return toClip(sum);
+    })(), off);
+    addGenTrack(`${t.label} – sång (AI)`, toClip(res.stems.vocals), off);
+    made.push('sång', 'komp');
+  }
+  vtStatus(`Klart på ${Math.round(res.wallMs / 1000)} s: nya spår för ${made.join(', ')}. Lyssna med S (solo) – spara de du vill behålla.`);
+}
+document.getElementById('aiGo').addEventListener('click', () => vtRun('aiGo', aiSeparate));
 document.getElementById('psMode').addEventListener('change', fillPsAmt);
 document.getElementById('psGo').addEventListener('click', () => vtRun('psGo', pitchToTrack));
 document.getElementById('syGo').addEventListener('click', () => vtRun('syGo', synthToTrack));

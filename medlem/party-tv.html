@@ -11,7 +11,7 @@
 <style>html.gate body { visibility: hidden; }</style>
 <script>document.documentElement.classList.add('gate');</script>
 <style>
-  /* Rock-TV: en gammal tjock-TV som slumpar hårdrocksvideor (iTunes-klipp + YouTube) */
+  /* Rock-TV: en gammal tjock-TV som slumpar hela hårdrocksvideor från YouTube */
   .tv-stage { display: grid; justify-items: center; margin-top: 0.5rem; }
   .tv { position: relative; width: min(100%, 960px); padding-top: 3.2rem; }
   /* antenn (kaninöron) */
@@ -124,11 +124,6 @@
       </div>
       <div class="ctrls">
         <span id="photoBtns" hidden style="display:contents"><button type="button" id="pwrBtn2">⏻ Ström</button><button type="button" id="chBtn2">📺 Nästa kanal</button></span>
-        <div class="seg" id="segSrc">
-          <button type="button" data-v="mix" aria-pressed="true">🎲 Blandat</button>
-          <button type="button" data-v="clip" aria-pressed="false">⚡ 30 s-klipp</button>
-          <button type="button" data-v="yt" aria-pressed="false">📺 Hela videor</button>
-        </div>
         <button type="button" class="btn-outline" id="fullBtn">⛶ Helskärm</button>
         <button type="button" class="btn-outline" id="castHelpBtn">📡 Visa på TV</button>
       </div>
@@ -140,11 +135,11 @@
           <li><b>Android</b>: öppna <b>Google Home-appen</b> → tryck på TV:n/Chromecasten → <b>Casta min skärm</b>. Vänd mobilen och tryck <b>⛶ Helskärm</b>.</li>
           <li><b>iPhone/iPad till Apple TV eller AirPlay-TV</b>: dra ner Kontrollcenter → <b>Skärmspegling</b> → välj TV:n.</li>
           <li><b>iPhone eller Android med appen <a href="https://www.webvideocaster.com/" target="_blank" rel="noopener">Web Video Caster</a></b> (gratis, funkar med Chromecast, Google TV, Fire TV, Roku m.fl.): öppna <b>heavyvoices.se</b> i appens egen webbläsare och logga in → Party → Rock-TV → slå på TV:n. När appen hittar videon trycker du på den och väljer TV:n.
-            <br><span class="text-muted">Obs: appen skickar bara videon som spelas just då (inte hela sidan). TV:n byter alltså inte kanal själv – efter kanalbyte väljer du den nya videon i appen. 30 s-klippen fungerar bäst; hela YouTube-videor fungerar inte alltid.</span></li>
+            <br><span class="text-muted">Obs: appen skickar bara videon som spelas just då (inte hela sidan). TV:n byter alltså inte kanal själv – efter kanalbyte väljer du den nya videon i appen. YouTube-videor hittas inte alltid av appen – fungerar det inte, använd en dator med Chrome.</span></li>
         </ol>
         <p class="text-muted">Tips: Ljudet kommer från TV:n när du castar. Ström och kanalbyte styr du som vanligt här.</p>
       </details>
-      <p class="note" id="note">Klipp från iTunes/Apple Music · hela videor från YouTube</p>
+      <p class="note" id="note">Hela musikvideor från YouTube</p>
       <details class="frame-admin" id="frameAdmin" hidden>
         <summary><b>🖼 Egen TV-bild</b> <span class="text-muted">– byt ut TV:n mot ett annat foto</span></summary>
         <p class="text-muted">Ladda upp ett foto av en TV (PNG med genomskinlig skärm blir snyggast, men vanliga JPG fungerar också). Justera sedan var skärmen sitter – videon visas direkt så att du ser resultatet.</p>
@@ -178,7 +173,7 @@ const $ = id => document.getElementById(id);
 function toast(msg, ms = 4000) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
 const shuffle = PartyMusic.shuffle, norm = PartyMusic.norm;
 const vid = $('vid');
-let on = false, ch = 0, src = 'mix', ytOk = null, ytPlayer = null, ytReady = null, busy = false, artists = [];
+let on = false, ch = 0, ytErr = '', ytOk = null, ytPlayer = null, ytReady = null, busy = false, artists = [];
 const seen = new Set();
 
 // ---------- brus vid kanalbyte ----------
@@ -206,38 +201,10 @@ function caption(txt) { const c = $('cap'); c.textContent = txt; c.classList.add
 
 // ---------- källor ----------
 function nextArtist() { if (!artists.length) artists = shuffle(window.ROCK_ARTISTS || []); return artists.pop(); }
-// iTunes: musikvideor med 30 s förhandsvisning
-const vidCache = new Map();
-function jsonp(url, ms = 8000) {
-  return new Promise((res, rej) => {
-    const cb = '__tv' + Math.random().toString(36).slice(2), sc = document.createElement('script');
-    const done = () => { delete window[cb]; sc.remove(); clearTimeout(t); };
-    const t = setTimeout(() => { done(); rej(new Error('timeout')); }, ms);
-    window[cb] = d => { done(); res(d); };
-    sc.onerror = () => { done(); rej(new Error('load')); };
-    sc.src = url + '&callback=' + cb; document.head.appendChild(sc);
-  });
-}
-async function itunesVideo() {
-  for (let tries = 0; tries < 6; tries++) {
-    const a = nextArtist();
-    let list = vidCache.get(a);
-    if (!list) {
-      try {
-        const d = await jsonp('https://itunes.apple.com/search?' + new URLSearchParams({ term: a, entity: 'musicVideo', attribute: 'artistTerm', limit: '25', country: 'se' }));
-        list = (d.results || []).filter(r => r.previewUrl && norm(r.artistName).startsWith(norm(a)) && !/\b(live|interview|behind the scenes|making of)\b/i.test(r.trackName));
-      } catch (e) { list = []; }
-      vidCache.set(a, list);
-    }
-    const v = shuffle(list).find(x => !seen.has('it' + x.trackId));
-    if (v) { seen.add('it' + v.trackId); return { kind: 'clip', url: v.previewUrl, title: v.trackName, artist: v.artistName, year: (v.releaseDate || '').slice(0, 4) }; }
-  }
-  return null;
-}
 // YouTube: hela musikvideor via Edge Function youtube-search (raw-läge)
 const ytCache = new Map();
 async function youtubeVideo() {
-  if (ytOk === false) return null;
+  ytErr = '';
   for (let tries = 0; tries < 3; tries++) {
     const a = nextArtist();
     let list = ytCache.get(a);
@@ -249,10 +216,11 @@ async function youtubeVideo() {
           body: JSON.stringify({ q: `${a} official music video`, raw: true }),
         });
         const out = await res.json().catch(() => ({}));
-        if (!res.ok || out.error || out.raw !== true) { ytOk = false; updateSrcButtons(); return null; }   // gammal version av funktionen / ingen nyckel / kvoten slut
+        // gammal version av funktionen / ingen nyckel / dagens YouTube-kvot slut
+        if (!res.ok || out.error || out.raw !== true) { ytErr = out.raw !== true && res.ok && !out.error ? 'YOUTUBE-SÖKNINGEN BEHÖVER UPPDATERAS' : /quota/i.test(out.error || '') ? 'DAGENS YOUTUBE-KVOT ÄR SLUT – PROVA IMORGON' : 'YOUTUBE SVARAR INTE'; return null; }
         ytOk = true;
         list = (out.items || []).filter(x => !/karaoke|lyrics?|cover|reaction|live at|full (album|concert)|instrumental/i.test(x.title));
-      } catch (e) { ytOk = false; updateSrcButtons(); return null; }
+      } catch (e) { ytErr = 'INGEN SIGNAL – KOLLA NÄTET'; return null; }
       ytCache.set(a, list);
     }
     const v = shuffle(list).find(x => !seen.has('yt' + x.id));
@@ -260,15 +228,6 @@ async function youtubeVideo() {
   }
   return null;
 }
-function updateSrcButtons() {
-  const b = $('segSrc').querySelector('[data-v="yt"]');
-  if (ytOk === false) {
-    b.disabled = true; b.title = 'YouTube-sökningen behöver uppdateras (Edge Function youtube-search)';
-    if (src === 'yt') { src = 'clip'; markSrc(); }
-    $('note').textContent = 'Klipp från iTunes/Apple Music · hela YouTube-videor kräver att Edge Function youtube-search är uppdaterad';
-  }
-}
-function markSrc() { $('segSrc').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === src))); }
 
 // ---------- YouTube-spelaren (IFrame API, för att veta när videon är slut) ----------
 function loadYt() {
@@ -292,7 +251,7 @@ async function playYt(v) {
         events: {
           onReady: () => res(),
           onStateChange: e => { if (e.data === YT.PlayerState.ENDED && on) next(); },
-          onError: () => { if (on) next(); },
+          onError: () => { if (!on) return; if (++fails >= 4) { fails = 0; $('msg').hidden = false; $('msg').textContent = 'VIDEON GICK INTE ATT SPELA · VRID KANALRATTEN'; return; } next(); },
         },
       });
       setTimeout(res, 8000);
@@ -311,27 +270,22 @@ async function next() {
   $('msg').hidden = true;
   vid.pause();
   try { if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo(); } catch (e) {}
-  let v = null;
-  const wantYt = src === 'yt' || (src === 'mix' && ytOk !== false && Math.random() < 0.5);
-  if (wantYt) v = await youtubeVideo();
-  if (!v && src !== 'yt') v = await itunesVideo();
-  if (!v && src === 'yt') v = await itunesVideo();
+  const v = await youtubeVideo();
   busy = false;
   if (!on) return;
-  if (!v) { $('msg').hidden = false; $('msg').textContent = 'INGEN SIGNAL – KOLLA NÄTET'; return; }
+  if (!v) { $('msg').hidden = false; $('msg').textContent = (ytErr || 'INGEN SIGNAL') + ' · VRID KANALRATTEN FÖR ATT FÖRSÖKA IGEN'; return; }
   try {
-    if (v.kind === 'yt') {
-      vid.style.display = 'none';
-      await playYt(v);
-    } else {
-      $('ytHost').style.display = 'none';
-      vid.style.display = 'block';
-      vid.src = v.url; vid.currentTime = 0;
-      await vid.play();
-    }
+    vid.style.display = 'none';
+    await playYt(v);
     caption(`${v.artist} – ${v.title}${v.year ? ' (' + v.year + ')' : ''}`);
-  } catch (e) { setTimeout(next, 400); }
+    fails = 0;
+  } catch (e) {
+    // stoppa efter några misslyckanden i rad – annars äter vi upp YouTube-kvoten
+    if (++fails >= 3) { fails = 0; $('msg').hidden = false; $('msg').textContent = 'YOUTUBE GICK INTE ATT SPELA · VRID KANALRATTEN FÖR ATT FÖRSÖKA IGEN'; return; }
+    setTimeout(next, 400);
+  }
 }
+let fails = 0;
 vid.addEventListener('ended', () => { if (on) next(); });
 vid.addEventListener('error', () => { if (on && vid.src) setTimeout(next, 300); });
 
@@ -353,7 +307,6 @@ $('pwrKnob').addEventListener('click', power);
 $('castHelpBtn').addEventListener('click', () => { const d = $('castHelp'); d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
 $('chKnob').addEventListener('click', () => { if (!on) power(); else next(); });
 $('msg').addEventListener('click', () => { if (!on) power(); });
-$('segSrc').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { src = b.dataset.v; markSrc(); if (on) next(); }));
 $('fullBtn').addEventListener('click', () => { const s = $('screen'); if (document.fullscreenElement) document.exitFullscreen(); else if (s.requestFullscreen) s.requestFullscreen().catch(() => {}); });
 document.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { if (on) next(); } else if (e.code === 'Space') { e.preventDefault(); power(); } });
 

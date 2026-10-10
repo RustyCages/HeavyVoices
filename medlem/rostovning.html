@@ -548,6 +548,10 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         <button type="button" class="btn-outline" data-op="split" title="Dela noten vid strecket/spelhuvudet (S) – texten delas på samma ställe">✂ Dela</button>
         <button type="button" class="btn-outline" data-op="add" title="Ny not vid spelhuvudet (N)">＋ Ny not</button>
         <button type="button" class="btn-outline" data-op="del" title="Ta bort vald not (Delete)">🗑 Ta bort</button>
+        <button type="button" class="btn-outline" data-op="clone" title="Klona markerade noter på samma ställe (D) – flytta eller sneda klonen så sjunger referenstonen båda samtidigt">⧉ Klona</button>
+        <button type="button" class="btn-outline" data-op="slopeUp" title="Gör noten sned: glider en halvton till uppåt mot slutet (Shift+↑ = flera gånger)">↗ Sned upp</button>
+        <button type="button" class="btn-outline" data-op="slopeDown" title="Gör noten sned: glider en halvton till nedåt mot slutet">↘ Sned ner</button>
+        <button type="button" class="btn-outline" data-op="shapeReset" title="Rak not och samma marginal som de andra">▭ Rak/standard</button>
         <button type="button" class="btn-outline" data-op="fit" title="Slå ihop och anpassa alla noter efter textraderna">≡ Anpassa till texten</button>
         <button type="button" class="btn-outline" data-op="auto" title="Börja om från notanalysen">⟲ Från notanalysen</button>
         <button type="button" class="btn-outline" data-op="selall" title="Markera alla noter (Ctrl+A)">▦ Markera alla</button>
@@ -812,7 +816,7 @@ function prepPitch(p) {
   let q = PitchAnalyze.foldOctaves(p);
   if (Array.isArray(p.edited_notes) && p.edited_notes.length) {
     // admin har justerat noterna → används precis som de är
-    const notes = p.edited_notes.map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}) }));
+    const notes = p.edited_notes.map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}), ...(n.s ? { s: n.s } : {}), ...(n.x ? { x: n.x } : {}) }));
     q = { ...q, notes, edited: true, stats: { ...(q.stats || {}), noteCount: notes.length,
       low: Math.min(...notes.map(n => n.n)), high: Math.max(...notes.map(n => n.n)) } };
   }
@@ -1060,6 +1064,19 @@ function songRange() {
 }
 function yRange() { return songRange(); }
 // luft över/under: notrutan (marginalen) + lite till, så inget klipps
+// per not: x = extra marginal i cent (+/−, läggs på svårighetsgraden), s = sned not (glider s halvtoner från start till slut)
+const nExtra = n => ({ ...(n.s ? { s: n.s } : {}), ...(n.x ? { x: n.x } : {}) });
+const globalTol = () => Number(document.getElementById('optTol').value) || 50;
+const noteTol = n => Math.max(15, Math.min(250, globalTol() + ((n && n.x) || 0)));
+const noteHalf = n => Math.max(0.25, noteTol(n) / 100);
+const pitchAt = (n, t) => n.s ? n.n + n.s * Math.max(0, Math.min(1, (t - n.t) / n.d)) : n.n;
+// rita ett notblock: rundad rektangel, eller parallellogram om noten är sned
+function blockPath(ctx, nx, nw, topA, topB, h, r) {
+  ctx.beginPath();
+  if (Math.abs(topA - topB) < 0.5) { ctx.roundRect(nx, topA, nw, h, r); return; }
+  ctx.moveTo(nx, topA); ctx.lineTo(nx + nw, topB); ctx.lineTo(nx + nw, topB + h); ctx.lineTo(nx, topA + h); ctx.closePath();
+}
+
 // notblockens höjd = marginalen (svårighetsgraden) i cent. Förval eller eget värde (dra i blockets kant eller −/+).
 const TOL_MIN = 20, TOL_MAX = 150;
 function setTol(c, quiet, live) {
@@ -1235,7 +1252,7 @@ function ghostNotes(st) {
   const base = st.pitchBase || st.pitch;
   let notes = base.notes;
   if (!base.edited && merge) notes = mergeNotes(notes, kLines.length ? lyricSpans(st) : []);
-  st._gh = notes.map(n => ({ t: n.t + sh, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}) })); st._ghKey = key;
+  st._gh = notes.map(n => ({ t: n.t + sh, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}), ...nExtra(n) })); st._ghKey = key;
   // stämmans egen text (kan ha andra ord) fördelad på dess noter
   st._ghW = base.lyr ? wordsFromBoxes(st._gh, base.lyr, sh) : hasWords(st._gh) ? st._gh.map(n => n.w || '') : autoWords(st._gh, linesFor(st), stemOffSec());
   return st._gh;
@@ -1327,11 +1344,11 @@ function drawRoll() {
     const gn = ghostNotes(gs);
     gn.forEach((n, gi) => {
       if (n.t + n.d < t0 || n.t > t0 + span) return;
-      const nx = x(n.t), nw = Math.max(3, n.d * pxs), top = y(n.n + boxHalf * 0.8), h = rowH * boxHalf * 1.6;
-      ghostRects.push({ st: gs, x0: nx, x1: nx + nw, y0: top, y1: top + h });
+      const gh = noteHalf(n) * 0.8, nx = x(n.t), nw = Math.max(3, n.d * pxs), top = y(n.n + gh), topB = y(n.n + (n.s || 0) + gh), h = rowH * gh * 2;
+      ghostRects.push({ st: gs, x0: nx, x1: nx + nw, y0: Math.min(top, topB), y1: Math.max(top, topB) + h });
       if (gs._ghW && gs._ghW[gi]) labels.push([gs._ghW[gi], gi, nx, nw, top, h, col, gn]);
       ctx.globalAlpha = 0.2; ctx.fillStyle = col;
-      ctx.beginPath(); ctx.roundRect(nx, top, nw, h, r); ctx.fill();
+      blockPath(ctx, nx, nw, top, topB, h, r); ctx.fill();
       ctx.globalAlpha = 0.85; ctx.strokeStyle = col; ctx.lineWidth = 1.3 * dpr;
       ctx.setLineDash([5 * dpr, 3 * dpr]); ctx.stroke(); ctx.setLineDash([]);
       ctx.globalAlpha = 1;
@@ -1340,19 +1357,20 @@ function drawRoll() {
   const vis = [];
   p.notes.forEach((n, ni) => { if (!(n.t + n.d < t0 || n.t > t0 + span)) vis.push([n, ni]); });
   vis.forEach(([n, ni]) => {
-    const nx = x(n.t), nw = Math.max(3, n.d * pxs), top = y(n.n + boxHalf), h = rowH * boxHalf * 2;
+    const half = noteHalf(n), nx = x(n.t), nw = Math.max(3, n.d * pxs), top = y(n.n + half), topB = y(n.n + (n.s || 0) + half), h = rowH * half * 2;
+    const yMin = Math.min(top, topB), hAll = Math.abs(top - topB) + h;
     const active = pos >= n.t && pos < n.t + n.d;
     ctx.save();
-    ctx.beginPath(); ctx.roundRect(nx, top, nw, h, r); ctx.clip();
+    blockPath(ctx, nx, nw, top, topB, h, r); ctx.clip();
     ctx.fillStyle = active && !mic ? 'rgba(229,169,104,0.55)' : 'rgba(229,169,104,0.22)';
-    ctx.fillRect(nx, top, nw, h);
+    ctx.fillRect(nx, yMin, nw, hAll);
     if (voice.length) {
       for (let i = 0; i < voice.length; i++) {
         const v = voice[i];
         if (v[3] !== ni || v[2] < 0) continue;
         const nxt = voice[i + 1] && voice[i + 1][0] - v[0] < 0.15 ? voice[i + 1][0] : v[0] + 1 / 60;
         ctx.fillStyle = v[2] === 1 ? '#45c871' : '#d8625f';
-        ctx.fillRect(Math.floor(x(v[0])), top, Math.ceil((nxt - v[0]) * pxs) + 1, h);
+        ctx.fillRect(Math.floor(x(v[0])), yMin, Math.ceil((nxt - v[0]) * pxs) + 1, hAll);
       }
     }
     ctx.restore();
@@ -1361,13 +1379,14 @@ function drawRoll() {
     if (ns && ns.tot >= 3 && pos >= n.t + n.d) stroke = ns.hit / ns.tot >= 0.6 ? '#4ade80' : '#f87171';
     const isSel = editMode && ni === sel, inMulti = editMode && multi.has(n);
     ctx.strokeStyle = (isSel || inMulti) ? '#fff' : stroke; ctx.lineWidth = ((isSel || inMulti) ? 2.6 : active ? 2 : 1.2) * dpr;
-    ctx.beginPath(); ctx.roundRect(nx, top, nw, h, r); ctx.stroke();
+    if (editMode && n.x) ctx.setLineDash([6 * dpr, 3 * dpr]);   // egen marginal: streckad kant
+    blockPath(ctx, nx, nw, top, topB, h, r); ctx.stroke(); ctx.setLineDash([]);
     if (isSel) {
       ctx.fillStyle = '#fff';
       ctx.fillRect(nx - 1.5 * dpr, top + h * 0.2, 3 * dpr, h * 0.6);
-      ctx.fillRect(nx + nw - 1.5 * dpr, top + h * 0.2, 3 * dpr, h * 0.6);
+      ctx.fillRect(nx + nw - 1.5 * dpr, topB + h * 0.2, 3 * dpr, h * 0.6);
       ctx.font = `600 ${12 * dpr}px DM Sans, sans-serif`; ctx.textBaseline = 'top';   // under blocket – texten ovanför syns
-      ctx.fillText(`${nm(n.n)} · ${n.d.toFixed(2)} s`, nx, top + h + 4 * dpr);
+      ctx.fillText(`${nm(n.n)}${n.s ? ' → ' + nm(n.n + n.s) : ''} · ${n.d.toFixed(2)} s${n.x ? ` · marginal ±${noteTol(n)} c` : ''}`, nx, Math.max(top, topB) + h + 4 * dpr);
     }
     // i blocket: texten som sjungs på noten (tonen syns på linjerna till vänster). Admin som redigerar ser tonnamnet.
     if (editMode && nw > 30 * dpr && h > 12 * dpr && !isSel) {   // admin som redigerar: tonnamnet i blocket, texten ovanför
@@ -1431,13 +1450,13 @@ function drawRoll() {
       if (!b.w || b.t + b.d < t0 - 2 || b.t > t0 + span) return;
       const n = p.notes.find(q => q.t <= b.t + 0.05 && q.t + q.d > b.t + 0.02) || p.notes.find(q => q.t >= b.t && q.t < b.t + b.d);
       if (!n) return;
-      const nx = Math.max(x(b.t), x(n.t)), top = y(n.n + boxHalf);
+      const nx = Math.max(x(b.t), x(n.t)), nh = noteHalf(n), top = y(pitchAt(n, Math.max(b.t, n.t)) + nh);
       const nxt = bxs[bi + 1];
       const room = Math.max(Math.max(3, n.d * pxs), (nxt ? x(nxt.t) : nx + 200 * dpr) - nx) - 4 * dpr;
       const t = fitText(ctx, b.w, Math.max(30 * dpr, room));
       if (!t) return;
       const active = pos >= b.t && pos < b.t + b.d;
-      const ty = top - fs - 4 * dpr < 0 ? top + rowH * boxHalf * 2 + fs + 3 * dpr : top - 3 * dpr;
+      const ty = top - fs - 4 * dpr < 0 ? top + rowH * nh * 2 + fs + 3 * dpr : top - 3 * dpr;
       ctx.fillStyle = active ? '#fde68a' : editT ? 'rgba(253,230,138,0.45)' : 'rgba(255,255,255,0.62)';
       ctx.fillText(t, nx + 2 * dpr, ty);
     });
@@ -1551,7 +1570,7 @@ function drawRoll() {
       ctx.font = `bold ${13 * dpr}px DM Sans, sans-serif`;
       ctx.fillStyle = ACCENT; ctx.textBaseline = 'middle';
       ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 3 * dpr;
-      ctx.fillText('♪ ' + nm(now.n), hx + 6 * dpr, Math.min(H - 10 * dpr, y(now.n - boxHalf) + 11 * dpr));
+      ctx.fillText('♪ ' + nm(pitchAt(now, pos)), hx + 6 * dpr, Math.min(H - 10 * dpr, y(pitchAt(now, pos) - noteHalf(now)) + 11 * dpr));
       ctx.shadowBlur = 0;
     }
   }
@@ -1750,7 +1769,7 @@ function setEditMode(on, text = false) {
   editMode = on; textMode = on && !!text; sel = -1; multi = new Set(); rangeBand = null;
   if (on) {
     // arbeta på en kopia av det som visas just nu
-    current.pitch = { ...current.pitch, notes: current.pitch.notes.map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}) })), lyr: current.pitch.lyr ? current.pitch.lyr.map(b => ({ ...b })) : null };
+    current.pitch = { ...current.pitch, notes: current.pitch.notes.map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}), ...nExtra(n) })), lyr: current.pitch.lyr ? current.pitch.lyr.map(b => ({ ...b })) : null };
     undoStack = []; selBox = -1;
   }
   applyEditUi();
@@ -1781,7 +1800,7 @@ async function saveNotes(removeEdits) {
   if (removeEdits) { delete data.edited_notes; delete data.edited_at; }
   else {
     const lyr = current.pitch.lyr;
-    data.edited_notes = eNotes().map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w && !lyr ? { w: n.w } : {}) }));
+    data.edited_notes = eNotes().map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w && !lyr ? { w: n.w } : {}), ...nExtra(n) }));
     if (lyr) data.lyrics = lyr.filter(b => b.w && b.w.trim()).map(b => ({ t: Math.round(b.t * 100) / 100, d: Math.round(b.d * 100) / 100, w: b.w.trim() }));
     data.edited_at = new Date().toISOString();
   }
@@ -1832,7 +1851,7 @@ function editOp(op) {
     if (!src.length) { toast('Markera noter först: klicka, Shift+klick eller Shift+dra över ett område'); return; }
     src.sort((a, b) => a.t - b.t);
     const t0 = src[0].t;
-    noteClip = src.map(x => ({ dt: x.t - t0, d: x.d, n: x.n, w: x.w }));
+    noteClip = src.map(x => ({ dt: x.t - t0, d: x.d, n: x.n, w: x.w, ...nExtra(x) }));
     toast(`${noteClip.length} noter kopierade – ställ spelhuvudet där de ska in och tryck Klistra in (Ctrl+V)`, 4500);
     return;
   }
@@ -1842,7 +1861,7 @@ function editOp(op) {
     snapshot();
     // noter som ligger i det inklistrade området ersätts (Ångra tar tillbaka dem)
     const kept = ns.filter(x => { const m = x.t + x.d / 2; return !(m >= pos && m <= pos + span); });
-    const added = noteClip.map(x => ({ t: pos + x.dt, d: x.d, n: x.n, ...(x.w ? { w: x.w } : {}) }));
+    const added = noteClip.map(x => ({ t: pos + x.dt, d: x.d, n: x.n, ...(x.w ? { w: x.w } : {}), ...nExtra(x) }));
     current.pitch.notes = kept.concat(added);
     afterEdit(added[0]);
     multi = new Set(added); tick();
@@ -1854,9 +1873,36 @@ function editOp(op) {
     let m = n;
     if (!m || pos <= m.t + 0.05 || pos >= m.t + m.d - 0.05) m = ns.find(x => pos > x.t + 0.05 && pos < x.t + x.d - 0.05);
     if (!m) { toast('Ställ strecket (spelhuvudet) inne i en not för att dela den'); return; }
-    snapshot(); const nn = { t: pos, d: m.t + m.d - pos, n: m.n }; m.d = pos - m.t; ns.push(nn); afterEdit(nn); return;
+    snapshot(); const nn = { t: pos, d: m.t + m.d - pos, n: m.n, ...(m.x ? { x: m.x } : {}) };
+    if (m.s) {   // sned not: varje halva glider sin del av vägen
+      const mid = pitchAt(m, pos), end = m.n + m.s;
+      nn.n = Math.round(mid); const s2 = Math.round((end - nn.n) * 100) / 100; if (s2) nn.s = s2;
+      const s1 = Math.round((mid - m.n) * 100) / 100; if (s1) m.s = s1; else delete m.s;
+    }
+    m.d = pos - m.t; ns.push(nn); afterEdit(nn); return;
   }
   if (!n) { toast('Välj en not först (klicka på den)'); return; }
+  if (op === 'clone' || op === 'slopeUp' || op === 'slopeDown' || op === 'shapeReset') {
+    const pick = multi.size > 1 ? [...multi] : n ? [n] : [];
+    if (!pick.length) { toast('Markera en not först'); return; }
+    snapshot();
+    if (op === 'clone') {
+      const clones = pick.map(q => ({ ...q, w: undefined }));
+      clones.forEach(q => { delete q.w; ns.push(q); });
+      multi = new Set(clones); afterEdit(clones[0]); multi = new Set(clones);
+      editStatus(`${clones.length > 1 ? clones.length + ' noter' : 'Noten'} klonad – dra klonen upp/ner eller gör den sned. Referenstonen spelar båda.`);
+      return;
+    }
+    pick.forEach(q => {
+      if (op === 'shapeReset') { delete q.s; delete q.x; return; }
+      const v = (q.s || 0) + (op === 'slopeUp' ? 1 : -1);
+      if (v) q.s = Math.max(-12, Math.min(12, v)); else delete q.s;
+    });
+    afterEdit(pick[0]); if (pick.length > 1) multi = new Set(pick);
+    const q = pick[0];
+    editStatus(op === 'shapeReset' ? 'Rak not, standardmarginal' : q.s ? `Sned not: ${nm(q.n)} → ${nm(q.n + q.s)}` : 'Rak not');
+    return;
+  }
   if (op === 'del') { snapshot(); if (multi.size > 1) current.pitch.notes = ns.filter(x => !multi.has(x)); else ns.splice(sel, 1); afterEdit(null); return; }
   if (op === 'merge') {
     const m = ns[sel + 1]; if (!m) return;
@@ -1872,8 +1918,9 @@ function hitNote(cx, cy) {
   const ns = eNotes(), edge = 9 * g.dpr;
   for (let i = ns.length - 1; i >= 0; i--) {
     const n = ns[i];
-    const nx = (n.t - g.t0) * g.pxs, nw = Math.max(3, n.d * g.pxs);
-    const top = g.H - (n.n + g.boxHalf - g.lo) * g.rowH, h = g.rowH * g.boxHalf * 2;
+    const nx = (n.t - g.t0) * g.pxs, nw = Math.max(3, n.d * g.pxs), half = noteHalf(n);
+    const pc = pitchAt(n, g.t0 + Math.max(nx, Math.min(nx + nw, cx)) / g.pxs);
+    const top = g.H - (pc + half - g.lo) * g.rowH, h = g.rowH * half * 2;
     if (cx < nx - edge * 0.5 || cx > nx + nw + edge * 0.5 || cy < top || cy > top + h) continue;
     const zone = nw > edge * 2.5 ? (cx < nx + edge ? 'start' : cx > nx + nw - edge ? 'end' : 'move') : (cx > nx + nw / 2 ? 'end' : 'move');
     return { i, zone };
@@ -2006,7 +2053,9 @@ function scheduleTones(when, pos) {
     const osc = audioCtx.createOscillator();
     if (sung) { osc.setPeriodicWave(VoiceTools.voiceWave(audioCtx, n.n, voice)); vib.connect(osc.detune); }
     else osc.type = 'triangle';
-    osc.frequency.value = 440 * Math.pow(2, (n.n - 69) / 12);
+    const hzOf = m => 440 * Math.pow(2, (m - 69) / 12);
+    osc.frequency.setValueAtTime(hzOf(pitchAt(n, Math.max(n.t, pos))), st);
+    if (n.s) osc.frequency.exponentialRampToValueAtTime(hzOf(n.n + n.s), en);   // sned not: tonen glider
     const g = audioCtx.createGain();
     g.gain.setValueAtTime(0, st);
     g.gain.linearRampToValueAtTime(pg, st + att);
@@ -2121,16 +2170,24 @@ function micLatency() {
   return (audioCtx.outputLatency || 0) + (audioCtx.baseLatency || 0) + 0.045;
 }
 
-function targetNoteIndex(t) {
+// noten som ska sjungas vid tiden t. Ligger flera noter samtidigt (klonade) väljs den som ligger närmast m.
+function targetNoteIndex(t, m) {
   const ns = current ? current.pitch.notes : [];
-  for (let i = 0; i < ns.length; i++) if (t >= ns[i].t && t < ns[i].t + ns[i].d) return i;
-  return -1;
+  let best = -1, bd = Infinity;
+  const oct = document.getElementById('optOctave') && document.getElementById('optOctave').checked;
+  for (let i = 0; i < ns.length; i++) {
+    if (!(t >= ns[i].t && t < ns[i].t + ns[i].d)) continue;
+    if (m == null) return i;
+    let d = m - pitchAt(ns[i], t); if (oct) d -= 12 * Math.round(d / 12);
+    if (Math.abs(d) < bd) { bd = Math.abs(d); best = i; }
+  }
+  return best;
 }
 
 function recomputeStats() {
   noteStats = [];
   voice.forEach(v => {
-    const i = targetNoteIndex(v[0]);
+    const i = v[3] != null && v[3] >= 0 ? v[3] : targetNoteIndex(v[0], v[1]);
     if (i < 0 || v[1] == null) return;
     const s = noteStats[i] || (noteStats[i] = { hit: 0, tot: 0 });
     s.tot++; if (v[2] === 1) s.hit++;
@@ -2257,8 +2314,9 @@ function micStep() {
   const m = mic.det.read();
   const noteEl = document.getElementById('micNote'), centsEl = document.getElementById('micCents');
   const t = playing ? position() - micLatency() : null;
-  const ti = t != null ? targetNoteIndex(t) : -1;
-  const target = ti >= 0 ? current.pitch.notes[ti].n : null;
+  const ti = t != null ? targetNoteIndex(t, m) : -1;
+  const tNote = ti >= 0 ? current.pitch.notes[ti] : null;
+  const target = tNote ? pitchAt(tNote, t) : null;
   let shown = m, status = -1, cents = null;
   if (target != null) lastTarget = target;
   if (m != null && target == null && lastTarget != null && document.getElementById('optOctave').checked) {
@@ -2268,7 +2326,7 @@ function micStep() {
     let diff = m - target;
     if (document.getElementById('optOctave').checked) { diff -= 12 * Math.round(diff / 12); shown = target + diff; }
     cents = Math.round(diff * 100);
-    const tol = Number(document.getElementById('optTol').value) || 50;
+    const tol = noteTol(tNote);
     status = Math.abs(cents) <= tol ? 1 : 0;
     // magnet: inom marginalen dras pricken mjukt mot notens mitt (utan hopp vid kanten)
     if (status === 1) { const q = Math.abs(cents) / tol; shown = target + diff * (0.2 + 0.8 * q * q); }
@@ -2909,20 +2967,25 @@ document.getElementById('overview').addEventListener('click', e => {
   // I redigeringsläget: bara precis innanför kanten och inte i hörnen (där ändras längden), och bara om blocket är högt nog
   const tolEdge = (cx, cy) => {
     const g = rollGeom; if (!g || !current || !current.pitch) return null;
-    const h = g.rowH * g.boxHalf * 2;
-    if (editMode && h < 16 * g.dpr) return null;
     const tolPx = (editMode ? 4 : 7) * g.dpr, side = editMode ? 9 * g.dpr : 0;
-    for (const n of current.pitch.notes) {
+    const ns = current.pitch.notes;
+    for (let i = ns.length - 1; i >= 0; i--) {
+      const n = ns[i], half = noteHalf(n), h = g.rowH * half * 2;
+      if (editMode && h < 16 * g.dpr) continue;
       const nx = (n.t - g.t0) * g.pxs, nw = Math.max(3, n.d * g.pxs);
       if (cx < nx + side || cx > nx + nw - side) continue;
-      const top = g.H - (n.n + g.boxHalf - g.lo) * g.rowH, bot = top + h;
-      if (editMode ? (cy >= top && cy - top <= tolPx) : Math.abs(cy - top) <= tolPx) return 'top';
-      if (editMode ? (cy <= bot && bot - cy <= tolPx) : Math.abs(cy - bot) <= tolPx) return 'bot';
+      const top = g.H - (pitchAt(n, g.t0 + cx / g.pxs) + half - g.lo) * g.rowH, bot = top + h;
+      if (editMode ? (cy >= top && cy - top <= tolPx) : Math.abs(cy - top) <= tolPx) return { side: 'top', n };
+      if (editMode ? (cy <= bot && bot - cy <= tolPx) : Math.abs(cy - bot) <= tolPx) return { side: 'bot', n };
     }
     return null;
   };
+  // utanför redigering: alla blocks höjd (svårighetsgraden). I redigering: den/de markerade notens egen marginal.
   const startTolDrag = (e, ed) => {
-    tolDrag = { y: e.clientY, side: ed, tol0: Number(document.getElementById('optTol').value) || 50, rowH: rollGeom.rowH, dpr: rollGeom.dpr };
+    const group = editMode ? (multi.has(ed.n) && multi.size > 1 ? [...multi] : [ed.n]) : null;
+    if (editMode) { sel = eNotes().indexOf(ed.n); if (!multi.has(ed.n)) multi = new Set([ed.n]); }
+    tolDrag = { y: e.clientY, side: ed.side, tol0: globalTol(), rowH: rollGeom.rowH, dpr: rollGeom.dpr,
+      group: group && group.map(n => ({ n, x0: n.x || 0 })), snap: false };
     c.setPointerCapture(e.pointerId); c.style.cursor = 'ns-resize';
   };
   const cxy = e => { const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1; return [(e.clientX - r.left) * d, (e.clientY - r.top) * d]; };
@@ -3052,7 +3115,21 @@ document.getElementById('overview').addEventListener('click', e => {
     }
     if (tolDrag) {
       const dy = (e.clientY - tolDrag.y) * tolDrag.dpr * (tolDrag.side === 'top' ? -1 : 1);   // utåt = högre block
-      setTol(tolDrag.tol0 + dy / tolDrag.rowH * 100, false, true);
+      const dc = dy / tolDrag.rowH * 100;
+      if (tolDrag.group) {
+        if (!tolDrag.snap && Math.abs(dc) < 2) return;
+        if (!tolDrag.snap) { snapshot(); tolDrag.snap = true; }
+        tolDrag.group.forEach(gq => {
+          let v = Math.round((gq.x0 + dc) / 5) * 5;
+          if (Math.abs(v) < 8) v = 0;   // nära standard = standard
+          v = Math.max(15 - globalTol(), Math.min(250 - globalTol(), v));
+          if (v) gq.n.x = v; else delete gq.n.x;
+        });
+        const n0 = tolDrag.group[0].n;
+        editStatus(`Marginal för ${tolDrag.group.length > 1 ? tolDrag.group.length + ' noter' : nm(n0.n)}: ±${noteTol(n0)} cent${n0.x ? ` (${n0.x > 0 ? '+' : ''}${n0.x} mot svårighetsgraden)` : ' (standard)'}`);
+        tick(); return;
+      }
+      setTol(tolDrag.tol0 + dc, false, true);
       return;
     }
     if (!editMode && startX == null && e.pointerType === 'mouse') { const [cx, cy] = cxy(e); c.style.cursor = tolEdge(cx, cy) ? 'ns-resize' : ''; }
@@ -3078,7 +3155,8 @@ document.getElementById('overview').addEventListener('click', e => {
   });
   const end = () => {
     if (tolDrag) {
-      tolDrag = null; c.style.cursor = '';
+      const td = tolDrag; tolDrag = null; c.style.cursor = '';
+      if (td.group) { if (td.snap) { afterEdit(td.group[0].n); editStatus('Notens marginal ändrad – osparat. Streckad kant = egen marginal.'); } return; }
       const v = Number(document.getElementById('optTol').value);
       setTol(v);
       toast(`Notblocken: ±${v} cent – ${v >= 100 ? 'mycket förlåtande' : v >= 70 ? 'lätt' : v >= 45 ? 'normal' : 'svår'}`);
@@ -3687,6 +3765,7 @@ document.addEventListener('keydown', e => {
   if (k === 'm') { editOp('merge'); return; }
   if (k === 's') { editOp('split'); return; }
   if (k === 'n') { editOp('add'); return; }
+  if (k === 'd') { editOp('clone'); return; }
   if (k === 'escape') { sel = -1; multi = new Set(); tick(); return; }
   if (!n || !['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) return;
   e.preventDefault(); snapshot();

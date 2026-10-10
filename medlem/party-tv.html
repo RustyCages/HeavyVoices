@@ -126,6 +126,8 @@
           <button type="button" data-v="yt" aria-pressed="false">📺 Hela videor</button>
         </div>
         <button type="button" class="btn-outline" id="fullBtn">⛶ Helskärm</button>
+        <button type="button" class="btn-outline" id="castBtn" hidden>📡 Casta</button>
+        <button type="button" class="btn-outline" id="airBtn" hidden>AirPlay</button>
       </div>
       <p class="note" id="note">Klipp från iTunes/Apple Music · hela videor från YouTube</p>
       <details class="frame-admin" id="frameAdmin" hidden>
@@ -156,6 +158,7 @@
 <script src="/js/party.js"></script>
 <script src="/js/party-quiz-questions.js"></script>
 <script src="/js/party-music.js"></script>
+<script src="/js/party-cast.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 function toast(msg, ms = 4000) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
@@ -295,15 +298,21 @@ async function next() {
   vid.pause();
   try { if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo(); } catch (e) {}
   let v = null;
-  const wantYt = src === 'yt' || (src === 'mix' && ytOk !== false && Math.random() < 0.5);
+  // YouTube-videor går inte att casta härifrån → bara klipp när vi castar
+  const wantYt = !PartyCast.connected && (src === 'yt' || (src === 'mix' && ytOk !== false && Math.random() < 0.5));
   if (wantYt) v = await youtubeVideo();
   if (!v && src !== 'yt') v = await itunesVideo();
-  if (!v && src === 'yt') v = await itunesVideo();
+  if (!v && (src === 'yt' || PartyCast.connected)) v = await itunesVideo();
   busy = false;
   if (!on) return;
   if (!v) { $('msg').hidden = false; $('msg').textContent = 'INGEN SIGNAL – KOLLA NÄTET'; return; }
   try {
-    if (v.kind === 'yt') {
+    if (PartyCast.connected) {
+      vid.style.display = 'none'; $('ytHost').style.display = 'none';
+      $('msg').hidden = false; $('msg').textContent = `📡 SPELAS PÅ ${PartyCast.device.toUpperCase()}`;
+      const ok = await PartyCast.load({ url: v.url, type: 'video/mp4', title: v.title, sub: v.artist + (v.year ? ' · ' + v.year : ''), video: true });
+      if (!ok) throw new Error('cast');
+    } else if (v.kind === 'yt') {
       vid.style.display = 'none';
       await playYt(v);
     } else {
@@ -313,8 +322,13 @@ async function next() {
       await vid.play();
     }
     caption(`${v.artist} – ${v.title}${v.year ? ' (' + v.year + ')' : ''}`);
-  } catch (e) { setTimeout(next, 400); }
+    castFails = 0;
+  } catch (e) {
+    if (PartyCast.connected && ++castFails >= 3) { castFails = 0; $('msg').hidden = false; $('msg').textContent = 'CASTNINGEN FUNKAR INTE – TRYCK KANAL FÖR ATT FÖRSÖKA IGEN'; return; }
+    setTimeout(next, 400);
+  }
 }
+let castFails = 0;
 vid.addEventListener('ended', () => { if (on) next(); });
 vid.addEventListener('error', () => { if (on && vid.src) setTimeout(next, 300); });
 
@@ -327,11 +341,26 @@ function power() {
   else {
     vid.pause(); vid.removeAttribute('src'); vid.load();
     try { if (ytPlayer) ytPlayer.stopVideo(); } catch (e) {}
+    PartyCast.stop();
     $('cap').classList.remove('on');
     $('msg').hidden = false; $('msg').textContent = '▶ TRYCK PÅ STRÖMBRYTAREN';
   }
 }
 $('pwrKnob').addEventListener('click', power);
+
+// ---------- casta till Chromecast / Google TV / Nest Hub (och AirPlay i Safari) ----------
+PartyCast.button($('castBtn'), (on, dev) => on ? `📡 ${dev}` : '📡 Casta');
+PartyCast.airplay($('airBtn'), vid);
+PartyCast.on('session', c => {
+  if (c) {
+    toast(`📡 Ansluten till ${PartyCast.device} – klippen spelas där. Hela YouTube-videor kan inte castas härifrån (tips: Chrome ⋮ → Casta → Casta flik).`, 7000);
+    vid.pause(); try { if (ytPlayer) ytPlayer.stopVideo(); } catch (e) {}
+    if (on) next(); else power();
+  } else if (on) {
+    $('msg').hidden = true; toast('Castningen avslutad – spelar här igen', 2500); next();
+  }
+});
+PartyCast.on('ended', () => { if (on && PartyCast.connected) next(); });
 $('chKnob').addEventListener('click', () => { if (!on) power(); else next(); });
 $('msg').addEventListener('click', () => { if (!on) power(); });
 $('segSrc').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { src = b.dataset.v; markSrc(); if (on) next(); }));

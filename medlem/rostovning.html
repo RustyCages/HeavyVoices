@@ -424,7 +424,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
             <option value="75" selected>Lätt</option>
             <option value="50">Normal</option>
             <option value="30">Svår</option>
-          </select><button type="button" class="help" data-help="tol" aria-label="Vad är svårighetsgrad?">?</button></span>
+          </select><span class="vol" role="group" aria-label="Notblockens höjd"><button type="button" class="btn-outline" id="tolLess" title="Lägre notblock – svårare (du måste ligga närmare tonen)" aria-label="Lägre notblock">−</button><button type="button" class="btn-outline" id="tolMore" title="Högre notblock – lättare (fångar mer av det du sjunger)" aria-label="Högre notblock">+</button></span><button type="button" class="help" data-help="tol" aria-label="Vad är svårighetsgrad?">?</button></span>
       </div>
       <div class="bulk">
         <button id="analyzeAllBtn">Analysera alla sångstämmor</button>
@@ -1060,6 +1060,24 @@ function songRange() {
 }
 function yRange() { return songRange(); }
 // luft över/under: notrutan (marginalen) + lite till, så inget klipps
+// notblockens höjd = marginalen (svårighetsgraden) i cent. Förval eller eget värde (dra i blockets kant eller −/+).
+const TOL_MIN = 20, TOL_MAX = 150;
+function setTol(c, quiet, live) {
+  const sel = document.getElementById('optTol');
+  c = Math.round(Math.max(TOL_MIN, Math.min(TOL_MAX, Number(c) || 50)) / 5) * 5;
+  let opt = sel.querySelector(`option[value="${c}"]`);
+  const custom = sel.querySelector('option[data-custom]');
+  if (!opt) {
+    opt = custom || document.createElement('option');
+    opt.dataset.custom = '1'; opt.value = c; opt.textContent = `Eget (±${c} cent)`;
+    if (!custom) sel.appendChild(opt);
+  } else if (custom && opt !== custom) custom.remove();
+  sel.value = String(c);
+  if (live) { if (current) tick(); return; }   // under dragning: rita bara om
+  try { localStorage.setItem('hv-tol', String(c)); } catch (e) {}
+  stems.forEach(st => { st._rr = null; }); viewLo = null;
+  if (current && !quiet) tick();
+}
 function rangePad() { return Math.max(0.45, (Number(document.getElementById('optTol').value) || 50) / 100) + 0.9; }
 
 // Notbanan: höjden följer tonerna som syns just nu (mjuk övergång)
@@ -1298,7 +1316,7 @@ function drawRoll() {
   // noter: rundade block, fylls grönt/rött där du sjungit
   // rutans höjd visar marginalen: allt inom rutan räknas som träff
   const tolSemi = (Number(document.getElementById('optTol').value) || 50) / 100;
-  const boxHalf = Math.max(0.45, tolSemi);
+  const boxHalf = Math.max(0.25, tolSemi);
   const r = Math.min(8 * dpr, rowH * boxHalf);
   rollGeom = { t0, pxs, lo, H, rowH, boxHalf, dpr, LH };
   wordRects = []; ghostRects = []; boxRects = [];
@@ -2754,8 +2772,10 @@ window.addEventListener('pagehide', flushSession);
 document.querySelectorAll('.prog-tabs button').forEach(b => b.addEventListener('click', () => { progScope = b.dataset.scope; renderProgress(); }));
 (() => {
   const tol = document.getElementById('optTol');
-  try { const v = localStorage.getItem('hv-tol'); if (v && tol.querySelector(`option[value="${v}"]`)) tol.value = v; } catch (e) {}
+  try { const v = Number(localStorage.getItem('hv-tol')); if (v) setTol(v, true); } catch (e) {}
   tol.addEventListener('change', () => { try { localStorage.setItem('hv-tol', tol.value); } catch (e) {} stems.forEach(st => { st._rr = null; }); viewLo = null; if (current) tick(); });
+  document.getElementById('tolLess').addEventListener('click', () => setTol(Number(tol.value) - 10));
+  document.getElementById('tolMore').addEventListener('click', () => setTol(Number(tol.value) + 10));
 })();
 (() => {
   const g = document.getElementById('guide'), b = document.getElementById('guideBtn');
@@ -2812,7 +2832,7 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
     tone: '<p><b>Referenston</b></p><p>Spelar exakt de noter du ska sjunga. Bra för att höra tonerna tydligt, utan text och utan andra röster. Välj ljud i listan: <b>Pip</b>, eller en sjungande röst – <b>Ooh</b>, <b>Aah</b> eller <b>Mmm</b>. Visar du fler stämmor i notbanan kan referenstonen sjunga dem också (bocka i <b>🎵 Referenstonen sjunger dem också</b>) – då hör du hur stämmorna låter ihop. Stäng av när du kan stämman.</p>',
     visa: '<p><b>Visa</b></p><p><b>Anpassa höjden efter tonerna</b><br>Notbanan zoomar i höjdled så att just de toner som syns nu fyller rutan. Noterna blir större och lättare att se, men banan rör sig lite när låten spelas. Av = hela låtens tonomfång syns hela tiden.</p><p><b>Slå ihop noter per textrad</b><br>Små, korta toner slås ihop till färre och längre noter, en per textrad där det går. Det blir lugnare att följa. Av = du ser alla noter precis som notanalysen hittade dem. Gäller inte noter som körledningen förberett.</p>',
     oktav: '<p><b>Godkänn annan oktav</b></p><p>På = det räknas som träff även om du sjunger en eller två oktaver högre eller lägre än noten. Bra om du t.ex. är bas och övar på tenorstämman.</p><p>Av = du måste sjunga i exakt rätt läge för att få grönt.</p>',
-    tol: '<p><b>Svårighetsgrad</b></p><p>Hur nära noten du måste ligga för att det ska bli grönt. 100 cent = en halvton.</p><p><b>Nybörjare</b> ±100 cent – mycket förlåtande.<br><b>Lätt</b> ±75 cent – bra att börja med.<br><b>Normal</b> ±50 cent – en kvarts ton fel går bra.<br><b>Svår</b> ±30 cent – för dig som vill finslipa.</p>',
+    tol: '<p><b>Svårighetsgrad</b></p><p>Hur nära noten du måste ligga för att det ska bli grönt. 100 cent = en halvton. Notblockens höjd visar marginalen – allt inom blocket räknas som träff.</p><p><b>Ändra själv:</b> tryck <b>−</b> / <b>+</b> för lägre/högre block, eller (på dator) dra i ett notblocks över- eller underkant.</p><p><b>Nybörjare</b> ±100 cent – mycket förlåtande.<br><b>Lätt</b> ±75 cent – bra att börja med.<br><b>Normal</b> ±50 cent – en kvarts ton fel går bra.<br><b>Svår</b> ±30 cent – för dig som vill finslipa.</p>',
   };
   const pop = document.createElement('div'); pop.id = 'helpPop'; pop.hidden = true; pop.setAttribute('role', 'dialog');
   document.body.appendChild(pop);
@@ -2884,7 +2904,20 @@ document.getElementById('overview').addEventListener('click', e => {
 (() => {
   const c = document.getElementById('roll');
   let startX = null, startY = 0, startT = 0, wasPlaying = false, scrubbed = false, panning = null;
-  let drag = null;
+  let drag = null, tolDrag = null;
+  // över- eller underkanten på någon av dina noter (±7 px)?
+  const tolEdge = (cx, cy) => {
+    const g = rollGeom; if (!g || !current || !current.pitch) return null;
+    const tolPx = 7 * g.dpr;
+    for (const n of current.pitch.notes) {
+      const nx = (n.t - g.t0) * g.pxs, nw = Math.max(3, n.d * g.pxs);
+      if (cx < nx || cx > nx + nw) continue;
+      const top = g.H - (n.n + g.boxHalf - g.lo) * g.rowH, bot = top + g.rowH * g.boxHalf * 2;
+      if (Math.abs(cy - top) <= tolPx) return 'top';
+      if (Math.abs(cy - bot) <= tolPx) return 'bot';
+    }
+    return null;
+  };
   const cxy = e => { const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1; return [(e.clientX - r.left) * d, (e.clientY - r.top) * d]; };
   c.addEventListener('pointerdown', e => {
     if (!current) return;
@@ -2929,6 +2962,11 @@ document.getElementById('overview').addEventListener('click', e => {
         c.setPointerCapture(e.pointerId); tick(); return;
       }
       sel = -1; multi = new Set(); tick();
+    }
+    if (!editMode) {   // dra i ett notblocks över-/underkant: gör alla block högre/lägre (= svårighetsgraden)
+      const [cx, cy] = cxy(e), ed = tolEdge(cx, cy);
+      if (ed) { tolDrag = { y: e.clientY, side: ed, tol0: Number(document.getElementById('optTol').value) || 50, rowH: rollGeom.rowH, dpr: rollGeom.dpr };
+        c.setPointerCapture(e.pointerId); c.style.cursor = 'ns-resize'; return; }
     }
     startX = e.clientX; startY = e.clientY; startT = position(); wasPlaying = playing; scrubbed = false; panning = null;
     c.setPointerCapture(e.pointerId); c.classList.add('dragging');
@@ -3004,6 +3042,12 @@ document.getElementById('overview').addEventListener('click', e => {
       }
       tick(); return;
     }
+    if (tolDrag) {
+      const dy = (e.clientY - tolDrag.y) * tolDrag.dpr * (tolDrag.side === 'top' ? -1 : 1);   // utåt = högre block
+      setTol(tolDrag.tol0 + dy / tolDrag.rowH * 100, false, true);
+      return;
+    }
+    if (!editMode && startX == null && e.pointerType === 'mouse') { const [cx, cy] = cxy(e); c.style.cursor = tolEdge(cx, cy) ? 'ns-resize' : ''; }
     if (editMode && startX == null) {
       const [cx, cy] = cxy(e);
       if (textMode) { const hb = inLane(cy) && hitBox(cx, cy); c.style.cursor = hitWord(cx, cy) ? 'grab' : hb ? (hb.zone === 'move' ? 'move' : 'ew-resize') : inLane(cy) ? 'copy' : 'grab'; }
@@ -3025,6 +3069,13 @@ document.getElementById('overview').addEventListener('click', e => {
     tick();
   });
   const end = () => {
+    if (tolDrag) {
+      tolDrag = null; c.style.cursor = '';
+      const v = Number(document.getElementById('optTol').value);
+      setTol(v);
+      toast(`Notblocken: ±${v} cent – ${v >= 100 ? 'mycket förlåtande' : v >= 70 ? 'lätt' : v >= 45 ? 'normal' : 'svår'}`);
+      return;
+    }
     if (wdrag) {
       const w = wdrag; wdrag = null; c.style.cursor = '';
       if (w.moved) dropWord(w); else tick();

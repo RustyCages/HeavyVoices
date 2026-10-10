@@ -63,6 +63,7 @@
 
   /* adminläge: låtens egna spår (synk, stämfiler) */
   #tl.drop { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 0.5rem; }
+  .wav-card summary { cursor: pointer; list-style: revert; }
   .vt { display: grid; gap: 0.55rem; padding: 0.6rem 0 0.2rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
   .admin-sync { margin-top: 1rem; padding: 0.8rem 0.9rem; border: 1px dashed rgba(229,169,104,0.5); border-radius: 0.6rem; display: grid; gap: 0.5rem; }
   .admin-sync .k { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
@@ -213,6 +214,12 @@
     <p class="hint" style="margin:0 0 0.7rem;">🔒 Privat = bara du · 👥 Körledningen = du och admin · 🌍 Alla = hela kören (i Studio för låten).</p>
     <div class="recs" id="myRecs"><span class="hint">Laddar…</span></div>
   </div>
+
+  <details class="card static wav-card" style="margin-top:1.5rem;">
+    <summary><h2 style="display:inline; margin:0; font-size:1.15rem;">🔄 Konvertera WAV till MP3</h2></summary>
+    <p class="hint" style="margin:0.6rem 0 0.7rem;">Gör om stora WAV-filer till MP3 och spara dem på datorn. Allt sker i din webbläsare – inget skickas iväg. WAV-filer sparas aldrig på nätet: laddar du in en WAV i Studio och sparar den görs den om till MP3 automatiskt.</p>
+    <div id="wavConvert"></div>
+  </details>
 </div>
 
 <div id="toast" style="position:fixed; bottom:1.5rem; right:1.5rem; background:var(--accent); color:#111317; padding:0.7rem 1.2rem; border-radius:0.6rem; font-weight:600; box-shadow:var(--card-shadow); z-index:999; display:none;"></div>
@@ -223,6 +230,7 @@
 <script src="/js/audio-edit.js"></script>
 <script src="/js/wave-timeline.js"></script>
 <script src="/js/track-edit-panel.js"></script>
+<script src="/js/wav-convert.js"></script>
 <script src="/js/pitch-analyze.js"></script>
 <script src="/js/voice-tools.js"></script>
 <script>
@@ -367,6 +375,8 @@ function renderLyric(p) {
   document.getElementById('lyNext').textContent = next ? next.text : '';
 }
 
+WavConvert.mount(document.getElementById('wavConvert'));
+
 // ---------- tidslinje + redigering (delade moduler) ----------
 const tl = WaveTimeline.create(document.getElementById('tl'), {
   getTracks: () => tracks, getDuration: duration, getPosition: position,
@@ -438,7 +448,8 @@ const panel = TrackEditPanel.mount(document.getElementById('panel'), {
     </div>
     <div class="tool-row" id="recRow2">
       <span class="k">Fil</span>
-      <select id="fmt"><option value="mp3">MP3</option><option value="wav">WAV</option></select>
+      <label class="status" for="fmt" title="Gäller bara nedladdning. Det som sparas på nätet blir alltid MP3, så att lagringen inte fylls.">Ladda ner som</label>
+      <select id="fmt" title="Gäller bara nedladdning – det som sparas på nätet blir alltid MP3"><option value="mp3">MP3</option><option value="wav">WAV (bara på datorn)</option></select>
       <button type="button" class="btn-outline" id="dlVoice" title="Ladda ner det valda spåret">⬇ Bara spåret</button>
       <button type="button" class="btn-outline" id="dlMix" title="Ladda ner allt som hörs just nu, mixat till en fil">⬇ Mix av det som hörs</button>
       <button type="button" class="btn-outline" id="recDelete">🗑 Ta bort</button>
@@ -815,8 +826,9 @@ async function calibrate() {
 }
 
 // ---------- spara / ladda ner / ta bort ----------
-async function encodeTrack(clip) {
-  if (document.getElementById('fmt').value === 'wav') return { blob: AudioEdit.encodeWav(clip), ext: 'wav', type: 'audio/wav' };
+// upload = true: det som sparas på nätet är alltid MP3 (WAV fyller lagringen) – WAV bara vid nedladdning
+async function encodeTrack(clip, upload) {
+  if (!upload && document.getElementById('fmt').value === 'wav') return { blob: AudioEdit.encodeWav(clip), ext: 'wav', type: 'audio/wav' };
   const blob = await AudioEdit.encodeMp3(clip, clip.channels.length > 1 ? 192 : 160, p => setRecStatus(`Kodar… ${Math.round(p * 100)} %`));
   return { blob, ext: 'mp3', type: 'audio/mpeg' };
 }
@@ -836,8 +848,8 @@ document.getElementById('recSave').addEventListener('click', async () => {
     let oldPath = null;
     if (!t.id || t.edited) {
       const id = t.id || crypto.randomUUID();
-      const { blob, type } = await encodeTrack(t.clip);
-      const path = `${me.id}/${id}-${Date.now().toString(36)}.${type === 'audio/wav' ? 'wav' : 'mp3'}`;
+      const { blob, type } = await encodeTrack(t.clip, true);
+      const path = `${me.id}/${id}-${Date.now().toString(36)}.mp3`;
       setRecStatus(`Laddar upp ${(blob.size / 1048576).toFixed(1)} MB…`);
       const { error } = await supabaseClient.storage.from(REC_BUCKET).upload(path, blob, { contentType: type });
       if (error) throw error;
@@ -943,10 +955,10 @@ document.getElementById('toStem').addEventListener('click', async () => {
   try {
     toast('Skapar stämfil…');
     // inläst fil som inte ändrats: ladda upp originalet (ingen omkodning, ingen kvalitetsförlust)
-    const orig = t.file && !t.edited ? t.file : null;
+    const orig = t.file && !t.edited && !AudioEdit.isUncompressedAudio(t.file) ? t.file : null;   // WAV/FLAC görs om till MP3
     const { blob, ext, type } = orig
       ? { blob: orig, ext: (orig.name.match(/\.([a-z0-9]{2,5})$/i) || [, 'mp3'])[1].toLowerCase(), type: orig.type || 'audio/mpeg' }
-      : await encodeTrack(t.clip);
+      : await encodeTrack(t.clip, true);
     const id = crypto.randomUUID(), path = `${song.id}/stem_${id}__${safeName(label)}.${ext}`;
     const { error } = await supabaseClient.storage.from(STEMS_BUCKET).upload(path, blob, { contentType: type });
     if (error) throw error;
@@ -1012,7 +1024,7 @@ document.getElementById('stemSave').addEventListener('click', async () => {
   if (!confirm(`Ersätta stämfilen för ${t.label} i låten?\n\nDen nuvarande filen sparas som säkerhetskopia och kan återställas. Notanalysen för stämman behöver göras om i Röstövning efteråt.`)) return;
   const btn = document.getElementById('stemSave'); btn.disabled = true;
   try {
-    const { blob, ext, type } = await encodeTrack(t.clip);
+    const { blob, ext, type } = await encodeTrack(t.clip, true);
     const name = `${baseName(t)}-redigerad-${stamp()}.${ext}`;
     const path = t.fixed ? `${song.id}/${t.key}__${name}` : `${song.id}/stem_${t.key}__${name}`;
     setFileStatus(`Laddar upp ${(blob.size / 1048576).toFixed(1)} MB…`);

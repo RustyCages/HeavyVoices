@@ -237,5 +237,19 @@
     return new Blob(parts, { type: 'audio/mpeg' });
   }
 
-  root.AudioEdit = { fromBuffer, toBuffer, duration: dur, cut, crop, insertSilence, paste, conform, gain, fadeEdges, timeStretch, normalize, mixdown, peaks, encodeWav, encodeMp3, loadLame };
+  // Okomprimerat ljud (WAV/AIFF/FLAC) sparas aldrig på nätet – det fyller lagringen. toMp3File gör om
+  // sådana filer till MP3 i webbläsaren före uppladdning; andra filer returneras som de är.
+  const UNCOMPRESSED_RX = /\.(wav|wave|aif|aiff|aifc|flac)$/i;
+  function isUncompressedAudio(f) { return !!f && (UNCOMPRESSED_RX.test(f.name || '') || /^audio\/(x-)?(wav|wave|aiff|flac)$/i.test(f.type || '')); }
+  async function toMp3File(file, kbps = 192, onProgress) {
+    if (!isUncompressedAudio(file)) return file;
+    const ctx = new (root.AudioContext || root.webkitAudioContext)();
+    try {
+      const clip = fromBuffer(await ctx.decodeAudioData(await file.arrayBuffer()));
+      const blob = await encodeMp3(clip, kbps, onProgress);
+      return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.mp3', { type: 'audio/mpeg' });
+    } finally { try { ctx.close(); } catch (e) {} }
+  }
+
+  root.AudioEdit = { fromBuffer, toBuffer, duration: dur, cut, crop, insertSilence, paste, conform, gain, fadeEdges, timeStretch, normalize, mixdown, peaks, encodeWav, encodeMp3, loadLame, isUncompressedAudio, toMp3File };
 })(typeof window !== 'undefined' ? window : globalThis);

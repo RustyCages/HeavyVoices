@@ -254,6 +254,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
+<script src="/js/audio-edit.js"></script>
 <script src="/js/bg-video.js"></script>
 <script src="/js/party.js"></script>
 <script>
@@ -461,8 +462,12 @@ function renderFwAdmin() {
     const kind = inp.dataset.kind, files = [...e.target.files]; if (!files.length) return;
     const st = document.getElementById('fwStatus');
     let okCount = 0;
-    for (const [k, file] of files.entries()) {
+    for (let [k, file] of files.entries()) {
       if (!file.size) { toast(`${file.name} är tom`, 5000); continue; }
+      if (AudioEdit.isUncompressedAudio(file)) {   // WAV sparas aldrig på nätet – gör om till MP3 först
+        try { st.textContent = `Gör om ${file.name} till MP3…`; file = await AudioEdit.toMp3File(file, 192); }
+        catch (err) { toast(`${file.name} kunde inte göras om till MP3`, 6000); continue; }
+      }
       if (file.size > 50 * 1048576) { toast(`${file.name} är större än 50 MB – välj en mindre version (720p/HD räcker gott)`, 6000); continue; }
       st.textContent = `Laddar upp ${k + 1}/${files.length}…`;
       const safe = file.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '_');

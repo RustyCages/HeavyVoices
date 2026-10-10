@@ -48,7 +48,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .karaoke.has-bg-video::after { content: ''; position: absolute; inset: 0; background: rgba(8,10,14,0.62); z-index: 0; pointer-events: none; }
   .karaoke::before { content:''; position:absolute; left:0; right:0; top:0.6rem; height:min(clamp(80px, 13vw, 120px), calc(100% - 1.2rem)); background:url('/icons/logo.png') center top / contain no-repeat; background-image:image-set(url('/icons/logo.webp') type('image/webp'), url('/icons/logo.png') type('image/png')); background-position:center top; background-size:contain; background-repeat:no-repeat; opacity:0.16; z-index:1; pointer-events:none; }
   .karaoke.has-bg-video .k-now, .karaoke.has-bg-video .k-next { text-shadow: 0 2px 8px rgba(0,0,0,0.85); }
-  .canvas-wrap { position: relative; border: 1px solid var(--border); border-radius: 0.6rem; overflow: hidden; background: rgba(0,0,0,0.25); touch-action: none; }
+  .canvas-wrap { position: relative; border: 1px solid var(--border); border-radius: 0.6rem; overflow: hidden; background: rgba(0,0,0,0.25); touch-action: pan-y; }   /* lodrätt drag med fingret rullar sidan, vågrätt spolar */
   #overview { display: block; width: 100%; height: 56px; cursor: pointer; border-bottom: 1px solid var(--border); }
   #roll { display: block; width: 100%; height: 420px; cursor: grab; }
   @media (max-width: 640px) { #roll { height: 360px; } }
@@ -190,7 +190,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .roll-resize::before { content: ''; width: 46px; height: 4px; border-radius: 2px; background: var(--border); }
   .roll-resize:hover::before, .roll-resize.dragging::before { background: var(--accent); }
   .edited-tag { font-size: 0.75rem; padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid rgba(74,222,128,0.5); color: #4ade80; }
-  #roll.editing { cursor: default; }
+  #roll.editing { cursor: default; touch-action: none; }   /* redigering: fingret flyttar noter och notfältet i höjdled */
   .zoom button { width: 2rem; height: 2rem; padding: 0; justify-content: center; font-size: 1.1rem; line-height: 1; }
   .zoom-v { min-width: 2.6rem; text-align: center; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
   .legend-row span { display: inline-flex; align-items: center; gap: 0.4rem; }

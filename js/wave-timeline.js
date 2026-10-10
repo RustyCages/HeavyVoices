@@ -13,14 +13,14 @@
 (function (root) {
   const CSS = `
   .wt { position: relative; user-select: none; }
-  .wt-ruler { display: block; width: 100%; height: 26px; cursor: pointer; border-bottom: 1px solid var(--border); touch-action: none; }
+  .wt-ruler { display: block; width: 100%; height: 26px; cursor: pointer; border-bottom: 1px solid var(--border); touch-action: pan-y; }
   .wt-track { border: 2px solid transparent; border-bottom-color: var(--border); border-radius: 0.5rem; padding: 0 calc(0.5rem - 2px); margin: 2px -0.5rem; transition: border-color 0.15s, background 0.15s; }
   .wt-track.active { border-color: var(--accent, #E5A968); background: rgba(229,169,104,0.09); box-shadow: inset 4px 0 0 var(--accent, #E5A968), 0 0 0 3px rgba(229,169,104,0.12); }
   .wt-head::before { content: ''; flex: none; width: 0.6rem; height: 0.6rem; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); }
   .wt-track.active .wt-head::before { background: var(--accent, #E5A968); border-color: var(--accent, #E5A968); box-shadow: 0 0 8px rgba(229,169,104,0.8); }
   .wt-track.active .wt-head .t-name { color: var(--accent, #E5A968); }
   .wt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.7rem; padding: 0.45rem 0.1rem 0.3rem; }
-  .wt-wave { display: block; width: 100%; height: 72px; touch-action: none; }
+  .wt-wave { display: block; width: 100%; height: 72px; touch-action: pan-y; }   /* lodrätt drag med fingret rullar sidan */
   .wt.tool-pan .wt-wave { cursor: grab; }
   .wt.tool-pan .wt-wave.dragging { cursor: grabbing; }
   .wt.tool-move .wt-wave { cursor: ew-resize; }

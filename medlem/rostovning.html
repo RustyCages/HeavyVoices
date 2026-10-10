@@ -2832,7 +2832,7 @@ document.getElementById('scrubber').addEventListener('input', e => { if (!playin
     tone: '<p><b>Referenston</b></p><p>Spelar exakt de noter du ska sjunga. Bra för att höra tonerna tydligt, utan text och utan andra röster. Välj ljud i listan: <b>Pip</b>, eller en sjungande röst – <b>Ooh</b>, <b>Aah</b> eller <b>Mmm</b>. Visar du fler stämmor i notbanan kan referenstonen sjunga dem också (bocka i <b>🎵 Referenstonen sjunger dem också</b>) – då hör du hur stämmorna låter ihop. Stäng av när du kan stämman.</p>',
     visa: '<p><b>Visa</b></p><p><b>Anpassa höjden efter tonerna</b><br>Notbanan zoomar i höjdled så att just de toner som syns nu fyller rutan. Noterna blir större och lättare att se, men banan rör sig lite när låten spelas. Av = hela låtens tonomfång syns hela tiden.</p><p><b>Slå ihop noter per textrad</b><br>Små, korta toner slås ihop till färre och längre noter, en per textrad där det går. Det blir lugnare att följa. Av = du ser alla noter precis som notanalysen hittade dem. Gäller inte noter som körledningen förberett.</p>',
     oktav: '<p><b>Godkänn annan oktav</b></p><p>På = det räknas som träff även om du sjunger en eller två oktaver högre eller lägre än noten. Bra om du t.ex. är bas och övar på tenorstämman.</p><p>Av = du måste sjunga i exakt rätt läge för att få grönt.</p>',
-    tol: '<p><b>Svårighetsgrad</b></p><p>Hur nära noten du måste ligga för att det ska bli grönt. 100 cent = en halvton. Notblockens höjd visar marginalen – allt inom blocket räknas som träff.</p><p><b>Ändra själv:</b> tryck <b>−</b> / <b>+</b> för lägre/högre block, eller (på dator) dra i ett notblocks över- eller underkant.</p><p><b>Nybörjare</b> ±100 cent – mycket förlåtande.<br><b>Lätt</b> ±75 cent – bra att börja med.<br><b>Normal</b> ±50 cent – en kvarts ton fel går bra.<br><b>Svår</b> ±30 cent – för dig som vill finslipa.</p>',
+    tol: '<p><b>Svårighetsgrad</b></p><p>Hur nära noten du måste ligga för att det ska bli grönt. 100 cent = en halvton. Notblockens höjd visar marginalen – allt inom blocket räknas som träff.</p><p><b>Ändra själv:</b> tryck <b>−</b> / <b>+</b> för lägre/högre block, eller (på dator) dra i ett notblocks över- eller underkant – det fungerar även i redigeringsläget (dra i mitten av blocket flyttar tonen som vanligt).</p><p><b>Nybörjare</b> ±100 cent – mycket förlåtande.<br><b>Lätt</b> ±75 cent – bra att börja med.<br><b>Normal</b> ±50 cent – en kvarts ton fel går bra.<br><b>Svår</b> ±30 cent – för dig som vill finslipa.</p>',
   };
   const pop = document.createElement('div'); pop.id = 'helpPop'; pop.hidden = true; pop.setAttribute('role', 'dialog');
   document.body.appendChild(pop);
@@ -2906,17 +2906,24 @@ document.getElementById('overview').addEventListener('click', e => {
   let startX = null, startY = 0, startT = 0, wasPlaying = false, scrubbed = false, panning = null;
   let drag = null, tolDrag = null;
   // över- eller underkanten på någon av dina noter (±7 px)?
+  // I redigeringsläget: bara precis innanför kanten och inte i hörnen (där ändras längden), och bara om blocket är högt nog
   const tolEdge = (cx, cy) => {
     const g = rollGeom; if (!g || !current || !current.pitch) return null;
-    const tolPx = 7 * g.dpr;
+    const h = g.rowH * g.boxHalf * 2;
+    if (editMode && h < 16 * g.dpr) return null;
+    const tolPx = (editMode ? 4 : 7) * g.dpr, side = editMode ? 9 * g.dpr : 0;
     for (const n of current.pitch.notes) {
       const nx = (n.t - g.t0) * g.pxs, nw = Math.max(3, n.d * g.pxs);
-      if (cx < nx || cx > nx + nw) continue;
-      const top = g.H - (n.n + g.boxHalf - g.lo) * g.rowH, bot = top + g.rowH * g.boxHalf * 2;
-      if (Math.abs(cy - top) <= tolPx) return 'top';
-      if (Math.abs(cy - bot) <= tolPx) return 'bot';
+      if (cx < nx + side || cx > nx + nw - side) continue;
+      const top = g.H - (n.n + g.boxHalf - g.lo) * g.rowH, bot = top + h;
+      if (editMode ? (cy >= top && cy - top <= tolPx) : Math.abs(cy - top) <= tolPx) return 'top';
+      if (editMode ? (cy <= bot && bot - cy <= tolPx) : Math.abs(cy - bot) <= tolPx) return 'bot';
     }
     return null;
+  };
+  const startTolDrag = (e, ed) => {
+    tolDrag = { y: e.clientY, side: ed, tol0: Number(document.getElementById('optTol').value) || 50, rowH: rollGeom.rowH, dpr: rollGeom.dpr };
+    c.setPointerCapture(e.pointerId); c.style.cursor = 'ns-resize';
   };
   const cxy = e => { const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1; return [(e.clientX - r.left) * d, (e.clientY - r.top) * d]; };
   c.addEventListener('pointerdown', e => {
@@ -2939,7 +2946,9 @@ document.getElementById('overview').addEventListener('click', e => {
       }
       if (inLane(cy)) { selBox = -1; syncWordInput(); tick(); }
     } else if (editMode) {
-      const [cx, cy] = cxy(e), h = hitNote(cx, cy);
+      const [cx, cy] = cxy(e);
+      { const ed = !e.shiftKey && tolEdge(cx, cy); if (ed) { startTolDrag(e, ed); return; } }   // över-/underkant: blockens höjd
+      const h = hitNote(cx, cy);
       if (h) {
         const ns = eNotes(), n = ns[h.i];
         if (e.shiftKey) { if (multi.has(n)) multi.delete(n); else multi.add(n); sel = h.i; tick(); return; }
@@ -2965,8 +2974,7 @@ document.getElementById('overview').addEventListener('click', e => {
     }
     if (!editMode) {   // dra i ett notblocks över-/underkant: gör alla block högre/lägre (= svårighetsgraden)
       const [cx, cy] = cxy(e), ed = tolEdge(cx, cy);
-      if (ed) { tolDrag = { y: e.clientY, side: ed, tol0: Number(document.getElementById('optTol').value) || 50, rowH: rollGeom.rowH, dpr: rollGeom.dpr };
-        c.setPointerCapture(e.pointerId); c.style.cursor = 'ns-resize'; return; }
+      if (ed) { startTolDrag(e, ed); return; }
     }
     startX = e.clientX; startY = e.clientY; startT = position(); wasPlaying = playing; scrubbed = false; panning = null;
     c.setPointerCapture(e.pointerId); c.classList.add('dragging');
@@ -3051,7 +3059,7 @@ document.getElementById('overview').addEventListener('click', e => {
     if (editMode && startX == null) {
       const [cx, cy] = cxy(e);
       if (textMode) { const hb = inLane(cy) && hitBox(cx, cy); c.style.cursor = hitWord(cx, cy) ? 'grab' : hb ? (hb.zone === 'move' ? 'move' : 'ew-resize') : inLane(cy) ? 'copy' : 'grab'; }
-      else { const h = hitNote(cx, cy); c.style.cursor = h ? (h.zone === 'move' ? 'move' : 'ew-resize') : hitGhost(cx, cy) ? 'pointer' : 'grab'; }
+      else { const h = hitNote(cx, cy); c.style.cursor = tolEdge(cx, cy) ? 'ns-resize' : h ? (h.zone === 'move' ? 'move' : 'ew-resize') : hitGhost(cx, cy) ? 'pointer' : 'grab'; }
     }
     if (startX == null) return;
     // redigering: dra uppåt/nedåt i tom yta flyttar notfältet i höjdled

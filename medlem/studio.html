@@ -62,6 +62,7 @@
   .t-ctrl .ms { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 4.2rem; text-align: right; }
 
   /* adminläge: låtens egna spår (synk, stämfiler) */
+  #tl.drop { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 0.5rem; }
   .vt { display: grid; gap: 0.55rem; padding: 0.6rem 0 0.2rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
   .admin-sync { margin-top: 1rem; padding: 0.8rem 0.9rem; border: 1px dashed rgba(229,169,104,0.5); border-radius: 0.6rem; display: grid; gap: 0.5rem; }
   .admin-sync .k { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
@@ -176,6 +177,8 @@
         </div>
         <button class="btn-outline" id="markBtn" title="Sätt en markör vid spelhuvudet (M)">⚑ Markör</button>
         <button class="btn-outline" id="newTrackBtn" title="Lägg till ett tomt spår att spela in eller klistra in i">➕ Nytt tomt spår</button>
+        <button class="btn-outline" id="importBtn" hidden title="Admin: ladda in en eller flera ljudfiler (MP3, WAV, M4A …) som nya spår – och lägg dem i låten med ➕ Gör till stämfil. Du kan också dra filer till tidslinjen.">📂 Ladda in ljudfil</button>
+        <input type="file" id="importFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" multiple hidden>
         <span class="sp"></span>
         <div class="zoom" role="group" aria-label="Zoom">
           <button type="button" class="btn-outline" id="zoomOut" title="Zooma ut (−)">−</button>
@@ -189,7 +192,7 @@
       <div id="panel"></div>
       <div class="admin-sync" id="adminSync" hidden>
         <span class="k">Admin · låtens spår</span>
-        <p class="note">Som admin kan du också flytta låtens egna spår (förskjutning), auto-synka dem och ändra själva stämfilerna – välj ett spår och använd verktygen ovan, sedan <b>💾 Spara som stämfil</b>. Den gamla filen sparas som säkerhetskopia.</p>
+        <p class="note">Som admin kan du också flytta låtens egna spår (förskjutning), auto-synka dem och ändra själva stämfilerna – välj ett spår och använd verktygen ovan, sedan <b>💾 Spara som stämfil</b>. Den gamla filen sparas som säkerhetskopia. Nya filer laddar du in med <b>📂 Ladda in ljudfil</b> (eller dra dem till tidslinjen), flyttar på plats och lägger i låten med <b>➕ Gör till stämfil i låten</b>.</p>
         <div class="actions">
           <label for="refSelect">Referens:</label> <select id="refSelect"></select>
           <button type="button" class="btn-outline" id="autoBtn" title="Räknar ut förskjutningen för låtens spår mot referensen – ackord och ansatser">Auto-synka</button>
@@ -907,13 +910,43 @@ function newEmptyTrack() {
   toast('Tomt spår tillagt – tryck ⏺ Spela in eller klistra in något');
 }
 document.getElementById('newTrackBtn').addEventListener('click', newEmptyTrack);
+// admin: ladda in ljudfiler direkt (knappen eller dra till tidslinjen)
+async function importAudioFiles(files) {
+  files = [...files].filter(f => /^audio\//.test(f.type) || /\.(mp3|wav|m4a|aac|ogg|oga|flac|webm)$/i.test(f.name));
+  if (!isAdmin || !song || !files.length) return;
+  let last = null;
+  for (const f of files) {
+    try {
+      toast(`Läser in ${f.name}…`, 20000);
+      const clip = AudioEdit.fromBuffer(await getCtx().decodeAudioData(await f.arrayBuffer()));
+      const t = { kind: 'rec', key: 'file-' + (++emptyNo), label: f.name.replace(/\.[^.]+$/, ''), color: REC_COLOR, mine: true, memberId: me.id,
+        clip, orig: clip, file: f, offsetMs: 0, savedOffsetMs: null, visibility: 'private', undo: [], edited: false, vol: 1, muted: false, solo: false };
+      setPeaks(t); tracks.push(t); last = t;
+    } catch (e) { toast(`Kunde inte läsa ${f.name} – är det en ljudfil?`, 6000); }
+  }
+  if (!last) return;
+  tl.render(); setActive(last);
+  toast(files.length > 1 ? `${files.length} filer inlästa – välj ett spår och tryck ➕ Gör till stämfil i låten` : `${last.label} inläst – flytta på plats och tryck ➕ Gör till stämfil i låten`, 7000);
+}
+document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', e => { importAudioFiles(e.target.files).finally(() => { e.target.value = ''; }); });
+(() => {
+  const tlEl = document.getElementById('tl');
+  tlEl.addEventListener('dragover', e => { if (isAdmin && e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); tlEl.classList.add('drop'); } });
+  tlEl.addEventListener('dragleave', () => tlEl.classList.remove('drop'));
+  tlEl.addEventListener('drop', e => { if (!isAdmin) return; e.preventDefault(); tlEl.classList.remove('drop'); importAudioFiles(e.dataTransfer.files); });
+})();
 // admin: lägg inspelningen som nytt spår i låten (heavy-voices-stems + extra_stems + stem_offsets)
 document.getElementById('toStem').addEventListener('click', async () => {
   const t = active; if (!isAdmin || !t || !t.clip) return;
   const label = prompt('Namn på spåret i låten:', t.label); if (!label) return;
   try {
     toast('Skapar stämfil…');
-    const { blob, ext, type } = await encodeTrack(t.clip);
+    // inläst fil som inte ändrats: ladda upp originalet (ingen omkodning, ingen kvalitetsförlust)
+    const orig = t.file && !t.edited ? t.file : null;
+    const { blob, ext, type } = orig
+      ? { blob: orig, ext: (orig.name.match(/\.([a-z0-9]{2,5})$/i) || [, 'mp3'])[1].toLowerCase(), type: orig.type || 'audio/mpeg' }
+      : await encodeTrack(t.clip);
     const id = crypto.randomUUID(), path = `${song.id}/stem_${id}__${safeName(label)}.${ext}`;
     const { error } = await supabaseClient.storage.from(STEMS_BUCKET).upload(path, blob, { contentType: type });
     if (error) throw error;
@@ -922,6 +955,12 @@ document.getElementById('toStem').addEventListener('click', async () => {
     const { error: e2 } = await supabaseClient.from('songs').update({ extra_stems: extra, stem_offsets: offsets }).eq('id', song.id);
     if (e2) throw e2;
     song.extra_stems = extra; song.stem_offsets = offsets;
+    // spåret blir ett av låtens spår direkt här i Studio
+    Object.assign(t, { kind: 'stem', key: id, label, path, fixed: false, color: STEM_COLORS[tracks.filter(x => x.kind === 'stem').length % STEM_COLORS.length],
+      orig: t.clip, savedOffsetMs: t.offsetMs, undo: [], edited: false, locked: false, readOnly: false, mine: false, id: undefined, file: undefined });
+    document.getElementById('refSelect').innerHTML = tracks.filter(x => x.kind === 'stem').map(x => `<option value="${esc(x.key)}">${esc(x.label)}</option>`).join('');
+    document.getElementById('adminSync').hidden = false;
+    tl.render(); setActive(t); updateSaveState();
     toast(`”${label}” finns nu som spår i låten – notanalysera den i Röstövning`, 6000);
   } catch (e) { toast('Kunde inte skapa stämfil: ' + (e.message || e), 6000); }
 });
@@ -1306,10 +1345,11 @@ window.addEventListener('beforeunload', e => { if (rec || unsaved()) { e.prevent
   const { data, error } = await supabaseClient.from('songs').select('*').order('title');
   const sel = document.getElementById('songSelect');
   if (error) { sel.innerHTML = `<option>Fel: ${esc(error.message)}</option>`; return; }
-  songs = (data || []).filter(s => (s.published !== false || isAdmin) && stemListFor(s).length);
+  songs = (data || []).filter(s => isAdmin || (s.published !== false && stemListFor(s).length));   // admin ser även låtar utan spår (kan ladda in filer)
+  if (isAdmin) document.getElementById('importBtn').hidden = false;
   loadMyRecs();
   if (!songs.length) { sel.innerHTML = '<option value="">Inga låtar med stämfiler än</option>'; return; }
-  sel.innerHTML = '<option value="">Välj låt…</option>' + songs.map(s => `<option value="${s.id}">${esc(s.title)}</option>`).join('');
+  sel.innerHTML = '<option value="">Välj låt…</option>' + songs.map(s => `<option value="${s.id}">${esc(s.title)}${stemListFor(s).length ? '' : ' (inga spår än)'}</option>`).join('');
   const pre = new URLSearchParams(location.search).get('song');
   if (pre && songs.some(s => String(s.id) === pre)) { sel.value = pre; loadSong(pre); }
 })();

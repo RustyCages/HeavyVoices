@@ -80,6 +80,10 @@
   .fa-check { grid-column: 1 / -1; display: flex !important; align-items: center; gap: 0.5rem; }
   .fa-check input { width: auto; margin: 0; }
   #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: #111317; padding: 0.7rem 1.2rem; border-radius: 0.6rem; font-weight: 600; box-shadow: var(--card-shadow); z-index: 2100; display: none; max-width: calc(100vw - 3rem); }
+  .cast-help { margin-top: 1rem; padding: 0.9rem 1rem; border-radius: 0.9rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); text-align: left; }
+  .cast-help summary { cursor: pointer; }
+  .cast-help ol { margin: 0.6rem 0; padding-left: 1.3rem; display: grid; gap: 0.5rem; font-size: 0.92rem; line-height: 1.5; }
+  .cast-help p { font-size: 0.88rem; }
 </style>
 </head>
 <body class="party-page">
@@ -126,9 +130,19 @@
           <button type="button" data-v="yt" aria-pressed="false">📺 Hela videor</button>
         </div>
         <button type="button" class="btn-outline" id="fullBtn">⛶ Helskärm</button>
-        <button type="button" class="btn-outline" id="castBtn" hidden>📡 Casta</button>
-        <button type="button" class="btn-outline" id="airBtn" hidden>AirPlay</button>
+        <button type="button" class="btn-outline" id="castHelpBtn">📡 Visa på TV</button>
       </div>
+      <details class="cast-help" id="castHelp">
+        <summary><b>📡 Visa Rock-TV på en TV eller Chromecast</b></summary>
+        <p class="text-muted">En webbsida kan inte själv starta skärmcastning, och hela YouTube-videor går inte att skicka vidare härifrån. Casta därför hela fliken eller skärmen – då följer allt med, både klipp och YouTube-videor, med ljud.</p>
+        <ol>
+          <li><b>Dator med Chrome</b> (bäst): klicka <b>⋮</b> uppe till höger → <b>Casta, spara och dela</b> → <b>Casta…</b> → under <b>Källor</b>, se till att <b>Casta flik</b> är valt → välj TV:n/Chromecasten. Tryck sedan <b>⛶ Helskärm</b>.</li>
+          <li><b>Android</b>: öppna <b>Google Home-appen</b> → tryck på TV:n/Chromecasten → <b>Casta min skärm</b>. Vänd mobilen och tryck <b>⛶ Helskärm</b>.</li>
+          <li><b>iPhone/iPad till Apple TV eller AirPlay-TV</b>: dra ner Kontrollcenter → <b>Skärmspegling</b> → välj TV:n.</li>
+          <li><b>iPhone till Chromecast/Google TV</b>: går inte direkt – använd en dator eller Android-mobil i stället.</li>
+        </ol>
+        <p class="text-muted">Tips: Ljudet kommer från TV:n när du castar. Ström och kanalbyte styr du som vanligt här.</p>
+      </details>
       <p class="note" id="note">Klipp från iTunes/Apple Music · hela videor från YouTube</p>
       <details class="frame-admin" id="frameAdmin" hidden>
         <summary><b>🖼 Egen TV-bild</b> <span class="text-muted">– byt ut TV:n mot ett annat foto</span></summary>
@@ -158,7 +172,6 @@
 <script src="/js/party.js"></script>
 <script src="/js/party-quiz-questions.js"></script>
 <script src="/js/party-music.js"></script>
-<script src="/js/party-cast.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 function toast(msg, ms = 4000) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
@@ -298,21 +311,15 @@ async function next() {
   vid.pause();
   try { if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo(); } catch (e) {}
   let v = null;
-  // YouTube-videor går inte att casta härifrån → bara klipp när vi castar
-  const wantYt = !PartyCast.connected && (src === 'yt' || (src === 'mix' && ytOk !== false && Math.random() < 0.5));
+  const wantYt = src === 'yt' || (src === 'mix' && ytOk !== false && Math.random() < 0.5);
   if (wantYt) v = await youtubeVideo();
   if (!v && src !== 'yt') v = await itunesVideo();
-  if (!v && (src === 'yt' || PartyCast.connected)) v = await itunesVideo();
+  if (!v && src === 'yt') v = await itunesVideo();
   busy = false;
   if (!on) return;
   if (!v) { $('msg').hidden = false; $('msg').textContent = 'INGEN SIGNAL – KOLLA NÄTET'; return; }
   try {
-    if (PartyCast.connected) {
-      vid.style.display = 'none'; $('ytHost').style.display = 'none';
-      $('msg').hidden = false; $('msg').textContent = `📡 SPELAS PÅ ${PartyCast.device.toUpperCase()}`;
-      const ok = await PartyCast.load({ url: v.url, type: 'video/mp4', title: v.title, sub: v.artist + (v.year ? ' · ' + v.year : ''), video: true });
-      if (!ok) throw new Error('cast');
-    } else if (v.kind === 'yt') {
+    if (v.kind === 'yt') {
       vid.style.display = 'none';
       await playYt(v);
     } else {
@@ -322,13 +329,8 @@ async function next() {
       await vid.play();
     }
     caption(`${v.artist} – ${v.title}${v.year ? ' (' + v.year + ')' : ''}`);
-    castFails = 0;
-  } catch (e) {
-    if (PartyCast.connected && ++castFails >= 3) { castFails = 0; $('msg').hidden = false; $('msg').textContent = 'CASTNINGEN FUNKAR INTE – TRYCK KANAL FÖR ATT FÖRSÖKA IGEN'; return; }
-    setTimeout(next, 400);
-  }
+  } catch (e) { setTimeout(next, 400); }
 }
-let castFails = 0;
 vid.addEventListener('ended', () => { if (on) next(); });
 vid.addEventListener('error', () => { if (on && vid.src) setTimeout(next, 300); });
 
@@ -341,26 +343,13 @@ function power() {
   else {
     vid.pause(); vid.removeAttribute('src'); vid.load();
     try { if (ytPlayer) ytPlayer.stopVideo(); } catch (e) {}
-    PartyCast.stop();
     $('cap').classList.remove('on');
     $('msg').hidden = false; $('msg').textContent = '▶ TRYCK PÅ STRÖMBRYTAREN';
   }
 }
 $('pwrKnob').addEventListener('click', power);
 
-// ---------- casta till Chromecast / Google TV / Nest Hub (och AirPlay i Safari) ----------
-PartyCast.button($('castBtn'), (on, dev) => on ? `📡 ${dev}` : '📡 Casta');
-PartyCast.airplay($('airBtn'), vid);
-PartyCast.on('session', c => {
-  if (c) {
-    toast(`📡 Ansluten till ${PartyCast.device} – klippen spelas där. Hela YouTube-videor kan inte castas härifrån (tips: Chrome ⋮ → Casta → Casta flik).`, 7000);
-    vid.pause(); try { if (ytPlayer) ytPlayer.stopVideo(); } catch (e) {}
-    if (on) next(); else power();
-  } else if (on) {
-    $('msg').hidden = true; toast('Castningen avslutad – spelar här igen', 2500); next();
-  }
-});
-PartyCast.on('ended', () => { if (on && PartyCast.connected) next(); });
+$('castHelpBtn').addEventListener('click', () => { const d = $('castHelp'); d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
 $('chKnob').addEventListener('click', () => { if (!on) power(); else next(); });
 $('msg').addEventListener('click', () => { if (!on) power(); });
 $('segSrc').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { src = b.dataset.v; markSrc(); if (on) next(); }));

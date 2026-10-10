@@ -1290,8 +1290,29 @@ async function loadSong(id) {
   requestAnimationFrame(() => { tl.fit(); tick(); });
 }
 
+// admin: skapa en ny låt direkt här (dold för medlemmarna tills den görs synlig under Låtar)
+function fillSongSelect(selId) {
+  const sel = document.getElementById('songSelect');
+  sel.innerHTML = '<option value="">Välj låt…</option>' + (isAdmin ? '<option value="__new">➕ Skapa ny låt…</option>' : '')
+    + songs.map(s => `<option value="${s.id}">${esc(s.title)}${stemListFor(s).length ? '' : ' (inga spår än)'}${s.published === false ? ' · dold' : ''}</option>`).join('');
+  sel.value = selId != null ? String(selId) : '';
+}
+async function createSong(sel) {
+  const back = () => { sel.value = song ? String(song.id) : ''; };
+  if (unsaved() && !confirm('Du har osparade inspelningar. Byta låt ändå?')) { back(); return; }
+  const title = (prompt('Namn på den nya låten:') || '').trim();
+  if (!title) { back(); return; }
+  const { data, error } = await supabaseClient.from('songs').insert({ title, published: false }).select().single();
+  if (error || !data) { toast('Kunde inte skapa låten: ' + ((error && error.message) || 'okänt fel'), 6000); back(); return; }
+  songs.push(data); songs.sort((a, b) => String(a.title).localeCompare(String(b.title), 'sv'));
+  fillSongSelect(data.id);
+  await loadSong(data.id);
+  toast(`”${title}” skapad (dold för medlemmarna) – ladda in ljudfiler med 📂 eller dra dem hit`, 7000);
+}
+
 // ---------- händelser ----------
-document.getElementById('songSelect').addEventListener('change', e => {
+document.getElementById('songSelect').addEventListener('change', async e => {
+  if (e.target.value === '__new') { await createSong(e.target); return; }
   if (unsaved() && !confirm('Du har osparade inspelningar. Byta låt ändå?')) { e.target.value = song ? song.id : ''; return; }
   loadSong(e.target.value);
 });
@@ -1360,8 +1381,8 @@ window.addEventListener('beforeunload', e => { if (rec || unsaved()) { e.prevent
   songs = (data || []).filter(s => isAdmin || (s.published !== false && stemListFor(s).length));   // admin ser även låtar utan spår (kan ladda in filer)
   if (isAdmin) document.getElementById('importBtn').hidden = false;
   loadMyRecs();
-  if (!songs.length) { sel.innerHTML = '<option value="">Inga låtar med stämfiler än</option>'; return; }
-  sel.innerHTML = '<option value="">Välj låt…</option>' + songs.map(s => `<option value="${s.id}">${esc(s.title)}${stemListFor(s).length ? '' : ' (inga spår än)'}</option>`).join('');
+  if (!songs.length && !isAdmin) { sel.innerHTML = '<option value="">Inga låtar med stämfiler än</option>'; return; }
+  fillSongSelect();
   const pre = new URLSearchParams(location.search).get('song');
   if (pre && songs.some(s => String(s.id) === pre)) { sel.value = pre; loadSong(pre); }
 })();

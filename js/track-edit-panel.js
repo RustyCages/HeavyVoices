@@ -11,6 +11,9 @@
   const CSS = `
   .tep { margin-top: 1rem; padding: 0.8rem 0.9rem; border: 1px solid var(--border); border-radius: 0.6rem; background: rgba(0,0,0,0.2); display: grid; gap: 0.6rem; }
   .tep h3 { margin: 0; font-size: 1rem; }
+  .tep > * { min-width: 0; }   /* smal skärm: inget får tvinga panelen bredare än sidan */
+  .tool-row select, .tool-row input[type=text], .tool-row button { max-width: 100%; }
+  .tool-row select { text-overflow: ellipsis; }
   .tep h3 .tep-name { color: var(--accent); }
   .tool-row { display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; align-items: center; font-size: 0.85rem; }
   .tool-row .k { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); min-width: 5.5rem; }

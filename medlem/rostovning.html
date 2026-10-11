@@ -543,6 +543,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
       </div>
       <div class="edit-tools" id="editTools" hidden>
         <label class="edit-voice" title="Byt stämma att redigera – eller klicka på en färgad stämma i notbanan">Redigerar <select id="editVoice"></select></label>
+        <label class="edit-voice" title="Spela tonen när du väljer, flyttar eller skapar en not (med referenstonens ljud och volym)"><input type="checkbox" id="optPreview" checked style="width:auto;margin:0;"> 🔊 Hör tonen</label>
         <label class="edit-voice grid-sel" title="Rutnät i notfältet som noterna fäster mot när du drar dem. Håll Alt för att dra fritt.">Rutnät <select id="gridSnap"></select></label>
         <button type="button" class="btn-outline" data-op="undo" title="Ångra (Ctrl+Z)">↶ Ångra</button>
         <button type="button" class="btn-outline" data-op="merge" title="Slå ihop vald not med nästa (M)">⊕ Slå ihop</button>
@@ -1065,6 +1066,31 @@ function songRange() {
 }
 function yRange() { return songRange(); }
 // luft över/under: notrutan (marginalen) + lite till, så inget klipps
+// ---------- hör tonen vid redigering ----------
+let lastPreview = { m: null, at: 0 };
+function previewNote(n, force) {
+  const box = document.getElementById('optPreview');
+  if (!n || !box || !box.checked || playing) return;
+  const now = performance.now();
+  if (!force && lastPreview.m === n.n + '|' + (n.s || 0) && now - lastPreview.at < 600) return;
+  lastPreview = { m: n.n + '|' + (n.s || 0), at: now };
+  ensureCtx().then(() => {
+    const voice = document.getElementById('toneVoice').value, sung = voice !== 'pip' && window.VoiceTools;
+    const t = audioCtx.currentTime + 0.01, d = Math.min(0.55, Math.max(0.3, n.d || 0.4)), hzOf = m => 440 * Math.pow(2, (m - 69) / 12);
+    if (previewNote.g) { try { previewNote.g.gain.cancelScheduledValues(t); previewNote.g.gain.setTargetAtTime(0, t, 0.015); } catch (e) {} }   // tysta förra
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain(), lp = audioCtx.createBiquadFilter();
+    if (sung) osc.setPeriodicWave(VoiceTools.voiceWave(audioCtx, n.n, voice)); else osc.type = 'triangle';
+    osc.frequency.setValueAtTime(hzOf(n.n), t);
+    if (n.s) osc.frequency.exponentialRampToValueAtTime(hzOf(n.n + n.s), t + d);
+    lp.type = 'lowpass'; lp.frequency.value = sung ? 5000 : 2200;
+    const v = volGain('tone') * 1.4;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.02); g.gain.setValueAtTime(v, t + d - 0.06); g.gain.linearRampToValueAtTime(0, t + d);
+    osc.connect(lp); lp.connect(g); g.connect(audioCtx.destination);
+    osc.start(t); osc.stop(t + d + 0.02);
+    previewNote.g = g;
+  });
+}
+
 // ---------- rutnät att fästa noterna mot (redigering) ----------
 // värden: 'off' | 'b1' slag | 'b2' 1/8 | 'b4' 1/16 | 'b3' triol | 'bar' takt | 's0.1' / 's0.25' / 's0.5' sekunder (utan tempo)
 function fillGridSel() {
@@ -1883,7 +1909,7 @@ function editOp(op) {
     const pitch = analysisPitchAt(pos) ?? (ns.reduce((b, x) => Math.abs(x.t - pos) < Math.abs(b.t - pos) ? x : b, ns[0] || { n: 60, t: 0 }).n);
     const d = Math.max(0.1, Math.min(0.5, (nextN ? nextN.t : pos + 0.5) - pos));
     const gs = gridStep(), t0n = gs ? Math.max(0, snapGrid(pos, gs)) : pos;
-    snapshot(); const nn = { t: t0n, d: gs ? Math.max(gs.per, Math.round(d / gs.per) * gs.per) : d, n: pitch }; ns.push(nn); afterEdit(nn); return;
+    snapshot(); const nn = { t: t0n, d: gs ? Math.max(gs.per, Math.round(d / gs.per) * gs.per) : d, n: pitch }; ns.push(nn); afterEdit(nn); previewNote(nn, true); return;
   }
   if (op === 'selall') { multi = new Set(ns); sel = ns.length ? 0 : -1; tick(); editStatus(ns.length + ' noter markerade'); return; }
   if (op === 'copy') {
@@ -1939,7 +1965,7 @@ function editOp(op) {
       if (v) q.s = Math.max(-12, Math.min(12, v)); else delete q.s;
     });
     afterEdit(pick[0]); if (pick.length > 1) multi = new Set(pick);
-    const q = pick[0];
+    const q = pick[0]; previewNote(q, true);
     editStatus(op === 'shapeReset' ? 'Rak not, standardmarginal' : q.s ? `Sned not: ${nm(q.n)} → ${nm(q.n + q.s)}` : 'Rak not');
     return;
   }
@@ -3065,6 +3091,7 @@ document.getElementById('overview').addEventListener('click', e => {
         const al = h.zone === 'end' ? ns.filter(x => x !== n && Math.abs(x.t + x.d - (n.t + n.d)) <= 0.03).map(snap)
           : h.zone === 'start' ? ns.filter(x => x !== n && Math.abs(x.t - n.t) <= 0.03).map(snap) : [];
         drag = { n, zone: h.zone, x: e.clientX, y: e.clientY, o: { ...n }, moved: false, grp, nb, al }; window.__noteDrag = true;
+        previewNote(n, true);
         c.setPointerCapture(e.pointerId); tick(); return;
       }
       const gh = !e.shiftKey && hitGhost(cx, cy);
@@ -3131,6 +3158,7 @@ document.getElementById('overview').addEventListener('click', e => {
         const sh = t - o.t;
         if (drag.grp) drag.grp.forEach(({ m, o: go }) => { m.t = Math.max(0, go.t + sh); m.n = go.n + dn; });
         else { n.t = t; n.n = o.n + dn; }
+        if (drag.lastN !== n.n) { if (drag.lastN != null) previewNote(n, true); drag.lastN = n.n; }
       } else if (drag.zone === 'start') {
         let t = snapTo(o.t + dt);
         nb.forEach(b => { t = Math.max(t, b.o.t + 0.05); });
@@ -3147,7 +3175,7 @@ document.getElementById('overview').addEventListener('click', e => {
           drag.pen = [n];
           nb.forEach(b => { b.m.t = b.o.t; b.m.d = b.o.d; }); al.forEach(b => { b.m.t = b.o.t; b.m.d = b.o.d; });
         }
-        if (drag.pen) { penMove(drag.pen, pm, e.altKey ? pt : snapTo(pt)); tick(); return; }
+        if (drag.pen) { penMove(drag.pen, pm, e.altKey ? pt : snapTo(pt)); if (drag.lastPen !== pm) { drag.lastPen = pm; previewNote({ n: pm, d: 0.35 }, true); } tick(); return; }
         let e2 = snapTo(o.t + o.d + dt);
         nb.forEach(b => { e2 = Math.min(e2, b.o.t + b.o.d - 0.05); });
         e2 = Math.max(e2, o.t + 0.05);
@@ -3259,7 +3287,7 @@ document.getElementById('overview').addEventListener('click', e => {
     // dubbelklick i tom yta: ny not där – dra sedan i dess högra kant för att rita vidare
     const g = rollGeom, gs = gridStep(), tc = g.t0 + cx / g.pxs, tq = gs ? gs.off + Math.floor((tc - gs.off) / gs.per) * gs.per : Math.round(tc * 100) / 100;   // rutnät: rutan man klickade i
     const nn = { t: Math.max(0, tq), d: gs ? Math.max(gs.per, Math.round(0.3 / gs.per) * gs.per) : 0.3, n: Math.round(g.lo + (g.H - cy) / g.rowH) };
-    snapshot(); eNotes().push(nn); afterEdit(nn);
+    snapshot(); eNotes().push(nn); afterEdit(nn); previewNote(nn, true);
     editStatus('Ny not – dra i högra kanten för att förlänga eller rita vidare till andra toner');
   });
 })();
@@ -3791,6 +3819,11 @@ document.getElementById('copyGo')?.addEventListener('click', async () => {
   toast(`Noterna kopierade till ${ok} stämm${ok === 1 ? 'a' : 'or'}${sh ? ` (${sh > 0 ? '+' : ''}${sh} halvtoner)` : ''}`);
 });
 document.querySelectorAll('#editTools [data-op], #textTools [data-op]').forEach(b => b.addEventListener('click', () => editOp(b.dataset.op)));
+(() => {
+  const b = document.getElementById('optPreview');
+  try { if (localStorage.getItem('hv-preview') === '0') b.checked = false; } catch (e) {}
+  b.addEventListener('change', () => { try { localStorage.setItem('hv-preview', b.checked ? '1' : '0'); } catch (e) {} });
+})();
 document.getElementById('gridSnap').addEventListener('change', e => {
   try { localStorage.setItem('hv-grid-' + (songBpm() ? 'b' : 's'), e.target.value); } catch (x) {}
   if (current) tick();
@@ -3825,6 +3858,7 @@ document.addEventListener('keydown', e => {
     else { const s = k === 'arrowright' ? 0.05 : -0.05; if (e.shiftKey) x.d = Math.max(0.05, x.d + s); else x.t = Math.max(0, x.t + s); }
   });
   afterEdit(n);
+  if (k === 'arrowup' || k === 'arrowdown') previewNote(n, true);
 });
 document.addEventListener('keydown', e => {
   if (e.code === 'Space' && current && !e.target.matches('input:not([type=checkbox]):not([type=range]):not([type=radio]), select, textarea')) {

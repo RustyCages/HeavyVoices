@@ -103,6 +103,15 @@
     </form>
   </div>
 
+  <div class="card" id="upcomingCard" style="margin-top: 1.5rem; display: none;">
+    <h3>På gång</h3>
+    <p class="text-muted" style="font-size:0.85rem;">Visas under Information för medlemmarna. Länken är valfri (t.ex. /medlem/repertoar.html eller en https-adress).</p>
+    <div id="upcomingRows"></div>
+    <button type="button" class="btn-outline" id="upcomingAdd">+ Lägg till</button>
+    <button type="button" id="upcomingSave">Spara</button>
+    <p class="error" id="upcomingError"></p>
+  </div>
+
   <h2 class="section-heading" id="filer">Filer och Dokument</h2>
 
 
@@ -635,10 +644,44 @@ document.getElementById('infoEditForm').addEventListener('submit', async (e) => 
   await loadInfo();
 });
 
+// ---------- På gång ----------
+const inpStyle = 'width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.5rem 0.7rem; margin-bottom:0.4rem;';
+function upcomingRow(i = {}) {
+  const d = document.createElement('div');
+  d.className = 'upcoming-row';
+  d.style.cssText = 'border:1px solid var(--border); border-radius:8px; padding:0.7rem; margin-bottom:0.7rem;';
+  d.innerHTML = `<input class="u-title" placeholder="Rubrik" style="${inpStyle}"><input class="u-text" placeholder="Beskrivning" style="${inpStyle}"><input class="u-url" placeholder="Länk (valfri)" style="${inpStyle}"><button type="button" class="btn-outline u-del">Ta bort</button>`;
+  d.querySelector('.u-title').value = i.title || '';
+  d.querySelector('.u-text').value = i.text || '';
+  d.querySelector('.u-url').value = i.url || '';
+  d.querySelector('.u-del').onclick = () => d.remove();
+  document.getElementById('upcomingRows').appendChild(d);
+}
+async function loadUpcomingEdit() {
+  const { data, error } = await supabaseClient.from('choir_info').select('upcoming').eq('id', 1).single();
+  const err = document.getElementById('upcomingError');
+  if (error) { err.textContent = 'Kolumnen saknas – kör migrationen 2026-10-12_info_upcoming.sql i Supabase. (' + error.message + ')'; return; }
+  document.getElementById('upcomingRows').innerHTML = '';
+  (Array.isArray(data.upcoming) ? data.upcoming : []).forEach(upcomingRow);
+}
+document.getElementById('upcomingAdd').onclick = () => upcomingRow();
+document.getElementById('upcomingSave').onclick = async () => {
+  const err = document.getElementById('upcomingError'); err.textContent = '';
+  const items = [...document.querySelectorAll('.upcoming-row')].map(r => ({
+    title: r.querySelector('.u-title').value.trim(), text: r.querySelector('.u-text').value.trim(), url: r.querySelector('.u-url').value.trim()
+  })).filter(i => i.title);
+  const { error } = await supabaseClient.from('choir_info').update({ upcoming: items }).eq('id', 1);
+  if (error) { err.textContent = error.message; return; }
+  toast('Sparat');
+  loadUpcomingEdit();
+};
+
 (async () => {
   const member = await requireAuth('stamledare');
   if (!member) return;
   document.getElementById('infoEditCard').style.display = 'block';
+  document.getElementById('upcomingCard').style.display = 'block';
+  loadUpcomingEdit();
   loadCurrent();          // filer och dokument
   await loadInfo();
   if (location.hash === '#filer') document.getElementById('filer').scrollIntoView();

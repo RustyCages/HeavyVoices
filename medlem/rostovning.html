@@ -543,6 +543,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
       </div>
       <div class="edit-tools" id="editTools" hidden>
         <label class="edit-voice" title="Byt stämma att redigera – eller klicka på en färgad stämma i notbanan">Redigerar <select id="editVoice"></select></label>
+        <label class="edit-voice grid-sel" title="Rutnät i notfältet som noterna fäster mot när du drar dem. Håll Alt för att dra fritt.">Rutnät <select id="gridSnap"></select></label>
         <button type="button" class="btn-outline" data-op="undo" title="Ångra (Ctrl+Z)">↶ Ångra</button>
         <button type="button" class="btn-outline" data-op="merge" title="Slå ihop vald not med nästa (M)">⊕ Slå ihop</button>
         <button type="button" class="btn-outline" data-op="split" title="Dela noten vid strecket/spelhuvudet (S) – texten delas på samma ställe">✂ Dela</button>
@@ -1064,6 +1065,29 @@ function songRange() {
 }
 function yRange() { return songRange(); }
 // luft över/under: notrutan (marginalen) + lite till, så inget klipps
+// ---------- rutnät att fästa noterna mot (redigering) ----------
+// värden: 'off' | 'b1' slag | 'b2' 1/8 | 'b4' 1/16 | 'b3' triol | 'bar' takt | 's0.1' / 's0.25' / 's0.5' sekunder (utan tempo)
+function fillGridSel() {
+  const sel = document.getElementById('gridSnap'); if (!sel) return;
+  const bpm = songBpm();
+  const opts = bpm ? [['off', 'Av'], ['bar', 'Takt'], ['b1', 'Slag (1/4)'], ['b2', '1/8'], ['b3', 'Triol'], ['b4', '1/16']]
+    : [['off', 'Av'], ['s0.5', '0,5 s'], ['s0.25', '0,25 s'], ['s0.1', '0,1 s']];
+  let saved = null; try { saved = localStorage.getItem('hv-grid-' + (bpm ? 'b' : 's')); } catch (e) {}
+  sel.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+  sel.value = opts.some(o => o[0] === saved) ? saved : (bpm ? 'b2' : 's0.25');
+}
+// { per, off } i den valda stämmans tid, eller null om rutnätet är av
+function gridStep() {
+  const sel = document.getElementById('gridSnap'); const v = sel ? sel.value : 'off';
+  if (!v || v === 'off') return null;
+  if (v[0] === 's') return { per: Number(v.slice(1)), off: 0, beat: 0 };
+  const bpm = songBpm(); if (!bpm) return null;
+  const beat = 60 / bpm, bpb = Math.max(1, Number(song.beats_per_bar) || 4);
+  const per = v === 'bar' ? beat * bpb : beat / Number(v.slice(1));
+  return { per, off: (Number(song.beat_offset) || 0) - stemOffSec(), beat, bar: beat * bpb };
+}
+const snapGrid = (v, g) => g.off + Math.round((v - g.off) / g.per) * g.per;
+
 // per not: x = extra marginal i cent (+/−, läggs på svårighetsgraden), s = sned not (glider s halvtoner från start till slut)
 const nExtra = n => ({ ...(n.s ? { s: n.s } : {}), ...(n.x ? { x: n.x } : {}) });
 const globalTol = () => Number(document.getElementById('optTol').value) || 50;
@@ -1327,6 +1351,20 @@ function drawRoll() {
     for (let s = Math.ceil(t0 * 2) / 2; s < t0 + span; s += 0.5) {
       ctx.fillStyle = Number.isInteger(s) ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)';
       ctx.fillRect(Math.round(x(s)), 0, 1, H);
+    }
+  }
+  // redigering: rutnätet som noterna fäster mot (tunna linjer; slag/takt syns redan ovan)
+  if (editMode && !textMode) {
+    const gs = gridStep();
+    if (gs && gs.per * pxs >= 5 * dpr) {
+      ctx.fillStyle = 'rgba(120,180,255,0.16)';
+      for (let k = Math.ceil((t0 - gs.off) / gs.per); ; k++) {
+        const gt = gs.off + k * gs.per; if (gt > t0 + span) break;
+        ctx.fillRect(Math.round(x(gt)), 0, 1, H);
+      }
+      // halvtonsrader som tunna linjer, så rutorna syns
+      ctx.fillStyle = 'rgba(120,180,255,0.10)';
+      for (let m = Math.ceil(lo - 0.5); m < hi; m++) ctx.fillRect(0, Math.round(y(m + 0.5)), W, 1);
     }
   }
 
@@ -1767,6 +1805,7 @@ function setEditMode(on, text = false) {
   if (!on && dirty) { current.pitch = current.pitchBase; applyMerge(current); dirty = false; }
   closeWordEditor();
   editMode = on; textMode = on && !!text; sel = -1; multi = new Set(); rangeBand = null;
+  if (on) fillGridSel();   // tempot kan ha ändrats sedan sist
   if (on) {
     // arbeta på en kopia av det som visas just nu
     current.pitch = { ...current.pitch, notes: current.pitch.notes.map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}), ...nExtra(n) })), lyr: current.pitch.lyr ? current.pitch.lyr.map(b => ({ ...b })) : null };
@@ -1843,7 +1882,8 @@ function editOp(op) {
     const nextN = ns.find(x => x.t > pos);
     const pitch = analysisPitchAt(pos) ?? (ns.reduce((b, x) => Math.abs(x.t - pos) < Math.abs(b.t - pos) ? x : b, ns[0] || { n: 60, t: 0 }).n);
     const d = Math.max(0.1, Math.min(0.5, (nextN ? nextN.t : pos + 0.5) - pos));
-    snapshot(); const nn = { t: pos, d, n: pitch }; ns.push(nn); afterEdit(nn); return;
+    const gs = gridStep(), t0n = gs ? Math.max(0, snapGrid(pos, gs)) : pos;
+    snapshot(); const nn = { t: t0n, d: gs ? Math.max(gs.per, Math.round(d / gs.per) * gs.per) : d, n: pitch }; ns.push(nn); afterEdit(nn); return;
   }
   if (op === 'selall') { multi = new Set(ns); sel = ns.length ? 0 : -1; tick(); editStatus(ns.length + ' noter markerade'); return; }
   if (op === 'copy') {
@@ -3077,11 +3117,16 @@ document.getElementById('overview').addEventListener('click', e => {
       // snappning: kanterna drar sig mot andra notblocks kanter (håll Alt för att stänga av)
       const tol = Math.max(0.02, 10 * d / g.pxs);
       const pts = e.altKey ? [] : eNotes().filter(x => x !== n && !nb.some(b => b.m === x) && !al.some(b => b.m === x) && !(drag.grp && multi.has(x))).flatMap(x => [x.t, x.t + x.d]);
-      const snapTo = v => { let best = v, bd = tol + 1; pts.forEach(q => { const dd = Math.abs(q - v); if (dd <= tol && dd < bd) { best = q; bd = dd; } }); return best; };
+      const gsn = !e.altKey && gridStep();
+      const snapTo = gsn ? (v => snapGrid(v, gsn))   // rutnätet på: kanterna fäster mot rutorna
+        : (v => { let best = v, bd = tol + 1; pts.forEach(q => { const dd = Math.abs(q - v); if (dd <= tol && dd < bd) { best = q; bd = dd; } }); return best; });
       if (drag.zone === 'move') {
         let t = o.t + dt;
-        const a = snapTo(t), b = snapTo(t + o.d);
-        if (a !== t && (b === t + o.d || Math.abs(a - t) <= Math.abs(b - (t + o.d)))) t = a; else if (b !== t + o.d) t = b - o.d;
+        if (gsn) t = snapTo(t);   // rutnät: starten fäster, längden behålls
+        else {
+          const a = snapTo(t), b = snapTo(t + o.d);
+          if (a !== t && (b === t + o.d || Math.abs(a - t) <= Math.abs(b - (t + o.d)))) t = a; else if (b !== t + o.d) t = b - o.d;
+        }
         t = Math.max(0, t);
         const sh = t - o.t;
         if (drag.grp) drag.grp.forEach(({ m, o: go }) => { m.t = Math.max(0, go.t + sh); m.n = go.n + dn; });
@@ -3212,7 +3257,8 @@ document.getElementById('overview').addEventListener('click', e => {
     }
     if (h || hitGhost(cx, cy) || !rollGeom) return;
     // dubbelklick i tom yta: ny not där – dra sedan i dess högra kant för att rita vidare
-    const g = rollGeom, nn = { t: Math.max(0, Math.round((g.t0 + cx / g.pxs) * 100) / 100), d: 0.3, n: Math.round(g.lo + (g.H - cy) / g.rowH) };
+    const g = rollGeom, gs = gridStep(), tc = g.t0 + cx / g.pxs, tq = gs ? gs.off + Math.floor((tc - gs.off) / gs.per) * gs.per : Math.round(tc * 100) / 100;   // rutnät: rutan man klickade i
+    const nn = { t: Math.max(0, tq), d: gs ? Math.max(gs.per, Math.round(0.3 / gs.per) * gs.per) : 0.3, n: Math.round(g.lo + (g.H - cy) / g.rowH) };
     snapshot(); eNotes().push(nn); afterEdit(nn);
     editStatus('Ny not – dra i högra kanten för att förlänga eller rita vidare till andra toner');
   });
@@ -3745,6 +3791,10 @@ document.getElementById('copyGo')?.addEventListener('click', async () => {
   toast(`Noterna kopierade till ${ok} stämm${ok === 1 ? 'a' : 'or'}${sh ? ` (${sh > 0 ? '+' : ''}${sh} halvtoner)` : ''}`);
 });
 document.querySelectorAll('#editTools [data-op], #textTools [data-op]').forEach(b => b.addEventListener('click', () => editOp(b.dataset.op)));
+document.getElementById('gridSnap').addEventListener('change', e => {
+  try { localStorage.setItem('hv-grid-' + (songBpm() ? 'b' : 's'), e.target.value); } catch (x) {}
+  if (current) tick();
+});
 window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 document.addEventListener('keydown', e => {
   if (!editMode || !current || e.target.matches('input, select, textarea')) return;

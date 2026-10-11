@@ -243,7 +243,7 @@ document.getElementById('logoutBtn').addEventListener('click', signOut);
 // ---------- Party Mode: ingen menyknapp – 10 tryck på rollskylten (admin alltid, medlemmar när admin öppnat) ----------
 let partyAllowed = false;
 async function showParty(member) {
-  if (member.role === 'admin') { partyAllowed = true; return; }
+  if (isSongEditor(member)) { partyAllowed = true; return; }
   const { data } = await supabaseClient.from('party_settings').select('members_enabled').eq('id', 1).maybeSingle();
   partyAllowed = !!(data && data.members_enabled);
 }

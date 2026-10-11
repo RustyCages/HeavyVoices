@@ -6,7 +6,7 @@
 async function requirePartyAccess() {
   const member = await requireAuth();
   if (!member) return null;
-  const isAdmin = member.role === 'admin';
+  const isAdmin = isSongEditor(member); // admin + stämledare
   let enabled = false, tableOk = true;
   const { data, error } = await supabaseClient.from('party_settings').select('members_enabled').eq('id', 1).maybeSingle();
   if (error) tableOk = false; else enabled = !!(data && data.members_enabled);

@@ -3975,7 +3975,7 @@ document.getElementById('partyResult').addEventListener('click', e => { if (e.ta
   if (error) { sel.innerHTML = `<option>Fel: ${esc(error.message)}</option>`; return; }
   (data || []).forEach(s => { songTitles[s.id] = s.title; });
   loadSessions();
-  songs = (data || []).filter(s => (s.published !== false || isAdmin || (PARTY && member.role === 'admin')) && stemListFor(s).some(st => st.key !== 'stem_backtrack_path'));
+  songs = (data || []).filter(s => (s.published !== false || isAdmin || (PARTY && isSongEditor(member))) && stemListFor(s).some(st => st.key !== 'stem_backtrack_path'));
   if (!isAdmin) {
     // medlemmar ser bara låtar där minst en stämma har tonkurva
     const { data: pr } = await supabaseClient.from('song_pitch').select('song_id');

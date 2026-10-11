@@ -33,9 +33,9 @@ Deno.serve(async (req) => {
   if (!token) return json({ error: "Inte inloggad" }, 401);
   const { data: u, error: uErr } = await admin.auth.getUser(token);
   if (uErr || !u?.user) return json({ error: "Ogiltig inloggning" }, 401);
-  const { data: me } = await admin.from("members").select("role, status").eq("id", u.user.id).single();
+  const { data: me } = await admin.from("members").select("role, status, stamledare").eq("id", u.user.id).single();
   if (!me || me.status !== "approved") return json({ error: "Inte godkänd medlem" }, 403);
-  if (me.role !== "admin") {
+  if (me.role !== "admin" && !me.stamledare) {
     const { data: s } = await admin.from("party_settings").select("members_enabled").eq("id", 1).maybeSingle();
     if (!s?.members_enabled) return json({ error: "Party Mode är inte öppnat för medlemmar" }, 403);
   }

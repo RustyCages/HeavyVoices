@@ -131,10 +131,20 @@
 <script src="/js/auth.js"></script>
 <script>
 (async () => {
-  const member = await requireAuth('admin');
+  const member = await requireAuth('stamledare');
   if (member) {
     document.getElementById('welcome').textContent = `Inloggad som ${member.name}`;
-    document.getElementById('roleBadge').textContent = member.role;
+    const full = member.role === 'admin';
+    document.getElementById('roleBadge').textContent = full ? member.role : 'stämledare';
+    if (!full) {
+      // Stämledare: bara låtverktygen. Resten tas bort (och skyddas dessutom i databasen / på sidorna).
+      document.querySelector('h1').textContent = 'Stämledare';
+      const ok = ['/admin/latar.html', '/medlem/rostovning.html', '/medlem/repertoar.html', '/medlem/studio.html'];
+      document.querySelectorAll('.nav-list > li').forEach(li => {
+        const href = (li.querySelector('a') || {}).getAttribute && li.querySelector('a').getAttribute('href').split('?')[0];
+        if (!ok.includes(href)) li.remove();
+      });
+    }
   }
 })();
  

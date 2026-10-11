@@ -905,7 +905,7 @@ document.getElementById('addSongForm').addEventListener('submit', async (e) => {
 });
 
 (async () => {
-  const member = await requireAuth('admin');
+  const member = await requireAuth('stamledare');
   if (member) loadSongs();
 })();
 </script>

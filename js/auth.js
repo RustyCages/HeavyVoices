@@ -21,13 +21,16 @@ async function getCurrentMember() {
 
   const { data, error } = await supabaseClient
     .from('members')
-    .select('id, name, role, status')
+    .select('id, name, role, status, stamledare')
     .eq('id', user.id)
     .single();
 
   if (error) return null;
   return data;
 }
+
+// Admin eller stämledare = får redigera låtar/stämspår (Repertoar, Studio, Röstövning)
+function isSongEditor(m) { return !!m && (m.role === 'admin' || m.stamledare === true); }
 
 // Anropa i toppen av admin/medlem-sidor. requiredRole: 'admin' | 'medlem' | null (valfri roll)
 async function requireAuth(requiredRole = null) {
@@ -44,6 +47,11 @@ async function requireAuth(requiredRole = null) {
   }
 
   if (requiredRole === 'admin' && member.role !== 'admin') {
+    window.location.href = '/medlem/';
+    return null;
+  }
+
+  if (requiredRole === 'stamledare' && !isSongEditor(member)) {
     window.location.href = '/medlem/';
     return null;
   }

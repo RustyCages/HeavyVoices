@@ -194,10 +194,17 @@
   const member = await requireAuth();
   if (member) {
     document.getElementById('welcome').textContent = `Välkommen ${member.name}`;
-    document.getElementById('roleBadge').textContent = member.role;
+    document.getElementById('roleBadge').textContent = (member.role !== 'admin' && member.stamledare) ? 'stämledare' : member.role;
     loadCheckin(member);
     showParty(member);
     if (member.role !== 'admin') setTimeout(showUpdateNotice, document.documentElement.classList.contains('intro') ? 2600 : 0);
+    if (member.role !== 'admin' && member.stamledare) {
+      const a = document.createElement('a');
+      a.href = '/admin/';
+      a.className = 'back-btn';
+      a.innerHTML = '🎼 Stämledarverktyg &rarr;';
+      document.querySelector('.container').prepend(a);
+    }
     if (member.role === 'admin') {
       const a = document.createElement('a');
       a.href = '/admin/';

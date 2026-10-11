@@ -165,7 +165,7 @@ function fmtDate(iso) {
 async function loadMembers() {
   const { data, error } = await supabaseClient
     .from('members')
-    .select('id, name, email, role, stamma, status, fee_paid, fee_paid_at')
+    .select('id, name, email, role, stamledare, stamma, status, fee_paid, fee_paid_at')
     .order('status')
     .order('name');
 
@@ -250,7 +250,8 @@ function renderMembers() {
       </td>
       <td>
         <select data-id="${m.id}" class="roleSelect" ${self ? 'disabled title="Du kan inte ändra din egen roll"' : ''}>
-          <option value="medlem" ${m.role === 'medlem' ? 'selected' : ''}>Medlem</option>
+          <option value="medlem" ${m.role === 'medlem' && !m.stamledare ? 'selected' : ''}>Medlem</option>
+          <option value="stamledare" ${m.role === 'medlem' && m.stamledare ? 'selected' : ''}>Stämledare</option>
           <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
         </select>
       </td>
@@ -303,8 +304,12 @@ function renderMembers() {
   tbody.querySelectorAll('.roleSelect').forEach(sel => {
     sel.addEventListener('change', async (e) => {
       const id = e.target.dataset.id;
-      const newRole = e.target.value;
-      const { error } = await supabaseClient.from('members').update({ role: newRole }).eq('id', id);
+      const v = e.target.value;
+      // "Stämledare" = vanlig medlem med flaggan stamledare (får redigera låtar, inget annat)
+      const patch = v === 'stamledare' ? { role: 'medlem', stamledare: true }
+                  : v === 'admin' ? { role: 'admin', stamledare: false }
+                  : { role: 'medlem', stamledare: false };
+      const { error } = await supabaseClient.from('members').update(patch).eq('id', id);
       if (error) {
         alert('Kunde inte ändra roll: ' + error.message);
         loadMembers();
@@ -405,7 +410,7 @@ document.getElementById('exportCsvBtn').addEventListener('click', () => {
   const header = ['Namn', 'E-post', 'Stämma', 'Status', 'Roll', 'Avgift betald', 'Betald datum'];
   const lines = rows.map(m => [
     m.name, m.email, m.stamma, STATUS_LABELS[m.status] || m.status,
-    m.role === 'admin' ? 'Admin' : 'Medlem',
+    m.role === 'admin' ? 'Admin' : (m.stamledare ? 'Stämledare' : 'Medlem'),
     m.fee_paid ? 'Ja' : 'Nej', m.fee_paid ? fmtDate(m.fee_paid_at) : ''
   ].map(csvCell).join(';'));
   const csv = '\uFEFF' + [header.join(';'), ...lines].join('\r\n');

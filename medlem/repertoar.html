@@ -594,7 +594,7 @@ async function loadPlaylistTracks(pl, containerEl) {
   const { data: songs, error: songsErr } = await supabaseClient.from('songs').select('*').in('id', songIds);
   if (songsErr) { containerEl.textContent = 'Fel: ' + songsErr.message; return; }
   const songsById = {};
-  const isAdmin = currentMember && currentMember.role === 'admin';
+  const isAdmin = isSongEditor(currentMember);
   songs.forEach(s => { if (s.published !== false || isAdmin) songsById[s.id] = s; });
 
   // Låtar som admin har dolt hoppas över i spellistan
@@ -746,7 +746,7 @@ async function loadRepertoar() {
   const { data, error } = await supabaseClient.from('songs').select('*').order('title', { ascending: true });
   if (error) { document.getElementById('repertoarList').textContent = 'Fel: ' + error.message; return; }
   // Dolda låtar (published = false) syns bara för admin, och märks "Dold"
-  const isAdmin = currentMember && currentMember.role === 'admin';
+  const isAdmin = isSongEditor(currentMember);
   repertoarCache = (data || []).filter(s => s.published !== false || isAdmin);
   renderRepertoar();
   renderTexter();
@@ -1721,7 +1721,7 @@ function splitParts(song) {
 function splitHidden() {
   try { const v = JSON.parse(localStorage.getItem('hv-split-hidden') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
 }
-function splitAvailable(song) { return !!(currentMember && currentMember.role === 'admin') && splitParts(song).length >= 2; }
+function splitAvailable(song) { return !!(isSongEditor(currentMember)) && splitParts(song).length >= 2; }
 function buildSplit(song) {
   const wrap = document.getElementById('karaokeSplit');
   const mine = voiceFromStamma(currentMember && currentMember.stamma);

@@ -146,7 +146,7 @@ let isAdminViewer = false;   // dolda låtar (published = false) visas bara för
   const member = await requireAuth();
   if (member) {
     currentMemberId = member.id;
-    isAdminViewer = member.role === 'admin';
+    isAdminViewer = isSongEditor(member);
     loadSong();
   }
 })();

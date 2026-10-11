@@ -1609,7 +1609,7 @@ function refreshSongInList() {
 
 // ---------- Start ----------
 (async () => {
-  const member = await requireAuth('admin');
+  const member = await requireAuth('stamledare');
   if (!member) return;
 
   try { const o = localStorage.getItem('hv-sync-offset'); if (o) $('offsetInput').value = o; } catch (_) {}

@@ -3946,7 +3946,7 @@ document.getElementById('partyResult').addEventListener('click', e => { if (e.ta
   } else {
     member = await requireAuth();
     if (!member) return;
-    isAdmin = member.role === 'admin';
+    isAdmin = isSongEditor(member);
   }
   meId = member.id;
   // "Sjung till": senaste valet sparas; första gången är Backtrack påslaget för medlemmar

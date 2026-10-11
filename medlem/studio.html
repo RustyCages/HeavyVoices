@@ -1346,8 +1346,14 @@ document.getElementById('calibGo').addEventListener('click', async () => { await
 document.getElementById('latency').addEventListener('change', e => { try { localStorage.setItem('hv-rec-latency', String(Math.round(Number(e.target.value) || 0))); } catch (x) {} });
 document.getElementById('optClick').addEventListener('change', restartIfPlaying);
 document.addEventListener('keydown', e => {
+  // mellanslag = spela/pausa överallt utom när man skriver text (även när en knapp, ett reglage eller en lista har fokus)
+  if (e.code === 'Space' && !e.target.matches("input:not([type=checkbox]):not([type=range]):not([type=radio]):not([type=button]):not([type=submit]):not([type=color]):not([type=file]), textarea, [contenteditable=''], [contenteditable=true]")) {
+    e.preventDefault();
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();   // knappen ska inte också "klickas"
+    if (!e.repeat) document.getElementById('playBtn').click();
+    return;
+  }
   if (e.target.matches('input, select, textarea')) return;
-  if (e.code === 'Space' && !e.target.matches('button')) { e.preventDefault(); document.getElementById('playBtn').click(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(active); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && sel) { e.preventDefault(); panel.copy(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') { e.preventDefault(); panel.paste(); return; }

@@ -3864,7 +3864,8 @@ document.addEventListener('keydown', e => {
   if (k === 'arrowup' || k === 'arrowdown') previewNote(n, true);
 });
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && current && !e.target.matches('input:not([type=checkbox]):not([type=range]):not([type=radio]), select, textarea')) {
+  // mellanslag = spela/pausa överallt utom när man skriver text (även när en knapp, ruta eller lista har fokus)
+  if (e.code === 'Space' && current && !e.target.matches("input:not([type=checkbox]):not([type=range]):not([type=radio]):not([type=button]):not([type=submit]):not([type=color]):not([type=file]), textarea, [contenteditable=''], [contenteditable=true]")) {
     e.preventDefault();
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); // knappen får inte också "klickas"
     if (e.repeat) return;

@@ -1096,14 +1096,21 @@ function previewNote(n, force) {
 function fillGridSel() {
   const sel = document.getElementById('gridSnap'); if (!sel) return;
   const bpm = songBpm();
-  const opts = bpm ? [['off', 'Av'], ['bar', 'Takt'], ['b0.5', 'Halvnot'], ['b1', 'Slag (1/4)'], ['b2', '1/8'], ['b3', 'Triol'], ['b4', '1/16'], ['b6', 'Triol 1/16'], ['b8', '1/32']]
-    : [['off', 'Av'], ['s0.5', '0,5 s'], ['s0.25', '0,25 s'], ['s0.125', '0,125 s'], ['s0.1', '0,1 s'], ['s0.05', '0,05 s']];
-  // v2: rutorna halverade mot förut – ett sparat val från v1 flyttas ett steg finare
-  const HALF = { bar: 'b0.5', b1: 'b2', b2: 'b4', b3: 'b6', b4: 'b8', 's0.5': 's0.25', 's0.25': 's0.125', 's0.1': 's0.05' };
-  const k = 'hv-grid2-' + (bpm ? 'b' : 's');
-  let saved = null; try { saved = localStorage.getItem(k); if (saved == null) { const old = localStorage.getItem('hv-grid-' + (bpm ? 'b' : 's')); if (old) saved = HALF[old] || old; } } catch (e) {}
+  const opts = bpm ? [['off', 'Av'], ['bar', 'Takt'], ['b0.5', 'Halvnot'], ['b1', 'Slag (1/4)'], ['b2', '1/8'], ['b3', 'Triol'], ['b4', '1/16'], ['b6', 'Triol 1/16'], ['b8', '1/32'], ['b12', 'Triol 1/32'], ['b16', '1/64']]
+    : [['off', 'Av'], ['s0.5', '0,5 s'], ['s0.25', '0,25 s'], ['s0.125', '0,125 s'], ['s0.1', '0,1 s'], ['s0.0625', '0,0625 s'], ['s0.05', '0,05 s'], ['s0.025', '0,025 s']];
+  // v3: rutorna halverade två gånger mot från början – ett sparat val från en äldre version flyttas ett steg finare per version
+  const HALF = { bar: 'b0.5', 'b0.5': 'b1', b1: 'b2', b2: 'b4', b3: 'b6', b4: 'b8', b6: 'b12', b8: 'b16', 's0.5': 's0.25', 's0.25': 's0.125', 's0.125': 's0.0625', 's0.1': 's0.05', 's0.05': 's0.025' };
+  const sfx = bpm ? 'b' : 's';
+  let saved = null;
+  try {
+    saved = localStorage.getItem('hv-grid3-' + sfx);
+    if (saved == null) {
+      const v2 = localStorage.getItem('hv-grid2-' + sfx), v1 = localStorage.getItem('hv-grid-' + sfx);
+      if (v2) saved = HALF[v2] || v2; else if (v1) saved = HALF[HALF[v1] || v1] || v1;
+    }
+  } catch (e) {}
   sel.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
-  sel.value = opts.some(o => o[0] === saved) ? saved : (bpm ? 'b4' : 's0.125');
+  sel.value = opts.some(o => o[0] === saved) ? saved : (bpm ? 'b8' : 's0.0625');
 }
 // { per, off } i den valda stämmans tid, eller null om rutnätet är av
 function gridStep() {
@@ -1815,8 +1822,8 @@ function snapshot() { undoStack.push(JSON.stringify({ n: eNotes(), l: current.pi
 function afterEdit(selObj) {
   const ns = eNotes();
   ns.forEach(n => {
-    const tr = Math.max(0, Math.round(n.t * 100) / 100), er = Math.round((n.t + n.d) * 100) / 100;
-    n.t = tr; n.d = Math.max(0.05, Math.round((er - tr) * 100) / 100); n.n = Math.round(n.n);
+    const tr = Math.max(0, Math.round(n.t * 1000) / 1000), er = Math.round((n.t + n.d) * 1000) / 1000;   // ms – så att fina rutnät hamnar exakt
+    n.t = tr; n.d = Math.max(0.02, Math.round((er - tr) * 1000) / 1000); n.n = Math.round(n.n);
   });
   ns.sort((a, b) => a.t - b.t);
   sel = selObj ? ns.indexOf(selObj) : -1;
@@ -3828,7 +3835,7 @@ document.querySelectorAll('#editTools [data-op], #textTools [data-op]').forEach(
   b.addEventListener('change', () => { try { localStorage.setItem('hv-preview', b.checked ? '1' : '0'); } catch (e) {} });
 })();
 document.getElementById('gridSnap').addEventListener('change', e => {
-  try { localStorage.setItem('hv-grid2-' + (songBpm() ? 'b' : 's'), e.target.value); } catch (x) {}
+  try { localStorage.setItem('hv-grid3-' + (songBpm() ? 'b' : 's'), e.target.value); } catch (x) {}
   if (current) tick();
 });
 window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });

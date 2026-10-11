@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brevmallar — Heavy Voices Admin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .tpl-layout { display:grid; grid-template-columns: 260px 1fr; gap:1.25rem; align-items:start; }
+  @media (max-width: 800px) { .tpl-layout { grid-template-columns: 1fr; } }
+  .tpl-list { display:flex; flex-direction:column; gap:0.4rem; }
+  .tpl-item { text-align:left; background:transparent; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:0.6rem 0.8rem; cursor:pointer; font:inherit; }
+  .tpl-item.active { border-color:var(--accent); color:var(--accent); }
+  .tpl-form label { display:block; font-size:0.85rem; color:var(--text-muted); margin:0.8rem 0 0.25rem; }
+  .tpl-form input, .tpl-form textarea, .tpl-form select { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.55rem 0.8rem; font:inherit; }
+  .tpl-form textarea { min-height:260px; line-height:1.5; }
+  .chips { display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.4rem; }
+  .chips button { padding:0.2rem 0.6rem; font-size:0.8rem; }
+  .actions { display:flex; flex-wrap:wrap; gap:0.6rem; margin-top:1rem; }
+  .preview { white-space:pre-wrap; line-height:1.6; border:1px dashed var(--border); border-radius:8px; padding:0.8rem 1rem; margin-top:0.6rem; }
+  .danger { background:#ef4444; color:#fff; }
+</style>
+</head>
+<body>
+<header class="site-header site-header--small"><a href="/admin/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+<div class="container">
+  <a href="/admin/" class="back-btn">&larr; Tillbaka</a>
+  <h1>Brevmallar</h1>
+  <p class="text-muted">Skapa och redigera mallar för mejl och brev till medlemmarna. Platshållare byts ut när du förhandsgranskar eller öppnar mallen i din e-post.</p>
+
+  <div class="tpl-layout">
+    <div class="card">
+      <button type="button" id="newBtn" class="btn-gold" style="width:100%; margin-bottom:0.8rem;">+ Ny mall</button>
+      <div class="tpl-list" id="tplList"><p class="text-muted">Laddar...</p></div>
+    </div>
+
+    <div class="card tpl-form" id="editor" hidden>
+      <label for="tName">Mallens namn</label>
+      <input id="tName" maxlength="80" placeholder="T.ex. Välkommen till kören">
+      <label for="tSubject">Ämne</label>
+      <input id="tSubject" maxlength="200" placeholder="Ämnesrad">
+      <label for="tBody">Text</label>
+      <textarea id="tBody" placeholder="Hej {fornamn}!&#10;&#10;..."></textarea>
+      <div class="chips" id="chips"></div>
+      <p class="text-muted" style="font-size:0.8rem; margin-top:0.4rem;">Klicka på en platshållare för att lägga in den där markören står.</p>
+
+      <div class="actions">
+        <button type="button" id="saveBtn">Spara</button>
+        <button type="button" id="dupBtn" class="btn-outline">Duplicera</button>
+        <button type="button" id="delBtn" class="btn-outline danger">Ta bort</button>
+      </div>
+      <p class="error" id="err"></p>
+
+      <h3 style="margin-top:1.8rem;">Förhandsgranska &amp; använd</h3>
+      <label for="memberSel">Medlem</label>
+      <select id="memberSel"></select>
+      <div class="preview" id="preview"></div>
+      <div class="actions">
+        <button type="button" id="copyBtn" class="btn-outline">Kopiera text</button>
+        <a id="mailBtn" class="btn-outline" style="display:inline-block; text-decoration:none; padding:0.6rem 1rem; border-radius:6px;" href="#">Öppna i e-post</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" style="position:fixed; bottom:1.5rem; right:1.5rem; background:var(--accent); color:#111317; padding:0.7rem 1.2rem; border-radius:0.6rem; font-weight:600; box-shadow:var(--card-shadow); z-index:999; display:none;"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const FIELDS = [['{fornamn}','Förnamn'],['{namn}','Fullständigt namn'],['{epost}','E-post'],['{stamma}','Stämma'],['{datum}','Dagens datum']];
+let templates = [], members = [], current = null, me = null;
+
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2200); }
+
+function fill(text) {
+  const m = members.find(x => x.id === $('memberSel').value) || { name: 'Anna Andersson', email: 'anna@exempel.se', stamma: 'Alt' };
+  const full = m.name || '';
+  const map = { fornamn: full.split(' ')[0] || '', namn: full, epost: m.email || '', stamma: m.stamma || '', datum: new Date().toLocaleDateString('sv-SE', { day:'numeric', month:'long', year:'numeric' }) };
+  return String(text || '').replace(/\{(\w+)\}/g, (a, k) => k in map ? map[k] : a);
+}
+
+function renderList() {
+  const el = $('tplList');
+  if (!templates.length) { el.innerHTML = '<p class="text-muted">Inga mallar än.</p>'; return; }
+  el.innerHTML = templates.map(t => `<button type="button" class="tpl-item${current && current.id === t.id ? ' active' : ''}" data-id="${t.id}">${esc(t.name)}</button>`).join('');
+  el.querySelectorAll('.tpl-item').forEach(b => b.onclick = () => select(templates.find(t => t.id === b.dataset.id)));
+}
+
+function select(t) {
+  current = t;
+  $('editor').hidden = !t;
+  if (t) { $('tName').value = t.name; $('tSubject').value = t.subject; $('tBody').value = t.body; $('err').textContent = ''; updatePreview(); }
+  renderList();
+}
+
+function updatePreview() {
+  const subj = fill($('tSubject').value), body = fill($('tBody').value);
+  $('preview').innerHTML = (subj ? `<strong>${esc(subj)}</strong>\n\n` : '') + esc(body);
+  const m = members.find(x => x.id === $('memberSel').value);
+  $('mailBtn').href = `mailto:${encodeURIComponent((m && m.email) || '')}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+}
+
+async function load() {
+  const { data, error } = await supabaseClient.from('letter_templates').select('*').order('name');
+  if (error) { $('tplList').innerHTML = `<p class="error">${esc(error.message)}</p>`; return; }
+  templates = data || [];
+  renderList();
+}
+
+async function save() {
+  $('err').textContent = '';
+  const name = $('tName').value.trim();
+  if (!name) { $('err').textContent = 'Mallen behöver ett namn.'; return; }
+  const row = { name, subject: $('tSubject').value, body: $('tBody').value, updated_by: me.id, updated_at: new Date().toISOString() };
+  const q = current && current.id
+    ? supabaseClient.from('letter_templates').update(row).eq('id', current.id).select().single()
+    : supabaseClient.from('letter_templates').insert(row).select().single();
+  const { data, error } = await q;
+  if (error) { $('err').textContent = error.message; return; }
+  await load();
+  select(templates.find(t => t.id === data.id));
+  toast('Sparat');
+}
+
+async function remove() {
+  if (!current || !current.id) return;
+  if (!confirm(`Ta bort mallen "${current.name}"?`)) return;
+  const { error } = await supabaseClient.from('letter_templates').delete().eq('id', current.id);
+  if (error) { $('err').textContent = error.message; return; }
+  current = null; await load(); select(null); toast('Borttagen');
+}
+
+$('newBtn').onclick = () => { current = { id: null, name: '', subject: '', body: '' }; $('editor').hidden = false; $('tName').value = ''; $('tSubject').value = ''; $('tBody').value = ''; $('err').textContent = ''; renderList(); updatePreview(); $('tName').focus(); };
+$('saveBtn').onclick = save;
+$('delBtn').onclick = remove;
+$('dupBtn').onclick = () => { if (!current) return; current = { id: null, name: $('tName').value + ' (kopia)', subject: $('tSubject').value, body: $('tBody').value }; $('tName').value = current.name; $('tName').focus(); toast('Kopia — tryck Spara'); };
+$('copyBtn').onclick = async () => { try { await navigator.clipboard.writeText(fill($('tSubject').value) + '\n\n' + fill($('tBody').value)); toast('Kopierat'); } catch (e) { toast('Kunde inte kopiera'); } };
+['tSubject','tBody'].forEach(id => $(id).addEventListener('input', updatePreview));
+$('memberSel').addEventListener('change', updatePreview);
+$('chips').innerHTML = FIELDS.map(([k, l]) => `<button type="button" class="btn-outline" data-k="${k}" title="${l}">${k}</button>`).join('');
+$('chips').querySelectorAll('button').forEach(b => b.onclick = () => {
+  const ta = $('tBody'), s = ta.selectionStart ?? ta.value.length, e = ta.selectionEnd ?? s;
+  ta.value = ta.value.slice(0, s) + b.dataset.k + ta.value.slice(e);
+  ta.focus(); ta.selectionStart = ta.selectionEnd = s + b.dataset.k.length; updatePreview();
+});
+
+(async () => {
+  me = await requireAuth('admin');
+  if (!me) return;
+  const { data } = await supabaseClient.from('members').select('id, name, email, stamma, status').order('name');
+  members = (data || []).filter(m => m.status === 'approved');
+  $('memberSel').innerHTML = '<option value="">Exempel (Anna Andersson)</option>' + members.map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
+  await load();
+})();
+</script>
+</body>
+</html>

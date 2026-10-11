@@ -62,7 +62,7 @@
   .seg button:disabled { opacity: 0.4; }
   .note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.8rem; }
   @media (max-width: 640px) { .cabinet { grid-template-columns: 1fr; } .panel { grid-template-rows: none; grid-template-columns: auto auto 1fr auto; align-items: center; } .grille { min-height: 2.4rem; } .klabel { margin: 0; } }
-  .tv-photo { position: relative; width: min(100%, 980px); }
+  .tv-photo { position: relative; width: min(100%, 900px, calc((100dvh - 8rem) * 1.096)); margin: 0 auto; }
   .tv-photo img { display: block; width: 100%; height: auto; position: relative; z-index: 2; pointer-events: none; user-select: none; }
   .tv-photo .screen { position: absolute; aspect-ratio: auto; z-index: 3; }
   .tv-photo { filter: drop-shadow(0 30px 40px rgba(0,0,0,0.75)); }
@@ -95,7 +95,7 @@
     <p class="party-sub">Slumpade hårdrocksvideor dygnet runt. Vrid på kanalratten för nästa video.</p>
 
     <div class="tv-stage">
-      <div class="tv-photo" id="tvPhoto" hidden><img id="tvImg" alt="TV"><button type="button" class="hot builtin" id="hotTune" title="Vrid – nästa kanal" aria-label="Nästa kanal" style="left:75.6%;top:81.9%;width:4.2%;height:6.6%"></button><button type="button" class="hot builtin" id="hotPower" title="Ström" aria-label="Ström på/av" style="left:42.3%;top:85.4%;width:2.9%;height:4.4%;border-radius:0.2rem"></button><button type="button" class="hot builtin" id="hotVol" title="Ljud av/på" aria-label="Ljud av/på" style="left:70.4%;top:81.9%;width:4.2%;height:6.6%"></button></div>
+      <div class="tv-photo" id="tvPhoto" hidden><img id="tvImg" alt="TV"><button type="button" class="hot builtin" id="hotTune" title="Vrid – nästa kanal" aria-label="Nästa kanal" style="left:86.9%;top:83.2%;width:5.83%;height:6.4%"></button><button type="button" class="hot builtin" id="hotPower" title="Ström" aria-label="Ström på/av" style="left:39.5%;top:86.4%;width:2.9%;height:4.4%;border-radius:0.2rem"></button><button type="button" class="hot builtin" id="hotVol" title="Ljud av/på" aria-label="Ljud av/på" style="left:79.4%;top:83.2%;width:5.83%;height:6.4%"></button></div>
       <div class="tv" id="tvDrawn">
         <div class="ant"><i></i></div>
         <div class="cabinet">
@@ -315,7 +315,7 @@ document.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key 
 const FRAME_DIR = 'party/tv-frame', BUCKET = 'heavy-voices-stems';
 let frame = null;   // { img (sökväg), l, t, w, h, r, behind }
 // Standard: fotot av Luxor-TV:n (images/party/tv.webp) med urklippt, genomskinlig skärm
-const BUILTIN_FRAME = { builtin: true, img: '/images/party/tv.webp', l: 24.05, t: 10.23, w: 52.0, h: 63.32, r: 10, behind: true };
+const BUILTIN_FRAME = { builtin: true, img: '/images/party/tv.webp', l: 12.16, t: 10.3, w: 75.69, h: 63.77, r: 10, behind: true };
 const DEF_FRAME = { l: 12, t: 14, w: 58, h: 62, r: 8, behind: false };
 async function signed(path) { const { data } = await supabaseClient.storage.from(BUCKET).createSignedUrl(path, 3600 * 6); return data ? data.signedUrl : null; }
 function applyFrame(imgUrl) {

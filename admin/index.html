@@ -139,7 +139,7 @@
     if (!full) {
       // Stämledare: bara låtverktygen. Resten tas bort (och skyddas dessutom i databasen / på sidorna).
       document.querySelector('h1').textContent = 'Stämledare';
-      const ok = ['/admin/latar.html', '/medlem/rostovning.html', '/medlem/repertoar.html', '/medlem/studio.html'];
+      const ok = ['/admin/latar.html', '/medlem/rostovning.html', '/medlem/repertoar.html', '/medlem/studio.html', '/admin/info.html'];
       document.querySelectorAll('.nav-list > li').forEach(li => {
         const href = (li.querySelector('a') || {}).getAttribute && li.querySelector('a').getAttribute('href').split('?')[0];
         if (!ok.includes(href)) li.remove();

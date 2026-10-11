@@ -636,7 +636,7 @@ document.getElementById('infoEditForm').addEventListener('submit', async (e) => 
 });
 
 (async () => {
-  const member = await requireAuth('admin');
+  const member = await requireAuth('stamledare');
   if (!member) return;
   document.getElementById('infoEditCard').style.display = 'block';
   loadCurrent();          // filer och dokument

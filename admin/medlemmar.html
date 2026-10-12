@@ -192,26 +192,31 @@ async function loadMembers() {
 let sortKey = null;   // null = standard (status, namn)
 let sortDir = 1;      // 1 = stigande, -1 = fallande
 const STATUS_ORDER = { pending: 0, approved: 1, paused: 2 };
+const ROLE_ORDER = { admin: 0, stamledare: 1, medlem: 2 };
 const collator = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
+// Jämför namn utan inledande/avslutande mellanslag
+const byName = (a, b) => collator.compare((a.name || '').trim(), (b.name || '').trim());
 
 function sortValue(m, key) {
   if (key === 'status') return STATUS_ORDER[m.status] ?? 9;
   if (key === 'fee_paid') return m.fee_paid ? 1 : 0;
-  return m[key] ?? '';
+  // Roll sorteras som den visas: Admin, Stämledare, Medlem
+  if (key === 'role') return m.role === 'admin' ? ROLE_ORDER.admin : (m.stamledare ? ROLE_ORDER.stamledare : ROLE_ORDER.medlem);
+  return String(m[key] ?? '').trim();
 }
 
 function sortMembers() {
   const key = sortKey;
   members.sort((a, b) => {
     if (!key) {
-      return (STATUS_ORDER[a.status] - STATUS_ORDER[b.status]) || collator.compare(a.name || '', b.name || '');
+      return (STATUS_ORDER[a.status] - STATUS_ORDER[b.status]) || byName(a, b);
     }
     const va = sortValue(a, key), vb = sortValue(b, key);
     // Tomma värden hamnar alltid sist
     if (va === '' && vb !== '') return 1;
     if (vb === '' && va !== '') return -1;
     const cmp = typeof va === 'number' ? va - vb : collator.compare(String(va), String(vb));
-    return (cmp * sortDir) || collator.compare(a.name || '', b.name || '');
+    return (cmp * sortDir) || byName(a, b);
   });
 }
 
@@ -613,7 +618,7 @@ document.querySelectorAll('input[name="inviteMode"]').forEach(radio => {
 
 document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const name = document.getElementById('inviteName').value;
+  const name = document.getElementById('inviteName').value.trim();
   const email = document.getElementById('inviteEmail').value;
   const role = document.getElementById('inviteRole').value;
   const mode = document.querySelector('input[name="inviteMode"]:checked').value;

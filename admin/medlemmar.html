@@ -106,8 +106,12 @@
   <div class="card static" style="margin-top: 1.5rem;" id="mailCard">
     <h3 style="margin-bottom: 0.2rem;">Skicka mejl</h3>
     <p class="muted" style="margin-top: 0;">Mottagare: <span id="mailRecipients">inga markerade</span> — markera i listan ovan. Varje person får ett eget mejl och svar går till din e-postadress.</p>
+    <div class="toolbar" style="margin-top: 0; align-items: center;">
+      <label for="mailTemplate" class="muted" style="margin:0;">Brevmall:</label>
+      <select id="mailTemplate" style="max-width: 20rem;"><option value="">Ingen mall</option></select>
+    </div>
     <input type="text" id="mailSubject" placeholder="Ämne" maxlength="200">
-    <textarea id="mailMessage" placeholder="Meddelande...&#10;&#10;Tips: skriv {namn} så byts det mot mottagarens förnamn."></textarea>
+    <textarea id="mailMessage" placeholder="Meddelande...&#10;&#10;Platshållare: {fornamn}, {namn} (hela namnet), {epost}, {stamma}, {datum}"></textarea>
     <div class="toolbar" style="margin-top: 0; align-items: center;">
       <label for="mailSignature" class="muted" style="margin:0;">Signatur:</label>
       <select id="mailSignature" style="max-width: 16rem;"></select>
@@ -433,6 +437,29 @@ document.getElementById('resetFeesBtn').addEventListener('click', async () => {
 });
 
 // =========================================================
+// Brevmallar (tabellen letter_templates, redigeras på admin/brevmallar.html)
+let letterTemplates = [];
+
+async function loadLetterTemplates() {
+  const { data, error } = await supabaseClient.from('letter_templates').select('id, name, subject, body').order('name');
+  letterTemplates = error ? [] : (data || []);
+  const sel = document.getElementById('mailTemplate');
+  sel.innerHTML = '<option value="">' + (letterTemplates.length ? 'Ingen mall' : 'Inga sparade mallar') + '</option>' +
+    letterTemplates.map(t => `<option value="${t.id}">${escapeHtmlSig(t.name)}</option>`).join('');
+}
+
+document.getElementById('mailTemplate').addEventListener('change', (e) => {
+  const t = letterTemplates.find(x => x.id === e.target.value);
+  if (!t) return;
+  const subj = document.getElementById('mailSubject');
+  const msg = document.getElementById('mailMessage');
+  const dirty = (subj.value.trim() || msg.value.trim()) && (subj.value !== (t.subject || '') || msg.value !== (t.body || ''));
+  if (dirty && !confirm(`Ersätta ämne och meddelande med mallen "${t.name}"?`)) { e.target.value = ''; return; }
+  subj.value = t.subject || '';
+  msg.value = t.body || '';
+});
+
+// =========================================================
 // Signaturer (tabellen email_signatures, delas av alla admins)
 // =========================================================
 let signatures = [];
@@ -567,6 +594,7 @@ document.getElementById('sendMailBtn').addEventListener('click', async () => {
     if (!result.failed || !result.failed.length) {
       document.getElementById('mailSubject').value = '';
       document.getElementById('mailMessage').value = '';
+      document.getElementById('mailTemplate').value = '';
     }
   } catch (err) {
     statusEl.textContent = 'Kunde inte nå servern: ' + err.message;
@@ -631,6 +659,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
     currentUserId = member.id;
     loadMembers();
     loadSignatures();
+    loadLetterTemplates();
   }
 })();
 </script>

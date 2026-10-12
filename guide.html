@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="Animerade guider till Heavy Voices: så blir du medlem, så funkar medlemssidan och adminguide.">
+<meta name="description" content="Animerade guider till Heavy Voices: så blir du medlem, så funkar medlemssidan, adminguide och guide för stämledare.">
 <link rel="icon" href="/heavyvoices-logo.png">
 <title>Heavy Voices Guide</title>
   <link rel="icon" href="/favicon.ico" sizes="any">
@@ -227,6 +227,41 @@ button:focus-visible, .step:focus-visible { outline: 2px solid var(--accent); ou
 .donecard { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; }
 .donecard .big { font-size: 34px; color: var(--ok); line-height: 1; }
 .confirm { border: 1px solid rgba(229,169,104,.4); border-radius: 10px; background: #232937; padding: 8px 10px; font-size: 10.5px; line-height: 1.4; }
+
+/* ---------- Stämledarguide: notbana, segment, stämval ---------- */
+.nroll { position: relative; height: 118px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  background: repeating-linear-gradient(to bottom, rgba(255,255,255,.035) 0 1px, transparent 1px 12px), rgba(255,255,255,.02); flex: none; }
+.nt { position: absolute; height: 9px; border-radius: 3px; background: rgba(229,169,104,.3); border: 1px solid var(--accent);
+  transition: top .45s, left .45s, width .45s, background .3s, border-color .3s, opacity .3s, box-shadow .2s; }
+.nt.xtra { background: rgba(231,196,104,.12); border-style: dashed; }
+.nt.warn { box-shadow: 0 0 0 3px rgba(231,196,104,.35); }
+.nt.sel { box-shadow: 0 0 0 2px #fff; }
+.nt.gone { opacity: 0; }
+.nt.hit { background: #45c871; border-color: #45c871; }
+.nt.miss { background: #d8625f; border-color: #d8625f; }
+.phd { position: absolute; top: 0; bottom: 0; left: 6%; width: 2px; background: #fff; opacity: .85; transition: left 3s linear; }
+.beat { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.18); opacity: 0; transition: opacity .4s; }
+.beat.on { opacity: 1; }
+.vsvg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.vsvg polyline { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 400; stroke-dashoffset: 400; transition: stroke-dashoffset 3s linear; }
+.vsvg.on polyline { stroke-dashoffset: 0; }
+.nwords { display: flex; gap: 6px; font-size: 10px; color: var(--muted); padding: 0 2px; }
+.nwords span.on { color: var(--text); }
+.tools { display: flex; flex-wrap: wrap; gap: 5px; }
+.tools .btn { padding: 5px 8px; font-size: 10px; }
+.ck { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; padding: 3px 7px; border-radius: 7px; border: 1px solid var(--line); font: 700 11px var(--f-head); color: var(--muted); transition: background .2s, color .2s, border-color .2s; }
+.ck.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.ltext { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 11px; line-height: 1.7; background: rgba(255,255,255,.03); }
+.ltext .seg { border-radius: 4px; padding: 1px 2px; transition: background .3s, color .3s; }
+.ltext .seg.mark { background: rgba(120,160,255,.28); }
+.ltext .seg.rise { background: rgba(127,201,154,.18); color: var(--ok); }
+.ltext .tag { font: 700 9px var(--f-head); color: var(--ok); margin-right: 3px; opacity: 0; transition: opacity .3s; }
+.ltext .tag.on { opacity: 1; }
+.stat { display: flex; gap: 8px; }
+.stat div { flex: 1; border: 1px solid var(--line); border-radius: 9px; padding: 5px 8px; font-size: 9.5px; color: var(--muted); }
+.stat b { display: block; font: 700 16px var(--f-head); color: var(--text); font-variant-numeric: tabular-nums; }
+.dot-dirty { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); margin-left: 6px; transition: opacity .3s; }
+.dot-dirty.off2 { opacity: 0; }
 
 /* ---------- Text & kontroller ---------- */
 .side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
@@ -622,6 +657,121 @@ const ADMIN = [
    act: [['tap','#nf'],['show','#n1','flex'],['wait',300],['text','#nn','Noter'],['hot','#n1'],['wait',500],['tap','#ul'],['up','#u0'],['show','#n2','flex'],['add','#toast','in'],['wait',1600]] },
 ];
 
+/* ======================= STÄMLEDARE & ADMIN: Textsynk + Röstövning ======================= */
+// Notbanan i demon: [vänster %, bredd %, topp px]. x1/x2 = extranoter från backvocals.
+const NOTES = { n1:[8,10,70], n2:[19,8,58], n3:[28,12,50], n4:[41,7,58], n5:[49,13,74], n6:[64,9,50], n7:[74,6,42], n8:[82,12,58] };
+const XTRA = { x1:[54,5,22], x2:[86,5,28] };
+const nroll = (opts = {}) => `<div class="nroll" id="roll">
+  ${opts.beats ? [14,32,50,68,86].map((l,i) => `<div class="beat" id="bt${i}" style="left:${l}%"></div>`).join('') : ''}
+  ${Object.entries(NOTES).map(([k,[l,w,t]]) => `<div class="nt" id="${k}" style="left:${l}%;width:${w}%;top:${t}px"></div>`).join('')}
+  ${opts.xtra ? Object.entries(XTRA).map(([k,[l,w,t]]) => `<div class="nt xtra" id="${k}" style="left:${l}%;width:${w}%;top:${t}px"></div>`).join('') : ''}
+  ${opts.voice ? `<svg class="vsvg" id="voice" viewBox="0 0 100 118" preserveAspectRatio="none"><polyline points="8,76 13,74 18,76 20,63 26,62 28,55 34,54 40,55 42,63 48,62 50,79 56,80 62,78 64,55 70,56 73,55 75,47 79,46 82,63 88,62 94,61"/></svg>` : ''}
+  <div class="phd" id="phd"></div></div>`;
+const nwords = `<div class="nwords"><span id="w1">Vi</span><span id="w2">tän-</span><span id="w3">der</span><span id="w4">lju-</span><span id="w5">sen,</span><span id="w6">sce-</span><span id="w7">nen</span><span id="w8">är vår</span></div>`;
+
+const STAM = [
+ { t: 'Var verktygen finns', path: '/admin/latar.html', url: 'heavyvoices.se/admin/<b>latar.html</b>',
+   d: 'Textsynk och Röstövning når du från Låtar. Varje låt har knapparna Redigera text & synk och Tonkurvor. Både admin och stämledare kan använda verktygen.',
+   tips: ['Verktygen är gjorda för dator. Redigeringen i Röstövning syns inte på mobil.', 'Gör textsynken först: Röstövning visar den synkade texten i notblocken och kan anpassa noterna efter den.', 'Ingenting syns för medlemmarna förrän du sparar.'],
+   html: `${bar('Niklas · Stämledare')}<h3 class="s-h">Repertoar</h3>
+     <div class="card" id="c1"><div class="top"><b>Stormens öga</b><em>👁 Synlig</em></div>
+       <div class="tools" style="margin-top:7px"><div class="btn sm ghost" id="b1">🎤 Redigera text &amp; synk</div><div class="btn sm ghost" id="b2">🎹 Tonkurvor</div></div></div>
+     <div class="card"><div class="top"><b>Järn och sammet</b><em>👁‍🗨 Dold</em></div></div>`,
+   act: [['wait',500],['hot','#c1'],['wait',600],['tap','#b1'],['wait',500],['tap','#b2'],['wait',900]] },
+
+ { t: 'Textsynk: välj låt och version', path: '/admin/text-synk.html', url: 'heavyvoices.se/admin/<b>text-synk.html</b>',
+   d: 'Välj låten. Under Version väljer du Gemensam (alla stämmor) eller en egen version för en stämma. Kontrollera att sångtexten ligger rätt: en rad per textrad.',
+   tips: ['En stämversion behövs bara när stämman sjunger annan text eller i annan takt. Börja då med Kopiera gemensam synk.', 'Saknas texten: klistra in den eller läs in en fil (.docx, .txt, .pdf). Rubriker som "Refräng" hoppas över automatiskt.'],
+   html: `${bar('Niklas · Stämledare')}<h3 class="s-h">Textsynk</h3>
+     <div class="field"><label>Låt</label><div class="in" id="song">Stormens öga ▾</div></div>
+     <div class="field"><label>Version</label><div class="in" id="ver">Gemensam ▾</div></div>
+     <div class="btn sm ghost off" id="cp">Kopiera gemensam synk</div>
+     <div class="field"><label>Sångtext</label><div class="ltext">${lyrics.slice(0,3).join('<br>')}</div></div>`,
+   act: [['wait',500],['tap','#ver'],['text','#ver','Tenor ▾'],['wait',300],['show','#cp','flex'],['tap','#cp'],['wait',1200]] },
+
+ { t: 'Tajma raderna', path: '/admin/text-synk.html', url: 'heavyvoices.se/admin/<b>text-synk.html</b>',
+   d: 'Tryck Spela. Håll inne TAP (eller mellanslag) medan den markerade raden sjungs: nedtryckning sätter start, släpp sätter slut. Ett snabbt tryck sätter bara start.',
+   tips: ['Sänk tempot till 75 % om det går fort. Tiderna blir ändå rätt.', 'Backsteg ångrar senaste tryck.', 'Reaktion (s) dras av från varje tryck för att kompensera reaktionstiden.'],
+   html: `${bar('Niklas · Stämledare')}<div class="tabs"><span>50 %</span><span class="on" id="t75">75 %</span><span>100 %</span></div>
+     <div class="clock" id="clk">0:00.00</div>
+     <div class="sync">${lyrics.slice(0,4).map((l,i)=>`<div class="sline${i===0?' cur':''}" id="s${i}"><code id="c${i}">–:–</code><span>${l}</span></div>`).join('')}</div>
+     <div style="display:flex;gap:10px;justify-content:center;align-items:center;margin-top:auto"><div class="btn ghost">↩ Ångra</div><div class="tapbtn" id="tap">TAP</div></div>`,
+   act: [['clock','#clk'],['wait',500],
+         ['tap','#tap'],['add','#tap','pressed'],['text','#c0','0:12.40'],['wait',700],['rm','#tap','pressed'],['synk',0],['wait',300],
+         ['tap','#tap'],['add','#tap','pressed'],['text','#c1','0:16.85'],['wait',700],['rm','#tap','pressed'],['synk',1],['wait',300],
+         ['tap','#tap'],['add','#tap','pressed'],['text','#c2','0:21.10'],['wait',700],['rm','#tap','pressed'],['synk',2],['wait',1000]] },
+
+ { t: 'Pauser och finjustering', path: '/admin/text-synk.html', url: 'heavyvoices.se/admin/<b>text-synk.html</b>',
+   d: 'Vid mellanspel och solon: pausa och tryck ♪ Paus (eller Enter) så läggs en tom paus-rad in. ▶ på en rad spelar från strax före den, och −/+ flyttar starttiden 0,1 s.',
+   tips: ['Under uppspelning sätter ♪ Slut här (eller Enter) sluttid på raden som sjungs.', 'Klicka på en tid för att skriva in den, t.ex. 1:23.45.', '⊘ hoppar över en rad helt.'],
+   html: `${bar('Niklas · Stämledare')}<h3 class="s-h" style="font-size:16px">Stormens öga · Gemensam</h3>
+     <div class="sync">
+       <div class="sline set"><code>0:12.40</code><span>${lyrics[0]}</span></div>
+       <div class="sline set" id="r2"><code id="t2">0:16.85</code><span>${lyrics[1]}</span></div>
+       <div class="sline set"><code>0:21.10</code><span>${lyrics[2]}</span></div>
+       <div class="sline off" id="sp"><code>0:24.80</code><span style="color:var(--muted)">♪ paus</span></div>
+       <div class="sline"><code>–:–</code><span>${lyrics[3]}</span></div></div>
+     <div class="tools"><div class="btn ghost" id="pl">▶</div><div class="btn ghost" id="mi">−</div><div class="btn ghost" id="pk">+</div><div class="btn ghost" id="gap">♪ Paus</div></div>`,
+   act: [['tap','#r2'],['hot','#r2'],['tap','#pl'],['wait',300],['tap','#mi'],['text','#t2','0:16.75'],['tap','#mi'],['text','#t2','0:16.65'],['wait',400],
+         ['tap','#gap'],['show','#sp','grid'],['wait',1200]] },
+
+ { t: 'Färger, pilar och Spara synk', path: '/admin/text-synk.html', url: 'heavyvoices.se/admin/<b>text-synk.html</b>',
+   d: 'Markera text, kryssa i stämmorna (S A T B) och tryck ↑ upp eller ↓ ned. Texten färgas där de stämmorna går upp eller ned. Tryck sedan Spara synk, annars ser medlemmarna ingenting.',
+   tips: ['Enstaka ↑ ↓ mitt i texten visar tonriktning (Alt+pil).', 'Pilar och färger påverkar inte tiderna.', 'Den gula pricken betyder osparade ändringar.'],
+   html: `${bar('Niklas · Stämledare')}<div class="field"><label>Sångtext</label>
+     <div class="ltext">${lyrics[0]}<br><span class="tag" id="tg">A T↑</span><span class="seg" id="sg">${lyrics[1]}</span><br>${lyrics[2]}</div></div>
+     <div class="tools" style="align-items:center"><span class="s-p">Stämmor går:</span><span class="ck">S</span><span class="ck" id="kA">A</span><span class="ck" id="kT">T</span><span class="ck">B</span></div>
+     <div class="tools"><div class="btn sm ghost" id="up">↑ upp</div><div class="btn sm ghost">↓ ned</div></div>
+     <div class="btn" id="sv" style="margin-top:auto">Spara synk<span class="dot-dirty" id="dd"></span></div>${toast('Synk sparad. Texten rullar nu i spelaren.')}`,
+   act: [['tap','#sg'],['add','#sg','mark'],['wait',300],['tap','#kA'],['add','#kA','on'],['tap','#kT'],['add','#kT','on'],['tap','#up'],
+         ['swapcls','#sg','mark','rise'],['add','#tg','on'],['wait',600],['tap','#sv'],['add','#dd','off2'],['add','#toast','in'],['wait',1600]] },
+
+ { t: 'Röstövning: analysera stämmorna', path: '/medlem/rostovning.html', url: 'heavyvoices.se/medlem/<b>rostovning.html</b>',
+   d: 'Välj låten och tryck Analysera alla sångstämmor. Sidan lyssnar igenom stämfilerna och räknar fram vilka toner som sjungs. Resultatet sparas direkt.',
+   tips: ['Backtrack, Instrumental och Full hoppas över.', '⚠ vid en stämma betyder att stämfilen har bytts ut. Analysera då igen.'],
+   html: `${bar('Niklas · Stämledare')}<h3 class="s-h">Röstövning</h3>
+     <div class="field"><label>Låt</label><div class="in">Stormens öga ▾</div></div>
+     <div class="btn" id="aa">Analysera alla sångstämmor</div>
+     ${['Sopran','Alt','Tenor','Bas'].map((v,i)=>`<div class="up" id="u${i}"><span>${v}</span><div class="bar"><i></i></div><span class="okm">✓</span></div>`).join('')}
+     <div class="row off" id="res"><span class="pill ok">✓</span><div class="t"><b>Tenor · 214 noter</b><small>C3–A4 · klar att kontrollera</small></div></div>`,
+   act: [['tap','#aa'],['up','#u0'],['up','#u1'],['up','#u2'],['up','#u3'],['wait',300],['show','#res','flex'],['hot','#res'],['wait',1400]] },
+
+ { t: 'Kontrollera med referenstonen', path: '/medlem/rostovning.html', url: 'heavyvoices.se/medlem/<b>rostovning.html</b>',
+   d: 'Tryck Välj på stämman, slå på Referenston och tryck ▶. Följer pipet stämman är notanalysen bra. Våra stämfiler har backvocals, så extra noter kan dyka upp.',
+   tips: ['De streckade noterna i demon är sådana extranoter. Dem tar du bort i nästa steg.'],
+   html: `${bar('Niklas · Stämledare')}<div class="row"><span class="chk" id="rt"></span><div class="t"><b>Referenston</b><small>Pip på noterna</small></div><div class="play" id="pb">▶</div></div>
+     ${nroll({xtra:true})}${nwords}`,
+   act: [['tap','#rt'],['add','#rt','on'],['tap','#pb'],['style','#phd',{left:'96%'}],['wait',1300],['add','#x1','warn'],['wait',900],['add','#x2','warn'],['wait',1200]] },
+
+ { t: 'Rätta noterna och spara', path: '/medlem/rostovning.html', url: 'heavyvoices.se/medlem/<b>rostovning.html</b>',
+   d: 'Öppna ✎ Redigera noter. Klicka på en not och ta bort den, eller dra den till rätt tid och ton. ≡ Anpassa till texten slår ihop noterna efter de synkade textraderna. Tryck 💾 Spara noter.',
+   tips: ['Dubbelklicka i tom yta för en ny not. Dra i kanterna för att ändra längden.', 'Ctrl+C / Ctrl+V kopierar noter, bra för upprepade refränger.', '⟲ Från notanalysen börjar om.'],
+   html: `${bar('Niklas · Stämledare')}<div class="tools"><div class="btn sm ghost" id="del">🗑 Ta bort</div><div class="btn sm ghost" id="fit">≡ Anpassa till texten</div><div class="btn sm" id="sv">💾 Spara noter</div></div>
+     ${nroll({xtra:true})}${nwords}${toast('Noterna sparade. Medlemmarna ser dem nu.')}`,
+   act: [['tap','#x1'],['add','#x1','sel'],['tap','#del'],['add','#x1','gone'],['wait',200],['tap','#x2'],['add','#x2','sel'],['tap','#del'],['add','#x2','gone'],
+         ['tap','#n5'],['add','#n5','sel'],['style','#n5',{top:'62px'}],['rm','#n5','sel'],['wait',300],
+         ['tap','#fit'],['style','#n3',{width:'20%'}],['add','#n4','gone'],['wait',500],['tap','#sv'],['add','#toast','in'],['wait',1500]] },
+
+ { t: 'Tempo och klick', path: '/medlem/rostovning.html', url: 'heavyvoices.se/medlem/<b>rostovning.html</b>',
+   d: 'Under 🥁 Tempo & klick ställer du in låtens BPM och taktart. Då får notbanan taktstreck och medlemmarna kan slå på klick (metronom). Tryck 💾 Spara tempo.',
+   tips: ['🔎 Räkna fram tempot lyssnar igenom kompet. 👆 Tappa takten låter dig trycka i takt medan låten spelar.', 'Tempot gäller hela låten, alla stämmor.'],
+   html: `${bar('Niklas · Stämledare')}<div class="field"><label>BPM</label><div class="in ph" id="bpm">t.ex. 120</div></div>
+     <div class="field"><label>Taktart</label><div class="in">4/4 ▾</div></div>
+     <div class="tools"><div class="btn sm ghost" id="auto">🔎 Räkna fram tempot</div><div class="btn sm" id="sv">💾 Spara tempo</div></div>
+     ${nroll({beats:true})}${toast('Tempo sparat: 96 BPM')}`,
+   act: [['tap','#auto'],['wait',500],['text','#bpm','96'],['add','#bt0','on'],['add','#bt1','on'],['add','#bt2','on'],['add','#bt3','on'],['add','#bt4','on'],['wait',300],['tap','#sv'],['add','#toast','in'],['wait',1500]] },
+
+ { t: 'Så ser medlemmarna det', path: '/medlem/rostovning.html', url: 'heavyvoices.se/medlem/<b>rostovning.html</b>',
+   d: 'Medlemmarna väljer låt och stämma, sätter i hörlurar och trycker Sjung med. Den vita linjen är rösten. Noterna blir gröna vid träff och röda vid miss, och träffprocenten visas under.',
+   tips: ['Dolda låtar syns inte för medlemmarna.', 'Backtrack kan bara väljas om kryssrutan är ikryssad på låten under Låtar.', 'Klick visas bara när tempot är sparat.'],
+   html: `${bar('Anna · Tenor')}<div class="tools"><span class="ck on">Tenor</span><span class="ck on">Backtrack</span><span class="ck">Referenston</span><div class="btn sm" id="mic">🎤 Sjung med</div></div>
+     ${nroll({voice:true})}${nwords}
+     <div class="stat"><div>Träff<b id="hit">–</b></div><div>Noter klara<b id="nok">–</b></div></div>`,
+   act: [['tap','#mic'],['style','#phd',{left:'96%'}],['add','#voice','on'],
+         ['add','#n1','hit'],['add','#n2','hit'],['add','#n3','hit'],['add','#n4','hit'],['add','#n5','miss'],['add','#n6','hit'],['add','#n7','hit'],['add','#n8','hit'],
+         ['text','#hit','82 %'],['text','#nok','7 / 8'],['wait',1500]] },
+];
+
 const GUIDES = {
   registrera: { steps: REG, label: 'Kom igång', kicker: 'heavyvoices.se · kom igång',
     h1: 'Så blir du medlem', lead: 'Från registrering till första inloggningen: så går det till att gå med i Heavy Voices medlemsportal.',
@@ -632,6 +782,9 @@ const GUIDES = {
   admin: { steps: ADMIN, label: 'Admin', kicker: 'heavyvoices.se · guide för admin',
     h1: 'Adminguide', lead: 'Godkänn medlemmar, håll koll på avgifter, skicka mejl, lägg upp låtar och synka texter.',
     cta: '<a class="cbtn main" href="/admin/">Till adminsidan</a><a class="cbtn" href="/admin/medlemmar.html">Medlemmar</a>' },
+  stamledare: { steps: STAM, label: 'Stämledare', kicker: 'heavyvoices.se · guide för stämledare och admin',
+    h1: 'Textsynk och Röstövning', lead: 'Synka sångtexten mot ljudet, räkna fram noterna ur stämfilerna och rätta dem, så att medlemmarna kan sjunga med.',
+    cta: '<a class="cbtn main" href="/admin/latar.html">Till låtarna</a><a class="cbtn" href="/admin/text-synk.html">Textsynk</a><a class="cbtn" href="/medlem/rostovning.html">Röstövning</a>' },
 };
 
 const $ = (s, r=document) => r.querySelector(s);
@@ -809,7 +962,7 @@ document.addEventListener('visibilitychange', () => {
   else if (resumeMusic) { resumeMusic = false; Music.start(); }
 });
 
-// ?guide=registrera|medlem|admin visar bara den guiden (utan väljare). Utan parameter: alla tre med väljare.
+// ?guide=registrera|medlem|admin|stamledare visar bara den guiden (utan väljare). Utan parameter: alla med väljare.
 const fixedGuide = new URLSearchParams(location.search).get('guide');
 if (fixedGuide && GUIDES[fixedGuide]) {
   $('#trackSel').style.display = 'none';
@@ -826,6 +979,7 @@ if (fixedGuide && GUIDES[fixedGuide]) {
   var g = new URLSearchParams(location.search).get('guide');
   var b = document.getElementById('backBtn');
   if (g === 'admin') b.href = '/admin/';
+  else if (g === 'stamledare') b.href = '/admin/latar.html';
   else if (g === 'registrera') b.href = '/logga-in.html';
   else b.href = '/medlem/';
   // mjuk utton när man lämnar guiden

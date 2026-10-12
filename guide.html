@@ -671,11 +671,11 @@ const nwords = `<div class="nwords"><span id="w1">Vi</span><span id="w2">tän-</
 
 const STAM = [
  { t: 'Var verktygen finns', path: '/admin/latar.html', url: 'heavyvoices.se/admin/<b>latar.html</b>',
-   d: 'Textsynk och Röstövning når du från Låtar. Varje låt har knapparna Redigera text & synk och Tonkurvor. Både admin och stämledare kan använda verktygen.',
+   d: 'Textsynk och Röstövning når du från Låtar. Varje låt har knapparna Redigera text & synk och Röstövning. Både admin och stämledare kan använda verktygen.',
    tips: ['Verktygen är gjorda för dator. Redigeringen i Röstövning syns inte på mobil.', 'Gör textsynken först: Röstövning visar den synkade texten i notblocken och kan anpassa noterna efter den.', 'Ingenting syns för medlemmarna förrän du sparar.'],
    html: `${bar('Niklas · Stämledare')}<h3 class="s-h">Repertoar</h3>
      <div class="card" id="c1"><div class="top"><b>Stormens öga</b><em>👁 Synlig</em></div>
-       <div class="tools" style="margin-top:7px"><div class="btn sm ghost" id="b1">🎤 Redigera text &amp; synk</div><div class="btn sm ghost" id="b2">🎹 Tonkurvor</div></div></div>
+       <div class="tools" style="margin-top:7px"><div class="btn sm ghost" id="b1">🎤 Redigera text &amp; synk</div><div class="btn sm ghost" id="b2">🎹 Röstövning</div></div></div>
      <div class="card"><div class="top"><b>Järn och sammet</b><em>👁‍🗨 Dold</em></div></div>`,
    act: [['wait',500],['hot','#c1'],['wait',600],['tap','#b1'],['wait',500],['tap','#b2'],['wait',900]] },
 

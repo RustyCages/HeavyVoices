@@ -41,6 +41,35 @@ behövs eftersom det bara finns en kör.
 En bucket: `heavy-voices-stems`. Ingen `choir-[slug]`-prefixning
 (till skillnad från ChoirStudio).
 
+## Arbetsrutin (för alla verktyg/chattar)
+Supabase-projekt: `scfudeyozwedohujsoua` ("heavy-voices").
+
+**Databasändringar**
+- Varje ändring i databasen skrivs som en fil i `supabase/migrations/`, namnad `YYYY-MM-DD_namn.sql`. Använd `drop policy if exists` före `create policy` så filen går att köra om.
+- Kör SQL:en i Supabase SQL Editor (eller via verktyget `apply_migration` om det är godkänt). Verifiera med en SELECT.
+- Pusha inte frontend som förutsätter en kolumn/policy förrän SQL:en är körd, annars kan inloggningen eller sidorna gå sönder.
+- Edge Functions (`supabase/functions/*`) driftsätts separat från git. Ändrad kod gäller inte förrän den är deployad.
+
+**Roller**
+- `members.role`: `admin` eller `medlem`. Boolean `members.stamledare` ger stämledare (medlem + flagga).
+- Hjälpfunktioner i RLS: `is_admin()`, `is_song_editor()` (admin eller stämledare), `is_approved_member()`.
+- Stämledare har samma rättigheter som admin på Repertoar, Studio, Röstövning, Öva & spela, Information och Partyläget, men inte på Medlemmar, Kalender eller Medlemsvyn.
+- I frontend: `requireAuth('admin' | 'stamledare')` i `js/auth.js`, och `isSongEditor(member)` för låtverktyg.
+
+**Git och deploy**
+- Pusha till `main` → heavyvoices.se (Cloudflare Pages). `dev` → dev.heavyvoices.se.
+- Dra ner senaste `main` (`git pull --rebase`) före push. Flera chattar kan röra samma fil, t.ex. `admin/index.html`.
+- Commit-meddelanden slutar med trailers för Claude-sessionen, se commit-historiken.
+
+**Vanliga platser**
+- Admin-meny: `admin/index.html`. Medlems-meny: `medlem/index.html`.
+- Brevmallar ligger under Medlemmar (`admin/brevmallar.html`, tabell `letter_templates`).
+- Information: `admin/info.html` och `medlem/info.html` (tabell `choir_info`, kolumnen `upcoming` för "På gång").
+- Partyläget: `medlem/party*.html`, `js/party.js`, tabellerna `party_settings` och `party_videos`.
+
+**Testning**
+- Ingen byggprocess. Öppna sidan i webbläsaren, eller testa med Playwright mot Supabase-stubbar. Kontrollera JS med `node --check` på skriptdelen.
+
 ## Att göra
 - [ ] Skapa Supabase-projekt, klistra in URL + anon key i js/supabase-config.js
 - [ ] Skapa GitHub-repo, koppla Cloudflare Pages

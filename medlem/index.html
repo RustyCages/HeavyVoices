@@ -52,7 +52,11 @@
 </style>
 <style>
   #checkinCard { margin-top: 1.5rem; border-color: var(--border-hover); }
-  #checkinCard h3 { margin: 0 0 0.6rem; }
+  #checkinCard h3 { margin: 0 0 0.6rem; padding-right: 2.2rem; }
+  #checkinCard { position: relative; }
+  .checkin-close { position: absolute; top: 0.6rem; right: 0.6rem; width: 2rem; height: 2rem; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid transparent; border-radius: 50%; color: var(--text-muted); font-size: 1.4rem; line-height: 1; cursor: pointer; }
+  .checkin-close[hidden] { display: none; }
+  .checkin-close:hover, .checkin-close:focus-visible { color: var(--text); border-color: var(--border-hover); background: transparent; }
   .checkin-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; padding: 0.6rem 0; border-top: 1px solid var(--border); }
   .checkin-row:first-of-type { border-top: none; }
   .checkin-info strong { display: block; }
@@ -112,6 +116,7 @@
   <div id="installTop" data-install-app="Lägg till som app"></div>
 
   <div class="card" id="checkinCard" hidden>
+    <button type="button" class="checkin-close" id="checkinClose" aria-label="Stäng" title="Stäng" hidden>&times;</button>
     <h3>Idag</h3>
     <div id="checkinList"></div>
   </div>
@@ -262,6 +267,10 @@ async function loadCheckin(member) {
     .eq('event_date', today).order('event_time', { nullsFirst: true });
   if (error || !events || !events.length) return;
 
+  // Stängd idag? (sparas per dag, så rutan kommer tillbaka nästa gång det finns något att checka in på)
+  const closedKey = 'hv_checkin_closed';
+  try { if (localStorage.getItem(closedKey) === today) return; } catch (e) {}
+
   const { data: mine } = await supabaseClient
     .from('attendance').select('event_id, checked_in_at')
     .eq('member_id', member.id).in('event_id', events.map(e => e.id));
@@ -269,6 +278,14 @@ async function loadCheckin(member) {
 
   const list = document.getElementById('checkinList');
   list.innerHTML = '';
+
+  // Krysset visas när man är incheckad på allt idag
+  const closeBtn = document.getElementById('checkinClose');
+  const updateClose = () => { closeBtn.hidden = !!list.querySelector('.checkin-btn'); };
+  closeBtn.onclick = () => {
+    document.getElementById('checkinCard').hidden = true;
+    try { localStorage.setItem(closedKey, today); } catch (e) {}
+  };
   events.forEach(ev => {
     const row = document.createElement('div');
     row.className = 'checkin-row';
@@ -280,6 +297,7 @@ async function loadCheckin(member) {
     const showChecked = (iso) => {
       const at = new Date(iso).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm' });
       action.innerHTML = `<span class="checked-in">✓ Incheckad ${at}</span>`;
+      updateClose();
     };
 
     if (checked.has(String(ev.id))) {
@@ -305,6 +323,7 @@ async function loadCheckin(member) {
     }
     list.appendChild(row);
   });
+  updateClose();
   document.getElementById('checkinCard').hidden = false;
 }
 

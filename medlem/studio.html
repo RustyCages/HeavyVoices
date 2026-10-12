@@ -79,6 +79,13 @@
   .ms-ctrl input.changed { border-color: var(--accent); }
   .ms-ctrl .unit { font-size: 0.72rem; color: var(--text-muted); }
   .tag.ref { color: var(--accent); border-color: rgba(229,169,104,0.5); }
+  .tag.lock { color: var(--text-muted); }
+  .tag.unlocked { color: #facc15; border-color: rgba(250,204,21,0.5); }
+  .t-ctrl .cloneBtn { width: auto; padding: 0 0.55rem; font-size: 0.75rem; font-weight: 600; }
+  .lock-row { display: flex; flex-wrap: wrap; gap: 0.4rem 0.7rem; align-items: center; padding: 0.55rem 0.7rem; border: 1px solid rgba(229,169,104,0.45); border-radius: 0.5rem; background: rgba(229,169,104,0.08); font-size: 0.85rem; }
+  .lock-row b { color: var(--accent); }
+  .lock-row button { font-size: 0.8rem; padding: 0.35rem 0.7rem; }
+  #stemEditBtn[aria-pressed="true"] { background: #facc15; border-color: #facc15; color: #111317; }
   .suggestion { font-size: 0.78rem; color: var(--text-muted); padding: 0 0.1rem 0.4rem; }
   .suggestion.low { color: #facc15; }
   .backups { display: grid; gap: 0.3rem; }
@@ -136,7 +143,7 @@
       <li><div><b>Kalibrera – en gång per dator eller telefon</b><p>Tryck <b>🎯 Kalibrera</b> och sedan <b>Starta</b>. Klappa i takt med de 8 klicken. Sidan mäter hur lång fördröjning dina hörlurar har, så att inspelningen hamnar i takt. Värdet sparas, så du behöver bara göra om det om du byter hörlurar.</p></div></li>
       <li><div><b>Spela in</b><p>Klicka i tidslinjen där du vill börja och tryck <b>⏺ Spela in</b>. Låten börjar spela – med <b>Inräkning</b> startar den 2 sekunder före, så du hinner komma in. Sjung! Tryck <b>⏹ Stoppa</b> (eller mellanslag) när du är klar. Den gröna mätaren visar att mikrofonen hör dig.</p></div></li>
       <li><div><b>Lyssna</b><p>Din tagning dyker upp som ett rött spår. Tryck ▶ och lyssna tillsammans med låten. Inte nöjd? Spela in en gång till – varje försök blir ett eget spår, och du tar bort de du inte vill ha med papperskorgen 🗑 längst till höger på spårets rad. Vill du ha ett tomt spår att spela in eller klistra in i? Tryck <b>➕ Nytt tomt spår</b>, välj det och tryck <b>⏺ Spela in</b>.</p></div></li>
-      <li><div><b>Putsa (om du vill)</b><p>Ligger inspelningen lite fel i tid? Slå på <b>↔ Flytta</b> och dra det röda spåret i sidled – klicka på Flytta igen när du är klar, så kan inget hamna ur synk av misstag. Utan valt verktyg drar du i spåren för att bläddra i låten (eller Shift + mushjulet). Vill du ta bort ett harkel eller en tyst början? Välj <b>▭ Markera</b>, dra över biten och tryck <b>✂ Ta bort markerat</b>. Vill du använda en bra bit igen – t.ex. en refräng – markera den, tryck <b>⎘ Kopiera markerat</b>, klicka i spåret du vill lägga den i, ställ spelhuvudet och tryck <b>📋 Klistra in</b> (<b>Ersätt</b> skriver över, <b>Infoga</b> skjuter resten framåt, <b>Lägg ovanpå</b> mixar ihop). <b>📶 Normalisera</b> gör en svag inspelning starkare, och under <b>Volym</b> höjer eller sänker du hela spåret eller bara det markerade (t.ex. +3 dB). <b>↶ Ångra</b> tar tillbaka.</p></div></li>
+      <li><div><b>Putsa (om du vill)</b><p>Låtens stämmor är 🔒 <b>låsta</b> och kan inte ändras. Vill du utgå från en stämma, tryck <b>⧉ Kopia</b> på dess rad – kopian blir ditt eget spår som du kan klippa och spara. Ligger inspelningen lite fel i tid? Slå på <b>↔ Flytta</b> och dra det röda spåret i sidled – klicka på Flytta igen när du är klar, så kan inget hamna ur synk av misstag. Utan valt verktyg drar du i spåren för att bläddra i låten (eller Shift + mushjulet). Vill du ta bort ett harkel eller en tyst början? Välj <b>▭ Markera</b>, dra över biten och tryck <b>✂ Ta bort markerat</b>. Vill du använda en bra bit igen – t.ex. en refräng – markera den, tryck <b>⎘ Kopiera markerat</b>, klicka i spåret du vill lägga den i, ställ spelhuvudet och tryck <b>📋 Klistra in</b> (<b>Ersätt</b> skriver över, <b>Infoga</b> skjuter resten framåt, <b>Lägg ovanpå</b> mixar ihop). <b>📶 Normalisera</b> gör en svag inspelning starkare, och under <b>Volym</b> höjer eller sänker du hela spåret eller bara det markerade (t.ex. +3 dB). <b>↶ Ångra</b> tar tillbaka.</p></div></li>
       <li><div><b>Röstverktyg (på dator)</b><p><b>🎵 Tonhöjd</b>: markera en fras och gör ett nytt spår med ny tonhöjd – välj <b>halvtoner</b> (allt flyttas lika mycket) eller <b>steg i tonarten</b> (t.ex. <i>ters över</i>, så som en stämma sjungs). Tempot ändras inte. Bäst upp till ungefär 4–5 halvtoner, längre än så låter det lätt konstlat. <b>🎹 Syntröst</b>: en datorröst som sjunger ”ooh”, ”aah” eller ”mmm” på en stämmas noter från Röstövning – samma toner eller som en stämma över/under. Bra för att höra hur en harmoni låter innan någon sjungit in den. <b>🧽 Rengör</b>: behåller tonen som sjungs och dämpar andra stämmor och brus – välj <i>Bara brus</i> om du bara vill ta bort sus från din inspelning. <b>🤖 AI-separera</b>: delar upp ett spår – t.ex. en inspelning av hela låten – i sång och komp (eller sång, trummor, bas, övrigt). Det körs på din egen dator och är gratis; första gången laddas en AI-modell ner, sedan går det fortare. Snabbast i Chrome eller Edge på en dator med grafikkort. Sången blir alla stämmor ihop – kör sedan <b>Rengör</b> på sångspåret för att lyfta fram en stämma.</p></div></li>
       <li><div><b>Spara</b><p>Skriv ett namn, till exempel ”Ters över refrängen”, välj vem som får höra den och tryck <b>💾 Spara inspelning</b>. Den hamnar under <b>Mina inspelningar</b> längst ner på sidan.</p></div></li>
     </ol>
@@ -194,7 +201,8 @@
       <div id="panel"></div>
       <div class="admin-sync" id="adminSync" hidden>
         <span class="k">Admin · låtens spår</span>
-        <p class="note">Som admin kan du också flytta låtens egna spår (förskjutning), auto-synka dem och ändra själva stämfilerna – välj ett spår och använd verktygen ovan, sedan <b>💾 Spara som stämfil</b>. Den gamla filen sparas som säkerhetskopia. Nya filer laddar du in med <b>📂 Ladda in ljudfil</b> (eller dra dem till tidslinjen), flyttar på plats och lägger i låten med <b>➕ Gör till stämfil i låten</b>.</p>
+        <div class="actions"><button type="button" class="btn-outline" id="stemEditBtn" aria-pressed="false" title="Låtens stämfiler är låsta så att ingen klipper i dem av misstag. Lås upp för att flytta, auto-synka, redigera eller ta bort dem.">🔒 Stämfilerna är låsta – lås upp för redigering</button></div>
+        <p class="note">Låtens stämfiler är låsta som standard, även för dig. Lås upp dem ovan för att flytta dem (förskjutning), auto-synka dem och ändra själva stämfilerna – välj ett spår och använd verktygen ovan, sedan <b>💾 Spara som stämfil</b>. Den gamla filen sparas som säkerhetskopia. Nya filer laddar du in med <b>📂 Ladda in ljudfil</b> (eller dra dem till tidslinjen), flyttar på plats och lägger i låten med <b>➕ Gör till stämfil i låten</b>.</p>
         <div class="actions">
           <label for="refSelect">Referens:</label> <select id="refSelect"></select>
           <button type="button" class="btn-outline" id="autoBtn" title="Räknar ut förskjutningen för låtens spår mot referensen – ackord och ansatser">Auto-synka</button>
@@ -247,6 +255,7 @@ const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const MUTE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>';
 
 let me = null, isAdmin = false, songs = [], song = null, names = {};
+let stemEdit = false;   // admin/stämledare: låtens stämfiler upplåsta för redigering (av som standard)
 let tracks = [];   // spår: { kind:'stem'|'rec', key, label, color, clip, peaks, offsetMs, locked, readOnly, vol, muted, solo, … }
 let active = null, sel = null, takeNo = 0;
 let audioCtx = null, sources = [], playing = false, startCtxTime = 0, startPos = 0, pausedPos = 0, raf = null, loadToken = 0;
@@ -274,7 +283,7 @@ async function ensureCtx() { getCtx(); if (audioCtx.state === 'suspended') { try
 const offS = t => (t.offsetMs || 0) / 1000;
 const tDur = t => t.clip ? AudioEdit.duration(t.clip) : 0;
 const isEmpty = t => !!(t && t.clip && t.clip.channels[0].length <= 1);   // nytt tomt spår (inget inspelat/inklistrat än)
-const canDelete = t => t.kind === 'rec' ? (t.mine || (isAdmin && !!t.id)) : (isAdmin && t.kind === 'stem');
+const canDelete = t => t.kind === 'rec' ? (t.mine || (isAdmin && !!t.id)) : (isAdmin && stemEdit && t.kind === 'stem');
 const isAccomp = t => t.key === 'stem_backtrack_path' || /instrument|karaoke|playback|komp|backing|\bfull\b/i.test(t.label || '');
 const unsaved = () => tracks.some(t => (t.kind === 'rec' && t.mine && (t.edited || !t.id || t.offsetMs !== t.savedOffsetMs))
   || (t.kind === 'stem' && isAdmin && (t.edited || t.offsetMs !== t.savedOffsetMs)));
@@ -466,18 +475,34 @@ const panel = TrackEditPanel.mount(document.getElementById('panel'), {
       <div class="backups" id="backups"></div>
     </div>`,
 });
+// skrivskyddat spår: ruta överst i panelen med knapp för att göra en egen kopia
+const lockRow = document.createElement('div');
+lockRow.className = 'lock-row'; lockRow.hidden = true;
+lockRow.innerHTML = '<span data-r="lockText"></span><button type="button" id="cloneBtn">⧉ Gör egen kopia att redigera</button>';
+document.querySelector('#panel h3').after(lockRow);
+lockRow.querySelector('#cloneBtn').addEventListener('click', () => { if (active) cloneTrack(active); });
+// egen kopia av ett spår (låtens stämma eller någon annans inspelning): nytt eget spår på samma plats i låten
+function cloneTrack(t) {
+  if (!t || !t.clip || isEmpty(t) || !me) return;
+  const c = addGenTrack(`${t.label} (kopia)`, t.clip, t.offsetMs || 0);
+  c._row && c._row.scrollIntoView && c._row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  toast(`Kopia av ${t.label} skapad – redigera den och spara som inspelning`);
+}
 function renderMs(t) { if (t._ms) t._ms.textContent = (t.offsetMs >= 0 ? '+' : '') + t.offsetMs + ' ms'; }
 function renderHead(t, head) {
-  const adminStem = t.kind === 'stem' && isAdmin;
+  const adminStem = t.kind === 'stem' && isAdmin && stemEdit;
   const tags = t.kind === 'rec'
     ? (t.mine ? `<span class="tag mine">${t.id ? VIS[t.visibility] : isEmpty(t) ? 'tomt' : 'ny tagning'}</span>` : `<span class="tag">${esc(names[t.memberId] || 'Någon')} · ${VIS[t.visibility]}</span>`) +
       ((t.mine && !isEmpty(t) && (t.edited || !t.id)) ? '<span class="tag edit">osparad</span>' : '')
-    : (adminStem ? `<small>${esc(stemFilename(t.path))}</small>${t.key === document.getElementById('refSelect').value ? '<span class="tag ref">REF</span>' : ''}${t.edited ? '<span class="tag edit">ändrad – osparad</span>' : ''}` : '');
+    : (adminStem ? `<small>${esc(stemFilename(t.path))}</small><span class="tag unlocked">✏ upplåst</span>${t.key === document.getElementById('refSelect').value ? '<span class="tag ref">REF</span>' : ''}${t.edited ? '<span class="tag edit">ändrad – osparad</span>' : ''}`
+      : '<span class="tag lock" title="Låtens stämma är skrivskyddad – gör en egen kopia för att redigera">🔒 låst</span>');
+  const canClone = t.readOnly && t.clip && !isEmpty(t);
   head.innerHTML = `
     <span class="t-name" title="Välj spåret"><i style="background:${t.color}"></i>${esc(t.label)}${tags}</span>
     <span class="t-ctrl">
       ${adminStem ? `<span class="ms-ctrl"><button class="btn-outline" data-d="-50">−50</button><button class="btn-outline" data-d="-10">−10</button><input type="number" step="1" aria-label="Förskjutning i ms"><span class="unit">ms</span><button class="btn-outline" data-d="10">+10</button><button class="btn-outline" data-d="50">+50</button></span>` : ''}
       ${t.kind === 'rec' ? '<span class="ms" title="Var inspelningen ligger i låten"></span>' : ''}
+      ${canClone ? '<button class="btn-outline cloneBtn" title="Gör en egen kopia av spåret som du kan redigera och spara">⧉ Kopia</button>' : ''}
       <input type="range" min="0" max="1.5" step="0.05" value="${t.vol ?? 1}" title="Volym" aria-label="Volym för ${esc(t.label)}">
       <button class="btn-outline muteBtn ${t.muted ? 'on' : ''}" title="Tysta">${MUTE_SVG}</button>
       <button class="btn-outline soloBtn ${t.solo ? 'on' : ''}" title="Solo">S</button>
@@ -497,14 +522,20 @@ function renderHead(t, head) {
   head.querySelector('.muteBtn').addEventListener('click', e => { t.muted = !t.muted; e.currentTarget.classList.toggle('on', t.muted); applyGains(); tl.drawTrack(t); });
   head.querySelector('.soloBtn').addEventListener('click', e => { t.solo = !t.solo; e.currentTarget.classList.toggle('on', t.solo); applyGains(); tracks.forEach(tl.drawTrack); });
   const del = head.querySelector('.delBtn'); if (del) del.addEventListener('click', () => deleteTrack(t));
+  const cl = head.querySelector('.cloneBtn'); if (cl) cl.addEventListener('click', () => cloneTrack(t));
 }
 function setActive(t) {
   active = t; tl.setActiveRow(); panel.refresh(); updateRecTools();
 }
 function updateRecTools() {
   const t = active, isRec = !!(t && t.kind === 'rec'), mine = isRec && t.mine;
-  const adminStem = !!(t && t.kind === 'stem' && isAdmin);
+  const adminStem = !!(t && t.kind === 'stem' && isAdmin && stemEdit);
   document.getElementById('stemRow').hidden = !adminStem;
+  const locked = !!(t && t.readOnly && t.clip && !isEmpty(t));
+  lockRow.hidden = !locked;
+  if (locked) lockRow.querySelector('[data-r=lockText]').innerHTML = t.kind === 'stem'
+    ? `<b>🔒 ${esc(t.label)} är låtens stämma och är skrivskyddad.</b> Gör en egen kopia för att klippa, flytta eller ändra den – originalet påverkas inte.`
+    : `<b>🔒 ${esc(t.label)} är någon annans inspelning.</b> Gör en egen kopia om du vill redigera den.`;
   renderBackups();
   document.getElementById('recRow1').hidden = !mine;
   ['recDelete'].forEach(id => { document.getElementById(id).hidden = !isRec || !(mine || (isAdmin && t.id)); });
@@ -521,7 +552,7 @@ function updateRecTools() {
 }
 function setPeaks(t) { t.buffer = AudioEdit.toBuffer(getCtx(), t.clip); t.peaks = AudioEdit.peaks(t.clip); }
 function applyEdit(t, clip, newOffsetMs, note) {
-  if (t.readOnly) return;
+  if (t.readOnly) { toast('Spåret är låst – tryck ⧉ Gör egen kopia för att redigera en kopia'); return; }
   t.undo.push({ clip: t.clip, offsetMs: t.offsetMs }); if (t.undo.length > 10) t.undo.shift();
   t.clip = clip; setPeaks(t); t.edited = true;
   if (newOffsetMs != null) t.offsetMs = newOffsetMs;
@@ -970,7 +1001,7 @@ document.getElementById('toStem').addEventListener('click', async () => {
     song.extra_stems = extra; song.stem_offsets = offsets;
     // spåret blir ett av låtens spår direkt här i Studio
     Object.assign(t, { kind: 'stem', key: id, label, path, fixed: false, color: STEM_COLORS[tracks.filter(x => x.kind === 'stem').length % STEM_COLORS.length],
-      orig: t.clip, savedOffsetMs: t.offsetMs, undo: [], edited: false, locked: false, readOnly: false, mine: false, id: undefined, file: undefined });
+      orig: t.clip, savedOffsetMs: t.offsetMs, undo: [], edited: false, locked: !stemEdit, readOnly: !stemEdit, mine: false, id: undefined, file: undefined });
     document.getElementById('refSelect').innerHTML = tracks.filter(x => x.kind === 'stem').map(x => `<option value="${esc(x.key)}">${esc(x.label)}</option>`).join('');
     document.getElementById('adminSync').hidden = false;
     tl.render(); setActive(t); updateSaveState();
@@ -979,6 +1010,22 @@ document.getElementById('toStem').addEventListener('click', async () => {
 });
 
 // ---------- admin: låtens spår (från Stämsynk) ----------
+// lås upp / lås låtens stämfiler (admin/stämledare)
+function setStemEdit(on, quiet) {
+  if (!on && tracks.some(t => t.kind === 'stem' && (t.edited || t.offsetMs !== t.savedOffsetMs))) {
+    if (!quiet) { toast('Spara eller ångra ändringarna i stämfilerna först', 5000); return; }
+  }
+  stemEdit = !!(on && isAdmin);
+  tracks.forEach(t => { if (t.kind === 'stem') { t.locked = !stemEdit; t.readOnly = !stemEdit; } });
+  const b = document.getElementById('stemEditBtn');
+  b.setAttribute('aria-pressed', String(stemEdit));
+  b.textContent = stemEdit ? '✏ Stämfilerna är upplåsta – klicka för att låsa' : '🔒 Stämfilerna är låsta – lås upp för redigering';
+  ['autoBtn', 'resetBtn'].forEach(id => { document.getElementById(id).disabled = !stemEdit; });
+  if (quiet) return;
+  tl.render(); if (active) setActive(active); updateSaveState();
+  toast(stemEdit ? 'Stämfilerna är upplåsta – ändringar påverkar låten för alla när du sparar' : 'Stämfilerna är låsta igen');
+}
+document.getElementById('stemEditBtn').addEventListener('click', () => setStemEdit(!stemEdit));
 function updateSaveState() {
   if (!isAdmin) return;
   const stems = tracks.filter(t => t.kind === 'stem');
@@ -1224,6 +1271,7 @@ async function loadSong(id) {
   const my = ++loadToken;
   if (rec) stopRecording();
   pause(); pausedPos = 0; sel = null; active = null; tracks = [];
+  setStemEdit(false, true);
   song = songs.find(s => String(s.id) === String(id)) || null;
   document.getElementById('studio').hidden = true;
   if (!song) return;
@@ -1254,7 +1302,7 @@ async function loadSong(id) {
       const ms = Math.round(Number(offs[s.key]) || 0);
       return { kind: 'stem', key: s.key, label: s.label, path: s.path, fixed: s.fixed, color: STEM_COLORS[i % STEM_COLORS.length], clip, orig: clip,
         offsetMs: ms, savedOffsetMs: ms, undo: [], edited: false,
-        locked: !isAdmin, readOnly: !isAdmin, vol: 1, muted: false, solo: false };
+        locked: !(isAdmin && stemEdit), readOnly: !(isAdmin && stemEdit), vol: 1, muted: false, solo: false };
     }));
     const recTracks = (await Promise.all((recs || []).map(async r => {
       try {
@@ -1359,7 +1407,7 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') { e.preventDefault(); panel.paste(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'r' || e.key === 'R') { document.getElementById('recBtn').click(); return; }
-  if (e.key === 'Delete' || e.key === 'Backspace') { if (sel) { e.preventDefault(); panel.cut(); } return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') { if (sel) { e.preventDefault(); if (active && active.readOnly) toast('Spåret är låst – tryck ⧉ Gör egen kopia för att redigera en kopia'); else panel.cut(); } return; }
   if (e.key === 'm' || e.key === 'M') { tl.addMarker(position()); return; }
   if (e.key === '+') { tl.zoom(2); return; }
   if (e.key === '-') { tl.zoom(0.5); return; }

@@ -753,6 +753,24 @@ function dedupeWords(t) {
   return out.join(' ');
 }
 
+// Slår ihop fraser som upprepas: samma fras två gånger, eller en fras som bara växer från föregående.
+function mergePhrases(list) {
+  const norm = x => x.toLowerCase().replace(/[.,!?;:]/g, '').replace(/\s+/g, ' ').trim();
+  const out = [];
+  list.filter(Boolean).forEach(p => {
+    const n = norm(p);
+    if (!n) return;
+    const last = out[out.length - 1];
+    if (last) {
+      const ln = norm(last);
+      if (ln === n || ln.includes(n)) return;      // dubblett eller kortare del av föregående
+      if (n.startsWith(ln)) { out[out.length - 1] = p; return; } // förlängning av föregående
+    }
+    out.push(p);
+  });
+  return out;
+}
+
 function formatPhrase(t) {
   t = dedupeWords(t);
   if (!t) return '';
@@ -781,7 +799,7 @@ function startRecording(evId, area, recBtn, recWrap) {
       if (r.isFinal) finals.push(formatPhrase(r[0].transcript));
       else interim += r[0].transcript;
     }
-    committed = sessionBase + finals.filter(Boolean).join(' ');
+    committed = sessionBase + mergePhrases(finals).join(' ');
     area.value = committed;
     if (interimEl) interimEl.textContent = dedupeWords(interim);
   };

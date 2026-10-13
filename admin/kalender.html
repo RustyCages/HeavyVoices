@@ -18,6 +18,19 @@
     background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 0.9rem;
     padding: 1.1rem 1.3rem; margin-bottom: 0.9rem; box-shadow: var(--card-shadow); }
   .event-item.past { opacity: 0.55; }
+  .mn-btn { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .mn-panel { border-top: 1px solid var(--border); margin-top: 0.8rem; padding-top: 0.8rem; }
+  .mn-rec { display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin-bottom:0.6rem; }
+  .mn-dot { width:0.7rem; height:0.7rem; border-radius:50%; background:#ef4444; display:none; }
+  .mn-rec.live .mn-dot { display:inline-block; animation: mnPulse 1s infinite; }
+  @keyframes mnPulse { 50% { opacity: 0.3; } }
+  .mn-area { width:100%; min-height:120px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.6rem 0.9rem; font-family:inherit; line-height:1.5; }
+  .mn-saved { margin-top:0.8rem; }
+  .mn-note { border:1px solid var(--border); border-radius:8px; padding:0.7rem 0.9rem; margin-bottom:0.6rem; }
+  .mn-note-head { display:flex; justify-content:space-between; gap:0.5rem; font-size:0.82rem; color:var(--text-muted); margin-bottom:0.4rem; }
+  .mn-note-body { white-space:pre-wrap; line-height:1.5; }
+  .mn-section { margin-top:2.5rem; }
+  .mn-section input[type=search] { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.55rem 0.8rem; margin-bottom:0.8rem; }
   .event-date { font-family: 'Roboto Condensed', sans-serif; font-size: 1.15rem; min-width: 95px; }
   .event-actions { display: flex; flex-direction: column; gap: 0.35rem; min-width: 7.5rem; }
   .event-actions button { justify-content: center; }
@@ -133,6 +146,13 @@
   <div class="tab-panel active" data-panel="rep"><p class="text-muted">Laddar...</p></div>
   <div class="tab-panel" data-panel="konsert"><p class="text-muted">Laddar...</p></div>
   <div class="tab-panel" data-panel="ovrigt"><p class="text-muted">Laddar...</p></div>
+</div>
+
+<div class="mn-section" id="mnSection" hidden>
+  <h2>Mötesanteckningar</h2>
+  <p class="text-muted" style="font-size:0.85rem;">Alla sparade anteckningar, nyast först. Klicka på en händelse ovan för att spela in nya.</p>
+  <input type="search" id="mnSearch" placeholder="Sök i anteckningarna...">
+  <div id="mnAll"><p class="text-muted">Laddar...</p></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -265,11 +285,13 @@ function eventHtml(ev) {
       </div>
       <div class="event-actions">
         ${ev.event_date <= todayStr ? `<button type="button" class="att-btn" data-id="${ev.id}" aria-expanded="false">Närvaro (${attCount(ev.id)}) ▾</button>` : ''}
+        <button type="button" class="mn-btn mn-open" data-id="${ev.id}" aria-expanded="false">🎙 Anteckningar</button>
         <button type="button" class="edit-btn" data-id="${ev.id}">Redigera</button>
         <button type="button" class="btn-danger deleteEventBtn" data-id="${ev.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort</button>
         ${ev.series_id ? `<button type="button" class="btn-danger deleteEventBtn" data-series="${ev.series_id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort serie</button>` : ''}
       </div>
       <div class="att-panel" data-panel-att="${ev.id}" hidden></div>
+      <div class="mn-panel" data-panel-mn="${ev.id}" hidden></div>
     </div>`;
 }
 
@@ -292,6 +314,7 @@ async function loadEvents() {
   }
 
   const byType = { rep: [], konsert: [], ovrigt: [] };
+  allEvents = new Map((events || []).map(ev => [String(ev.id), ev]));
   (events || []).forEach(ev => (byType[ev.event_type] || byType.ovrigt).push(ev));
 
   Object.entries(byType).forEach(([type, list]) => {
@@ -609,9 +632,167 @@ $f('addEventForm').addEventListener('submit', () => {
   document.querySelectorAll('.tp .tp-text').forEach(t => { const v = tpParse(t.value); if (v !== null) $f(t.closest('.tp').dataset.target).value = v; });
 }, true);
 
+
+// ---------- Mötesanteckningar (taligenkänning i webbläsaren, Web Speech API) ----------
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+let notesByEvent = new Map();   // eventId -> [{id, body, created_at}]
+let allEvents = new Map();      // eventId -> event
+let mnRecognizer = null, mnRecording = false, mnBaseText = '';
+
+function fmtNoteTime(iso) {
+  return new Date(iso).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+async function loadNotes() {
+  const { data, error } = await supabaseClient.from('meeting_notes').select('*').order('created_at', { ascending: false });
+  notesByEvent = new Map();
+  if (error) { console.warn('meeting_notes saknas – kör migrationen 2026-10-13_meeting_notes.sql', error.message); return false; }
+  (data || []).forEach(n => {
+    const k = String(n.event_id);
+    if (!notesByEvent.has(k)) notesByEvent.set(k, []);
+    notesByEvent.get(k).push(n);
+  });
+  return true;
+}
+
+function noteItemHtml(n, showEvent) {
+  const ev = allEvents.get(String(n.event_id));
+  const head = showEvent && ev ? `${formatDate(ev.event_date)} — ${escapeAtt(ev.title)} · ` : '';
+  return `<div class="mn-note" data-note="${n.id}">
+    <div class="mn-note-head"><span>${head}${fmtNoteTime(n.created_at)}</span><button type="button" class="btn-danger mn-del" data-note="${n.id}" style="padding:0.2rem 0.6rem; font-size:0.8rem;">Ta bort</button></div>
+    <div class="mn-note-body">${escapeAtt(n.body)}</div>
+  </div>`;
+}
+
+function updateNoteCounts() {
+  document.querySelectorAll('.mn-open').forEach(b => {
+    const n = (notesByEvent.get(String(b.dataset.id)) || []).length;
+    b.textContent = n ? `🎙 Anteckningar (${n})` : '🎙 Anteckningar';
+  });
+}
+
+function renderAllNotes() {
+  const q = (document.getElementById('mnSearch').value || '').trim().toLowerCase();
+  const list = [...notesByEvent.values()].flat()
+    .filter(n => !q || n.body.toLowerCase().includes(q) || ((allEvents.get(String(n.event_id)) || {}).title || '').toLowerCase().includes(q))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  document.getElementById('mnAll').innerHTML = list.length
+    ? list.map(n => noteItemHtml(n, true)).join('')
+    : `<p class="text-muted">${q ? 'Inga träffar.' : 'Inga anteckningar sparade än.'}</p>`;
+  document.getElementById('mnSection').hidden = false;
+  bindNoteDeletes(document.getElementById('mnAll'));
+}
+
+function bindNoteDeletes(root) {
+  root.querySelectorAll('.mn-del').forEach(btn => btn.onclick = async () => {
+    if (!confirm('Ta bort anteckningen?')) return;
+    const { error } = await supabaseClient.from('meeting_notes').delete().eq('id', btn.dataset.note);
+    if (error) { alert('Kunde inte ta bort: ' + error.message); return; }
+    await loadNotes(); renderAllNotes(); updateNoteCounts();
+    const evPanel = btn.closest('.mn-panel');
+    if (evPanel && !mnRecording) renderEventNotes(evPanel.dataset.panelMn, evPanel);
+  });
+}
+
+function renderEventNotes(evId, panel) {
+  const saved = notesByEvent.get(String(evId)) || [];
+  panel.innerHTML = `
+    <div class="mn-rec">
+      <span class="mn-dot"></span>
+      <button type="button" class="mn-rec-btn btn-gold">${mnRecording && mnRecording === String(evId) ? 'Stoppa' : 'Spela in'}</button>
+      <span class="text-muted" style="font-size:0.85rem;">${SpeechRec ? 'Talet skrivs ut medan du pratar. Redigera gärna efteråt.' : 'Din webbläsare saknar taligenkänning – använd Chrome eller Edge. Du kan skriva direkt i rutan.'}</span>
+    </div>
+    <textarea class="mn-area" placeholder="Anteckningar från mötet..."></textarea>
+    <div class="actions" style="margin-top:0.6rem; display:flex; gap:0.6rem;">
+      <button type="button" class="mn-save">Spara anteckning</button>
+      <button type="button" class="btn-outline mn-clear">Rensa</button>
+      <span class="mn-err error"></span>
+    </div>
+    <div class="mn-saved">${saved.length ? `<h4 style="margin:0.6rem 0;">Sparade (${saved.length})</h4>` + saved.map(n => noteItemHtml(n, false)).join('') : '<p class="text-muted">Inga sparade anteckningar för den här händelsen.</p>'}</div>`;
+
+  const area = panel.querySelector('.mn-area');
+  const recBtn = panel.querySelector('.mn-rec-btn');
+  const recWrap = panel.querySelector('.mn-rec');
+  if (mnRecording === String(evId)) recWrap.classList.add('live');
+
+  recBtn.onclick = () => {
+    if (!SpeechRec) return;
+    if (mnRecording === String(evId)) { stopRecording(); return; }
+    if (mnRecording) stopRecording();
+    startRecording(evId, area, recBtn, recWrap);
+  };
+  panel.querySelector('.mn-clear').onclick = () => { area.value = ''; };
+  panel.querySelector('.mn-save').onclick = async () => {
+    const err = panel.querySelector('.mn-err'); err.textContent = '';
+    const body = area.value.trim();
+    if (!body) { err.textContent = 'Anteckningen är tom.'; return; }
+    const { error } = await supabaseClient.from('meeting_notes').insert({ event_id: evId, body, created_by: adminId });
+    if (error) { err.textContent = error.message; return; }
+    if (mnRecording === String(evId)) stopRecording();
+    await loadNotes();
+    renderEventNotes(evId, panel);
+    renderAllNotes();
+    updateNoteCounts();
+  };
+  bindNoteDeletes(panel);
+}
+
+function startRecording(evId, area, recBtn, recWrap) {
+  mnRecognizer = new SpeechRec();
+  mnRecognizer.lang = 'sv-SE';
+  mnRecognizer.continuous = true;
+  mnRecognizer.interimResults = true;
+  mnRecording = String(evId);
+  mnBaseText = area.value ? area.value.replace(/\s*$/, ' ') : '';
+  let finalText = mnBaseText;
+  mnRecognizer.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) finalText += r[0].transcript.trim() + ' ';
+      else interim += r[0].transcript;
+    }
+    area.value = finalText + interim;
+  };
+  mnRecognizer.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { mnRecording = false; alert('Mikrofonen är blockerad. Tillåt mikrofon i webbläsaren och försök igen.'); }
+  };
+  mnRecognizer.onend = () => {
+    // Webbläsaren stoppar ofta efter tystnad – starta om så länge användaren inte tryckt Stoppa
+    if (mnRecording === String(evId)) { try { mnRecognizer.start(); } catch (e) { stopRecording(); } }
+    else { recWrap.classList.remove('live'); recBtn.textContent = 'Spela in'; }
+  };
+  try { mnRecognizer.start(); } catch (e) { mnRecording = false; return; }
+  recWrap.classList.add('live');
+  recBtn.textContent = 'Stoppa';
+}
+
+function stopRecording() {
+  const id = mnRecording;
+  mnRecording = false;
+  if (mnRecognizer) { try { mnRecognizer.stop(); } catch (e) {} }
+  const panel = id && document.querySelector(`.mn-panel[data-panel-mn="${CSS.escape(id)}"]`);
+  if (panel) { panel.querySelector('.mn-rec').classList.remove('live'); panel.querySelector('.mn-rec-btn').textContent = 'Spela in'; }
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mn-open');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const panel = document.querySelector(`.mn-panel[data-panel-mn="${CSS.escape(id)}"]`);
+  if (!panel) return;
+  const open = panel.hidden;
+  panel.hidden = !open;
+  btn.setAttribute('aria-expanded', String(open));
+  if (open) renderEventNotes(id, panel);
+});
+
+document.getElementById('mnSearch').addEventListener('input', renderAllNotes);
+
 (async () => {
   const member = await requireAuth('admin');
-  if (member) { adminId = member.id; loadEvents(); }
+  if (member) { adminId = member.id; await loadEvents(); if (await loadNotes()) { renderAllNotes(); updateNoteCounts(); }
+  else { document.querySelectorAll('.mn-open').forEach(b => b.hidden = true); } }
 })();
 </script>
 

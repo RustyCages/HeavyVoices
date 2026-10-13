@@ -759,7 +759,7 @@ function startRecording(evId, area, recBtn, recWrap) {
   let sessionBase = area.value ? area.value.trimEnd() + ' ' : '';
   let committed = sessionBase;
   mnRecognizer.onresult = (e) => {
-    // e.results innehåller HELA sessionen. Slutgiltiga frfaser läggs in i rutan (formaterade),
+    // e.results innehåller HELA sessionen. Slutgiltiga fraser läggs in i rutan (formaterade),
     // osäker text visas bara i en egen rad så att rutan inte hoppar runt.
     const finals = [];
     let interim = '';

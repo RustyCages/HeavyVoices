@@ -808,30 +808,42 @@ function dedupeWords(t) {
 }
 
 // Slår ihop fraser som upprepas: samma fras två gånger, eller en fras som bara växer från föregående.
-function mergePhrases(list) {
+function mergeItems(items) {
   const norm = x => x.toLowerCase().replace(/[.,!?;:]/g, '').replace(/\s+/g, ' ').trim();
   const out = [];
-  list.filter(Boolean).forEach(p => {
-    const n = norm(p);
+  items.forEach(it => {
+    const n = norm(it.t);
     if (!n) return;
     const last = out[out.length - 1];
     if (last) {
-      const ln = norm(last);
-      if (ln === n || ln.includes(n)) return;      // dubblett eller kortare del av föregående
-      if (n.startsWith(ln)) { out[out.length - 1] = p; return; } // förlängning av föregående
+      const ln = norm(last.t);
+      if (ln === n || ln.includes(n)) return;                  // dubblett eller kortare del av föregående
+      if (n.startsWith(ln)) { out[out.length - 1] = { t: it.t, gap: last.gap }; return; } // förlängning
     }
-    out.push(p);
+    out.push({ t: it.t, gap: it.gap });
   });
   return out;
 }
 
-function formatPhrase(t) {
-  t = dedupeWords(t);
-  if (!t) return '';
-  t = t.charAt(0).toUpperCase() + t.slice(1);
-  if (!/[.!?,;:]$/.test(t)) t += '.';
-  return t;
+// Bygger texten utifrån pauserna före varje fras:
+//  ≥ 5 s tyst → punkt + ny rad (stor bokstav)
+//  ≥ 3 s tyst → punkt + stor bokstav
+//  annars     → samma mening
+function buildText(items, startsFresh) {
+  let out = '';
+  items.forEach((it, i) => {
+    const t = dedupeWords(it.t);
+    if (!t) return;
+    const endPunct = out && !/[.!?]\s*$/.test(out) ? '.' : '';
+    if (!out) { out = startsFresh ? cap(t) : t; return; }
+    if (it.gap >= 5000) out = out.replace(/\s*$/, '') + endPunct + '\n' + cap(t);
+    else if (it.gap >= 3000) out = out.replace(/\s*$/, '') + endPunct + ' ' + cap(t);
+    else out = out + ' ' + t;
+  });
+  return out;
 }
+
+function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
 
 function startRecording(evId, area, recBtn, recWrap) {
   const interimEl = recWrap.parentElement.querySelector('.mn-interim');
@@ -840,20 +852,30 @@ function startRecording(evId, area, recBtn, recWrap) {
   mnRecognizer.continuous = true;
   mnRecognizer.interimResults = true;
   mnRecording = String(evId);
-  // Text från tidigare sessioner (efter omstart) som redan är formaterad
-  let sessionBase = area.value ? area.value.trimEnd() + ' ' : '';
+  // Text från tidigare sessioner (efter omstart)
+  const hasBase = !!area.value.trim();
+  let sessionBase = hasBase ? area.value.trimEnd() + ' ' : '';
   let committed = sessionBase;
+  // Pausmätning: tiden mellan att talet slutade och nästa tal började
+  let lastSpeechEnd = 0, pendingGap = 0;
+  const gaps = [];   // gap per resultindex i aktuell session
+  mnRecognizer.onspeechstart = () => {
+    pendingGap = lastSpeechEnd ? Date.now() - lastSpeechEnd : 0;
+  };
+  mnRecognizer.onspeechend = () => { lastSpeechEnd = Date.now(); };
   mnRecognizer.onresult = (e) => {
-    // e.results innehåller HELA sessionen. Slutgiltiga fraser läggs in i rutan (formaterade),
-    // osäker text visas bara i en egen rad så att rutan inte hoppar runt.
+    // e.results innehåller HELA sessionen, så texten byggs om från början varje gång.
     const finals = [];
     let interim = '';
     for (let i = 0; i < e.results.length; i++) {
       const r = e.results[i];
-      if (r.isFinal) finals.push(formatPhrase(r[0].transcript));
+      if (gaps[i] === undefined) gaps[i] = pendingGap;
+      if (r.isFinal) finals.push({ t: r[0].transcript.trim(), gap: gaps[i] });
       else interim += r[0].transcript;
     }
-    committed = sessionBase + mergePhrases(finals).join(' ');
+    const merged = mergeItems(finals);
+    const body = buildText(merged, !hasBase && !sessionBase);
+    committed = sessionBase + body;
     area.value = committed;
     if (interimEl) interimEl.textContent = dedupeWords(interim);
   };
@@ -864,6 +886,7 @@ function startRecording(evId, area, recBtn, recWrap) {
     // Webbläsaren stoppar ofta efter tystnad – starta om, med det hittills sagda som ny start
     if (mnRecording === String(evId)) {
       sessionBase = committed ? committed.trimEnd() + ' ' : '';
+      gaps.length = 0;
       try { mnRecognizer.start(); } catch (e) { stopRecording(); }
     } else {
       recWrap.classList.remove('live'); recBtn.textContent = 'Spela in';

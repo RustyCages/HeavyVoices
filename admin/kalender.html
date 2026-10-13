@@ -712,6 +712,8 @@ function renderEventNotes(evId, panel) {
     <div class="mn-saved">${saved.length ? `<h4 style="margin:0.6rem 0;">Sparade (${saved.length})</h4>` + saved.map(n => noteItemHtml(n, false)).join('') : '<p class="text-muted">Inga sparade anteckningar för den här händelsen.</p>'}</div>`;
 
   const area = panel.querySelector('.mn-area');
+  const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  if (SpeechRec && IS_IOS) panel.querySelector('.mn-rec span.text-muted').textContent = 'På iPhone/iPad är taligenkänningen opålitlig (upprepningar, avbrott). Använd dator med Chrome eller Edge för inspelning, eller skriv direkt i rutan.';
   const recBtn = panel.querySelector('.mn-rec-btn');
   const recWrap = panel.querySelector('.mn-rec');
   if (mnRecording === String(evId)) recWrap.classList.add('live');
@@ -740,8 +742,19 @@ function renderEventNotes(evId, panel) {
 
 // Gör en slutgiltig fras läsbar: stor bokstav i början och punkt i slutet.
 // Taligenkänningen ger ingen interpunktion, så det här är en grov gissning vid pauser.
+// iPhone/iPad (Safari) ger ofta upprepade ord ("Malla Malla Malla"). Slå ihop direkt intill varandra.
+function dedupeWords(t) {
+  const out = [];
+  t.trim().split(/\s+/).forEach(w => {
+    if (!w) return;
+    const prev = out[out.length - 1];
+    if (!prev || prev.toLowerCase() !== w.toLowerCase()) out.push(w);
+  });
+  return out.join(' ');
+}
+
 function formatPhrase(t) {
-  t = t.trim();
+  t = dedupeWords(t);
   if (!t) return '';
   t = t.charAt(0).toUpperCase() + t.slice(1);
   if (!/[.!?,;:]$/.test(t)) t += '.';
@@ -770,7 +783,7 @@ function startRecording(evId, area, recBtn, recWrap) {
     }
     committed = sessionBase + finals.filter(Boolean).join(' ');
     area.value = committed;
-    if (interimEl) interimEl.textContent = interim.trim();
+    if (interimEl) interimEl.textContent = dedupeWords(interim);
   };
   mnRecognizer.onerror = (e) => {
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { mnRecording = false; alert('Mikrofonen är blockerad. Tillåt mikrofon i webbläsaren och försök igen.'); }

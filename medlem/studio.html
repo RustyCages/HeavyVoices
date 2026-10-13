@@ -63,6 +63,12 @@
 
   /* adminläge: låtens egna spår (synk, stämfiler) */
   #tl.drop { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 0.5rem; }
+  .ai-home .ai-steps { margin: 0; padding-left: 1.3rem; display: grid; gap: 0.7rem; font-size: 0.92rem; }
+  .ai-home .ai-steps button { font-size: 0.82rem; padding: 0.3rem 0.65rem; margin: 0.2rem 0; }
+  .ai-home .ai-progs { display: grid; gap: 0.6rem; margin-top: 0.45rem; }
+  .ai-home .ai-progs > div { border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.55rem 0.75rem; }
+  .ai-home .ai-progs p { margin: 0.3rem 0 0; color: var(--text-muted); font-size: 0.88rem; }
+  .ai-home .ai-progs small { color: var(--text-muted); }
   .wav-card summary { cursor: pointer; list-style: revert; }
   .vt > * { min-width: 0; }
   .vt { display: grid; gap: 0.55rem; padding: 0.6rem 0 0.2rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
@@ -186,7 +192,7 @@
         </div>
         <button class="btn-outline" id="markBtn" title="Sätt en markör vid spelhuvudet (M)">⚑ Markör</button>
         <button class="btn-outline" id="newTrackBtn" title="Lägg till ett tomt spår att spela in eller klistra in i">➕ Nytt tomt spår</button>
-        <button class="btn-outline" id="importBtn" hidden title="Admin: ladda in en eller flera ljudfiler (MP3, WAV, M4A …) som nya spår – och lägg dem i låten med ➕ Gör till stämfil. Du kan också dra filer till tidslinjen.">📂 Ladda in ljudfil</button>
+        <button class="btn-outline" id="importBtn" title="Ladda in en eller flera ljudfiler (MP3, WAV, M4A …) från datorn som nya spår – t.ex. en stämma som ett program sjungit. Du kan också dra filer till tidslinjen.">📂 Ladda in ljudfil</button>
         <input type="file" id="importFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" multiple hidden>
         <span class="sp"></span>
         <div class="zoom" role="group" aria-label="Zoom">
@@ -224,6 +230,25 @@
     <div class="recs" id="myRecs"><span class="hint">Laddar…</span></div>
   </div>
 
+  <details class="card static wav-card ai-home" style="margin-top:1.5rem;">
+    <summary><h2 style="display:inline; margin:0; font-size:1.15rem;">🤖 Låt datorn sjunga stämman – gratis program hemma</h2></summary>
+    <p class="hint" style="margin:0.6rem 0 0.8rem;">Med gratisprogram kan du låta datorn sjunga låtens stämmor – bra för att höra hur en stämma eller harmoni ska låta. Du laddar ner noterna här, låter programmet sjunga dem och laddar sedan in ljudet i Studio som ett eget spår. Programmen körs på din egen dator och kostar ingenting.</p>
+    <ol class="ai-steps">
+      <li><b>Hämta noterna.</b> Välj låt överst och tryck <button type="button" class="btn-outline" id="midiDl">⬇ Ladda ner noterna (MIDI)</button> – ett spår per stämma, med låtens tempo om det är inställt. <span class="hint" id="midiDlInfo"></span></li>
+      <li><b>Låt ett program sjunga.</b> Välj ett av dessa:
+        <div class="ai-progs">
+          <div><b>Enklast: MuseScore Studio + Muse Choir</b> <small>(gratis, Windows/Mac/Linux)</small>
+            <p>Körljud som sjunger <i>aah</i>, <i>ooh</i> och <i>mmm</i> – inte ord, men låter som en riktig kör (sopran, alt, tenor, bas).</p>
+            <p>1) Installera <a href="https://musescore.org/download" target="_blank" rel="noopener">MuseScore Studio</a>, och med MuseHub det kostnadsfria ljudpaketet <a href="https://www.musehub.com/muse-sounds/muse-choir" target="_blank" rel="noopener">Muse Choir</a>. 2) Öppna MIDI-filen i MuseScore. 3) Byt instrument på stämmorna till kör (Muse Choir). 4) Exportera som ljud (MP3) – gärna en stämma i taget genom att tysta de andra i mixern.</p></div>
+          <div><b>Sjunger text: OpenUtau + en AI-röst (DiffSinger)</b> <small>(gratis, öppen källkod, Windows/Mac/Linux)</small>
+            <p>Sjunger orden du skriver in. Lite mer pill. De gratis AI-rösterna sjunger mest engelska och japanska – svenska ord blir ungefärliga, så <i>aah</i> eller engelska fungerar bäst.</p>
+            <p>1) Hämta <a href="https://github.com/openutau/OpenUtau/releases" target="_blank" rel="noopener">OpenUtau</a> (<a href="https://github.com/openutau/OpenUtau/wiki" target="_blank" rel="noopener">hjälp</a>). 2) Ladda ner en gratis DiffSinger-röst (<a href="https://vocalsynth.fandom.com/wiki/DiffSinger" target="_blank" rel="noopener">lista över röster</a>) och dra in röstpaketet i OpenUtau-fönstret. 3) Importera MIDI-filen (File → Import Tracks), välj rösten och skriv in texten. 4) Exportera ljudet (File → Export Mixdown).</p></div>
+        </div>
+      </li>
+      <li><b>Tillbaka till Studio.</b> Tryck <b>📂 Ladda in ljudfil</b> (eller dra filen till tidslinjen). Ljudet blir ett eget spår – ligger det inte i takt, flytta det med <b>↔ Flytta</b>. Spara med <b>💾 Spara inspelning</b> (WAV görs om till MP3 automatiskt).</li>
+    </ol>
+  </details>
+
   <details class="card static wav-card" style="margin-top:1.5rem;">
     <summary><h2 style="display:inline; margin:0; font-size:1.15rem;">🔄 Konvertera WAV till MP3</h2></summary>
     <p class="hint" style="margin:0.6rem 0 0.7rem;">Gör om stora WAV-filer till MP3 och spara dem på datorn. Allt sker i din webbläsare – inget skickas iväg. WAV-filer sparas aldrig på nätet: laddar du in en WAV i Studio och sparar den görs den om till MP3 automatiskt.</p>
@@ -240,6 +265,7 @@
 <script src="/js/wave-timeline.js"></script>
 <script src="/js/track-edit-panel.js"></script>
 <script src="/js/wav-convert.js"></script>
+<script src="/js/note-io.js"></script>
 <script src="/js/pitch-analyze.js"></script>
 <script src="/js/voice-tools.js"></script>
 <script>
@@ -957,7 +983,7 @@ document.getElementById('newTrackBtn').addEventListener('click', newEmptyTrack);
 // admin: ladda in ljudfiler direkt (knappen eller dra till tidslinjen)
 async function importAudioFiles(files) {
   files = [...files].filter(f => /^audio\//.test(f.type) || /\.(mp3|wav|m4a|aac|ogg|oga|flac|webm)$/i.test(f.name));
-  if (!isAdmin || !song || !files.length) return;
+  if (!song || !files.length) return;
   let last = null;
   for (const f of files) {
     try {
@@ -970,15 +996,28 @@ async function importAudioFiles(files) {
   }
   if (!last) return;
   tl.render(); setActive(last);
-  toast(files.length > 1 ? `${files.length} filer inlästa – välj ett spår och tryck ➕ Gör till stämfil i låten` : `${last.label} inläst – flytta på plats och tryck ➕ Gör till stämfil i låten`, 7000);
+  const next = isAdmin ? 'tryck ➕ Gör till stämfil i låten (eller 💾 Spara inspelning)' : 'spara med 💾 Spara inspelning';
+  toast(files.length > 1 ? `${files.length} filer inlästa – välj ett spår och ${next}` : `${last.label} inläst – flytta på plats och ${next}`, 7000);
 }
 document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+// låtens noter (notanalysen per stämma) som MIDI – i låtens tid, så att ljudet som ett program sjunger hamnar rätt när det laddas in igen
+document.getElementById('midiDl').addEventListener('click', async () => {
+  const info = document.getElementById('midiDlInfo');
+  if (!song) { info.textContent = 'Välj en låt överst först.'; return; }
+  const parts = tracks.filter(t => t.kind === 'stem' && pitchByKey[t.key] && !isAccomp(t)).map(t => ({
+    name: t.label, notes: pitchByKey[t.key].notes.map(n => ({ t: Math.round((n.t + offS(t)) * 1000) / 1000, d: n.d, n: n.n })).filter(n => n.t >= 0),
+  })).filter(x => x.notes.length);
+  if (!parts.length) { info.textContent = 'Den här låten har inga noter än – körledningen behöver göra notanalys i Röstövning först.'; return; }
+  const mid = NoteIO.toMidi(parts[0].notes, { song: song.title }, { tracks: parts, bpm: Number(song.bpm) || undefined });
+  const res = await NoteIO.saveFile(mid, `${safeName(song.title)}-stammor.mid`, 'audio/midi');
+  info.textContent = res && res !== 'cancelled' ? `${parts.length} ${parts.length === 1 ? 'stämma' : 'stämmor'}: ${parts.map(x => x.name).join(', ')}` : '';
+});
 document.getElementById('importFile').addEventListener('change', e => { importAudioFiles(e.target.files).finally(() => { e.target.value = ''; }); });
 (() => {
   const tlEl = document.getElementById('tl');
-  tlEl.addEventListener('dragover', e => { if (isAdmin && e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); tlEl.classList.add('drop'); } });
+  tlEl.addEventListener('dragover', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); tlEl.classList.add('drop'); } });
   tlEl.addEventListener('dragleave', () => tlEl.classList.remove('drop'));
-  tlEl.addEventListener('drop', e => { if (!isAdmin) return; e.preventDefault(); tlEl.classList.remove('drop'); importAudioFiles(e.dataTransfer.files); });
+  tlEl.addEventListener('drop', e => { e.preventDefault(); tlEl.classList.remove('drop'); importAudioFiles(e.dataTransfer.files); });
 })();
 // admin: lägg inspelningen som nytt spår i låten (heavy-voices-stems + extra_stems + stem_offsets)
 document.getElementById('toStem').addEventListener('click', async () => {
@@ -1434,7 +1473,6 @@ window.addEventListener('beforeunload', e => { if (rec || unsaved()) { e.prevent
   const sel = document.getElementById('songSelect');
   if (error) { sel.innerHTML = `<option>Fel: ${esc(error.message)}</option>`; return; }
   songs = (data || []).filter(s => isAdmin || (s.published !== false && stemListFor(s).length));   // admin ser även låtar utan spår (kan ladda in filer)
-  if (isAdmin) document.getElementById('importBtn').hidden = false;
   loadMyRecs();
   if (!songs.length && !isAdmin) { sel.innerHTML = '<option value="">Inga låtar med stämfiler än</option>'; return; }
   fillSongSelect();

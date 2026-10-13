@@ -26,8 +26,13 @@
   @keyframes mnPulse { 50% { opacity: 0.3; } }
   .mn-area { width:100%; min-height:120px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.6rem 0.9rem; font-family:inherit; line-height:1.5; }
   .mn-saved { margin-top:0.8rem; }
-  .mn-note { border:1px solid var(--border); border-radius:8px; padding:0.7rem 0.9rem; margin-bottom:0.6rem; }
-  .mn-note-head { display:flex; justify-content:space-between; gap:0.5rem; font-size:0.82rem; color:var(--text-muted); margin-bottom:0.4rem; }
+  .mn-note { border:1px solid var(--border); border-radius:8px; padding:0.6rem 0.9rem; margin-bottom:0.6rem; }
+  .mn-note > summary { cursor:pointer; list-style-position:inside; display:flex; flex-wrap:wrap; gap:0.3rem 0.8rem; align-items:baseline; font-size:0.9rem; }
+  .mn-note > summary .mn-when { color:var(--text-muted); font-size:0.82rem; }
+  .mn-note > summary .mn-preview { color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; flex:1 1 12rem; }
+  .mn-note[open] > summary .mn-preview { display:none; }
+  .mn-note-actions { display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.6rem; }
+  .mn-note-actions button { padding:0.25rem 0.6rem; font-size:0.8rem; }
   .mn-note-body { white-space:pre-wrap; line-height:1.5; }
   .mn-section { margin-top:2.5rem; }
   .mn-section input[type=search] { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.55rem 0.8rem; margin-bottom:0.8rem; }
@@ -152,6 +157,10 @@
   <h2>Mötesanteckningar</h2>
   <p class="text-muted" style="font-size:0.85rem;">Alla sparade anteckningar, nyast först. Klicka på en händelse ovan för att spela in nya.</p>
   <input type="search" id="mnSearch" placeholder="Sök i anteckningarna...">
+  <div class="mn-note-actions" style="margin-bottom:0.8rem;">
+    <button type="button" class="btn-outline" id="mnExportTxt">Exportera listan till .txt</button>
+    <button type="button" class="btn-outline" id="mnExportDoc">Exportera listan till Word</button>
+  </div>
   <div id="mnAll"><p class="text-muted">Laddar...</p></div>
 </div>
 
@@ -657,12 +666,48 @@ async function loadNotes() {
 
 function noteItemHtml(n, showEvent) {
   const ev = allEvents.get(String(n.event_id));
-  const head = showEvent && ev ? `${formatDate(ev.event_date)} — ${escapeAtt(ev.title)} · ` : '';
-  return `<div class="mn-note" data-note="${n.id}">
-    <div class="mn-note-head"><span>${head}${fmtNoteTime(n.created_at)}</span><button type="button" class="btn-danger mn-del" data-note="${n.id}" style="padding:0.2rem 0.6rem; font-size:0.8rem;">Ta bort</button></div>
+  const when = (showEvent && ev ? `${formatDate(ev.event_date)} — ${escapeAtt(ev.title)} · ` : '') + fmtNoteTime(n.created_at);
+  const preview = n.body.replace(/\s+/g, ' ').slice(0, 90);
+  return `<details class="mn-note" data-note="${n.id}">
+    <summary><span class="mn-when">${when}</span><span class="mn-preview">${escapeAtt(preview)}${n.body.length > 90 ? '…' : ''}</span></summary>
     <div class="mn-note-body">${escapeAtt(n.body)}</div>
-  </div>`;
+    <div class="mn-note-actions">
+      <button type="button" class="btn-outline mn-exp-txt" data-note="${n.id}">Till .txt</button>
+      <button type="button" class="btn-outline mn-exp-doc" data-note="${n.id}">Till Word</button>
+      <button type="button" class="btn-danger mn-del" data-note="${n.id}">Ta bort</button>
+    </div>
+  </details>`;
 }
+
+// ---------- Export ----------
+let mnFiltered = [];
+
+function noteEventLabel(n) {
+  const ev = allEvents.get(String(n.event_id));
+  return ev ? `${formatDate(ev.event_date)} — ${ev.title}` : 'Ingen händelse';
+}
+
+function exportNotesFile(notes, baseName, kind) {
+  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  let content, mime, ext;
+  if (kind === 'txt') {
+    ext = 'txt'; mime = 'text/plain;charset=utf-8';
+    content = notes.map(n => `${noteEventLabel(n)}\n${fmtNoteTime(n.created_at)}\n\n${n.body}`).join('\n\n----------\n\n');
+  } else {
+    // Word öppnar HTML-baserade .doc-filer direkt
+    ext = 'doc'; mime = 'application/msword';
+    const parts = notes.map(n => `<h2>${esc(noteEventLabel(n))}</h2><p><i>${esc(fmtNoteTime(n.created_at))}</i></p><p style="white-space:pre-wrap">${esc(n.body)}</p>`);
+    content = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${esc(baseName)}</title></head><body style="font-family:Calibri,Arial,sans-serif">${parts.join('<hr>')}</body></html>`;
+  }
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${baseName}.${ext}`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function todayFileStamp() { return new Date().toISOString().slice(0, 10); }
 
 function updateNoteCounts() {
   document.querySelectorAll('.mn-open').forEach(b => {
@@ -676,6 +721,7 @@ function renderAllNotes() {
   const list = [...notesByEvent.values()].flat()
     .filter(n => !q || n.body.toLowerCase().includes(q) || ((allEvents.get(String(n.event_id)) || {}).title || '').toLowerCase().includes(q))
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  mnFiltered = list;
   document.getElementById('mnAll').innerHTML = list.length
     ? list.map(n => noteItemHtml(n, true)).join('')
     : `<p class="text-muted">${q ? 'Inga träffar.' : 'Inga anteckningar sparade än.'}</p>`;
@@ -684,7 +730,11 @@ function renderAllNotes() {
 }
 
 function bindNoteDeletes(root) {
-  root.querySelectorAll('.mn-del').forEach(btn => btn.onclick = async () => {
+  const findNote = id => [...notesByEvent.values()].flat().find(n => String(n.id) === String(id));
+  root.querySelectorAll('.mn-exp-txt').forEach(b => b.onclick = (e) => { e.preventDefault(); const n = findNote(b.dataset.note); if (n) exportNotesFile([n], `Mote-${todayFileStamp()}-${n.id.slice(0, 8)}`, 'txt'); });
+  root.querySelectorAll('.mn-exp-doc').forEach(b => b.onclick = (e) => { e.preventDefault(); const n = findNote(b.dataset.note); if (n) exportNotesFile([n], `Mote-${todayFileStamp()}-${n.id.slice(0, 8)}`, 'doc'); });
+  root.querySelectorAll('.mn-del').forEach(btn => btn.onclick = async (e) => {
+    e.preventDefault();
     if (!confirm('Ta bort anteckningen?')) return;
     const { error } = await supabaseClient.from('meeting_notes').delete().eq('id', btn.dataset.note);
     if (error) { alert('Kunde inte ta bort: ' + error.message); return; }
@@ -842,6 +892,8 @@ document.addEventListener('click', (e) => {
 });
 
 document.getElementById('mnSearch').addEventListener('input', renderAllNotes);
+document.getElementById('mnExportTxt').addEventListener('click', () => { if (mnFiltered.length) exportNotesFile(mnFiltered, `Motesanteckningar-${todayFileStamp()}`, 'txt'); });
+document.getElementById('mnExportDoc').addEventListener('click', () => { if (mnFiltered.length) exportNotesFile(mnFiltered, `Motesanteckningar-${todayFileStamp()}`, 'doc'); });
 
 (async () => {
   const member = await requireAuth('admin');

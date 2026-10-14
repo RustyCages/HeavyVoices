@@ -34,8 +34,9 @@
       <h3>Valt spår: <span class="tep-name">–</span> <span class="status" data-r="info"></span></h3>
       <div class="tool-row desktop-only" data-g="edit">
         <span class="k">Klipp</span>
-        <button type="button" class="btn-outline" data-a="cut" title="Ta bort det markerade (Delete)">✂ Ta bort markerat</button>
-        <button type="button" class="btn-outline" data-a="crop" title="Behåll bara det markerade">⌗ Beskär till markerat</button>
+        <button type="button" class="btn-outline" data-a="mute" title="Ersätt det markerade med tystnad – resten av spåret ligger kvar på samma plats (Delete)">🔇 Tysta markerat</button>
+        <button type="button" class="btn-outline" data-a="cut" title="Ta bort det markerade och dra ihop – allt efter flyttas tidigare (Shift+Delete)">✂ Ta bort och dra ihop</button>
+        <button type="button" class="btn-outline" data-a="crop" title="Behåll bara det markerade – det ligger kvar på samma plats i låten">⌗ Beskär till markerat</button>
         <span class="status" data-r="sel">Markera ett område med ▭ Markera</span>
       </div>
       <p class="desktop-note">✂ Klipp, kopiera, tystnad och tempo visas bara på dator. <button type="button" class="btn-outline" data-device-show>Visa ändå</button></p>
@@ -103,6 +104,7 @@
     }
     const sil = () => Math.max(0.01, Math.min(60, Number($('[data-r=sil]').value) || 0.5));
     const act = {
+      mute() { const r = needSel(); if (!r) return; const tr = o.getTrack(); o.onEdit(tr, AudioEdit.silence(tr.clip, r[0], r[1]), null, `${(r[1] - r[0]).toFixed(2)} s tystat – resten ligger kvar`); },
       cut() { const r = needSel(); if (!r) return; const tr = o.getTrack(); const c = AudioEdit.cut(tr.clip, r[0], r[1]); AudioEdit.fadeEdges(c, r[0]); o.onEdit(tr, c, null, `${(r[1] - r[0]).toFixed(2)} s borttaget`); },
       // det som blir kvar ska ligga kvar på samma ställe i låten → förskjutningen flyttas med
       crop() { const r = needSel(); if (!r) return; const tr = o.getTrack(); o.onEdit(tr, AudioEdit.crop(tr.clip, r[0], r[1]), (tr.offsetMs || 0) + Math.round(r[0] * 1000), 'Beskuret'); },
@@ -200,7 +202,7 @@
       }
       selInfo();
     }
-    return { el, refresh, status, selInfo, cut: () => act.cut(), copy: () => act.copy(), paste: () => act.paste() };
+    return { el, refresh, status, selInfo, cut: () => act.cut(), mute: () => act.mute(), copy: () => act.copy(), paste: () => act.paste() };
   }
   root.TrackEditPanel = { mount };
 })(window);

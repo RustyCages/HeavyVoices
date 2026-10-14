@@ -24,6 +24,15 @@
     const i0 = idx(c, Math.min(a, b)), i1 = idx(c, Math.max(a, b));
     return map(c, ch => { const o = new Float32Array(ch.length - (i1 - i0)); o.set(ch.subarray(0, i0)); o.set(ch.subarray(i1), i0); return o; });
   }
+  // tysta [a, b) men behåll längden – det efter ligger kvar på samma plats. Korta toningar i kanterna så att det inte klickar.
+  function silence(c, a, b, ms = 8) {
+    const sr = c.sampleRate, n = len(c), i0 = idx(c, Math.min(a, b)), i1 = idx(c, Math.max(a, b)), r = Math.round(ms / 1000 * sr);
+    return map(c, ch => {
+      const o = ch.slice(); o.fill(0, i0, i1);
+      for (let k = 1; k <= r; k++) { const g = 1 - k / r; if (i0 - k >= 0) o[i0 - k] *= 1 - g; if (i1 - 1 + k < n) o[i1 - 1 + k] *= 1 - g; }
+      return o;
+    });
+  }
   // behåll bara [a, b)
   function crop(c, a, b) {
     const i0 = idx(c, Math.min(a, b)), i1 = idx(c, Math.max(a, b));
@@ -251,5 +260,5 @@
     } finally { try { ctx.close(); } catch (e) {} }
   }
 
-  root.AudioEdit = { fromBuffer, toBuffer, duration: dur, cut, crop, insertSilence, paste, conform, gain, fadeEdges, timeStretch, normalize, mixdown, peaks, encodeWav, encodeMp3, loadLame, isUncompressedAudio, toMp3File };
+  root.AudioEdit = { fromBuffer, toBuffer, duration: dur, cut, crop, silence, insertSilence, paste, conform, gain, fadeEdges, timeStretch, normalize, mixdown, peaks, encodeWav, encodeMp3, loadLame, isUncompressedAudio, toMp3File };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1710,7 +1710,7 @@ let splitOn = false;
 try { splitOn = localStorage.getItem('hv-karaoke-split') === 'on'; } catch (e) {}
 let splitPanels = []; // [{ key, lines, idx, box }]
 let splitSong = null;
-// Delad skärm visas just nu bara för admin (testas innan den släpps till alla)
+// Delad skärm: alla medlemmar kan välja vilka stämmor/texter som ska synas
 // Rutorna: gemensam text (om den finns) + varje stämma med egen synkad text
 function splitParts(song) {
   if (!song) return [];
@@ -1721,7 +1721,7 @@ function splitParts(song) {
 function splitHidden() {
   try { const v = JSON.parse(localStorage.getItem('hv-split-hidden') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
 }
-function splitAvailable(song) { return !!(isSongEditor(currentMember)) && splitParts(song).length >= 2; }
+function splitAvailable(song) { return splitParts(song).length >= 2; }
 function buildSplit(song) {
   const wrap = document.getElementById('karaokeSplit');
   const mine = voiceFromStamma(currentMember && currentMember.stamma);

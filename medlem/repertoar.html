@@ -796,8 +796,16 @@ function renderSongCard(s) {
 
   const summary = document.createElement('summary');
   summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}${s.published === false ? ' <span class="hidden-tag" title="Dold för medlemmar – syns bara för admin">Dold</span>' : ''}</h3>` +
-    `<span class="song-actions"><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="text-muted">Visa ▾</span></span></div>`;
+    `<span class="song-actions"><button type="button" class="btn-outline pl-play-all" title="Spela låten med alla stämmor och texten">▶ Spela alla</button><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="text-muted">Visa ▾</span></span></div>`;
   details.appendChild(summary);
+  summary.querySelector('.pl-play-all').addEventListener('click', e => {
+    e.preventDefault(); e.stopPropagation();
+    // Alla stämmor + synkad text (delad skärm) direkt från repertoaren
+    karaokeOn = true; splitOn = true;
+    document.getElementById('karaokeBtn').classList.add('active');
+    try { localStorage.setItem('hv-karaoke', 'on'); localStorage.setItem('hv-karaoke-split', 'on'); } catch (err) {}
+    playSongPreview(s, getStemDefs(s), 'preview-' + s.id);
+  });
   summary.querySelector('.pl-quick').addEventListener('click', e => {
     e.preventDefault(); e.stopPropagation();
     details.open = true;

@@ -85,6 +85,14 @@
   .ms-ctrl input.changed { border-color: var(--accent); }
   .ms-ctrl .unit { font-size: 0.72rem; color: var(--text-muted); }
   .tag.ref { color: var(--accent); border-color: rgba(229,169,104,0.5); }
+  .bpm-badge { display: inline-flex; align-items: baseline; gap: 0.3rem; padding: 0.2rem 0.6rem; border: 1px solid rgba(229,169,104,0.45); border-radius: 999px; font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .bpm-badge b { color: var(--accent); font-family: 'Roboto Condensed', sans-serif; font-size: 1rem; }
+  .bpm-badge.none b { color: var(--text-muted); }
+  .sync-row input[type=range] { width: 14rem; max-width: 40vw; margin: 0; padding: 0; accent-color: var(--accent); }
+  .sync-row .nudge-val { min-width: 4.8rem; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .sync-row .nudge-val.changed { color: var(--accent); }
+  .sync-row select { width: auto; }
+  .sync-row kbd { font: inherit; font-size: 0.75rem; padding: 0 0.3rem; border: 1px solid var(--border); border-radius: 0.25rem; }
   .tag.lock { color: var(--text-muted); }
   .tag.unlocked { color: #facc15; border-color: rgba(250,204,21,0.5); }
   .t-ctrl .cloneBtn { width: auto; padding: 0 0.55rem; font-size: 0.75rem; font-weight: 600; }
@@ -149,7 +157,7 @@
       <li><div><b>Kalibrera – en gång per dator eller telefon</b><p>Tryck <b>🎯 Kalibrera</b> och sedan <b>Starta</b>. Klappa i takt med de 8 klicken. Sidan mäter hur lång fördröjning dina hörlurar har, så att inspelningen hamnar i takt. Värdet sparas, så du behöver bara göra om det om du byter hörlurar.</p></div></li>
       <li><div><b>Spela in</b><p>Klicka i tidslinjen där du vill börja och tryck <b>⏺ Spela in</b>. Låten börjar spela – med <b>Inräkning</b> startar den 2 sekunder före, så du hinner komma in. Sjung! Tryck <b>⏹ Stoppa</b> (eller mellanslag) när du är klar. Den gröna mätaren visar att mikrofonen hör dig.</p></div></li>
       <li><div><b>Lyssna</b><p>Din tagning dyker upp som ett rött spår. Tryck ▶ och lyssna tillsammans med låten. Inte nöjd? Spela in en gång till – varje försök blir ett eget spår, och du tar bort de du inte vill ha med papperskorgen 🗑 längst till höger på spårets rad. Vill du ha ett tomt spår att spela in eller klistra in i? Tryck <b>➕ Nytt tomt spår</b>, välj det och tryck <b>⏺ Spela in</b>.</p></div></li>
-      <li><div><b>Putsa (om du vill)</b><p>Låtens stämmor är 🔒 <b>låsta</b> och kan inte ändras. Vill du utgå från en stämma, tryck <b>⧉ Kopia</b> på dess rad – kopian blir ditt eget spår som du kan klippa och spara. Ligger inspelningen lite fel i tid? Slå på <b>↔ Flytta</b> och dra det röda spåret i sidled – klicka på Flytta igen när du är klar, så kan inget hamna ur synk av misstag. Utan valt verktyg drar du i spåren för att bläddra i låten (eller Shift + mushjulet). Vill du ta bort ett harkel eller en tyst början? Välj <b>▭ Markera</b>, dra över biten och tryck <b>✂ Ta bort markerat</b>. Vill du använda en bra bit igen – t.ex. en refräng – markera den, tryck <b>⎘ Kopiera markerat</b>, klicka i spåret du vill lägga den i, ställ spelhuvudet och tryck <b>📋 Klistra in</b> (<b>Ersätt</b> skriver över, <b>Infoga</b> skjuter resten framåt, <b>Lägg ovanpå</b> mixar ihop). <b>📶 Normalisera</b> gör en svag inspelning starkare, och under <b>Volym</b> höjer eller sänker du hela spåret eller bara det markerade (t.ex. +3 dB). <b>↶ Ångra</b> tar tillbaka.</p></div></li>
+      <li><div><b>Putsa (om du vill)</b><p>Låtens stämmor är 🔒 <b>låsta</b> och kan inte ändras. Vill du utgå från en stämma, tryck <b>⧉ Kopia</b> på dess rad – kopian blir ditt eget spår som du kan klippa och spara. Ligger inspelningen lite fel i tid? Slå på <b>↔ Flytta</b> och dra det röda spåret i sidled – klicka på Flytta igen när du är klar, så kan inget hamna ur synk av misstag. För finjustering: klicka på spåret och tryck <b>←</b> / <b>→</b> (Shift = större steg), eller använd knapparna och reglaget på raden <b>Synk</b>. Med <b>Taktrutnät</b> på syns låtens takter som streck i spåren. Har spåret fel tempo? Tryck <b>📏 Mät BPM</b> och sedan <b>⇔ Sträck till måltempot</b> – tonhöjden ändras inte. Utan valt verktyg drar du i spåren för att bläddra i låten (eller Shift + mushjulet). Vill du ta bort ett harkel eller en tyst början? Välj <b>▭ Markera</b>, dra över biten och tryck <b>✂ Ta bort markerat</b>. Vill du använda en bra bit igen – t.ex. en refräng – markera den, tryck <b>⎘ Kopiera markerat</b>, klicka i spåret du vill lägga den i, ställ spelhuvudet och tryck <b>📋 Klistra in</b> (<b>Ersätt</b> skriver över, <b>Infoga</b> skjuter resten framåt, <b>Lägg ovanpå</b> mixar ihop). <b>📶 Normalisera</b> gör en svag inspelning starkare, och under <b>Volym</b> höjer eller sänker du hela spåret eller bara det markerade (t.ex. +3 dB). <b>↶ Ångra</b> tar tillbaka.</p></div></li>
       <li><div><b>Röstverktyg (på dator)</b><p><b>🎵 Tonhöjd</b>: markera en fras och gör ett nytt spår med ny tonhöjd – välj <b>halvtoner</b> (allt flyttas lika mycket) eller <b>steg i tonarten</b> (t.ex. <i>ters över</i>, så som en stämma sjungs). Tempot ändras inte. Bäst upp till ungefär 4–5 halvtoner, längre än så låter det lätt konstlat. <b>🎹 Syntröst</b>: en datorröst som sjunger ”ooh”, ”aah” eller ”mmm” på en stämmas noter från Röstövning – samma toner eller som en stämma över/under. Bra för att höra hur en harmoni låter innan någon sjungit in den. <b>🧽 Rengör</b>: behåller tonen som sjungs och dämpar andra stämmor och brus – välj <i>Bara brus</i> om du bara vill ta bort sus från din inspelning. <b>🤖 AI-separera</b>: delar upp ett spår – t.ex. en inspelning av hela låten – i sång och komp (eller sång, trummor, bas, övrigt). Det körs på din egen dator och är gratis; första gången laddas en AI-modell ner, sedan går det fortare. Snabbast i Chrome eller Edge på en dator med grafikkort. Sången blir alla stämmor ihop – kör sedan <b>Rengör</b> på sångspåret för att lyfta fram en stämma.</p></div></li>
       <li><div><b>Spara</b><p>Skriv ett namn, till exempel ”Ters över refrängen”, välj vem som får höra den och tryck <b>💾 Spara inspelning</b>. Den hamnar under <b>Mina inspelningar</b> längst ner på sidan.</p></div></li>
     </ol>
@@ -172,9 +180,11 @@
         <button type="button" class="rec-btn" id="recBtn" title="Spela in från spelhuvudet (R)">⏺ Spela in</button>
         <span class="meter" title="Mikrofonens nivå"><div id="meter"></div></span>
         <span class="time" id="curTime">0:00.0</span><span class="time" id="durTime" style="min-width:auto">/ 0:00</span>
+        <span class="bpm-badge" id="bpmBadge" hidden title="Låtens tempo (ställs in under Röstövning → 🥁 Tempo & klick)"><b id="bpmVal">–</b> BPM <span id="meterVal"></span></span>
         <span class="sp"></span>
         <label class="opt" title="Så här mycket av låten spelas före inspelningen">Inräkning <select id="preRoll"><option value="0">0 s</option><option value="2" selected>2 s</option><option value="4">4 s</option></select></label>
         <label class="opt" id="clickOpt" hidden><input type="checkbox" id="optClick"> Klick</label>
+        <label class="opt" id="gridOpt" hidden title="Visa takt- och slagstreck i spåren – gör det lättare att se om ett spår ligger i takt"><input type="checkbox" id="optGrid" checked> Taktrutnät</label>
         <button type="button" class="btn-outline" id="calibBtn" title="Mät fördröjningen i din dator/hörlurar så att inspelningen hamnar i takt">🎯 Kalibrera</button>
       </div>
       <div class="calib" id="calib" hidden>
@@ -307,6 +317,7 @@ function stemListFor(s) {
 function getCtx() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
 async function ensureCtx() { getCtx(); if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} } }
 const offS = t => (t.offsetMs || 0) / 1000;
+const songBpm = () => { const b = Number(song && song.bpm); return b >= 20 && b <= 400 ? b : 0; };   // låtens tempo (songs.bpm) eller 0
 const tDur = t => t.clip ? AudioEdit.duration(t.clip) : 0;
 const isEmpty = t => !!(t && t.clip && t.clip.channels[0].length <= 1);   // nytt tomt spår (inget inspelat/inklistrat än)
 const canDelete = t => t.kind === 'rec' ? (t.mine || (isAdmin && !!t.id)) : (isAdmin && stemEdit && t.kind === 'stem');
@@ -422,6 +433,8 @@ const tl = WaveTimeline.create(document.getElementById('tl'), {
   onActive: t => setActive(t),
   onSelection: s => { sel = s; panel.selInfo(); },
   onView: () => { document.getElementById('zoomVal').textContent = tl.spanLabel(); },
+  getBeats: () => songBpm() && document.getElementById('optGrid').checked
+    ? { bpm: songBpm(), offset: Number(song.beat_offset) || 0, bpb: Math.max(1, Number(song.beats_per_bar) || 4) } : null,
   renderHead,
   renderFoot: (t, foot) => { if (t.kind === 'stem' && isAdmin) { foot.innerHTML = '<div class="suggestion" hidden></div>'; t._sugg = foot.firstChild; } },
 });
@@ -431,6 +444,7 @@ function setOffset(t, ms, live) {
   ms = Math.round(Math.max(-MAX_OFFSET_MS, Math.min(MAX_OFFSET_MS, Number(ms) || 0)));
   if (ms !== t.offsetMs) { t.offsetMs = ms; tl.drawTrack(t); }
   renderMs(t); if (t._msIn) t._msIn();
+  updateSync();
   if (!live) { restartIfPlaying(); updateRecTools(); panel.refresh(); }
   updateSaveState();
 }
@@ -507,6 +521,162 @@ lockRow.className = 'lock-row'; lockRow.hidden = true;
 lockRow.innerHTML = '<span data-r="lockText"></span><button type="button" id="cloneBtn">⧉ Gör egen kopia att redigera</button>';
 document.querySelector('#panel h3').after(lockRow);
 lockRow.querySelector('#cloneBtn').addEventListener('click', () => { if (active) cloneTrack(active); });
+
+// ---------- synk: skjut valt spår stegvis i sidled (knappar, reglage, ← →) + tempo/BPM ----------
+const syncBox = document.createElement('div');
+syncBox.innerHTML = `
+  <div class="tool-row sync-row" id="syncRow">
+    <span class="k">Synk</span>
+    <button type="button" class="btn-outline" data-n="-10"></button>
+    <button type="button" class="btn-outline" data-n="-1"></button>
+    <input type="range" id="nudgeRange" min="-1000" max="1000" step="10" value="0" title="Dra för att skjuta spåret i sidled (±1 s från där det låg när du valde det)" aria-label="Förskjutning av valt spår">
+    <button type="button" class="btn-outline" data-n="1"></button>
+    <button type="button" class="btn-outline" data-n="10"></button>
+    <span class="nudge-val" id="nudgeVal">+0 ms</span>
+    <label class="status">Steg <select id="nudgeStep" title="Hur långt knapparna och piltangenterna flyttar">
+      <option value="1">1 ms</option><option value="5">5 ms</option><option value="10" selected>10 ms</option><option value="50">50 ms</option><option value="100">100 ms</option></select></label>
+    <button type="button" class="btn-outline" id="nudgeReset" title="Tillbaka till där spåret låg senast det sparades">⟲ Sparad plats</button>
+    <span class="status desktop-only" id="nudgeHint"><kbd>←</kbd> <kbd>→</kbd> flyttar valt spår · <kbd>Shift</kbd> = 10 × steget</span>
+  </div>
+  <div class="tool-row sync-row desktop-only" id="tempoRow">
+    <span class="k">Tempo</span>
+    <span class="status">Spåret</span>
+    <input type="number" id="trkBpm" min="30" max="300" step="0.1" placeholder="?" title="Spårets tempo – mät det eller skriv in det"> BPM
+    <button type="button" class="btn-outline" id="bpmDetect" title="Lyssnar efter slagen i spåret och räknar ut ungefärligt tempo">📏 Mät BPM</button>
+    <span class="status">→ mål</span>
+    <input type="number" id="tgtBpm" min="30" max="300" step="0.1" placeholder="?" title="Tempot spåret ska få – förifyllt med låtens tempo"> BPM
+    <button type="button" class="btn-outline" id="bpmFit" title="Sträcker eller trycker ihop spåret så att det får måltempot – tonhöjden ändras inte">⇔ Sträck till måltempot</button>
+    <span class="status" id="bpmStatus"></span>
+  </div>`;
+lockRow.after(...syncBox.children);
+const nudgeRange = document.getElementById('nudgeRange');
+let syncAnchor = { t: null, ms: 0 };
+const nudgeStep = () => Number(document.getElementById('nudgeStep').value) || 10;
+const movable = t => !!(t && t.clip && !t.locked && !isEmpty(t));
+function bpmStatus(msg, warn) { const e = document.getElementById('bpmStatus'); e.textContent = msg || ''; e.classList.toggle('warn', !!warn); }
+function syncLabels() {
+  const s = nudgeStep();
+  document.querySelectorAll('#syncRow [data-n]').forEach(b => {
+    const d = Number(b.dataset.n) * s; b.textContent = (d > 0 ? '+' : '−') + Math.abs(d);
+    b.title = `Flytta ${Math.abs(d)} ms ${d > 0 ? 'senare (åt höger)' : 'tidigare (åt vänster)'}`;
+  });
+  nudgeRange.step = String(s);
+}
+let tempoFor = null;
+function updateSync() {
+  const t = active, can = movable(t);
+  document.getElementById('syncRow').hidden = !(t && t.clip && !isEmpty(t));
+  document.querySelectorAll('#syncRow button, #syncRow input').forEach(b => { b.disabled = !can; });
+  if (t && t.clip) {
+    const v = document.getElementById('nudgeVal');
+    v.textContent = (t.offsetMs >= 0 ? '+' : '') + t.offsetMs + ' ms';
+    v.classList.toggle('changed', t.savedOffsetMs != null && t.offsetMs !== t.savedOffsetMs);
+    v.title = t.locked ? 'Spåret är låst och kan inte flyttas' : 'Spårets förskjutning i låten';
+  }
+  if (can) {
+    if (syncAnchor.t !== t || Math.abs(t.offsetMs - syncAnchor.ms) > 1000) syncAnchor = { t, ms: t.offsetMs };
+    nudgeRange.value = t.offsetMs - syncAnchor.ms;
+    document.getElementById('nudgeReset').disabled = t.savedOffsetMs == null || t.offsetMs === t.savedOffsetMs;
+  }
+  // tempo
+  const tr = document.getElementById('tempoRow');
+  tr.hidden = !(t && t.clip && !isEmpty(t));
+  if (tempoFor !== t) {
+    tempoFor = t;
+    document.getElementById('trkBpm').value = t && t._bpm ? t._bpm : '';
+    bpmStatus('');
+  }
+  const tgt = document.getElementById('tgtBpm');
+  if (!tgt.value && songBpm()) tgt.value = songBpm();
+  document.getElementById('bpmFit').disabled = !(t && t.clip && !t.readOnly && !isEmpty(t));
+  document.getElementById('bpmFit').title = t && t.readOnly ? 'Spåret är låst – gör en egen kopia (⧉) för att ändra tempot' : 'Sträcker eller trycker ihop spåret så att det får måltempot – tonhöjden ändras inte';
+}
+// flytta valt spår; under snabba tryck uppdateras bara bilden, uppspelningen följer med när man släpper
+function nudgeActive(d) {
+  const t = active;
+  if (!t || !t.clip || isEmpty(t)) return;
+  if (t.locked) {
+    toast(t.kind === 'stem' ? (isAdmin ? 'Låtens stämfiler är låsta – lås upp dem (Admin nedan) för att flytta' : 'Låtens stämma är låst – gör en egen kopia (⧉) för att flytta den') : 'Någon annans inspelning – gör en egen kopia (⧉) för att flytta den');
+    return;
+  }
+  setOffset(t, t.offsetMs + d, true);
+  clearTimeout(nudgeActive._t);
+  nudgeActive._t = setTimeout(() => { if (t === active) setOffset(t, t.offsetMs, false); }, 250);
+}
+document.querySelectorAll('#syncRow [data-n]').forEach(b => b.addEventListener('click', () => nudgeActive(Number(b.dataset.n) * nudgeStep())));
+document.getElementById('nudgeStep').addEventListener('change', () => { syncLabels(); document.getElementById('nudgeStep').blur(); });
+nudgeRange.addEventListener('input', () => { if (movable(active)) setOffset(active, syncAnchor.ms + Number(nudgeRange.value), true); });
+nudgeRange.addEventListener('change', () => { if (movable(active)) setOffset(active, active.offsetMs, false); });
+document.getElementById('nudgeReset').addEventListener('click', () => {
+  const t = active; if (movable(t) && t.savedOffsetMs != null) setOffset(t, t.savedOffsetMs, false);
+});
+syncLabels();
+
+// ungefärligt tempo: ansatskurva (5 ms-steg) → autokorrelation, med extra vikt för tempon kring 120
+function estimateBpm(clip) {
+  const sr = clip.sampleRate, c0 = clip.channels[0], c1 = clip.channels[1] || c0;
+  const hop = Math.max(1, Math.round(sr * 0.005)), win = hop * 4, fps = sr / hop;
+  const len = Math.min(c0.length, Math.round(sr * 120));
+  const n = Math.floor((len - win) / hop); if (n < fps * 4) return null;   // kortare än ~4 s räcker inte
+  const env = new Float32Array(n); let prev = 0;
+  for (let i = 0; i < n; i++) {
+    let e = 0; for (let j = i * hop, s = j + win; j < s; j++) { const v = c0[j] + c1[j]; e += v * v; }
+    const l = Math.log1p(1000 * e / win); env[i] = i ? Math.max(0, l - prev) : 0; prev = l;
+  }
+  const W = Math.round(fps * 0.4), on = new Float32Array(n); let acc = 0;   // ta bort långsam nivå
+  for (let i = 0; i < n; i++) { acc += env[i] - (i >= W ? env[i - W] : 0); on[i] = Math.max(0, env[i] - acc / Math.min(i + 1, W)); }
+  const lagMin = Math.floor(60 * fps / 220), lagMax = Math.ceil(60 * fps / 50), ac = new Float32Array(2 * lagMax + 2);
+  for (let l = lagMin; l < ac.length && l < n / 2; l++) { let s = 0; for (let i = 0; i + l < n; i++) s += on[i] * on[i + l]; ac[l] = s / (n - l); }
+  let best = 0, bestL = 0, sum = 0, cnt = 0;
+  for (let l = lagMin; l <= lagMax; l++) {
+    const bpm = 60 * fps / l, w = Math.exp(-0.5 * Math.pow(Math.log2(bpm / 120) / 1.0, 2));
+    const s = (ac[l] + 0.5 * (ac[2 * l] || 0)) * w; sum += s; cnt++;
+    if (s > best) { best = s; bestL = l; }
+  }
+  if (!bestL || !(best > 0)) return null;
+  const a = ac[bestL - 1] || 0, b = ac[bestL], c = ac[bestL + 1] || 0, den = a - 2 * b + c;
+  const lag = bestL + (den < 0 ? 0.5 * (a - c) / den : 0);
+  return { bpm: 60 * fps / lag, confidence: best / (sum / cnt) };
+}
+document.getElementById('bpmDetect').addEventListener('click', async () => {
+  const t = active; if (!t || !t.clip || isEmpty(t)) return;
+  const b = document.getElementById('bpmDetect'); b.disabled = true; bpmStatus('Mäter…');
+  await new Promise(r => setTimeout(r, 30));
+  // markerat område i spåret används om det finns – annars hela spåret (max 2 min)
+  let clip = t.clip;
+  if (sel && sel.track === t && Math.abs(sel.b - sel.a) > 4) {
+    const a = Math.max(0, Math.min(sel.a, sel.b) - offS(t)), e = Math.min(tDur(t), Math.max(sel.a, sel.b) - offS(t));
+    if (e - a > 4) clip = AudioEdit.crop(t.clip, a, e);
+  }
+  const r = estimateBpm(clip);
+  b.disabled = false;
+  if (!r) { bpmStatus('Kunde inte hitta något tydligt tempo (spåret är för kort eller saknar tydliga slag)', true); return; }
+  let bpm = r.bpm, song0 = Number(document.getElementById('tgtBpm').value) || songBpm();
+  if (song0) [0.5, 2, 2 / 3, 1.5].forEach(f => { if (Math.abs(Math.log(bpm * f / song0)) < Math.abs(Math.log(bpm / song0)) && Math.abs(Math.log(bpm * f / song0)) < 0.12) bpm *= f; });
+  bpm = Math.round(bpm * 10) / 10;
+  t._bpm = bpm; document.getElementById('trkBpm').value = bpm;
+  const sure = r.confidence > 1.6;
+  bpmStatus(`≈ ${bpm.toLocaleString('sv-SE')} BPM${sure ? '' : ' (osäkert – kontrollera med klicket)'}${song0 ? ` · ${Math.abs(bpm - song0) < 0.15 ? 'samma som målet ✓' : `${bpm > song0 ? 'snabbare' : 'långsammare'} än målet`}` : ''}`, !sure);
+});
+document.getElementById('trkBpm').addEventListener('change', e => { if (active) active._bpm = Number(e.target.value) || null; });
+document.getElementById('bpmFit').addEventListener('click', async () => {
+  const t = active; if (!t || !t.clip || t.readOnly || isEmpty(t)) return;
+  const from = Number(document.getElementById('trkBpm').value), to = Number(document.getElementById('tgtBpm').value);
+  if (!(from >= 30 && from <= 300)) { toast('Ange spårets tempo först – tryck 📏 Mät BPM eller skriv in det'); return; }
+  if (!(to >= 30 && to <= 300)) { toast(songBpm() ? 'Ange måltempot' : 'Låten har inget tempo inställt – skriv in måltempot (eller ställ in låtens tempo i Röstövning → 🥁 Tempo & klick)'); return; }
+  const rate = to / from;
+  if (Math.abs(rate - 1) < 0.0005) { bpmStatus('Spåret har redan måltempot ✓'); return; }
+  if (rate < 0.5 || rate > 2) { toast('Skillnaden är för stor (mer än dubbelt/halva tempot) – kontrollera siffrorna'); return; }
+  const b = document.getElementById('bpmFit'); b.disabled = true;
+  bpmStatus(`Sträcker ${t.label} från ${from} till ${to} BPM… (kan ta några sekunder)`);
+  await new Promise(r => setTimeout(r, 40));
+  try {
+    applyEdit(t, AudioEdit.timeStretch(t.clip, rate), null, `Tempo ${from} → ${to} BPM`);
+    t._bpm = to; document.getElementById('trkBpm').value = to;
+    bpmStatus(`Klart – ${t.label} har nu ${to.toLocaleString('sv-SE')} BPM. Finjustera starten med ← → så att första slaget ligger på taktstrecket.`);
+  } catch (e) { bpmStatus('Kunde inte ändra tempot: ' + (e.message || e), true); }
+  b.disabled = false; updateSync();
+});
 // egen kopia av ett spår (låtens stämma eller någon annans inspelning): nytt eget spår på samma plats i låten
 function cloneTrack(t) {
   if (!t || !t.clip || isEmpty(t) || !me) return;
@@ -562,7 +732,7 @@ function updateRecTools() {
   if (locked) lockRow.querySelector('[data-r=lockText]').innerHTML = t.kind === 'stem'
     ? `<b>🔒 ${esc(t.label)} är låtens stämma och är skrivskyddad.</b> Gör en egen kopia för att klippa, flytta eller ändra den – originalet påverkas inte.`
     : `<b>🔒 ${esc(t.label)} är någon annans inspelning.</b> Gör en egen kopia om du vill redigera den.`;
-  renderBackups();
+  renderBackups(); updateSync();
   document.getElementById('recRow1').hidden = !mine;
   ['recDelete'].forEach(id => { document.getElementById(id).hidden = !isRec || !(mine || (isAdmin && t.id)); });
   document.getElementById('toStem').hidden = !(isAdmin && isRec);
@@ -1363,6 +1533,13 @@ async function loadSong(id) {
   lines = parseLrc(song.lyrics_lrc || ''); lyIdx = -2;
   document.getElementById('lyric').hidden = !lines.some(l => l.text);
   document.getElementById('clickOpt').hidden = !(Number(song.bpm) >= 20);
+  document.getElementById('gridOpt').hidden = !songBpm();
+  document.getElementById('bpmBadge').hidden = !songBpm();
+  if (songBpm()) {
+    document.getElementById('bpmVal').textContent = (Math.round(songBpm() * 10) / 10).toLocaleString('sv-SE');
+    document.getElementById('meterVal').textContent = `· ${Math.max(1, Number(song.beats_per_bar) || 4)}/4`;
+  }
+  document.getElementById('tgtBpm').value = songBpm() || ''; tempoFor = null;
   document.getElementById('studio').hidden = false;
   takeNo = tracks.filter(t => t.kind === 'rec' && t.mine).length;
   if (isAdmin) {
@@ -1432,6 +1609,8 @@ document.getElementById('calibBtn').addEventListener('click', () => { const c = 
 document.getElementById('calibGo').addEventListener('click', async () => { await ensureCtx(); calibrate(); });
 document.getElementById('latency').addEventListener('change', e => { try { localStorage.setItem('hv-rec-latency', String(Math.round(Number(e.target.value) || 0))); } catch (x) {} });
 document.getElementById('optClick').addEventListener('change', restartIfPlaying);
+document.getElementById('optGrid').addEventListener('change', e => { try { localStorage.setItem('hv-studio-grid', e.target.checked ? '1' : '0'); } catch (x) {} tl.draw(); });
+try { if (localStorage.getItem('hv-studio-grid') === '0') document.getElementById('optGrid').checked = false; } catch (e) {}
 document.addEventListener('keydown', e => {
   // mellanslag = spela/pausa överallt utom när man skriver text (även när en knapp, ett reglage eller en lista har fokus)
   if (e.code === 'Space' && !e.target.matches("input:not([type=checkbox]):not([type=range]):not([type=radio]):not([type=button]):not([type=submit]):not([type=color]):not([type=file]), textarea, [contenteditable=''], [contenteditable=true]")) {
@@ -1447,6 +1626,13 @@ document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'r' || e.key === 'R') { document.getElementById('recBtn').click(); return; }
   if (e.key === 'Delete' || e.key === 'Backspace') { if (sel) { e.preventDefault(); if (active && active.readOnly) toast('Spåret är låst – tryck ⧉ Gör egen kopia för att redigera en kopia'); else panel.cut(); } return; }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {   // flytta valt spår (Shift = 10 × steget)
+    if (!song || !active) return;
+    e.preventDefault();
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+    nudgeActive((e.key === 'ArrowRight' ? 1 : -1) * nudgeStep() * (e.shiftKey ? 10 : 1));
+    return;
+  }
   if (e.key === 'm' || e.key === 'M') { tl.addMarker(position()); return; }
   if (e.key === '+') { tl.zoom(2); return; }
   if (e.key === '-') { tl.zoom(0.5); return; }

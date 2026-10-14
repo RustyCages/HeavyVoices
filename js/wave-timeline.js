@@ -7,6 +7,7 @@
 //     onSeek(t), onOffset(track, ms, live), onActive(track), onSelection(sel),
 //     renderHead(track, headEl),   // knappar/namn ovanför vågformen (sidans egna)
 //     renderFoot(track, footEl),   // valfri rad under vågformen
+//     getBeats(),                  // valfritt: { bpm, offset, bpb } ritar taktrutnät i spåren
 //   });
 //   Spår: { key, color, clip:{sampleRate,channels}, peaks, offsetMs, locked? }  (locked = går inte att dra)
 //   tl.render() bygger om raderna, tl.draw() ritar om, tl.tick() följer spelhuvudet.
@@ -76,6 +77,20 @@
       }
       markers.forEach(m => { ctx.fillStyle = '#facc15'; ctx.fillText('⚑', xOf(m) * dpr - 4 * dpr, 12 * dpr); });
     }
+    // valfritt taktrutnät: o.getBeats() → { bpm, offset (s), bpb } eller null. Taktstreck starkare än slag.
+    function drawGrid(ctx, W, H, dpr) {
+      const g = o.getBeats && o.getBeats(); if (!g || !(g.bpm >= 20)) return;
+      const per = 60 / g.bpm, bpb = Math.max(1, g.bpb || 4), off = g.offset || 0, beatPx = per * view.pps;
+      if (beatPx * bpb < 10) return;   // för utzoomat – rutnätet blir bara brus
+      const end = view.t0 + W / dpr / view.pps;
+      for (let k = Math.ceil((view.t0 - off) / per), n = 0; n < 20000; k++, n++) {
+        const t = off + k * per; if (t > end) break;
+        const bar = ((k % bpb) + bpb) % bpb === 0;
+        if (!bar && beatPx < 8) continue;
+        ctx.fillStyle = bar ? 'rgba(229,169,104,0.35)' : 'rgba(255,255,255,0.08)';
+        ctx.fillRect(Math.round(xOf(t) * dpr), 0, Math.max(1, Math.round(dpr)), H);
+      }
+    }
     function drawTrack(tr) {
       const c = tr._canvas; if (!c || !c.isConnected) return;
       const dpr = sizeCanvas(c), ctx = c.getContext('2d'), W = c.width, H = c.height, mid = H / 2;
@@ -84,6 +99,7 @@
       ctx.fillStyle = act ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.015)'; ctx.fillRect(0, 0, W, H);
       const a = xOf(offS(tr)) * dpr, b = xOf(offS(tr) + dur(tr)) * dpr;
       ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(Math.max(0, a), 0, Math.min(W, b) - Math.max(0, a), H);
+      drawGrid(ctx, W, H, dpr);
       if (sel && sel.track === tr) {
         const s0 = xOf(Math.min(sel.a, sel.b)) * dpr, s1 = xOf(Math.max(sel.a, sel.b)) * dpr;
         ctx.fillStyle = 'rgba(96,165,250,0.25)'; ctx.fillRect(s0, 0, s1 - s0, H);

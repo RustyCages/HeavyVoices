@@ -92,6 +92,13 @@
   .sync-row .nudge-val { min-width: 4.8rem; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
   .sync-row .nudge-val.changed { color: var(--accent); }
   .sync-row select { width: auto; }
+  .fx-row input[type=range] { width: 8.5rem; margin: 0; padding: 0; accent-color: var(--accent); }
+  .fx-row .fx-ctl { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+  .fx-row .fx-ctl b { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 3.4rem; color: var(--text); }
+  .fx-row .fx-ctl small { color: var(--text-muted); font-size: 0.72rem; }
+  .fx-row select { width: auto; }
+  #fxRevOn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #111317; }
+  .tag.fx { color: #93c5fd; border-color: rgba(147,197,253,0.5); }
   .sync-row kbd { font: inherit; font-size: 0.75rem; padding: 0 0.3rem; border: 1px solid var(--border); border-radius: 0.25rem; }
   .tag.lock { color: var(--text-muted); }
   .tag.unlocked { color: #facc15; border-color: rgba(250,204,21,0.5); }
@@ -157,7 +164,7 @@
       <li><div><b>Kalibrera – en gång per dator eller telefon</b><p>Tryck <b>🎯 Kalibrera</b> och sedan <b>Starta</b>. Klappa i takt med de 8 klicken. Sidan mäter hur lång fördröjning dina hörlurar har, så att inspelningen hamnar i takt. Värdet sparas, så du behöver bara göra om det om du byter hörlurar.</p></div></li>
       <li><div><b>Spela in</b><p>Klicka i tidslinjen där du vill börja och tryck <b>⏺ Spela in</b>. Låten börjar spela – med <b>Inräkning</b> startar den 2 sekunder före, så du hinner komma in. Sjung! Tryck <b>⏹ Stoppa</b> (eller mellanslag) när du är klar. Den gröna mätaren visar att mikrofonen hör dig.</p></div></li>
       <li><div><b>Lyssna</b><p>Din tagning dyker upp som ett rött spår. Tryck ▶ och lyssna tillsammans med låten. Inte nöjd? Spela in en gång till – varje försök blir ett eget spår, och du tar bort de du inte vill ha med papperskorgen 🗑 längst till höger på spårets rad. Vill du ha ett tomt spår att spela in eller klistra in i? Tryck <b>➕ Nytt tomt spår</b>, välj det och tryck <b>⏺ Spela in</b>.</p></div></li>
-      <li><div><b>Putsa (om du vill)</b><p>Låtens stämmor är 🔒 <b>låsta</b> och kan inte ändras. Vill du utgå från en stämma, tryck <b>⧉ Kopia</b> på dess rad – kopian blir ditt eget spår som du kan klippa och spara. Ligger inspelningen lite fel i tid? Slå på <b>↔ Flytta</b> och dra det röda spåret i sidled – klicka på Flytta igen när du är klar, så kan inget hamna ur synk av misstag. För finjustering: klicka på spåret och tryck <b>←</b> / <b>→</b> (Shift = större steg), eller använd knapparna och reglaget på raden <b>Synk</b>. Med <b>Taktrutnät</b> på syns låtens takter som streck i spåren. Har spåret fel tempo? Tryck <b>📏 Mät BPM</b> och sedan <b>⇔ Sträck till måltempot</b> – tonhöjden ändras inte. Utan valt verktyg drar du i spåren för att bläddra i låten (eller Shift + mushjulet). Vill du ta bort ett harkel? Välj <b>▭ Markera</b>, dra över biten och tryck <b>🔇 Tysta markerat</b> (eller Delete) – resten av spåret ligger kvar i synk. <b>✂ Ta bort och dra ihop</b> (Shift+Delete) klipper bort biten så att allt efter flyttas tidigare, och <b>⌗ Beskär</b> behåller bara det markerade på samma plats. Vill du använda en bra bit igen – t.ex. en refräng – markera den, tryck <b>⎘ Kopiera markerat</b>, klicka i spåret du vill lägga den i, ställ spelhuvudet och tryck <b>📋 Klistra in</b> (<b>Ersätt</b> skriver över, <b>Infoga</b> skjuter resten framåt, <b>Lägg ovanpå</b> mixar ihop). <b>📶 Normalisera</b> gör en svag inspelning starkare, och under <b>Volym</b> höjer eller sänker du hela spåret eller bara det markerade (t.ex. +3 dB). <b>↶ Ångra</b> tar tillbaka.</p></div></li>
+      <li><div><b>Putsa (om du vill)</b><p>Låtens stämmor är 🔒 <b>låsta</b> och kan inte ändras. Vill du utgå från en stämma, tryck <b>⧉ Kopia</b> på dess rad – kopian blir ditt eget spår som du kan klippa och spara. Ligger inspelningen lite fel i tid? Slå på <b>↔ Flytta</b> och dra det röda spåret i sidled – klicka på Flytta igen när du är klar, så kan inget hamna ur synk av misstag. För finjustering: klicka på spåret och tryck <b>←</b> / <b>→</b> (Shift = större steg), eller använd knapparna och reglaget på raden <b>Synk</b>. Med <b>Taktrutnät</b> på syns låtens takter som streck i spåren. Har spåret fel tempo? Tryck <b>📏 Mät BPM</b> och sedan <b>⇔ Sträck till måltempot</b> – tonhöjden ändras inte. Under <b>Effekter</b> slår du på <b>🌫 Reverb</b> (efterklang), väljer ett rum och finjusterar med reglagen medan du lyssnar. Reverben hörs direkt men läggs i filen först när du trycker <b>🔥 Lägg på i spåret</b> (eller när du sparar och svarar ja). Utan valt verktyg drar du i spåren för att bläddra i låten (eller Shift + mushjulet). Vill du ta bort ett harkel? Välj <b>▭ Markera</b>, dra över biten och tryck <b>🔇 Tysta markerat</b> (eller Delete) – resten av spåret ligger kvar i synk. <b>✂ Ta bort och dra ihop</b> (Shift+Delete) klipper bort biten så att allt efter flyttas tidigare, och <b>⌗ Beskär</b> behåller bara det markerade på samma plats. Vill du använda en bra bit igen – t.ex. en refräng – markera den, tryck <b>⎘ Kopiera markerat</b>, klicka i spåret du vill lägga den i, ställ spelhuvudet och tryck <b>📋 Klistra in</b> (<b>Ersätt</b> skriver över, <b>Infoga</b> skjuter resten framåt, <b>Lägg ovanpå</b> mixar ihop). <b>📶 Normalisera</b> gör en svag inspelning starkare, och under <b>Volym</b> höjer eller sänker du hela spåret eller bara det markerade (t.ex. +3 dB). <b>↶ Ångra</b> tar tillbaka.</p></div></li>
       <li><div><b>Röstverktyg (på dator)</b><p><b>🎵 Tonhöjd</b>: markera en fras och gör ett nytt spår med ny tonhöjd – välj <b>halvtoner</b> (allt flyttas lika mycket) eller <b>steg i tonarten</b> (t.ex. <i>ters över</i>, så som en stämma sjungs). Tempot ändras inte. Bäst upp till ungefär 4–5 halvtoner, längre än så låter det lätt konstlat. <b>🎹 Syntröst</b>: en datorröst som sjunger ”ooh”, ”aah” eller ”mmm” på en stämmas noter från Röstövning – samma toner eller som en stämma över/under. Bra för att höra hur en harmoni låter innan någon sjungit in den. <b>🧽 Rengör</b>: behåller tonen som sjungs och dämpar andra stämmor och brus – välj <i>Bara brus</i> om du bara vill ta bort sus från din inspelning. <b>🤖 AI-separera</b>: delar upp ett spår – t.ex. en inspelning av hela låten – i sång och komp (eller sång, trummor, bas, övrigt). Det körs på din egen dator och är gratis; första gången laddas en AI-modell ner, sedan går det fortare. Snabbast i Chrome eller Edge på en dator med grafikkort. Sången blir alla stämmor ihop – kör sedan <b>Rengör</b> på sångspåret för att lyfta fram en stämma.</p></div></li>
       <li><div><b>Spara</b><p>Skriv ett namn, till exempel ”Ters över refrängen”, välj vem som får höra den och tryck <b>💾 Spara inspelning</b>. Den hamnar under <b>Mina inspelningar</b> längst ner på sidan.</p></div></li>
     </ol>
@@ -272,6 +279,7 @@
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/audio-edit.js"></script>
+<script src="/js/effects.js"></script>
 <script src="/js/wave-timeline.js"></script>
 <script src="/js/track-edit-panel.js"></script>
 <script src="/js/wav-convert.js"></script>
@@ -345,7 +353,8 @@ function positionNow() { return playing ? startPos + (audioCtx.currentTime - sta
 function position() { return positionNow(); }
 function audible(t) { const anySolo = tracks.some(x => x.solo); return anySolo ? t.solo : !t.muted; }
 function gainOf(t) { return audible(t) ? (t.vol ?? 1) : 0; }
-function stopSources() { sources.forEach(({ src }) => { try { src.stop(); } catch (e) {} try { src.disconnect(); } catch (e) {} }); sources = []; }
+function stopSources() { sources.forEach(({ src, fx }) => { try { src.stop(); } catch (e) {} try { src.disconnect(); } catch (e) {} if (fx) { try { fx.output.disconnect(); } catch (e) {} } }); sources = []; }
+const hasReverb = t => !!(t && t.fx && t.fx.reverb && t.fx.reverb.on && t.fx.reverb.mix > 0);
 function startAt(pos) {
   stopSources();
   const when = audioCtx.currentTime + 0.06;
@@ -356,9 +365,11 @@ function startAt(pos) {
     if (inFile >= t.buffer.duration) return;
     const src = audioCtx.createBufferSource(); src.buffer = t.buffer;
     const g = audioCtx.createGain(); g.gain.value = gainOf(t);
-    src.connect(g); g.connect(audioCtx.destination);
+    let fx = null;
+    if (hasReverb(t)) { fx = Effects.reverbChain(audioCtx, t.fx.reverb); src.connect(g); g.connect(fx.input); fx.output.connect(audioCtx.destination); }
+    else { src.connect(g); g.connect(audioCtx.destination); }
     if (inFile >= 0) src.start(when, inFile); else src.start(when - inFile, 0);
-    sources.push({ t, src, gain: g });
+    sources.push({ t, src, gain: g, fx });
   });
   if (document.getElementById('optClick').checked) scheduleClicks(when, pos);
   playing = true;
@@ -612,6 +623,87 @@ document.getElementById('nudgeReset').addEventListener('click', () => {
 });
 syncLabels();
 
+// ---------- effekter (per spår): reverb live i uppspelningen, kan läggas på i filen ----------
+const fxBox = document.createElement('div');
+fxBox.innerHTML = `
+  <div class="tool-row fx-row" id="fxRow">
+    <span class="k">Effekter</span>
+    <button type="button" class="btn-outline" id="fxRevOn" aria-pressed="false" title="Slå på/av reverb (efterklang) för valt spår – hörs direkt när du spelar">🌫 Reverb av</button>
+    <select id="fxPreset" title="Färdiga rum – finjustera med reglagen">
+      <option value="">Välj rum…</option>
+      ${Effects.REVERB_PRESETS.map(p => `<option value="${p.id}">${p.label}</option>`).join('')}
+    </select>
+    <label class="fx-ctl" title="Hur mycket eko som blandas in – 0 % = torrt">Mängd <input type="range" id="fxMix" min="0" max="100" step="1"> <b id="fxMixV"></b></label>
+    <label class="fx-ctl" title="Hur länge ekot klingar – litet rum ≈ 0,5 s, kyrka ≈ 4–5 s">Rum <input type="range" id="fxSize" min="0.3" max="8" step="0.1"> <b id="fxSizeV"></b></label>
+    <label class="fx-ctl" title="Mörkt eko låter varmt och avlägset, ljust eko luftigt">Ton <small>mörk</small><input type="range" id="fxTone" min="0" max="100" step="1"><small>ljus</small></label>
+    <label class="fx-ctl" title="Tid innan ekot börjar – lite förfördröjning håller rösten tydlig">Förfördröjning <input type="range" id="fxPre" min="0" max="150" step="1"> <b id="fxPreV"></b></label>
+  </div>
+  <div class="tool-row fx-row" id="fxRow2">
+    <span class="k"></span>
+    <button type="button" class="btn-outline" id="fxReset" title="Standardinställning för reverb">⟲ Nollställ</button>
+    <button type="button" class="btn-outline" id="fxBake" title="Gör reverben till en del av ljudfilen (går att ångra). Spåret blir lite längre av efterklangen.">🔥 Lägg på i spåret</button>
+    <span class="status" id="fxStatus">Reverben hörs live medan du lyssnar – den finns inte i filen förrän du trycker 🔥 Lägg på i spåret.</span>
+  </div>`;
+document.getElementById('tempoRow').after(...fxBox.children);
+const fxEl = id => document.getElementById(id);
+function fxStatus(msg, warn) { const e = fxEl('fxStatus'); e.textContent = msg; e.classList.toggle('warn', !!warn); }
+const revOf = t => { if (!t.fx) t.fx = {}; if (!t.fx.reverb) t.fx.reverb = { ...Effects.REVERB_DEFAULT }; return t.fx.reverb; };
+const FX_HINT = 'Reverben hörs live medan du lyssnar – den finns inte i filen förrän du trycker 🔥 Lägg på i spåret.';
+let fxFor = null;
+function fxShow() {
+  const t = active, show = !!(t && t.clip && !isEmpty(t));
+  if (fxFor !== t) { fxFor = t; fxStatus(FX_HINT); }
+  fxEl('fxRow').hidden = fxEl('fxRow2').hidden = !show; if (!show) return;
+  const r = revOf(t);
+  fxEl('fxRevOn').setAttribute('aria-pressed', String(r.on)); fxEl('fxRevOn').textContent = r.on ? '🌫 Reverb på' : '🌫 Reverb av';
+  fxEl('fxMix').value = Math.round(r.mix * 100); fxEl('fxMixV').textContent = Math.round(r.mix * 100) + ' %';
+  fxEl('fxSize').value = r.size; fxEl('fxSizeV').textContent = r.size.toFixed(1).replace('.', ',') + ' s';
+  fxEl('fxTone').value = Math.round(r.tone * 100);
+  fxEl('fxPre').value = r.pre; fxEl('fxPreV').textContent = Math.round(r.pre) + ' ms';
+  const p = Effects.REVERB_PRESETS.find(p => p.mix === r.mix && p.size === r.size && p.tone === r.tone && p.pre === r.pre);
+  fxEl('fxPreset').value = p ? p.id : '';
+  ['fxPreset', 'fxMix', 'fxSize', 'fxTone', 'fxPre', 'fxReset'].forEach(id => { fxEl(id).disabled = !r.on; });
+  fxEl('fxBake').disabled = !r.on || !!t.readOnly;
+  fxEl('fxBake').title = t.readOnly ? 'Spåret är låst – gör en egen kopia (⧉) för att lägga på reverben i filen. Du kan ändå lyssna med reverb här.' : 'Gör reverben till en del av ljudfilen (går att ångra). Spåret blir lite längre av efterklangen.';
+}
+// ändra inställning: hörs direkt om spåret spelar; på/av kräver ny kedja → starta om uppspelningen
+function fxSet(patch) {
+  const t = active; if (!t) return;
+  const r = revOf(t), wasOn = hasReverb(t);
+  Object.assign(r, patch, Effects.normReverb({ ...r, ...patch }));
+  const nowOn = hasReverb(t);
+  if (wasOn !== nowOn) { restartIfPlaying(); tl.render(); setActive(t); }
+  else sources.forEach(x => { if (x.t === t && x.fx) x.fx.update(r); });
+  fxShow();
+}
+fxEl('fxRevOn').addEventListener('click', () => { const r = active && revOf(active); if (r) { fxStatus(FX_HINT); fxSet({ on: !r.on }); fxEl('fxRevOn').blur(); } });
+fxEl('fxPreset').addEventListener('change', e => { const p = Effects.REVERB_PRESETS.find(p => p.id === e.target.value); if (p) fxSet({ mix: p.mix, size: p.size, tone: p.tone, pre: p.pre }); });
+fxEl('fxMix').addEventListener('input', e => fxSet({ mix: Number(e.target.value) / 100 }));
+fxEl('fxTone').addEventListener('input', e => fxSet({ tone: Number(e.target.value) / 100 }));
+fxEl('fxPre').addEventListener('input', e => fxSet({ pre: Number(e.target.value) }));
+// rumsstorlek räknar om ekot – vänta tills reglaget står still en kort stund
+fxEl('fxSize').addEventListener('input', e => {
+  fxEl('fxSizeV').textContent = Number(e.target.value).toFixed(1).replace('.', ',') + ' s';
+  clearTimeout(fxSet._t); fxSet._t = setTimeout(() => fxSet({ size: Number(e.target.value) }), 120);
+});
+fxEl('fxReset').addEventListener('click', () => { const d = Effects.REVERB_DEFAULT; fxSet({ mix: d.mix, size: d.size, tone: d.tone, pre: d.pre }); });
+// spårets ljud med effekter (för nedladdning och mix)
+async function clipWithFx(t) { return hasReverb(t) ? await Effects.renderReverb(t.clip, t.fx.reverb) : t.clip; }
+async function bakeReverb(t) {
+  if (!t || !hasReverb(t) || t.readOnly) return false;
+  fxEl('fxBake').disabled = true; fxStatus(`Lägger på reverb i ${t.label}…`);
+  try {
+    const r = t.fx.reverb, c = await Effects.renderReverb(t.clip, r);
+    const peak = c.peak; delete c.peak;
+    applyEdit(t, c, null, `Reverb (${Math.round(r.mix * 100)} %, ${r.size.toFixed(1).replace('.', ',')} s)`);
+    r.on = false; tl.render(); setActive(t); restartIfPlaying();
+    fxStatus(peak > 1 ? `Reverben är inlagd – varning: ljudet slår i taket (${(20 * Math.log10(peak)).toFixed(1)} dB för högt). Ångra och sänk mängden, eller sänk volymen på spåret.` : 'Reverben är inlagd i spåret ✓ (↶ Ångra tar bort den). Glöm inte att spara.', peak > 1);
+    return true;
+  } catch (e) { fxStatus('Kunde inte lägga på reverb: ' + (e.message || e), true); return false; }
+  finally { fxShow(); }
+}
+fxEl('fxBake').addEventListener('click', () => bakeReverb(active));
+
 // ungefärligt tempo: ansatskurva (5 ms-steg) → autokorrelation, med extra vikt för tempon kring 120
 function estimateBpm(clip) {
   const sr = clip.sampleRate, c0 = clip.channels[0], c1 = clip.channels[1] || c0;
@@ -694,7 +786,7 @@ function renderHead(t, head) {
       : '<span class="tag lock" title="Låtens stämma är skrivskyddad – gör en egen kopia för att redigera">🔒 låst</span>');
   const canClone = t.readOnly && t.clip && !isEmpty(t);
   head.innerHTML = `
-    <span class="t-name" title="Välj spåret"><i style="background:${t.color}"></i>${esc(t.label)}${tags}</span>
+    <span class="t-name" title="Välj spåret"><i style="background:${t.color}"></i>${esc(t.label)}${tags}${hasReverb(t) ? '<span class="tag fx" title="Reverb hörs live – inte inbakat i filen än">reverb</span>' : ''}</span>
     <span class="t-ctrl">
       ${adminStem ? `<span class="ms-ctrl"><button class="btn-outline" data-d="-50">−50</button><button class="btn-outline" data-d="-10">−10</button><input type="number" step="1" aria-label="Förskjutning i ms"><span class="unit">ms</span><button class="btn-outline" data-d="10">+10</button><button class="btn-outline" data-d="50">+50</button></span>` : ''}
       ${t.kind === 'rec' ? '<span class="ms" title="Var inspelningen ligger i låten"></span>' : ''}
@@ -732,7 +824,7 @@ function updateRecTools() {
   if (locked) lockRow.querySelector('[data-r=lockText]').innerHTML = t.kind === 'stem'
     ? `<b>🔒 ${esc(t.label)} är låtens stämma och är skrivskyddad.</b> Gör en egen kopia för att klippa, flytta eller ändra den – originalet påverkas inte.`
     : `<b>🔒 ${esc(t.label)} är någon annans inspelning.</b> Gör en egen kopia om du vill redigera den.`;
-  renderBackups(); updateSync();
+  renderBackups(); updateSync(); fxShow();
   document.getElementById('recRow1').hidden = !mine;
   ['recDelete'].forEach(id => { document.getElementById(id).hidden = !isRec || !(mine || (isAdmin && t.id)); });
   document.getElementById('toStem').hidden = !(isAdmin && isRec);
@@ -758,6 +850,7 @@ function applyEdit(t, clip, newOffsetMs, note) {
 }
 function undo(t) {
   if (!t || !t.undo || !t.undo.length) return;
+  fxFor = null;
   const u = t.undo.pop(); t.clip = u.clip; t.offsetMs = u.offsetMs; setPeaks(t); t.edited = t.clip !== t.orig;
   tl.render(); setActive(t); restartIfPlaying(); updateSaveState(); panel.status('Ångrat');
 }
@@ -1070,6 +1163,9 @@ document.getElementById('recTitle').addEventListener('change', () => tl.render()
 document.getElementById('recVis').addEventListener('change', e => { if (active && active.mine) { active.visibility = e.target.value; updateRecTools(); } });
 document.getElementById('recSave').addEventListener('click', async () => {
   const t = active; if (!t || !t.mine || !t.clip) return;
+  if (hasReverb(t) && confirm(`Reverben på ”${t.label}” hörs bara här i Studio än. Lägga på den i inspelningen innan den sparas?\n\nOK = spara med reverb · Avbryt = spara utan`)) {
+    if (!(await bakeReverb(t))) return;
+  }
   const btn = document.getElementById('recSave'); btn.disabled = true;
   try {
     const row = { title: t.label, offset_ms: t.offsetMs, visibility: t.visibility, duration: Math.round(tDur(t) * 100) / 100, song_id: song.id, updated_at: new Date().toISOString() };
@@ -1095,14 +1191,15 @@ document.getElementById('recSave').addEventListener('click', async () => {
 });
 document.getElementById('dlVoice').addEventListener('click', async () => {
   const t = active; if (!t || !t.clip) return;
-  try { const { blob, ext } = await encodeTrack(t.clip); download(blob, `${safeName(song.title)}-${safeName(t.label)}.${ext}`); setRecStatus(''); }
+  try { const { blob, ext } = await encodeTrack(await clipWithFx(t)); download(blob, `${safeName(song.title)}-${safeName(t.label)}.${ext}`); setRecStatus(''); }
   catch (e) { toast('Kunde inte skapa filen: ' + (e.message || e)); }
 });
 document.getElementById('dlMix').addEventListener('click', async () => {
-  const parts = tracks.filter(t => t.clip && gainOf(t) > 0).map(t => ({ clip: t.clip, offsetSec: offS(t), gain: gainOf(t) }));
-  if (!parts.length) { toast('Inget spår hörs – slå på något först'); return; }
+  const audibleT = tracks.filter(t => t.clip && gainOf(t) > 0);
+  if (!audibleT.length) { toast('Inget spår hörs – slå på något först'); return; }
   setRecStatus('Mixar…'); await new Promise(r => setTimeout(r, 30));
   try {
+    const parts = await Promise.all(audibleT.map(async t => ({ clip: await clipWithFx(t), offsetSec: offS(t), gain: gainOf(t) })));
     const mix = AudioEdit.mixdown(parts, getCtx().sampleRate, 0);
     const { blob, ext } = await encodeTrack(mix); download(blob, `${safeName(song.title)}-mix.${ext}`); setRecStatus('');
   } catch (e) { toast('Kunde inte mixa: ' + (e.message || e)); }

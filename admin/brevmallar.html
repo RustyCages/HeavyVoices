@@ -28,6 +28,7 @@
   <a href="/admin/medlemmar.html" class="back-btn">&larr; Tillbaka till Medlemmar</a>
   <h1>Brevmallar</h1>
   <p class="text-muted">Skapa och redigera mallar för mejl och brev till medlemmarna. Platshållare byts ut när du förhandsgranskar eller öppnar mallen i din e-post.</p>
+  <p class="text-muted" style="font-size:0.88rem;">⚡ Mallen <strong>Välkommen ny medlem</strong> skickas automatiskt till en ny medlem när du godkänner hen under Medlemmar. Ändra gärna texten, men behåll namnet på mallen, annars skickas en enklare standardtext.</p>
 
   <div class="tpl-layout">
     <div class="card">
@@ -87,7 +88,7 @@ function fill(text) {
 function renderList() {
   const el = $('tplList');
   if (!templates.length) { el.innerHTML = '<p class="text-muted">Inga mallar än.</p>'; return; }
-  el.innerHTML = templates.map(t => `<button type="button" class="tpl-item${current && current.id === t.id ? ' active' : ''}" data-id="${t.id}">${esc(t.name)}</button>`).join('');
+  el.innerHTML = templates.map(t => `<button type="button" class="tpl-item${current && current.id === t.id ? ' active' : ''}" data-id="${t.id}">${esc(t.name)}${t.name === 'Välkommen ny medlem' ? ' <span title="Skickas automatiskt när en medlem godkänns">⚡</span>' : ''}</button>`).join('');
   el.querySelectorAll('.tpl-item').forEach(b => b.onclick = () => select(templates.find(t => t.id === b.dataset.id)));
 }
 

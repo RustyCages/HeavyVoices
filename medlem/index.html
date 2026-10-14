@@ -285,9 +285,9 @@ async function loadCheckin(member) {
   const list = document.getElementById('checkinList');
   list.innerHTML = '';
 
-  // Krysset visas när man är incheckad på allt idag
+  // Krysset visas när man är incheckad eller har markerat frånvaro på allt idag
   const closeBtn = document.getElementById('checkinClose');
-  const updateClose = () => { closeBtn.hidden = !!list.querySelector('.checkin-btn'); };
+  const updateClose = () => { closeBtn.hidden = !!list.querySelector('.checkin-btn:not(.absence-btn):not(.absence-undo)'); };
   closeBtn.onclick = () => {
     document.getElementById('checkinCard').hidden = true;
     try { localStorage.setItem(closedKey, today); } catch (e) {}

@@ -275,6 +275,12 @@ async function loadCheckin(member) {
     .from('attendance').select('event_id, checked_in_at')
     .eq('member_id', member.id).in('event_id', events.map(e => e.id));
   const checked = new Map((mine || []).map(a => [String(a.event_id), a.checked_in_at]));
+  // Frånvaro ("kan inte närvara"). Om tabellen saknas (migrationen inte körd) döljs knappen.
+  const { data: absRows, error: absErr } = await supabaseClient
+    .from('event_absences').select('event_id')
+    .eq('member_id', member.id).in('event_id', events.map(e => e.id));
+  const absenceOk = !absErr;
+  const absent = new Set((absRows || []).map(a => String(a.event_id)));
 
   const list = document.getElementById('checkinList');
   list.innerHTML = '';
@@ -300,9 +306,23 @@ async function loadCheckin(member) {
       updateClose();
     };
 
-    if (checked.has(String(ev.id))) {
-      showChecked(checked.get(String(ev.id)));
-    } else {
+    const showAbsent = () => {
+      action.innerHTML = `<span class="checked-out">✗ Kan inte närvara</span> <button type="button" class="checkin-btn btn-outline absence-undo">Ångra</button>`;
+      action.querySelector('.absence-undo').addEventListener('click', async (e) => {
+        e.currentTarget.disabled = true;
+        const { error } = await supabaseClient.from('event_absences').delete()
+          .eq('event_id', ev.id).eq('member_id', member.id);
+        if (error) { e.currentTarget.disabled = false; alert('Kunde inte ångra: ' + error.message); return; }
+        absent.delete(String(ev.id));
+        renderRow();
+      });
+      updateClose();
+    };
+
+    const renderRow = () => {
+      action.innerHTML = '';
+      if (checked.has(String(ev.id))) { showChecked(checked.get(String(ev.id))); return; }
+      if (absent.has(String(ev.id))) { showAbsent(); return; }
       const btn = document.createElement('button');
       btn.className = 'checkin-btn';
       btn.textContent = 'Checka in';
@@ -320,7 +340,24 @@ async function loadCheckin(member) {
         showChecked(data.checked_in_at);
       });
       action.appendChild(btn);
-    }
+      if (absenceOk) {
+        const no = document.createElement('button');
+        no.type = 'button';
+        no.className = 'checkin-btn btn-outline absence-btn';
+        no.textContent = 'Kan inte';
+        no.title = 'Markera att du inte kan närvara';
+        no.addEventListener('click', async () => {
+          no.disabled = true;
+          const { error } = await supabaseClient.from('event_absences').insert({ event_id: ev.id, member_id: member.id });
+          if (error && error.code !== '23505') { no.disabled = false; alert('Kunde inte spara: ' + error.message); return; }
+          absent.add(String(ev.id));
+          renderRow();
+        });
+        action.appendChild(no);
+      }
+      updateClose();
+    };
+    renderRow();
     list.appendChild(row);
   });
   updateClose();

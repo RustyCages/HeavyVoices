@@ -804,12 +804,11 @@ function renderSongCard(s) {
     const keys = [...details.querySelectorAll('.stemCheck:checked')].map(c => c.value);
     if (!keys.length) { toast('Bocka i minst en stämma'); return; }
     const defs = getStemDefs(s).filter(d => keys.includes(d.key));
-    const vols = {};
-    details.querySelectorAll('.stemPreVol').forEach(r => { vols[r.dataset.key] = Number(r.value); });
+
     karaokeOn = true; splitOn = true;
     document.getElementById('karaokeBtn').classList.add('active');
     try { localStorage.setItem('hv-karaoke', 'on'); localStorage.setItem('hv-karaoke-split', 'on'); } catch (err) {}
-    playSongPreview(s, defs, 'preview-' + s.id + '-' + keys.join(','), vols);
+    playSongPreview(s, defs, 'preview-' + s.id + '-' + keys.join(','));
   });
   summary.querySelector('.pl-quick').addEventListener('click', e => {
     e.preventDefault(); e.stopPropagation();
@@ -839,7 +838,6 @@ function renderSongCard(s) {
   row.innerHTML = `
     <button class="track-play-btn" data-playlist-id="preview" data-row-id="preview-${s.id}-${def.key}" title="Förhandslyssna ${escapeHtml(def.label)}">${ICO.play}</button>
     <label><input type="checkbox" class="stemCheck" value="${def.key}" checked> ${escapeHtml(def.label)}</label>
-    <input type="range" min="0" max="100" value="100" class="stemPreVol" data-key="${def.key}" title="Volym innan start" aria-label="Volym ${escapeHtml(def.label)}" style="flex:1; min-width:0; max-width:160px; margin-left:auto;">
     `;
     checksWrap.appendChild(row);
     row.querySelector('.track-play-btn').addEventListener('click', () => {
@@ -1095,7 +1093,7 @@ function startPlaylist(pl, items, index) {
   activePlaylistId = pl.id;
   playTrackAt(index, 0);
 }
-function playSongPreview(song, stemDefs, previewId, presetVolumes) {
+function playSongPreview(song, stemDefs, previewId) {
   previewId = previewId || ('preview-' + song.id);
   if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
   const activeItem = (currentPlaylist && activePlaylistId === 'preview') ? currentPlaylist.items[currentIndex] : null;
@@ -1104,7 +1102,7 @@ function playSongPreview(song, stemDefs, previewId, presetVolumes) {
     return;
   }
   const volumes = {};
-  stemDefs.forEach(def => { volumes[def.key] = (presetVolumes && presetVolumes[def.key] != null) ? presetVolumes[def.key] : 100; });
+  stemDefs.forEach(def => { volumes[def.key] = 100; });
   const item = {
     rowId: previewId,
     playlistId: 'preview',

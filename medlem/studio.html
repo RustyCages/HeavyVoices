@@ -191,7 +191,7 @@
     <h3>Vem hör min inspelning?</h3>
     <p class="g-p">🔒 <b>Privat</b> – bara du. 👥 <b>Körledningen</b> – du och körledningen, bra när du vill visa en idé. 🌍 <b>Alla</b> – hela kören kan lyssna på den i Studio. Du kan ändra valet när du vill och spara igen.</p>
     <div class="tips">
-      <b>Tips:</b> Sjung in en stämma i taget och lyssna på den tillsammans med originalstämman. Sänk låtens volym eller tysta sångspåren om du vill höra dig själv tydligare. <b>⬇ Mix av det som hörs</b> laddar ner allt som är påslaget som en ljudfil – bra att skicka till någon. Kortkommandon på dator: <b>R</b> = spela in, <b>mellanslag</b> = spela/stoppa, <b>Ctrl+Z</b> = ångra, <b>Ctrl+C / Ctrl+V</b> = kopiera markerat / klistra in vid spelhuvudet.
+      <b>Tips:</b> Sjung in en stämma i taget och lyssna på den tillsammans med originalstämman. Sänk låtens volym eller tysta sångspåren om du vill höra dig själv tydligare. <b>⬇ Mix av det som hörs</b> laddar ner allt som är påslaget som en ljudfil – bra att skicka till någon. Kortkommandon på dator: <b>R</b> = spela in, <b>mellanslag</b> = spela/stoppa, <b>Ctrl+Z</b> = ångra, <b>Ctrl+C / Ctrl+V</b> = kopiera markerat / klistra in vid spelhuvudet, <b>Ctrl+Shift+C</b> = markerat till nytt spår på samma plats.
     </div>
   </div>
 
@@ -490,6 +490,11 @@ function setOffset(t, ms, live) {
 const panel = TrackEditPanel.mount(document.getElementById('panel'), {
   getTrack: () => active, getSelection: () => sel, getPosition: position, toast,
   onEdit: applyEdit, onUndo: undo, onOriginal: original,
+  onCopyToNew: (t, clip, offsetMs, len) => {
+    const c = addGenTrack(`${t.label} (${fmt(offsetMs / 1000, true)}–${fmt(offsetMs / 1000 + len, true)})`, clip, offsetMs);
+    c._row && c._row.scrollIntoView && c._row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    toast(`${len.toFixed(2)} s från ${t.label} i ett nytt spår – på samma plats i låten`);
+  },
   canUndo: t => !!(t && t.undo && t.undo.length), isEdited: t => !!(t && t.edited),
   extraRows: `
     <div class="vt desktop-only" id="vtBox">
@@ -1793,6 +1798,7 @@ document.addEventListener('keydown', e => {
   }
   if (e.target.matches('input, select, textarea')) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(active); return; }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c' && sel) { e.preventDefault(); panel.copyNew(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && sel) { e.preventDefault(); panel.copy(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') { e.preventDefault(); panel.paste(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;

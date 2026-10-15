@@ -43,6 +43,7 @@
       <div class="tool-row desktop-only">
         <span class="k">Kopiera</span>
         <button type="button" class="btn-outline" data-a="copy" title="Kopiera det markerade (Ctrl+C) – det går att markera i vilket spår som helst">⎘ Kopiera markerat</button>
+        ${o.onCopyToNew ? '<button type="button" class="btn-outline" data-a="copyNew" title="Lägg det markerade i ett nytt eget spår, på samma plats i låten (Ctrl+Shift+C) – fungerar även från låsta stämmor">⧉ Till nytt spår</button>' : ''}
         <select data-r="pmode" title="Hur biten läggs in i det valda spåret">
           <option value="replace">Ersätt</option>
           <option value="insert">Infoga</option>
@@ -149,6 +150,15 @@
         status(`Kopierat ${(b - a).toFixed(2)} s från ${tr.label} – klicka i spåret du vill klistra in i, ställ spelhuvudet och tryck Klistra in`);
         refresh();
       },
+      // markeringen till ett nytt spår som börjar exakt där markeringen ligger i låten
+      copyNew() {
+        if (!o.onCopyToNew) return;
+        const s = o.getSelection(), tr = s && s.track;
+        if (!s || !tr || !tr.clip || Math.abs(s.b - s.a) < 0.01) { toast('Markera först ett område (▭ Markera och dra) i spåret du vill kopiera från'); return; }
+        const a = fileT(tr, Math.min(s.a, s.b)), b = fileT(tr, Math.max(s.a, s.b));
+        if (b - a < 0.01) { toast('Markeringen ligger utanför spårets ljud'); return; }
+        o.onCopyToNew(tr, AudioEdit.crop(tr.clip, a, b), Math.round((tr.offsetMs || 0) + a * 1000), b - a);
+      },
       paste() {
         const tr = o.getTrack();
         if (!clipboard) { toast('Kopiera först en bit (markera och ⎘ Kopiera markerat)'); return; }
@@ -202,7 +212,7 @@
       }
       selInfo();
     }
-    return { el, refresh, status, selInfo, cut: () => act.cut(), mute: () => act.mute(), copy: () => act.copy(), paste: () => act.paste() };
+    return { el, refresh, status, selInfo, cut: () => act.cut(), mute: () => act.mute(), copy: () => act.copy(), copyNew: () => act.copyNew(), paste: () => act.paste() };
   }
   root.TrackEditPanel = { mount };
 })(window);

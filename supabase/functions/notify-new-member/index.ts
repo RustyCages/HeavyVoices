@@ -3,9 +3,9 @@
 //  1. INSERT med status 'pending'        → mejl till alla godkända admins (ny registrering)
 //  2. UPDATE 'pending' → 'approved'      → välkomstmejl till medlemmen (kontot godkänt)
 //
-// Välkomstmejlet hämtas från brevmallen WELCOME_TEMPLATE i tabellen letter_templates
-// (redigeras under Medlemmar → Brevmallar). Platshållare: {fornamn} {namn} {epost} {stamma} {datum}.
-// Saknas mallen skickas en inbyggd reservtext. Mejlet skickas från info@heavyvoices.se så att svar når kören.
+// Välkomstmejlet är den brevmall i letter_templates som har send_on_approval = true
+// (väljs under Medlemmar → Brevmallar, högst en åt gången). Ingen vald = inget välkomstmejl.
+// Platshållare: {fornamn} {namn} {epost} {stamma} {datum}. Skickas från info@heavyvoices.se så att svar når kören.
 //
 // Secrets (Edge Functions → Secrets):
 //   RESEND_API_KEY   – Resend API-nyckel (samma som används som SMTP-lösenord)
@@ -18,7 +18,6 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const SITE_URL = "https://heavyvoices.se";
 const FROM = "Heavy Voices <no-reply@heavyvoices.se>";      // admin-notisen
 const WELCOME_FROM = "Heavy Voices <info@heavyvoices.se>";  // välkomstmejlet – svar går till kören
-const WELCOME_TEMPLATE = "Välkommen ny medlem";
 const WELCOME_SIGNATURE = "Hälsningar,\nHeavy Voices";
 const LOGO_URL = "https://heavyvoices.se/icons/logo-large.png"; // vit logga, transparent PNG
 
@@ -213,27 +212,22 @@ function wrapHtml(body: string, signature: string): string {
 }
 
 async function sendWelcomeMail(apiKey: string, rec: any) {
-  // Hämta brevmallen; saknas den används reservtexten nedan
-  let subject = "Välkommen till Heavy Voices, {fornamn}!";
-  let body =
-    "Hej {fornamn}!\n\nDitt konto i Heavy Voices är nu godkänt. Logga in med e-postadressen {epost} och lösenordet du valde när du registrerade dig:\n" +
-    `${SITE_URL}/logga-in.html\n\nDär hittar du repertoar, stämfiler att öva med, sångtexter och kalendern.`;
-  let source = "fallback";
+  // Den brevmall som är vald för automatiskt utskick
   const { data: tpl, error: tplErr } = await db()
     .from("letter_templates")
-    .select("subject, body")
-    .eq("name", WELCOME_TEMPLATE)
-    .order("updated_at", { ascending: false })
+    .select("name, subject, body")
+    .eq("send_on_approval", true)
     .limit(1)
     .maybeSingle();
-  if (tplErr) console.error("Kunde inte läsa brevmallen:", tplErr);
-  if (tpl && String(tpl.body || "").trim()) {
-    subject = String(tpl.subject || "").trim() || subject;
-    body = String(tpl.body);
-    source = "template";
-  } else {
-    console.warn(`Brevmallen "${WELCOME_TEMPLATE}" saknas – skickar reservtexten`);
+  if (tplErr) {
+    console.error("Kunde inte läsa brevmallen:", tplErr);
+    return json({ error: "Could not load template" }, 500);
   }
+  if (!tpl || !String(tpl.body || "").trim()) {
+    return json({ skipped: "no template selected for approval" });
+  }
+  const subject = String(tpl.subject || "").trim() || "Välkommen till Heavy Voices, {fornamn}!";
+  const body = String(tpl.body);
 
   const subj = fillPlaceholders(subject, rec);
   const msg = fillPlaceholders(body.replace(/\r\n?/g, "\n").trim(), rec);
@@ -253,5 +247,5 @@ async function sendWelcomeMail(apiKey: string, rec: any) {
     console.error("Resend-fel (välkomstmejl):", res.status, await res.text());
     return json({ error: "Resend error", status: res.status }, 502);
   }
-  return json({ sent: 1, kind: "approved", source });
+  return json({ sent: 1, kind: "approved", template: tpl.name });
 }

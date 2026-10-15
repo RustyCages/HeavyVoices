@@ -20,6 +20,8 @@
   .actions { display:flex; flex-wrap:wrap; gap:0.6rem; margin-top:1rem; }
   .preview { white-space:pre-wrap; line-height:1.6; border:1px dashed var(--border); border-radius:8px; padding:0.8rem 1rem; margin-top:0.6rem; }
   .danger { background:#ef4444; color:#fff; }
+  .tpl-form label.auto-row { display:flex; gap:0.6rem; align-items:flex-start; margin:1rem 0 0; padding:0.7rem 0.8rem; border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:0.92rem; cursor:pointer; }
+  .tpl-form label.auto-row input { width:auto; margin:0.2rem 0 0; accent-color:var(--accent); }
 </style>
 </head>
 <body>
@@ -28,7 +30,7 @@
   <a href="/admin/medlemmar.html" class="back-btn">&larr; Tillbaka till Medlemmar</a>
   <h1>Brevmallar</h1>
   <p class="text-muted">Skapa och redigera mallar för mejl och brev till medlemmarna. Platshållare byts ut när du förhandsgranskar eller öppnar mallen i din e-post.</p>
-  <p class="text-muted" style="font-size:0.88rem;">⚡ Mallen <strong>Välkommen ny medlem</strong> skickas automatiskt till en ny medlem när du godkänner hen under Medlemmar. Ändra gärna texten, men behåll namnet på mallen, annars skickas en enklare standardtext.</p>
+  <p class="text-muted" style="font-size:0.88rem;" id="autoInfo"></p>
 
   <div class="tpl-layout">
     <div class="card">
@@ -46,6 +48,7 @@
       <div class="chips" id="chips"></div>
       <p class="text-muted" style="font-size:0.8rem; margin-top:0.4rem;">Klicka på en platshållare för att lägga in den där markören står.</p>
 
+      <label class="auto-row" for="tAuto"><input type="checkbox" id="tAuto"> <span>⚡ <strong>Skicka automatiskt vid godkännande</strong><br><small class="text-muted">Mejlas till en ny medlem när du godkänner hen under Medlemmar. Bara en mall åt gången – väljer du den här avmarkeras den förra.</small></span></label>
       <div class="actions">
         <button type="button" id="saveBtn">Spara</button>
         <button type="button" id="dupBtn" class="btn-outline">Duplicera</button>
@@ -88,14 +91,22 @@ function fill(text) {
 function renderList() {
   const el = $('tplList');
   if (!templates.length) { el.innerHTML = '<p class="text-muted">Inga mallar än.</p>'; return; }
-  el.innerHTML = templates.map(t => `<button type="button" class="tpl-item${current && current.id === t.id ? ' active' : ''}" data-id="${t.id}">${esc(t.name)}${t.name === 'Välkommen ny medlem' ? ' <span title="Skickas automatiskt när en medlem godkänns">⚡</span>' : ''}</button>`).join('');
+  el.innerHTML = templates.map(t => `<button type="button" class="tpl-item${current && current.id === t.id ? ' active' : ''}" data-id="${t.id}">${esc(t.name)}${t.send_on_approval ? ' <span title="Skickas automatiskt när en medlem godkänns">⚡</span>' : ''}</button>`).join('');
   el.querySelectorAll('.tpl-item').forEach(b => b.onclick = () => select(templates.find(t => t.id === b.dataset.id)));
+  renderAutoInfo();
+}
+
+function renderAutoInfo() {
+  const auto = templates.find(t => t.send_on_approval);
+  $('autoInfo').innerHTML = auto
+    ? `⚡ <strong>${esc(auto.name)}</strong> skickas automatiskt till en ny medlem när du godkänner hen under Medlemmar.`
+    : '⚡ Ingen mall skickas automatiskt vid godkännande. Kryssa i <em>Skicka automatiskt vid godkännande</em> på en mall för att slå på det.';
 }
 
 function select(t) {
   current = t;
   $('editor').hidden = !t;
-  if (t) { $('tName').value = t.name; $('tSubject').value = t.subject; $('tBody').value = t.body; $('err').textContent = ''; updatePreview(); }
+  if (t) { $('tName').value = t.name; $('tSubject').value = t.subject; $('tBody').value = t.body; $('tAuto').checked = !!t.send_on_approval; $('err').textContent = ''; updatePreview(); }
   renderList();
 }
 
@@ -117,7 +128,10 @@ async function save() {
   $('err').textContent = '';
   const name = $('tName').value.trim();
   if (!name) { $('err').textContent = 'Mallen behöver ett namn.'; return; }
-  const row = { name, subject: $('tSubject').value, body: $('tBody').value, updated_by: me.id, updated_at: new Date().toISOString() };
+  const auto = $('tAuto').checked;
+  const prev = templates.find(t => t.send_on_approval && (!current || t.id !== current.id));
+  if (auto && prev && !confirm(`"${prev.name}" skickas automatiskt i dag. Byta till den här mallen?`)) return;
+  const row = { name, subject: $('tSubject').value, body: $('tBody').value, send_on_approval: auto, updated_by: me.id, updated_at: new Date().toISOString() };
   const q = current && current.id
     ? supabaseClient.from('letter_templates').update(row).eq('id', current.id).select().single()
     : supabaseClient.from('letter_templates').insert(row).select().single();
@@ -136,10 +150,10 @@ async function remove() {
   current = null; await load(); select(null); toast('Borttagen');
 }
 
-$('newBtn').onclick = () => { current = { id: null, name: '', subject: '', body: '' }; $('editor').hidden = false; $('tName').value = ''; $('tSubject').value = ''; $('tBody').value = ''; $('err').textContent = ''; renderList(); updatePreview(); $('tName').focus(); };
+$('newBtn').onclick = () => { current = { id: null, name: '', subject: '', body: '' }; $('editor').hidden = false; $('tName').value = ''; $('tSubject').value = ''; $('tBody').value = ''; $('tAuto').checked = false; $('err').textContent = ''; renderList(); updatePreview(); $('tName').focus(); };
 $('saveBtn').onclick = save;
 $('delBtn').onclick = remove;
-$('dupBtn').onclick = () => { if (!current) return; current = { id: null, name: $('tName').value + ' (kopia)', subject: $('tSubject').value, body: $('tBody').value }; $('tName').value = current.name; $('tName').focus(); toast('Kopia — tryck Spara'); };
+$('dupBtn').onclick = () => { if (!current) return; current = { id: null, name: $('tName').value + ' (kopia)', subject: $('tSubject').value, body: $('tBody').value }; $('tAuto').checked = false; $('tName').value = current.name; $('tName').focus(); toast('Kopia — tryck Spara'); };
 $('copyBtn').onclick = async () => { try { await navigator.clipboard.writeText(fill($('tSubject').value) + '\n\n' + fill($('tBody').value)); toast('Kopierat'); } catch (e) { toast('Kunde inte kopiera'); } };
 ['tSubject','tBody'].forEach(id => $(id).addEventListener('input', updatePreview));
 $('memberSel').addEventListener('change', updatePreview);

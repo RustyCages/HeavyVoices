@@ -2,6 +2,7 @@
 // Bläddra i en YouTube-kanals videor (anropas från medlem/uppvarmning.html).
 // Tillgänglig för alla godkända medlemmar (admin kan dessutom lägga till videor på sidan).
 // Body: { channel_id?: string (UC...), page_token?: string }
+//   eller (admin) { resolve: "@namn" | kanal-länk | UC-id } → { channel_id, name }
 // Svar: { videos: [{ id, title, published }], next_page_token: string | null, source: "api" | "rss" }
 //
 // Med secret YOUTUBE_API_KEY (YouTube Data API v3) hämtas hela arkivet, 50 i taget med sidnumrering.
@@ -57,6 +58,38 @@ Deno.serve(async (req) => {
 
   let body: any = {};
   try { body = await req.json(); } catch { /* tom body är ok */ }
+
+  // --- Slå upp en kanal (admin lägger till kanalknapp): { resolve: "@namn" | kanal-länk | UC-id } ---
+  // Svar: { channel_id, name }
+  if (body?.resolve) {
+    if (me.role !== "admin") return json({ error: "Endast admin" }, 403);
+    const input = String(body.resolve).trim();
+    try {
+      let id = input.match(/(UC[\w-]{22})/)?.[1] ?? null;
+      let name = "";
+      if (!id) {
+        let url = input;
+        if (/^@[\w.-]+$/.test(input)) url = `https://www.youtube.com/${input}`;
+        else if (!/^https?:\/\//i.test(input)) url = `https://www.youtube.com/@${input.replace(/^@/, "")}`;
+        if (!/^https:\/\/(www\.|m\.)?youtube\.com\//i.test(url)) return json({ error: "Känner inte igen länken" }, 400);
+        const res = await fetch(url, { headers: { "Accept-Language": "sv,en;q=0.8", "Cookie": "CONSENT=YES+1; SOCS=CAI" } });
+        const html = await res.text();
+        id = html.match(/"(?:externalId|channelId)":"(UC[\w-]{22})"/)?.[1]
+          ?? html.match(/youtube\.com\/channel\/(UC[\w-]{22})/)?.[1] ?? null;
+        name = decodeXml(html.match(/<meta property="og:title" content="([^"]*)"/)?.[1] ?? "");
+      }
+      if (!id) return json({ error: "Hittade ingen kanal – klistra in kanal-ID:t (UC…) i stället" }, 404);
+      if (!name) {
+        const rss = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${id}`);
+        if (rss.ok) name = decodeXml((await rss.text()).match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? "");
+      }
+      return json({ channel_id: id, name });
+    } catch (e) {
+      console.error("resolve fel:", e);
+      return json({ error: "Kunde inte nå YouTube" }, 502);
+    }
+  }
+
   const channelId = String(body?.channel_id ?? DEFAULT_CHANNEL).trim();
   if (!/^UC[\w-]{22}$/.test(channelId)) return json({ error: "Ogiltigt kanal-ID" }, 400);
   const pageToken = body?.page_token ? String(body.page_token) : "";

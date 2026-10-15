@@ -72,6 +72,31 @@
   .fav-section .hint { margin: 0 0 0.6rem; }
   .b-grid .meta h3 { font-size: 0.9rem; font-weight: 600; }
   .b-grid .meta button:not(.fav-btn) { justify-self: start; font-size: 0.8rem; padding: 0.3rem 0.65rem; }
+
+  /* egna videofiler */
+  .player button.poster.file-poster { background-color: #15171c; }
+  .player button.poster.file-poster:not([style*="url("])::before { content: '🎬'; position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font-size: 1.6rem; opacity: 0.5; }
+  .player video { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; }
+  .src-toggle { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .src-toggle button { border-radius: 999px; padding: 0.4rem 0.95rem; font-size: 0.88rem; }
+  .src-toggle button[aria-pressed="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
+  .file-info { font-size: 0.8rem; color: var(--text-muted); }
+
+  /* kanalhantering (admin) */
+  .chan-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+  .chan-head h2 { margin: 0; }
+  #chanAdminBtn { font-size: 0.82rem; padding: 0.35rem 0.75rem; }
+  #chanAdminBtn[aria-expanded="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
+  .chan-admin { margin: 0.4rem 0 1rem; padding: 0.8rem 0.9rem; border-radius: 0.6rem; background: rgba(0,0,0,0.2); display: grid; gap: 0.6rem; }
+  .chan-admin ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+  .chan-admin li { display: flex; align-items: center; gap: 0.35rem; }
+  .chan-admin li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chan-admin li small { color: var(--text-muted); }
+  .chan-admin li button { font-size: 0.75rem; padding: 0.3rem 0.55rem; }
+  .chan-admin form { display: grid; grid-template-columns: 2fr 1.3fr auto; gap: 0.5rem; align-items: end; }
+  .chan-admin form label { display: grid; gap: 0.25rem; font-size: 0.82rem; color: var(--text-muted); margin: 0; }
+  .chan-admin form input { margin: 0; }
+  @media (max-width: 600px) { .chan-admin form { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -91,7 +116,7 @@
     <h2>Så uppdaterar du videorna</h2>
     <p class="g-p">Bara admin ser formuläret och knapparna nedan. Medlemmarna ser videorna direkt när du sparat.</p>
     <ol>
-      <li><div><b>Kopiera länken på YouTube</b><p>Öppna videon på YouTube och kopiera adressen, eller tryck <em>Dela → Kopiera</em>. Alla vanliga format fungerar: <code>youtube.com/watch?v=…</code>, <code>youtu.be/…</code> och <code>youtube.com/shorts/…</code>.</p></div></li>
+      <li><div><b>Kopiera länken på YouTube (eller välj en egen fil)</b><p>Öppna videon på YouTube och kopiera adressen, eller tryck <em>Dela → Kopiera</em>. Alla vanliga format fungerar: <code>youtube.com/watch?v=…</code>, <code>youtu.be/…</code> och <code>youtube.com/shorts/…</code>.</p></div></li>
       <li><div><b>Klistra in och fyll i</b><p>Klistra in länken i <em>YouTube-länk</em>. <em>Titel</em> kan lämnas tom – då hämtas videons namn från YouTube. Välj <em>Kategori</em> (eller skriv en egen, t.ex. "Andning") och <em>För stämma</em> om videon bara gäller en stämma. Skriv gärna en kort instruktion i <em>Beskrivning</em>. Tryck <b>Lägg till</b>.</p></div></li>
       <li><div><b>Starta mitt i en video (valfritt)</b><p>Vill du att videon ska börja vid t.ex. 1:30? Högerklicka i YouTube-videon vid rätt ställe och välj <em>Kopiera videons webbadress vid aktuell tid</em>, eller lägg till <code>&amp;t=90s</code> i slutet av länken.</p></div></li>
       <li><div><b>Ändra eller ta bort</b><p>Under varje video finns <b>✎ Ändra</b> (formuläret fylls i – ändra och tryck <em>Spara ändringar</em>, eller <em>Avbryt</em>) och <b>🗑 Ta bort</b>.</p></div></li>
@@ -100,14 +125,21 @@
     <div class="tips">
       <b>Vem ser vad?</b> Medlemmar ser videor för <em>Alla stämmor</em> plus sin egen stämma. Du som admin ser alla.<br>
       <b>"Videon är inte tillgänglig"?</b> Då har den som laddat upp videon stängt av inbäddning, eller så är den privat. Olistade videor fungerar, privata gör det inte – välj en annan video eller länka till den i beskrivningen.<br>
-      <b>Egen video?</b> Ladda upp den som olistad på körens YouTube-konto och lägg in länken här.
+      <b>Egen video?</b> Välj <em>🎬 Egen videofil</em> överst i formuläret och ladda upp filen direkt (mp4 fungerar på alla enheter). Håll filen liten, helst under 50 MB (t.ex. 720p). Titeln blir filnamnet om du inte skriver en egen.<br>
+      <b>Fler kanaler?</b> Tryck <em>⚙ Hantera kanaler</em> längst ner och klistra in kanalens länk, t.ex. <code>youtube.com/@kanalnamn</code>.
     </div>
   </div>
 
   <div class="card static admin-only" id="adminCard" hidden>
     <h2 style="margin:0 0 0.6rem; font-size:1.1rem;" id="formTitle">Lägg till video</h2>
     <form class="add-form" id="addForm">
-      <label>YouTube-länk <input type="url" id="fUrl" placeholder="https://www.youtube.com/watch?v=…" required></label>
+      <div class="src-toggle" role="group" aria-label="Typ av video">
+        <button type="button" class="btn-outline" data-src="yt" aria-pressed="true">▶ YouTube-länk</button>
+        <button type="button" class="btn-outline" data-src="file" aria-pressed="false">🎬 Egen videofil</button>
+      </div>
+      <label id="urlWrap">YouTube-länk <input type="url" id="fUrl" placeholder="https://www.youtube.com/watch?v=…" required></label>
+      <label id="fileWrap" hidden>Videofil (mp4 fungerar bäst) <input type="file" id="fFile" accept="video/mp4,video/webm,video/quicktime,video/*">
+        <span class="file-info" id="fFileInfo"></span></label>
       <div class="row">
         <label>Titel <input type="text" id="fTitle" maxlength="140" placeholder="Hämtas automatiskt från YouTube om fältet är tomt"></label>
         <label>Kategori <input type="text" id="fCat" list="catList" value="Uppvärmning" maxlength="40"></label>
@@ -137,8 +169,20 @@
   </section>
 
   <section class="card static browse-card" id="browseCard">
-    <h2>📺 Fler övningar på YouTube</h2>
+    <div class="chan-head">
+      <h2>📺 Fler övningar på YouTube</h2>
+      <button type="button" class="btn-outline" id="chanAdminBtn" aria-expanded="false" aria-controls="chanAdmin" hidden>⚙ Hantera kanaler</button>
+    </div>
     <p class="g-p">Bläddra bland alla videor från de här kanalerna och spela dem direkt här. Tryck på en kanal för att öppna listan.</p>
+    <div class="chan-admin" id="chanAdmin" hidden>
+      <ul id="chanAdminList"></ul>
+      <form id="chanForm">
+        <label>Kanal-länk, @namn eller kanal-ID <input type="text" id="cInput" placeholder="https://www.youtube.com/@kanalnamn" required></label>
+        <label>Namn på knappen <input type="text" id="cName" maxlength="60" placeholder="Hämtas automatiskt om tomt"></label>
+        <button type="submit" id="cSave">+ Lägg till kanal</button>
+      </form>
+      <span class="status" id="cStatus"></span>
+    </div>
     <div class="chan-btns" id="chanBtns"></div>
     <div id="browsePanel" hidden>
       <p class="hint admin-only-hint" style="margin-top:0.75rem;" hidden>Admin: tryck <b>+ Lägg till</b> så hamnar videon i kategorin och för stämman som är valda i formuläret ovan. Du kan ändra den efteråt.</p>
@@ -162,6 +206,9 @@ const VOICES = { sopran: 'Sopran', alt: 'Alt', tenor: 'Tenor', bas: 'Bas' };
 const CAT_ORDER = ['Andning', 'Uppvärmning', 'Skalövningar', 'Stämspecifikt', 'Övrigt'];
 let isAdmin = false, myVoice = '', videos = [], filter = 'Alla', editing = null;
 let favs = [];   // egna favoriter (member_favorites), senast tillagda först
+const WARMUP_BUCKET = 'heavy-voices-warmup';   // egna videofiler + miniatyrer
+const signed = {};                               // storage-sökväg → signerad URL
+let srcMode = 'yt';                              // formuläret: 'yt' | 'file'
 
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 function toast(msg, ms = 3000) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
@@ -209,13 +256,17 @@ function render() {
 
 function card(v, items) {
   const i = items.indexOf(v);
+  const poster = v.video_path
+    ? `<button type="button" class="poster file-poster" data-file="${esc(v.video_path)}" aria-label="Spela ${esc(v.title)}"
+        ${v.thumb_path && signed[v.thumb_path] ? `style="background-image:url('${esc(signed[v.thumb_path])}')"` : ''}></button>`
+    : `<button type="button" class="poster" data-yt="${esc(v.youtube_id)}" data-start="${v.start_sec || 0}" aria-label="Spela ${esc(v.title)}"
+        style="background-image:url('https://i.ytimg.com/vi/${esc(v.youtube_id)}/hqdefault.jpg')"></button>`;
   return `<article class="vid">
-    <div class="player"><button type="button" class="poster" data-yt="${esc(v.youtube_id)}" data-start="${v.start_sec || 0}" aria-label="Spela ${esc(v.title)}"
-      style="background-image:url('https://i.ytimg.com/vi/${esc(v.youtube_id)}/hqdefault.jpg')"></button></div>
+    <div class="player">${poster}</div>
     <div class="meta">
-      <div class="meta-top"><h3>${esc(v.title)}</h3>${favBtn(v.youtube_id, v.title, v.start_sec)}</div>
+      <div class="meta-top"><h3>${esc(v.title)}</h3>${v.youtube_id ? favBtn(v.youtube_id, v.title, v.start_sec) : ''}</div>
       ${v.description ? `<p>${esc(v.description)}</p>` : ''}
-      <div class="tags">${v.voice ? `<span class="tag">${esc(VOICES[v.voice] || v.voice)}</span>` : ''}</div>
+      <div class="tags">${v.voice ? `<span class="tag">${esc(VOICES[v.voice] || v.voice)}</span>` : ''}${v.video_path && isAdmin ? '<span class="tag">🎬 Egen fil</span>' : ''}</div>
       ${isAdmin ? `<div class="admin-bar">
         <button type="button" class="btn-outline" data-act="up" data-id="${v.id}" ${i === 0 ? 'disabled' : ''} title="Flytta upp">▲</button>
         <button type="button" class="btn-outline" data-act="down" data-id="${v.id}" ${i === items.length - 1 ? 'disabled' : ''} title="Flytta ner">▼</button>
@@ -230,24 +281,39 @@ function card(v, items) {
 function stopAll() {
   document.querySelectorAll('.vid.playing').forEach(card => {
     card.classList.remove('playing');
-    const p = card.querySelector('.player'), f = p.querySelector('iframe');
-    if (!f) return;
-    const id = f.dataset.yt;
-    p.innerHTML = `<button type="button" class="poster" data-yt="${id}" data-start="${f.dataset.start}" style="background-image:url('https://i.ytimg.com/vi/${id}/hqdefault.jpg')"></button>`;
-    p.querySelector('button').addEventListener('click', e => play(e.currentTarget));
+    const p = card.querySelector('.player');
+    p.querySelector('video')?.pause();
+    if (card._poster) p.replaceChildren(card._poster);   // samma knapp tillbaka (klick-lyssnaren följer med)
     card.querySelector('.play-bar')?.remove();
   });
 }
-function play(btn) {
+async function signedUrl(path, secs = 3600 * 6) {
+  if (signed[path]) return signed[path];
+  const { data, error } = await supabaseClient.storage.from(WARMUP_BUCKET).createSignedUrl(path, secs);
+  if (error) throw error;
+  return (signed[path] = data.signedUrl);
+}
+async function play(btn) {
   stopAll();   // bara en video åt gången
   const card = btn.closest('.vid');
-  const id = btn.dataset.yt, start = +btn.dataset.start || 0;
-  const f = document.createElement('iframe');
-  f.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1&fs=1${start ? '&start=' + start : ''}`;
-  f.allow = 'autoplay; encrypted-media; fullscreen';
-  f.allowFullscreen = true;
-  f.title = 'YouTube-video';
-  f.dataset.yt = id; f.dataset.start = start;
+  let f;
+  if (btn.dataset.file) {
+    let src;
+    try { src = await signedUrl(btn.dataset.file); } catch (err) { toast('Kunde inte öppna videon: ' + err.message); return; }
+    stopAll();
+    f = document.createElement('video');
+    f.src = src; f.controls = true; f.autoplay = true; f.playsInline = true; f.preload = 'auto';
+    f.setAttribute('controlsList', 'nodownload');
+    f.addEventListener('error', () => toast('Videon kunde inte spelas – formatet stöds kanske inte av den här webbläsaren (mp4 fungerar bäst).', 6000));
+  } else {
+    const id = btn.dataset.yt, start = +btn.dataset.start || 0;
+    f = document.createElement('iframe');
+    f.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1&fs=1${start ? '&start=' + start : ''}`;
+    f.allow = 'autoplay; encrypted-media; fullscreen';
+    f.allowFullscreen = true;
+    f.title = 'YouTube-video';
+  }
+  card._poster = btn;
   btn.parentElement.replaceChildren(f);
   // spelande video blir stor (hela raden) och får egna, tydliga knappar
   card.classList.add('playing');
@@ -272,11 +338,14 @@ async function adminAct(act, id) {
     if (!confirm(`Ta bort "${v.title}"?`)) return;
     const { error } = await supabaseClient.from('warmup_videos').delete().eq('id', id);
     if (error) { toast('Kunde inte ta bort: ' + error.message); return; }
+    removeFiles(v);
     videos = videos.filter(x => x.id !== id); render(); return;
   }
   if (act === 'edit') {
     editing = v;
-    document.getElementById('fUrl').value = `https://www.youtube.com/watch?v=${v.youtube_id}${v.start_sec ? '&t=' + v.start_sec + 's' : ''}`;
+    setSrc(v.video_path ? 'file' : 'yt');
+    document.getElementById('fUrl').value = v.youtube_id ? `https://www.youtube.com/watch?v=${v.youtube_id}${v.start_sec ? '&t=' + v.start_sec + 's' : ''}` : '';
+    document.getElementById('fFileInfo').textContent = v.video_path ? 'Nuvarande fil behålls om du inte väljer en ny.' : '';
     document.getElementById('fTitle').value = v.title;
     document.getElementById('fCat').value = v.category;
     document.getElementById('fVoice').value = v.voice || '';
@@ -297,9 +366,81 @@ async function adminAct(act, id) {
   const res = await Promise.all(items.map(x => supabaseClient.from('warmup_videos').update({ position: x.position }).eq('id', x.id)));
   const err = res.find(r => r.error); if (err) toast('Kunde inte spara ordningen: ' + err.error.message);
 }
+// ---------- egna videofiler ----------
+function removeFiles(v) {
+  const paths = [v.video_path, v.thumb_path].filter(Boolean);
+  if (paths.length) supabaseClient.storage.from(WARMUP_BUCKET).remove(paths).catch(() => {});
+}
+function setSrc(mode) {
+  srcMode = mode;
+  document.querySelectorAll('.src-toggle [data-src]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.src === mode)));
+  document.getElementById('urlWrap').hidden = mode !== 'yt';
+  document.getElementById('fileWrap').hidden = mode !== 'file';
+  document.getElementById('fUrl').required = mode === 'yt';
+  document.getElementById('fTitle').placeholder = mode === 'yt' ? 'Hämtas automatiskt från YouTube om fältet är tomt' : 'Filnamnet används om fältet är tomt';
+  document.getElementById('fStatus').textContent = '';
+}
+document.querySelectorAll('.src-toggle [data-src]').forEach(b => b.addEventListener('click', () => setSrc(b.dataset.src)));
+document.getElementById('fFile').addEventListener('change', e => {
+  const f = e.target.files[0];
+  document.getElementById('fFileInfo').textContent = f ? `${f.name} – ${(f.size / 1048576).toFixed(1)} MB` : '';
+});
+// miniatyrbild: en bildruta ~1 s in i videon (null om webbläsaren inte kan avkoda filen)
+function makeThumb(file) {
+  return new Promise(resolve => {
+    const v = document.createElement('video'), url = URL.createObjectURL(file);
+    let done = false;
+    const fin = b => { if (done) return; done = true; URL.revokeObjectURL(url); v.removeAttribute('src'); resolve(b); };
+    v.muted = true; v.playsInline = true; v.preload = 'auto';
+    v.addEventListener('loadedmetadata', () => { v.currentTime = Math.min(1, (v.duration || 3) / 3); });
+    v.addEventListener('seeked', () => {
+      try {
+        const w = 640, h = Math.round(w * ((v.videoHeight / v.videoWidth) || 9 / 16));
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(v, 0, 0, w, h);
+        c.toBlob(b => fin(b), 'image/jpeg', 0.8);
+      } catch (err) { fin(null); }
+    });
+    v.addEventListener('error', () => fin(null));
+    setTimeout(() => fin(null), 10000);
+    v.src = url;
+  });
+}
+async function uploadVideo(file, st) {
+  const mb = (file.size / 1048576).toFixed(1);
+  if (file.size > 50 * 1048576 && !confirm(`Filen är ${mb} MB. Stora filer tar lång tid att ladda för medlemmarna (och kan stoppas av lagringsgränsen). Ladda upp ändå?`)) return null;
+  const key = crypto.randomUUID();
+  const ext = (file.name.match(/\.(\w{2,5})$/) || [, 'mp4'])[1].toLowerCase();
+  st.textContent = 'Skapar miniatyrbild…';
+  const thumb = await makeThumb(file);
+  st.textContent = `Laddar upp ${file.name} (${mb} MB)… låt sidan vara öppen.`;
+  const video_path = `${key}.${ext}`;
+  const up = await supabaseClient.storage.from(WARMUP_BUCKET).upload(video_path, file, { contentType: file.type || 'video/mp4' });
+  if (up.error) {
+    st.textContent = /bucket/i.test(up.error.message) ? 'Lagringen saknas – kör supabase/migrations/2026-10-15_warmup_channels_uploads.sql'
+      : /size|large|413/i.test(up.error.message) ? `Filen är för stor för lagringen (${mb} MB). Gör en mindre version, t.ex. 720p.`
+      : 'Uppladdningen misslyckades: ' + up.error.message;
+    return null;
+  }
+  let thumb_path = null;
+  if (thumb) {
+    const t = await supabaseClient.storage.from(WARMUP_BUCKET).upload(`${key}.jpg`, thumb, { contentType: 'image/jpeg' });
+    if (!t.error) thumb_path = `${key}.jpg`;
+  }
+  return { video_path, thumb_path };
+}
+async function signThumbs() {
+  const paths = videos.map(v => v.thumb_path).filter(p => p && !signed[p]);
+  if (!paths.length) return;
+  const { data } = await supabaseClient.storage.from(WARMUP_BUCKET).createSignedUrls(paths, 3600 * 6);
+  (data || []).forEach(d => { if (d.signedUrl && d.path) signed[d.path] = d.signedUrl; });
+}
+
 function resetForm() {
   editing = null;
   document.getElementById('addForm').reset();
+  document.getElementById('fFileInfo').textContent = '';
+  setSrc('yt');
   document.getElementById('fCat').value = 'Uppvärmning';
   document.getElementById('formTitle').textContent = 'Lägg till video';
   document.getElementById('fSave').textContent = 'Lägg till';
@@ -309,24 +450,46 @@ document.getElementById('fCancel').addEventListener('click', resetForm);
 document.getElementById('addForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const st = document.getElementById('fStatus');
-  const url = document.getElementById('fUrl').value, id = ytId(url);
-  if (!id) { st.textContent = 'Känner inte igen länken – klistra in en YouTube-länk.'; return; }
+  const saveBtn = document.getElementById('fSave');
   let title = document.getElementById('fTitle').value.trim();
-  if (!title) {
-    st.textContent = 'Hämtar titel…';
-    try {
-      const r = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id));
-      if (r.ok) title = (await r.json()).title || '';
-    } catch (err) { /* ingen titel – används nedan */ }
-    if (!title) { st.textContent = 'Kunde inte hämta titeln automatiskt – skriv en titel.'; return; }
-  }
   const category = document.getElementById('fCat').value.trim() || 'Uppvärmning';
   const row = {
-    youtube_id: id, title, category,
+    title, category,
     voice: document.getElementById('fVoice').value || null,
     description: document.getElementById('fDesc').value.trim() || null,
   };
-  row.start_sec = ytStart(url);
+  let uploaded = null;   // nyuppladdade filer (tas bort igen om raden inte går att spara)
+
+  if (srcMode === 'yt') {
+    const url = document.getElementById('fUrl').value, id = ytId(url);
+    if (!id) { st.textContent = 'Känner inte igen länken – klistra in en YouTube-länk.'; return; }
+    if (!title) {
+      st.textContent = 'Hämtar titel…';
+      try {
+        const r = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id));
+        if (r.ok) title = (await r.json()).title || '';
+      } catch (err) { /* ingen titel – används nedan */ }
+      if (!title) { st.textContent = 'Kunde inte hämta titeln automatiskt – skriv en titel.'; return; }
+    }
+    Object.assign(row, { title, youtube_id: id, start_sec: ytStart(url) });
+    if (editing && editing.video_path) Object.assign(row, { video_path: null, thumb_path: null });   // fil → YouTube
+  } else {
+    const file = document.getElementById('fFile').files[0];
+    const keep = editing && editing.video_path && !file;
+    if (!file && !keep) { st.textContent = 'Välj en videofil.'; return; }
+    if (file && !/^video\//.test(file.type) && !/\.(mp4|m4v|webm|mov)$/i.test(file.name)) { st.textContent = 'Det där ser inte ut som en videofil.'; return; }
+    if (!title) title = file ? file.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim() : editing.title;
+    row.title = title;
+    row.youtube_id = null; row.start_sec = 0;
+    if (file) {
+      saveBtn.disabled = true;
+      uploaded = await uploadVideo(file, st);
+      saveBtn.disabled = false;
+      if (!uploaded) return;
+      Object.assign(row, uploaded);
+    }
+  }
+
   st.textContent = 'Sparar…';
   let res;
   if (editing) res = await supabaseClient.from('warmup_videos').update(row).eq('id', editing.id).select().single();
@@ -335,13 +498,19 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
     res = await supabaseClient.from('warmup_videos').insert(row).select().single();
   }
   if (res.error) {
-    st.textContent = /warmup_videos/.test(res.error.message) ? 'Tabellen saknas – kör supabase/migrations/2026-10-05_warmup_videos.sql' : 'Kunde inte spara: ' + res.error.message;
+    if (uploaded) removeFiles(uploaded);
+    st.textContent = /warmup_videos|video_path|null value/.test(res.error.message)
+      ? 'Databasen behöver uppdateras – kör supabase/migrations/2026-10-15_warmup_channels_uploads.sql'
+      : 'Kunde inte spara: ' + res.error.message;
     return;
   }
-  const saved = res.data;
+  // gamla filer bort om de ersattes eller om videon bytte till YouTube
+  if (editing && editing.video_path && editing.video_path !== res.data.video_path) removeFiles(editing);
+  const saved = res.data, wasEditing = !!editing;
   videos = editing ? videos.map(v => v.id === saved.id ? saved : v) : videos.concat(saved);
-  st.textContent = editing ? 'Ändrad ✓' : `"${title}" tillagd ✓`;
+  await signThumbs();
   resetForm(); render();
+  st.textContent = wasEditing ? 'Ändrad ✓' : `"${title}" tillagd ✓`;
 });
 
 // ---------- mina favoriter (privata per medlem) ----------
@@ -395,12 +564,14 @@ document.addEventListener('click', e => {
   if (b) toggleFav(b);
 });
 
-// ---------- bläddra i YouTube-kanaler (admin) ----------
-// Lägg till fler kanaler här: id = kanalens UC…-id (finns i kanalens RSS-länk / "Dela kanal → Kopiera kanal-id").
-const CHANNELS = [
-  { id: 'UCbAHuHgj0RjadzpDzZ0OWVA', name: 'Aussie Vocal Coach' },
-  { id: 'UCYvO0FPpDlJA8S5n9elvQuw', name: 'Singeo' },
+// ---------- bläddra i YouTube-kanaler ----------
+// Kanalerna ligger i tabellen warmup_channels och hanteras av admin via "⚙ Hantera kanaler".
+// Reservlista om tabellen inte finns än (före migrationen 2026-10-15).
+const DEFAULT_CHANNELS = [
+  { channel_id: 'UCbAHuHgj0RjadzpDzZ0OWVA', name: 'Aussie Vocal Coach', position: 0 },
+  { channel_id: 'UCYvO0FPpDlJA8S5n9elvQuw', name: 'Singeo', position: 1 },
 ];
+let channels = [], channelsFromDb = false;
 const chanState = {};        // kanal-id → { videos, next, loaded }
 let curChan = null;
 const cs = () => chanState[curChan] || (chanState[curChan] = { videos: [], next: null, loaded: false });
@@ -454,11 +625,14 @@ async function addFromChannel(id) {
   render(); renderChannel();
   toast(`"${v.title}" tillagd i ${category}`);
 }
-(() => {
+function renderChanBtns() {
   const box = document.getElementById('chanBtns');
-  box.innerHTML = CHANNELS.map(c => `<button type="button" class="btn-outline" data-chan="${esc(c.id)}">📺 Bläddra i kanalen ${esc(c.name)}</button>`).join('');
+  const p = document.getElementById('browsePanel');
+  if (curChan && !channels.some(c => c.channel_id === curChan)) { stopAll(); curChan = null; p.hidden = true; }
+  box.innerHTML = channels.map(c => `<button type="button" class="btn-outline${c.channel_id === curChan && !p.hidden ? ' on' : ''}" data-chan="${esc(c.channel_id)}">📺 Bläddra i kanalen ${esc(c.name)}</button>`).join('')
+    || `<p class="empty">${isAdmin ? 'Inga kanaler än – lägg till en med ⚙ Hantera kanaler.' : 'Inga kanaler upplagda än.'}</p>`;
+  document.getElementById('browseCard').hidden = !channels.length && !isAdmin;
   box.querySelectorAll('[data-chan]').forEach(b => b.addEventListener('click', () => {
-    const p = document.getElementById('browsePanel');
     if (curChan === b.dataset.chan && !p.hidden) { stopAll(); p.hidden = true; b.classList.remove('on'); return; }
     stopAll();
     curChan = b.dataset.chan;
@@ -468,7 +642,99 @@ async function addFromChannel(id) {
     renderChannel();
     if (!cs().loaded) { cs().loaded = true; loadChannel(false); }
   }));
-})();
+  if (isAdmin) renderChanAdmin();
+}
+async function loadChannels() {
+  const { data, error } = await supabaseClient.from('warmup_channels').select('*').order('position').order('created_at');
+  channelsFromDb = !error;
+  channels = error ? DEFAULT_CHANNELS.slice() : (data || []);
+  renderChanBtns();
+}
+
+// --- admin: lägg till / ta bort / flytta kanaler ---
+function renderChanAdmin() {
+  const ul = document.getElementById('chanAdminList');
+  ul.innerHTML = channels.map((c, i) => `<li>
+    <span>${esc(c.name)} <small>${esc(c.channel_id)}</small></span>
+    <button type="button" class="btn-outline" data-cact="up" data-cid="${esc(c.channel_id)}" ${i === 0 ? 'disabled' : ''} title="Flytta upp">▲</button>
+    <button type="button" class="btn-outline" data-cact="down" data-cid="${esc(c.channel_id)}" ${i === channels.length - 1 ? 'disabled' : ''} title="Flytta ner">▼</button>
+    <button type="button" class="btn-outline" data-cact="ren" data-cid="${esc(c.channel_id)}" title="Byt namn på knappen">✎</button>
+    <button type="button" class="btn-outline" data-cact="del" data-cid="${esc(c.channel_id)}" title="Ta bort kanalen">🗑</button>
+  </li>`).join('') || '<li><small>Inga kanaler.</small></li>';
+  ul.querySelectorAll('[data-cact]').forEach(b => b.addEventListener('click', () => chanAct(b.dataset.cact, b.dataset.cid)));
+  if (!channelsFromDb) document.getElementById('cStatus').textContent = 'Kanaltabellen saknas – kör supabase/migrations/2026-10-15_warmup_channels_uploads.sql för att kunna ändra.';
+}
+async function chanAct(act, cid) {
+  if (!channelsFromDb) return;
+  const c = channels.find(x => x.channel_id === cid); if (!c) return;
+  if (act === 'del') {
+    if (!confirm(`Ta bort knappen "${c.name}"? Videor som redan lagts till på sidan ligger kvar.`)) return;
+    const { error } = await supabaseClient.from('warmup_channels').delete().eq('id', c.id);
+    if (error) { toast('Kunde inte ta bort: ' + error.message); return; }
+    channels = channels.filter(x => x !== c); renderChanBtns(); return;
+  }
+  if (act === 'ren') {
+    const name = (prompt('Namn på knappen:', c.name) || '').trim().slice(0, 60);
+    if (!name || name === c.name) return;
+    const { error } = await supabaseClient.from('warmup_channels').update({ name }).eq('id', c.id);
+    if (error) { toast('Kunde inte spara: ' + error.message); return; }
+    c.name = name; renderChanBtns(); return;
+  }
+  const i = channels.indexOf(c), j = act === 'up' ? i - 1 : i + 1;
+  if (j < 0 || j >= channels.length) return;
+  [channels[i], channels[j]] = [channels[j], channels[i]];
+  channels.forEach((x, k) => { x.position = k; });
+  renderChanBtns();
+  const res = await Promise.all(channels.map(x => supabaseClient.from('warmup_channels').update({ position: x.position }).eq('id', x.id)));
+  const err = res.find(r => r.error); if (err) toast('Kunde inte spara ordningen: ' + err.error.message);
+}
+// slå upp kanal-ID och namn via Edge Function (förstår @namn och alla kanal-länkar)
+async function resolveChannel(input) {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/youtube-channel`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ resolve: input }),
+  });
+  const r = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(r.error || 'fel ' + res.status);
+  if (!r.channel_id) throw new Error('Edge Function youtube-channel behöver deployas om för att känna igen länken – klistra in kanal-ID:t (UC…) och ett namn i stället');
+  return r;
+}
+document.getElementById('chanAdminBtn').addEventListener('click', e => {
+  const box = document.getElementById('chanAdmin'), open = box.hidden;
+  box.hidden = !open; e.currentTarget.setAttribute('aria-expanded', String(open));
+});
+document.getElementById('chanForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const st = document.getElementById('cStatus');
+  if (!channelsFromDb) { st.textContent = 'Kanaltabellen saknas – kör supabase/migrations/2026-10-15_warmup_channels_uploads.sql först.'; return; }
+  const input = document.getElementById('cInput').value.trim();
+  let name = document.getElementById('cName').value.trim();
+  let id = (input.match(/(UC[\w-]{22})/) || [])[1] || null;
+  const btn = document.getElementById('cSave');
+  btn.disabled = true;
+  try {
+    if (!id || !name) {
+      st.textContent = 'Letar upp kanalen…';
+      try {
+        const r = await resolveChannel(input);
+        id = r.channel_id; name = name || r.name;
+      } catch (err) {
+        if (!id) { st.textContent = err.message; return; }
+      }
+      if (!name) { st.textContent = 'Hittade inget namn – skriv ett namn på knappen.'; return; }
+    }
+    if (channels.some(c => c.channel_id === id)) { st.textContent = `"${name}" finns redan.`; return; }
+    const position = Math.max(-1, ...channels.map(c => c.position)) + 1;
+    const { data, error } = await supabaseClient.from('warmup_channels').insert({ channel_id: id, name: name.slice(0, 60), position }).select().single();
+    if (error) { st.textContent = 'Kunde inte spara: ' + error.message; return; }
+    channels = channels.concat(data);
+    e.target.reset();
+    renderChanBtns();
+    st.textContent = `"${data.name}" tillagd ✓`;
+  } finally { btn.disabled = false; }
+});
 document.getElementById('bMore').addEventListener('click', () => loadChannel(true));
 document.getElementById('bSearch').addEventListener('input', renderChannel);
 
@@ -478,6 +744,8 @@ document.getElementById('bSearch').addEventListener('input', renderChannel);
   isAdmin = member.role === 'admin';
   document.getElementById('adminCard').hidden = !isAdmin;
   document.querySelector('.admin-only-hint').hidden = !isAdmin;
+  document.getElementById('chanAdminBtn').hidden = !isAdmin;
+  loadChannels();
   if (isAdmin) {
     const g = document.getElementById('guide'), b = document.getElementById('guideBtn');
     b.hidden = false;
@@ -495,6 +763,7 @@ document.getElementById('bSearch').addEventListener('input', renderChannel);
   const { data, error } = await supabaseClient.from('warmup_videos').select('*').order('position');
   if (error) { document.getElementById('list').innerHTML = `<p class="empty">Kunde inte hämta videor: ${esc(error.message)}</p>`; return; }
   videos = data || [];
+  await signThumbs().catch(() => {});
   render();
 })();
 </script>

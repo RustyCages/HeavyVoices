@@ -792,11 +792,15 @@ function renderRepertoar() {
 
 function renderSongCard(s) {
   const details = document.createElement('details');
+  // Mixer-state för kortet – delas med spelaren (samma objekt) så reglagen
+  // också påverkar en låt som redan spelas härifrån
+  const mixState = { volumes: {}, muted: new Set() };
+  getStemDefs(s).forEach(def => { mixState.volumes[def.key] = 100; });
   details.className = 'song-card card modern-card';
 
   const summary = document.createElement('summary');
   summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}${s.published === false ? ' <span class="hidden-tag" title="Dold för medlemmar – syns bara för admin">Dold</span>' : ''}</h3>` +
-    `<span class="song-actions"><button type="button" class="btn-outline pl-play-all" title="Spela de bockade stämmorna med synkad text">▶ Spela i bockade</button><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="text-muted">Visa ▾</span></span></div>`;
+    `<span class="song-actions"><button type="button" class="btn-outline pl-play-all" title="Spela de bockade stämmorna med synkad text">▶ Spela i bockade</button><button type="button" class="btn-outline pl-mixer-toggle" title="Mixa stämmor">Mixer ▾</button><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="text-muted">Visa ▾</span></span></div>`;
   details.appendChild(summary);
   summary.querySelector('.pl-play-all').addEventListener('click', e => {
     e.preventDefault(); e.stopPropagation();
@@ -808,7 +812,7 @@ function renderSongCard(s) {
     karaokeOn = true; splitOn = true;
     document.getElementById('karaokeBtn').classList.add('active');
     try { localStorage.setItem('hv-karaoke', 'on'); localStorage.setItem('hv-karaoke-split', 'on'); } catch (err) {}
-    playSongPreview(s, defs, 'preview-' + s.id + '-' + keys.join(','));
+    playSongPreview(s, defs, 'preview-' + s.id + '-' + keys.join(','), mixState);
   });
   summary.querySelector('.pl-quick').addEventListener('click', e => {
     e.preventDefault(); e.stopPropagation();
@@ -888,6 +892,48 @@ function renderSongCard(s) {
   };
   addWrap.querySelector('.addToPlaylistBtn').addEventListener('click', doAdd);
   plName.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
+
+  // Mixer (samma utseende som i spellistan) – ligger överst i kortet
+  const mixer = document.createElement('div');
+  mixer.className = 'mixer';
+  mixer.style.display = 'none';
+  getStemDefs(s).forEach(def => {
+    const mrow = document.createElement('div');
+    mrow.className = 'mixer-row';
+    mrow.innerHTML = `
+      <span class="label">${escapeHtml(def.label)}</span>
+      <input type="range" min="0" max="100" value="${mixState.volumes[def.key] ?? 100}" class="volSlider" data-key="${def.key}">
+      <button class="btn-outline muteBtn" data-key="${def.key}" title="Tysta ${escapeHtml(def.label)}" aria-label="Tysta ${escapeHtml(def.label)}" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg></button>
+    `;
+    mrow.querySelector('.volSlider').addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      mixState.volumes[def.key] = val;
+      // Om just denna låt spelas: uppdatera ljudet direkt
+      const cur = currentPlaylist && currentPlaylist.items[currentIndex];
+      if (cur && cur.muted === mixState.muted) applyGainForKey(cur, def.key, val);
+    });
+    mrow.querySelector('.muteBtn').addEventListener('click', (e) => {
+      const k = def.key;
+      const btn = e.currentTarget;
+      if (mixState.muted.has(k)) mixState.muted.delete(k); else mixState.muted.add(k);
+      const isMuted = mixState.muted.has(k);
+      btn.classList.toggle('muted', isMuted);
+      btn.setAttribute('aria-pressed', isMuted);
+      const cur = currentPlaylist && currentPlaylist.items[currentIndex];
+      if (cur && cur.muted === mixState.muted) applyGainForKey(cur, k, mixState.volumes[k]);
+    });
+    attachMarquee(mrow.querySelector('.label'), { speed: 25 });
+    mixer.appendChild(mrow);
+  });
+  const mixerBtn = summary.querySelector('.pl-mixer-toggle');
+  mixerBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const willOpen = mixer.style.display === 'none';
+    mixer.style.display = willOpen ? 'block' : 'none';
+    mixerBtn.textContent = willOpen ? 'Mixer ▴' : 'Mixer ▾';
+    mixerBtn.classList.toggle('open', willOpen);
+  });
+  body.insertBefore(mixer, body.firstChild);
 
   details.appendChild(body);
   return details;
@@ -1093,7 +1139,7 @@ function startPlaylist(pl, items, index) {
   activePlaylistId = pl.id;
   playTrackAt(index, 0);
 }
-function playSongPreview(song, stemDefs, previewId) {
+function playSongPreview(song, stemDefs, previewId, mix) {
   previewId = previewId || ('preview-' + song.id);
   if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
   const activeItem = (currentPlaylist && activePlaylistId === 'preview') ? currentPlaylist.items[currentIndex] : null;
@@ -1101,8 +1147,8 @@ function playSongPreview(song, stemDefs, previewId) {
     if (isPlaying) pauseAll(); else resumeAll();
     return;
   }
-  const volumes = {};
-  stemDefs.forEach(def => { volumes[def.key] = 100; });
+  const volumes = mix ? mix.volumes : {};
+  if (!mix) stemDefs.forEach(def => { volumes[def.key] = 100; });
   const item = {
     rowId: previewId,
     playlistId: 'preview',
@@ -1110,7 +1156,7 @@ function playSongPreview(song, stemDefs, previewId) {
     stemDefs,
     volumes,
     extraVolumesRaw: {},
-    muted: new Set(),
+    muted: mix ? mix.muted : new Set(),
     isPreview: true
   };
   currentPlaylist = { pl: { id: 'preview', name: song.title }, items: [item] };

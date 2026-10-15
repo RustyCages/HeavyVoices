@@ -833,14 +833,25 @@ function renderRows() {
   const wrap = document.getElementById('stemRows');
   wrap.innerHTML = '';
   if (!isAdmin) {
-    let ready = stems.filter(st => st.pitch && singable(st));
-    if (!ready.length) ready = stems.filter(st => st.pitch);
+    // Alla medlemmar kan se alla stämfiler (komp/fulla mixar döljs bara som standard)
+    const pitched = stems.filter(st => st.pitch);
+    let ready = showAllStems ? pitched : pitched.filter(singable);
+    if (!ready.length) ready = pitched;
+    const hiddenForMembers = pitched.filter(st => !singable(st));
     wrap.innerHTML = '<div class="voice-pick"><span class="field-k">Stämma <small>den du sjunger</small></span>' + ready.map((st, i) =>
       `<button type="button" class="btn-outline" data-i="${i}" aria-pressed="${st === current}">${esc(st.label)}</button>`).join('') + '</div>';
     wrap.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
       showStem(ready[Number(b.dataset.i)]);
       wrap.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     }));
+    if (hiddenForMembers.length) {
+      const tb = document.createElement('button');
+      tb.type = 'button'; tb.className = 'btn-outline stems-more';
+      tb.textContent = showAllStems ? 'Dölj komp och fulla mixar' : `Visa även komp och fulla mixar (${hiddenForMembers.length})`;
+      tb.title = hiddenForMembers.map(st => st.label).join(', ');
+      tb.addEventListener('click', () => { showAllStems = !showAllStems; renderRows(); });
+      wrap.appendChild(tb);
+    }
     stems.forEach(st => { st.rowEl = null; });
     return;
   }

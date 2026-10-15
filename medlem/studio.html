@@ -38,6 +38,13 @@
   .seg button[aria-pressed="true"] { background: var(--accent); color: #111317; }
   .zoom { display: inline-flex; align-items: center; gap: 0.3rem; }
   .zoom button { width: 2rem; height: 2rem; padding: 0; justify-content: center; font-size: 1.05rem; }
+  .zoom-bar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 0.5rem 0 0.2rem; font-size: 0.82rem; color: var(--text-muted); }
+  .zoom-bar .zl { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .zoom-bar input[type=range] { flex: 1 1 14rem; max-width: 26rem; margin: 0; padding: 0; accent-color: var(--accent); }
+  .zoom-bar button { width: 1.9rem; height: 1.9rem; padding: 0; justify-content: center; }
+  .zoom-bar .zv { min-width: 3.6rem; font-variant-numeric: tabular-nums; }
+  .zoom-bar .zoom-hint { margin-left: auto; }
+  .zoom-bar kbd { font-size: 0.72rem; padding: 0.05rem 0.35rem; border: 1px solid var(--border); border-radius: 0.3rem; background: rgba(255,255,255,0.05); }
   .zoom .zv { min-width: 3.4rem; text-align: center; font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
   .lyric { min-height: 2.6rem; margin: 0.2rem 0 0.6rem; text-align: center; }
   .lyric .now { font-family: 'Roboto Condensed', sans-serif; font-size: 1.25rem; font-weight: 700; color: var(--accent); }
@@ -234,6 +241,14 @@
       </div>
       <div class="lyric" id="lyric" hidden><div class="now" id="lyNow">&nbsp;</div><div class="next" id="lyNext"></div></div>
       <div id="tl"></div>
+      <div class="zoom-bar">
+        <span class="zl">Zoom</span>
+        <button type="button" class="btn-outline" id="zoomOut2" title="Zooma ut">−</button>
+        <input type="range" id="zoomRange" min="0" max="1000" step="1" value="0" aria-label="Zoom i tidslinjen" title="Dra för att zooma in eller ut">
+        <button type="button" class="btn-outline" id="zoomIn2" title="Zooma in">+</button>
+        <span class="zv" id="zoomVal2"></span>
+        <span class="zoom-hint desktop-only"><kbd>Ctrl</kbd> + scroll = zooma in/ut · <kbd>Shift</kbd> + scroll = bläddra i sidled</span>
+      </div>
       <div id="panel"></div>
       <div class="admin-sync" id="adminSync" hidden>
         <span class="k">Admin · låtens spår</span>
@@ -456,7 +471,7 @@ const tl = WaveTimeline.create(document.getElementById('tl'), {
   onOffset: (t, ms, live) => setOffset(t, ms, live),
   onActive: t => setActive(t),
   onSelection: s => { sel = s; panel.selInfo(); },
-  onView: () => { document.getElementById('zoomVal').textContent = tl.spanLabel(); },
+  onView: v => { document.getElementById('zoomVal').textContent = document.getElementById('zoomVal2').textContent = v.spanLabel(); syncZoomRange(v); },
   getBeats: () => songBpm() && document.getElementById('optGrid').checked
     ? { bpm: songBpm(), offset: Number(song.beat_offset) || 0, bpb: Math.max(1, Number(song.beats_per_bar) || 4) } : null,
   renderHead,
@@ -1741,6 +1756,18 @@ document.getElementById('toolSelect').addEventListener('click', () => setTool('s
 document.getElementById('zoomIn').addEventListener('click', () => tl.zoom(2));
 document.getElementById('zoomOut').addEventListener('click', () => tl.zoom(0.5));
 document.getElementById('zoomFit').addEventListener('click', () => tl.fit());
+// zoomreglaget under spåren: logaritmiskt från hela låten (vänster) till närmast (höger), stegen kring mitten
+const zoomRange = document.getElementById('zoomRange');
+const zLo = v => Math.log(v.minPps()), zHi = v => Math.log(v.maxPps);
+function syncZoomRange(v) {   // anropas också medan tidslinjen skapas – använd v, inte tl
+  const zr = document.getElementById('zoomRange');
+  if (!v || document.activeElement === zr) return;
+  zr.value = Math.round((Math.log(v.view.pps) - zLo(v)) / (zHi(v) - zLo(v)) * 1000);
+}
+zoomRange.addEventListener('input', () => tl.zoomTo(Math.exp(zLo(tl) + (zHi(tl) - zLo(tl)) * Number(zoomRange.value) / 1000)));
+zoomRange.addEventListener('change', () => zoomRange.blur());
+document.getElementById('zoomIn2').addEventListener('click', () => tl.zoom(1.5));
+document.getElementById('zoomOut2').addEventListener('click', () => tl.zoom(1 / 1.5));
 document.getElementById('markBtn').addEventListener('click', () => tl.addMarker(position()));
 document.getElementById('calibBtn').addEventListener('click', () => { const c = document.getElementById('calib'); c.hidden = !c.hidden; });
 document.getElementById('calibGo').addEventListener('click', async () => { await ensureCtx(); calibrate(); });

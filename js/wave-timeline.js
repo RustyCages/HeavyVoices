@@ -205,7 +205,17 @@
     // hjul: Ctrl/⌘ = zoom runt pekaren, sidled (eller Shift) = bläddra
     rootEl.addEventListener('wheel', e => {
       const x = e.clientX - ruler.getBoundingClientRect().left;
-      if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoom(e.deltaY < 0 ? 1.25 : 0.8, x); }
+      if (e.ctrlKey || e.metaKey) {
+        // stegvis: ett hack på hjulet ≈ 20 %, styrplattans nyp blir mjukt – samlas ihop per bildruta så att
+        // många snabba händelser (smidig rullning) inte zoomar ända in/ut på en gång
+        e.preventDefault();
+        const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1;
+        wheelZoom.dy += Math.max(-120, Math.min(120, e.deltaY * unit)); wheelZoom.x = x;
+        if (!wheelZoom.raf) wheelZoom.raf = requestAnimationFrame(() => {
+          const f = Math.max(0.8, Math.min(1.25, Math.pow(2, -wheelZoom.dy / 320)));
+          wheelZoom.dy = 0; wheelZoom.raf = 0; zoom(f, wheelZoom.x);
+        });
+      }
       else if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
         e.preventDefault();
         // ett hack på mushjulet = en lagom bit (aldrig mer än en femtedel av vyn), oavsett webbläsarens enhet
@@ -216,9 +226,13 @@
     }, { passive: false });
     window.addEventListener('resize', () => draw());
 
-    function zoom(f, aroundX) {
+    const wheelZoom = { dy: 0, x: 0, raf: 0 };
+    const MAX_PPS = 4000;
+    const minPps = () => Math.max(2, (width() - 10) / ((o.getDuration() || 10) * 1.02) * 0.5);   // längst ut: halva låten till marginal
+    function zoom(f, aroundX) { zoomTo(view.pps * f, aroundX); }
+    function zoomTo(pps, aroundX) {
       const ax = aroundX ?? xOf(o.getPosition()), at = tOf(ax);
-      view.pps = Math.max(2, Math.min(4000, view.pps * f));
+      view.pps = Math.max(minPps(), Math.min(MAX_PPS, pps));
       view.t0 = at - ax / view.pps; clampView(); draw();
     }
     function fit() { const d = o.getDuration() || 10; view.pps = Math.max(2, (width() - 10) / (d * 1.02)); view.t0 = 0; draw(); }
@@ -235,7 +249,7 @@
     }
     function setTool(t) { tool = t || 'pan'; ['pan', 'move', 'select'].forEach(k => rootEl.classList.toggle('tool-' + k, tool === k)); }
     const api = {
-      el: rootEl, view, markers, render, draw, drawTrack, setActiveRow, zoom, fit, tick, setTool, spanLabel, xOf, tOf,
+      el: rootEl, view, markers, render, draw, drawTrack, setActiveRow, zoom, zoomTo, minPps, maxPps: MAX_PPS, fit, tick, setTool, spanLabel, xOf, tOf,
       get tool() { return tool; },
       get selection() { return sel; },
       set selection(s) { sel = s; tracks().forEach(drawTrack); },

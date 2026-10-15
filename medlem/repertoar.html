@@ -800,7 +800,7 @@ function renderSongCard(s) {
 
   const summary = document.createElement('summary');
   summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}${s.published === false ? ' <span class="hidden-tag" title="Dold för medlemmar – syns bara för admin">Dold</span>' : ''}</h3>` +
-    `<span class="song-actions"><button type="button" class="btn-outline pl-play-all" title="Spela de bockade stämmorna med synkad text">▶ Spela i bockade</button><button type="button" class="btn-outline pl-mixer-toggle" title="Mixa stämmor">Mixer ▾</button><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="text-muted">Visa ▾</span></span></div>`;
+    `<span class="song-actions"><button type="button" class="btn-outline pl-play-all" title="Spela de bockade stämmorna med synkad text">▶ Spela ibockade</button><button type="button" class="btn-outline pl-mixer-toggle" title="Mixa stämmor">Mixer ▾</button><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="text-muted">Visa ▾</span></span></div>`;
   details.appendChild(summary);
   summary.querySelector('.pl-play-all').addEventListener('click', e => {
     e.preventDefault(); e.stopPropagation();

@@ -475,6 +475,11 @@ const tl = WaveTimeline.create(document.getElementById('tl'), {
   getBeats: () => songBpm() && document.getElementById('optGrid').checked
     ? { bpm: songBpm(), offset: Number(song.beat_offset) || 0, bpb: Math.max(1, Number(song.beats_per_bar) || 4) } : null,
   renderHead,
+  onReorder: (from, to) => {
+    const t = tracks.splice(from, 1)[0]; if (!t) return;
+    tracks.splice(to, 0, t);
+    saveTrackOrder(); tl.render(); setActive(active);
+  },
   renderFoot: (t, foot) => { if (t.kind === 'stem' && isAdmin) { foot.innerHTML = '<div class="suggestion" hidden></div>'; t._sugg = foot.firstChild; } },
 });
 const MAX_OFFSET_MS = 30000;
@@ -845,6 +850,15 @@ function cloneTrack(t) {
   toast(`Kopia av ${t.label} skapad – redigera den och spara som inspelning`);
 }
 function renderMs(t) { if (t._ms) t._ms.textContent = (t.offsetMs >= 0 ? '+' : '') + t.offsetMs + ' ms'; }
+// spårens ordning (dra i ⋮⋮) sparas per låt i den här webbläsaren; nya spår hamnar sist
+const orderKey = () => 'hv-studio-order-' + (song && song.id);
+function saveTrackOrder() { try { localStorage.setItem(orderKey(), JSON.stringify(tracks.map(t => t.key))); } catch (e) {} }
+function applyTrackOrder(list) {
+  let ord = null; try { ord = JSON.parse(localStorage.getItem(orderKey()) || 'null'); } catch (e) {}
+  if (!Array.isArray(ord) || !ord.length) return list;
+  const pos = k => { const i = ord.indexOf(k); return i === -1 ? 1e6 : i; };
+  return list.map((t, i) => ({ t, i })).sort((a, b) => (pos(a.t.key) - pos(b.t.key)) || (a.i - b.i)).map(x => x.t);
+}
 function renderHead(t, head) {
   const adminStem = t.kind === 'stem' && isAdmin && stemEdit;
   const tags = t.kind === 'rec'
@@ -1688,7 +1702,7 @@ async function loadSong(id) {
       } catch (e) { prog(); return null; }
     }))).filter(Boolean);
     if (my !== loadToken) return;
-    tracks = [...stemTracks, ...recTracks];
+    tracks = applyTrackOrder([...stemTracks, ...recTracks]);
   } catch (e) { if (my === loadToken) note.textContent = 'Kunde inte ladda spåren: ' + (e.message || e); return; }
   tracks.forEach(setPeaks);
   // första gången: komp + (helst) en sångstämma hörs, fulla mixen tyst om det finns ett komp

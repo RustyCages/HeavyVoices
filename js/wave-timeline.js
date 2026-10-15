@@ -8,6 +8,7 @@
 //     renderHead(track, headEl),   // knappar/namn ovanför vågformen (sidans egna)
 //     renderFoot(track, footEl),   // valfri rad under vågformen
 //     getBeats(),                  // valfritt: { bpm, offset, bpb } ritar taktrutnät i spåren
+//     onReorder(from, to),         // valfritt: handtag till vänster – dra spåret upp/ner (index i getTracks())
 //   });
 //   Spår: { key, color, clip:{sampleRate,channels}, peaks, offsetMs, locked? }  (locked = går inte att dra)
 //   tl.render() bygger om raderna, tl.draw() ritar om, tl.tick() följer spelhuvudet.
@@ -29,6 +30,15 @@
   .wt.tool-move .wt-wave.dragging { cursor: grabbing; }
   .wt.tool-select .wt-wave { cursor: text; }
   .wt-foot:empty { display: none; }
+  .wt-track { position: relative; }
+  .wt.reorder .wt-head { padding-left: 1.4rem; }
+  .wt-grip { position: absolute; left: calc(0.5rem - 4px); top: 0.35rem; width: 1.1rem; height: 1.7rem; display: grid; place-items: center; border-radius: 0.3rem;
+    color: var(--text-muted, #9ca3af); cursor: grab; touch-action: none; font-size: 0.95rem; line-height: 1; letter-spacing: -0.12em; opacity: 0.65; z-index: 2; }
+  .wt-grip:hover { opacity: 1; background: rgba(255,255,255,0.08); color: var(--text, #fff); }
+  .wt-track.dragging { z-index: 5; background: #1e2026; box-shadow: 0 10px 28px rgba(0,0,0,0.5); cursor: grabbing; }
+  .wt-track.dragging .wt-grip { cursor: grabbing; opacity: 1; }
+  .wt-drop { height: 3px; margin: -2px 0 -1px; border-radius: 2px; background: var(--accent, #E5A968); box-shadow: 0 0 8px rgba(229,169,104,0.8); }
+  body.wt-reordering, body.wt-reordering * { cursor: grabbing !important; user-select: none; }
   .wt-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 6px rgba(0,0,0,0.6); pointer-events: none; z-index: 3; }`;
   let cssDone = false;
   const fmt = (sec, tenths) => {
@@ -42,6 +52,7 @@
   function create(rootEl, o) {
     if (!cssDone) { cssDone = true; const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st); }
     rootEl.classList.add('wt', 'tool-pan');
+    if (o.onReorder) rootEl.classList.add('reorder');
     rootEl.innerHTML = '<canvas class="wt-ruler" title="Klicka för att hoppa, dra för att bläddra"></canvas><div class="wt-tracks"></div><div class="wt-playhead"></div>';
     const ruler = rootEl.querySelector('.wt-ruler'), tracksEl = rootEl.querySelector('.wt-tracks'), ph = rootEl.querySelector('.wt-playhead');
     const view = { t0: 0, pps: 20 };
@@ -186,9 +197,55 @@
         if (o.renderHead) o.renderHead(tr, row.querySelector('.wt-head'));
         if (o.renderFoot) o.renderFoot(tr, row.querySelector('.wt-foot'));
         wire(tr, c);
+        if (o.onReorder) wireGrip(tr, row);
         tracksEl.appendChild(row);
       });
       requestAnimationFrame(draw);
+    }
+    // dra i handtaget: raden följer pekaren, en guldlinje visar var den hamnar
+    function wireGrip(tr, row) {
+      const g = document.createElement('span');
+      g.className = 'wt-grip'; g.innerHTML = '<svg viewBox="0 0 10 16" width="10" height="16" fill="currentColor"><circle cx="2.5" cy="3" r="1.5"/><circle cx="7.5" cy="3" r="1.5"/><circle cx="2.5" cy="8" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/><circle cx="2.5" cy="13" r="1.5"/><circle cx="7.5" cy="13" r="1.5"/></svg>'; g.title = 'Dra för att flytta spåret upp eller ner';
+      g.setAttribute('aria-label', 'Flytta spåret'); row.appendChild(g);
+      let d = null;
+      g.addEventListener('pointerdown', e => {
+        if (e.button) return;
+        e.preventDefault(); g.setPointerCapture(e.pointerId);
+        const rows = [...tracksEl.children].filter(r => r.classList.contains('wt-track'));
+        d = { y: e.clientY, from: rows.indexOf(row), to: null, rows, line: document.createElement('div'), scroll: 0, raf: 0 };
+        d.line.className = 'wt-drop';
+        row.classList.add('dragging'); document.body.classList.add('wt-reordering');
+      });
+      const place = () => {
+        const mid = row.getBoundingClientRect(), cy = mid.top + mid.height / 2;
+        let to = d.rows.length;   // index bland de andra raderna där den ska in
+        const others = d.rows.filter(r => r !== row);
+        for (let i = 0; i < others.length; i++) { const b = others[i].getBoundingClientRect(); if (cy < b.top + b.height / 2) { to = i; break; } }
+        if (to > others.length) to = others.length;
+        d.to = to;
+        if (to < others.length) others[to].before(d.line); else others[others.length - 1].after(d.line);
+      };
+      const autoScroll = () => {
+        if (!d) return;
+        if (d.scroll) { window.scrollBy(0, d.scroll); d.y -= d.scroll; row.style.transform = `translateY(${d.lastY - d.y}px)`; place(); }
+        d.raf = requestAnimationFrame(autoScroll);
+      };
+      g.addEventListener('pointermove', e => {
+        if (!d) return;
+        d.lastY = e.clientY;
+        row.style.transform = `translateY(${e.clientY - d.y}px)`;
+        d.scroll = e.clientY < 70 ? -12 : e.clientY > innerHeight - 70 ? 12 : 0;
+        if (!d.raf) d.raf = requestAnimationFrame(autoScroll);
+        place();
+      });
+      const end = () => {
+        if (!d) return;
+        const { from, to, line, raf } = d; d = null;
+        cancelAnimationFrame(raf); line.remove();
+        row.classList.remove('dragging'); row.style.transform = ''; document.body.classList.remove('wt-reordering');
+        if (to != null && to !== from) o.onReorder(from, to);
+      };
+      g.addEventListener('pointerup', end); g.addEventListener('pointercancel', end);
     }
     function setActiveRow() { tracks().forEach(tr => { if (tr._row) tr._row.classList.toggle('active', !!(o.isActive && o.isActive(tr))); drawTrack(tr); }); }
 

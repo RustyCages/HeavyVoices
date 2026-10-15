@@ -681,10 +681,18 @@ let fxFor = null;
 function fxShow() {
   const t = active, show = !!(t && t.clip && !isEmpty(t));
   if (fxFor !== t) { fxFor = t; fxStatus(FX_HINT); }
-  fxEl('fxRow').hidden = fxEl('fxRow2').hidden = !show;
+  // gruppen syns alltid – utan ljud i valt spår (tomt spår, inspelning pågår) blir den grå med en förklaring
+  fxEl('fxRow').hidden = fxEl('fxRow2').hidden = false;
   const fxSec = document.getElementById('secFx');
-  if (fxSec) { fxSec.hidden = !show; fxSec.querySelector('.sec-b').hidden = !(show && hasReverb(t)); }
-  if (!show) return;
+  if (fxSec) fxSec.querySelector('.sec-b').hidden = !(show && hasReverb(t));
+  if (!show) {
+    fxEl('fxRow').querySelectorAll('button, select, input').forEach(e => { e.disabled = true; });
+    ['fxReset', 'fxBake'].forEach(id => { fxEl(id).disabled = true; });
+    fxStatus(!t ? 'Välj ett spår för att använda effekter.' : (rec && rec.track === t) ? 'Effekter går att använda när inspelningen är klar.' : 'Spåret är tomt – spela in eller klistra in något först, sedan kan du lägga på effekter.');
+    fxFor = null;   // visa vanliga tipset igen när spåret fått ljud
+    return;
+  }
+  fxEl('fxRevOn').disabled = false;
   const r = revOf(t);
   fxEl('fxRevOn').setAttribute('aria-pressed', String(r.on)); fxEl('fxRevOn').textContent = r.on ? '🌫 Reverb på' : '🌫 Reverb av';
   fxEl('fxMix').value = Math.round(r.mix * 100); fxEl('fxMixV').textContent = Math.round(r.mix * 100) + ' %';

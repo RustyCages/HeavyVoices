@@ -99,6 +99,19 @@
   .fx-row select { width: auto; }
   #fxRevOn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #111317; }
   .tag.fx { color: #93c5fd; border-color: rgba(147,197,253,0.5); }
+  /* utfällbara verktygsgrupper i panelen: Effekter, Redigera, Röstverktyg */
+  .tep-sec { border: 1px solid var(--border); border-radius: 0.55rem; background: rgba(255,255,255,0.02); }
+  .tep-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.75rem; user-select: none; }
+  .tep-sec > summary::-webkit-details-marker { display: none; }
+  .tep-sec > summary::before { content: '▸'; color: var(--accent); font-size: 0.9rem; transition: transform 0.15s; }
+  .tep-sec[open] > summary::before { transform: rotate(90deg); }
+  .tep-sec > summary:hover { background: rgba(255,255,255,0.04); border-radius: 0.55rem; }
+  .tep-sec .sec-t { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 0.9rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); }
+  .tep-sec .sec-d { font-size: 0.78rem; color: var(--text-muted); }
+  .tep-sec .sec-b { margin-left: auto; }
+  .tep-sec .sec-body { display: grid; gap: 0.6rem; padding: 0.2rem 0.75rem 0.75rem; min-width: 0; }
+  .tep-sec .sec-body > * { min-width: 0; }
+  .tep-sec .vt { border: 0; padding: 0; }
   .sync-row kbd { font: inherit; font-size: 0.75rem; padding: 0 0.3rem; border: 1px solid var(--border); border-radius: 0.25rem; }
   .tag.lock { color: var(--text-muted); }
   .tag.unlocked { color: #facc15; border-color: rgba(250,204,21,0.5); }
@@ -465,7 +478,7 @@ const panel = TrackEditPanel.mount(document.getElementById('panel'), {
   canUndo: t => !!(t && t.undo && t.undo.length), isEdited: t => !!(t && t.edited),
   extraRows: `
     <div class="vt desktop-only" id="vtBox">
-      <div class="tool-row"><span class="k">Röstverktyg</span><span class="status">Gäller det markerade i valt spår – eller hela spåret om inget är markerat. Tonhöjd och syntröst blir nya spår; Rengör ändrar dina egna spår direkt (går att ångra), annars blir det ett nytt spår.</span></div>
+      <div class="tool-row"><span class="status">Gäller det markerade i valt spår – eller hela spåret om inget är markerat. Tonhöjd och syntröst blir nya spår; Rengör ändrar dina egna spår direkt (går att ångra), annars blir det ett nytt spår.</span></div>
       <div class="tool-row">
         <span class="k">Tonhöjd</span>
         <select id="psMode" title="Halvtoner flyttar allt lika mycket. Steg i tonarten flyttar varje ton inom tonarten – en ters blir stor eller liten beroende på tonen, som när man sjunger en stämma."><option value="semi">Halvtoner</option><option value="key">Steg i tonarten</option></select>
@@ -627,7 +640,7 @@ syncLabels();
 const fxBox = document.createElement('div');
 fxBox.innerHTML = `
   <div class="tool-row fx-row" id="fxRow">
-    <span class="k">Effekter</span>
+    <span class="k">Reverb</span>
     <button type="button" class="btn-outline" id="fxRevOn" aria-pressed="false" title="Slå på/av reverb (efterklang) för valt spår – hörs direkt när du spelar">🌫 Reverb av</button>
     <select id="fxPreset" title="Färdiga rum – finjustera med reglagen">
       <option value="">Välj rum…</option>
@@ -653,7 +666,10 @@ let fxFor = null;
 function fxShow() {
   const t = active, show = !!(t && t.clip && !isEmpty(t));
   if (fxFor !== t) { fxFor = t; fxStatus(FX_HINT); }
-  fxEl('fxRow').hidden = fxEl('fxRow2').hidden = !show; if (!show) return;
+  fxEl('fxRow').hidden = fxEl('fxRow2').hidden = !show;
+  const fxSec = document.getElementById('secFx');
+  if (fxSec) { fxSec.hidden = !show; fxSec.querySelector('.sec-b').hidden = !(show && hasReverb(t)); }
+  if (!show) return;
   const r = revOf(t);
   fxEl('fxRevOn').setAttribute('aria-pressed', String(r.on)); fxEl('fxRevOn').textContent = r.on ? '🌫 Reverb på' : '🌫 Reverb av';
   fxEl('fxMix').value = Math.round(r.mix * 100); fxEl('fxMixV').textContent = Math.round(r.mix * 100) + ' %';
@@ -703,6 +719,30 @@ async function bakeReverb(t) {
   finally { fxShow(); }
 }
 fxEl('fxBake').addEventListener('click', () => bakeReverb(active));
+
+// ---------- utfällbara grupper: Effekter, Redigera, Röstverktyg (öppet/stängt sparas i webbläsaren) ----------
+function makeSection(id, title, desc, nodes, cls) {
+  nodes = nodes.filter(Boolean); if (!nodes.length) return null;
+  const d = document.createElement('details');
+  d.className = 'tep-sec' + (cls ? ' ' + cls : ''); d.id = id;
+  d.innerHTML = `<summary><span class="sec-t">${title}</span><span class="sec-d">${desc}</span><span class="tag fx sec-b" hidden>reverb på</span></summary><div class="sec-body"></div>`;
+  nodes[0].before(d);
+  d.querySelector('.sec-body').append(...nodes);
+  const key = 'hv-studio-sec-' + id;
+  try { d.open = localStorage.getItem(key) === '1'; } catch (e) {}
+  d.addEventListener('toggle', () => { try { localStorage.setItem(key, d.open ? '1' : '0'); } catch (e) {} });
+  return d;
+}
+(() => {
+  const panelEl = document.getElementById('panel');
+  makeSection('secFx', '🎛 Effekter', 'Reverb', [fxEl('fxRow'), fxEl('fxRow2')]);
+  // Redigera: panelens egna rader, från Klipp till och med Ändringar
+  const kids = [...panelEl.children];
+  const first = panelEl.querySelector('[data-a=mute]').closest('.tool-row');
+  const last = panelEl.querySelector('[data-a=undo]').closest('.tool-row');
+  makeSection('secEdit', '✂ Redigera', 'Klipp · Kopiera · Tystnad · Volym · Ändringar', kids.slice(kids.indexOf(first), kids.indexOf(last) + 1));
+  makeSection('secVoice', '🎤 Röstverktyg', 'Tonhöjd · Syntröst · Rengör · AI-separera', [document.getElementById('vtBox')], 'desktop-only');
+})();
 
 // ungefärligt tempo: ansatskurva (5 ms-steg) → autokorrelation, med extra vikt för tempon kring 120
 function estimateBpm(clip) {

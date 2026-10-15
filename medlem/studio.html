@@ -119,6 +119,32 @@
   .tep-sec .sec-body { display: grid; gap: 0.6rem; padding: 0.2rem 0.75rem 0.75rem; min-width: 0; }
   .tep-sec .sec-body > * { min-width: 0; }
   .tep-sec .vt { border: 0; padding: 0; }
+  .snap-sec { margin-top: 1rem; }
+  .auto-state { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+  .tep-status { font-size: 0.82rem; color: var(--text-muted); }
+  .tep-status:empty { display: none; }
+  .tep-status.warn { color: #facc15; }
+  .tep-status button { font-size: 0.75rem; padding: 0.2rem 0.55rem; margin-left: 0.4rem; }
+  .snap-sec input[type=text] { width: 16rem; max-width: 100%; margin: 0; padding: 0.3rem 0.45rem; }
+  .snap-sec select { width: auto; margin: 0; padding: 0.3rem 0.45rem; font-size: 0.82rem; }
+  .snap-sec .tool-row button { font-size: 0.8rem; padding: 0.35rem 0.65rem; }
+  .snap-list { display: grid; gap: 0.4rem; }
+  .snap-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.3rem 0.6rem; align-items: center; padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.85rem; }
+  .snap-row b { margin-right: 0.3rem; }
+  .snap-row small { display: block; color: var(--text-muted); }
+  .snap-act { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+  .snap-act button { font-size: 0.78rem; padding: 0.3rem 0.6rem; }
+  .snap-act button svg { width: 14px; height: 14px; }
+  .snap-ov { grid-column: 1 / -1; }
+  .ov-h { margin: 0.4rem 0 0; font-size: 0.85rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); font-family: 'Roboto Condensed', sans-serif; }
+  .ov-wrap { overflow-x: auto; }
+  table.ov { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  table.ov th { text-align: left; font-weight: 600; color: var(--text-muted); padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.ov td { padding: 0.32rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); white-space: nowrap; }
+  table.ov .num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.ov td i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 0.45rem; }
+  table.ov tr.muted td { color: var(--text-muted); opacity: 0.7; }
+  table.ov .solo { color: var(--accent); }
   .sync-row kbd { font: inherit; font-size: 0.75rem; padding: 0 0.3rem; border: 1px solid var(--border); border-radius: 0.25rem; }
   .tag.lock { color: var(--text-muted); }
   .tag.unlocked { color: #facc15; border-color: rgba(250,204,21,0.5); }
@@ -191,7 +217,7 @@
     <h3>Vem hör min inspelning?</h3>
     <p class="g-p">🔒 <b>Privat</b> – bara du. 👥 <b>Körledningen</b> – du och körledningen, bra när du vill visa en idé. 🌍 <b>Alla</b> – hela kören kan lyssna på den i Studio. Du kan ändra valet när du vill och spara igen.</p>
     <div class="tips">
-      <b>Tips:</b> Sjung in en stämma i taget och lyssna på den tillsammans med originalstämman. Sänk låtens volym eller tysta sångspåren om du vill höra dig själv tydligare. <b>⬇ Mix av det som hörs</b> laddar ner allt som är påslaget som en ljudfil – bra att skicka till någon. Kortkommandon på dator: <b>R</b> = spela in, <b>mellanslag</b> = spela/stoppa, <b>Ctrl+Z</b> = ångra, <b>Ctrl+C / Ctrl+V</b> = kopiera markerat / klistra in vid spelhuvudet, <b>Ctrl+Shift+C</b> = markerat till nytt spår på samma plats.
+      <b>Tips:</b> Sjung in en stämma i taget och lyssna på den tillsammans med originalstämman. Sänk låtens volym eller tysta sångspåren om du vill höra dig själv tydligare. <b>⬇ Mix av det som hörs</b> laddar ner allt som är påslaget som en ljudfil – bra att skicka till någon. Kortkommandon på dator: <b>R</b> = spela in, <b>mellanslag</b> = spela/stoppa, <b>Ctrl+Z</b> = ångra, <b>Ctrl+C / Ctrl+V</b> = kopiera markerat / klistra in vid spelhuvudet, <b>Ctrl+Shift+C</b> = markerat till nytt spår på samma plats. <b>📸 Ögonblicksbilder</b>: läget sparas automatiskt så du fortsätter där du var, osparade spår blir privata utkast, och du kan spara namngivna lägen och dela dem med körledningen.
     </div>
   </div>
 
@@ -262,6 +288,24 @@
           <span class="save-state" id="saveState"></span>
         </div>
       </div>
+      <details class="tep-sec snap-sec" id="secSnap">
+        <summary><span class="sec-t">📸 Ögonblicksbilder</span><span class="sec-d">Spara, dela och återställ mixen och spårens lägen · överblick</span><span class="sec-b auto-state" id="autoState"></span></summary>
+        <div class="sec-body">
+          <p class="hint" style="margin:0">Läget – volym, tyst/solo, placering, reverb, ordning, markörer och zoom – sparas automatiskt, så du fortsätter där du var nästa gång. Osparade spår sparas som privata <b>utkast</b> (rensas efter 30 dagar). En <b>ögonblicksbild</b> är ett läge du vill behålla eller visa körledningen. Den sparar inställningarna, inte ljudet.</p>
+          <div class="tool-row">
+            <input type="text" id="snapName" maxlength="80" placeholder="Namn, t.ex. Före reverb">
+            <select id="snapVis" title="Vem som ser ögonblicksbilden"><option value="private">🔒 Privat</option><option value="leaders">👥 Körledningen</option><option value="all">🌍 Alla</option></select>
+            <button type="button" id="snapSave">📸 Spara ögonblicksbild</button>
+            <button type="button" class="btn-outline" id="snapExport" title="Ladda ner nuvarande läge som JSON-fil">⬇ Exportera JSON</button>
+            <button type="button" class="btn-outline" id="snapImport" title="Läs in en ögonblicksbild från en JSON-fil">📂 Importera JSON</button>
+            <input type="file" id="snapFile" accept=".json,application/json" hidden>
+          </div>
+          <div class="tep-status" id="snapStatus"></div>
+          <div class="snap-list" id="snapList"><span class="hint">Laddar…</span></div>
+          <h4 class="ov-h">Överblick – nuvarande läge</h4>
+          <div id="overview"></div>
+        </div>
+      </details>
       <div class="guide-box">
         <b>Så gör du:</b> välj låt, sätt i hörlurarna och tryck <b>⏺ Spela in</b> (eller R). Du hör låten från spelhuvudet – med <b>inräkning</b> börjar den lite före. Tryck igen (eller mellanslag) för att stoppa. Varje tagning blir ett nytt spår. Lyssna, dra den i sidled om den inte ligger i takt, och klipp bort det du inte vill ha med <b>▭ Markera</b>. Ge den ett namn och tryck <b>💾 Spara inspelning</b>. <b>Kalibrera</b> en gång per dator/hörlurar så hamnar inspelningarna rätt från början.
       </div>
@@ -271,7 +315,7 @@
 
   <div class="card static" style="margin-top:1.5rem;">
     <h2 style="margin:0 0 0.3rem; font-size:1.15rem;">Mina inspelningar</h2>
-    <p class="hint" style="margin:0 0 0.7rem;">🔒 Privat = bara du · 👥 Körledningen = du och admin · 🌍 Alla = hela kören (i Studio för låten).</p>
+    <p class="hint" style="margin:0 0 0.7rem;">🔒 Privat = bara du · 👥 Körledningen = du, admin och stämledare · 🌍 Alla = hela kören (i Studio för låten).</p>
     <div class="recs" id="myRecs"><span class="hint">Laddar…</span></div>
   </div>
 
@@ -862,7 +906,7 @@ function applyTrackOrder(list) {
 function renderHead(t, head) {
   const adminStem = t.kind === 'stem' && isAdmin && stemEdit;
   const tags = t.kind === 'rec'
-    ? (t.mine ? `<span class="tag mine">${t.id ? VIS[t.visibility] : isEmpty(t) ? 'tomt' : 'ny tagning'}</span>` : `<span class="tag">${esc(names[t.memberId] || 'Någon')} · ${VIS[t.visibility]}</span>`) +
+    ? (t.mine ? `<span class="tag mine">${t.draft ? '✎ utkast' : t.id ? VIS[t.visibility] : isEmpty(t) ? 'tomt' : 'ny tagning'}</span>` : `<span class="tag">${esc(names[t.memberId] || 'Någon')} · ${VIS[t.visibility]}</span>`) +
       ((t.mine && !isEmpty(t) && (t.edited || !t.id)) ? '<span class="tag edit">osparad</span>' : '')
     : (adminStem ? `<small>${esc(stemFilename(t.path))}</small><span class="tag unlocked">✏ upplåst</span>${t.key === document.getElementById('refSelect').value ? '<span class="tag ref">REF</span>' : ''}${t.edited ? '<span class="tag edit">ändrad – osparad</span>' : ''}`
       : '<span class="tag lock" title="Låtens stämma är skrivskyddad – gör en egen kopia för att redigera">🔒 låst</span>');
@@ -915,9 +959,9 @@ function updateRecTools() {
     const ti = document.getElementById('recTitle');
     if (document.activeElement !== ti) ti.value = t.label;
     document.getElementById('recVis').value = t.visibility || 'private';
-    const dirty = t.edited || !t.id || t.offsetMs !== t.savedOffsetMs || t.label !== t.savedTitle || t.visibility !== t.savedVis;
+    const dirty = t.edited || !t.id || t.draft || t.offsetMs !== t.savedOffsetMs || t.label !== t.savedTitle || t.visibility !== t.savedVis;
     document.getElementById('recSave').disabled = !dirty || isEmpty(t);
-    document.getElementById('recStatus').textContent = isEmpty(t) ? 'Tomt spår – spela in eller klistra in något först' : !t.id ? 'Inte sparad än' : dirty ? 'Osparade ändringar' : 'Sparad ✓';
+    document.getElementById('recStatus').textContent = isEmpty(t) ? 'Tomt spår – spela in eller klistra in något först' : !t.id ? 'Inte sparad än' : t.draft ? 'Utkast – autosparat privat. Tryck Spara för att behålla som inspelning' : dirty ? 'Osparade ändringar' : 'Sparad ✓';
   }
 }
 function setPeaks(t) { t.buffer = AudioEdit.toBuffer(getCtx(), t.clip); t.peaks = AudioEdit.peaks(t.clip); }
@@ -1250,7 +1294,7 @@ document.getElementById('recSave').addEventListener('click', async () => {
   }
   const btn = document.getElementById('recSave'); btn.disabled = true;
   try {
-    const row = { title: t.label, offset_ms: t.offsetMs, visibility: t.visibility, duration: Math.round(tDur(t) * 100) / 100, song_id: song.id, updated_at: new Date().toISOString() };
+    const row = { title: t.label, offset_ms: t.offsetMs, visibility: t.visibility, draft: false, duration: Math.round(tDur(t) * 100) / 100, song_id: song.id, updated_at: new Date().toISOString() };
     let oldPath = null;
     if (!t.id || t.edited) {
       const id = t.id || crypto.randomUUID();
@@ -1266,7 +1310,7 @@ document.getElementById('recSave').addEventListener('click', async () => {
     } else {
       const { error } = await supabaseClient.from('recordings').update(row).eq('id', t.id); if (error) throw error;
     }
-    t.orig = t.clip; t.edited = false; t.undo = []; t.savedOffsetMs = t.offsetMs; t.savedTitle = t.label; t.savedVis = t.visibility;
+    t.orig = t.clip; t.edited = false; t.draft = false; t.undo = []; t.savedOffsetMs = t.offsetMs; t.savedTitle = t.label; t.savedVis = t.visibility;
     tl.render(); setActive(t); loadMyRecs();
     toast(`”${t.label}” sparad – ${VIS[t.visibility]}`);
   } catch (e) { setRecStatus('Kunde inte spara: ' + (e.message || e)); btn.disabled = false; }
@@ -1638,7 +1682,7 @@ document.getElementById('refSelect').addEventListener('change', () => tl.render(
 // ---------- mina inspelningar ----------
 async function loadMyRecs() {
   const box = document.getElementById('myRecs');
-  const { data, error } = await supabaseClient.from('recordings').select('*').eq('member_id', me.id).order('created_at', { ascending: false });
+  const { data, error } = await supabaseClient.from('recordings').select('*').eq('member_id', me.id).eq('draft', false).order('created_at', { ascending: false });
   if (error) { box.innerHTML = `<span class="hint">Kunde inte hämta: ${esc(error.message)}</span>`; return; }
   if (!data || !data.length) { box.innerHTML = '<span class="hint">Inga sparade inspelningar än.</span>'; return; }
   const titles = Object.fromEntries(songs.map(s => [String(s.id), s.title]));
@@ -1668,9 +1712,10 @@ async function loadSong(id) {
   getCtx();
   const offs = song.stem_offsets || {};
   const stemDefs = stemListFor(song);
-  const [{ data: recs }, { data: pitchRows }] = await Promise.all([
+  const [{ data: recs }, { data: pitchRows }, { data: stRow }] = await Promise.all([
     supabaseClient.from('recordings').select('*').eq('song_id', song.id).order('created_at'),
     supabaseClient.from('song_pitch').select('stem_key, data').eq('song_id', song.id),
+    supabaseClient.from('studio_state').select('state, updated_at').eq('song_id', song.id).eq('member_id', me.id).maybeSingle(),
   ]);
   if (my !== loadToken) return;
   pitchByKey = {};
@@ -1697,7 +1742,7 @@ async function loadSong(id) {
         const clip = await loadClip(REC_BUCKET, r.path); prog();
         const mine = r.member_id === me.id;
         return { kind: 'rec', id: r.id, key: 'rec-' + r.id, label: r.title, path: r.path, memberId: r.member_id, mine, visibility: r.visibility,
-          color: mine ? REC_COLOR : REC_OTHER, clip, orig: clip, offsetMs: r.offset_ms, savedOffsetMs: r.offset_ms, savedTitle: r.title, savedVis: r.visibility,
+          draft: !!r.draft, color: mine ? REC_COLOR : REC_OTHER, clip, orig: clip, offsetMs: r.offset_ms, savedOffsetMs: r.offset_ms, savedTitle: r.title, savedVis: r.visibility,
           locked: !mine, readOnly: !mine, undo: [], edited: false, vol: 1, muted: !mine, solo: false };
       } catch (e) { prog(); return null; }
     }))).filter(Boolean);
@@ -1731,7 +1776,19 @@ async function loadSong(id) {
   active = tracks.find(t => t.kind === 'rec' && t.mine) || tracks[0];
   fillVtSelects(); vtStatus('');
   tl.render(); setActive(active);
-  requestAnimationFrame(() => { tl.fit(); tick(); });
+  stateSaved = { song: null, json: null, at: null }; showAutoState(); snapStatus(''); beforeRestore = null;
+  requestAnimationFrame(() => {
+    tl.fit(); tick();
+    const st = stRow && stRow.state;
+    if (st && st.tracks) {   // fortsätt där du var
+      applyState(st);
+      const at = new Date(stRow.updated_at);
+      stateSaved = { song: song.id, json: null, at };
+      toast(`Fortsätter där du var – ${at.toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}`);
+    }
+    requestAnimationFrame(() => { if (song) { stateSaved.song = song.id; stateSaved.json = stateJson(captureState()); showAutoState(); } });
+  });
+  loadSnapshots();
 }
 
 // admin: skapa en ny låt direkt här (dold för medlemmarna tills den görs synlig under Låtar)
@@ -1841,6 +1898,270 @@ window.addEventListener('beforeunload', e => { if (rec || unsaved()) { e.prevent
   b.addEventListener('click', () => set(g.hidden));
 })();
 
+// ---------- fortsätt där du var: läge, utkast och ögonblicksbilder ----------
+// Läget (mixer, reverb, placering, ordning, markörer, zoom, spelhuvud) är ett litet JSON-objekt.
+// Det senaste sparas automatiskt per medlem och låt (studio_state); namngivna ögonblicksbilder i studio_snapshots.
+// Osparade spår laddas upp automatiskt som privata utkast (recordings.draft) så att de finns kvar nästa gång.
+const SNAP_VIS = { private: '🔒 Privat', leaders: '👥 Körledningen', all: '🌍 Alla' };
+const DRAFT_DAYS = 30;
+let stateSaved = { song: null, json: null, at: null }, stateBusy = false, draftBusy = false, snapshots = [], beforeRestore = null;
+const round = (v, d = 3) => Math.round(v * 10 ** d) / 10 ** d;
+// spår som kan pekas ut i ett läge: låtens stämmor och inspelningar/utkast med id
+const stateTracks = () => tracks.filter(t => t.kind === 'stem' || t.id);
+function captureState() {
+  return {
+    v: 1, song_id: song.id, song: song.title,
+    view: { pps: round(tl.view.pps), t0: round(tl.view.t0), playhead: round(position()) },
+    markers: tl.markers.map(m => round(m)),
+    order: stateTracks().map(t => t.key),
+    tracks: Object.fromEntries(stateTracks().map(t => [t.key, {
+      label: t.label, vol: round(t.vol ?? 1, 2), muted: !!t.muted, solo: !!t.solo, offsetMs: t.offsetMs || 0,
+      reverb: t.fx && t.fx.reverb ? { ...t.fx.reverb } : null,
+    }])),
+  };
+}
+// lägg på ett läge; returnerar antal spår som inte fanns (privata, borttagna eller annan låt)
+function applyState(st, { view = true } = {}) {
+  if (!st || !st.tracks) return 0;
+  const byKey = new Map(tracks.map(t => [t.key, t]));
+  let missing = 0;
+  Object.entries(st.tracks).forEach(([k, s]) => {
+    const t = byKey.get(k);
+    if (!t) { missing++; return; }
+    t.vol = Math.max(0, Math.min(1.5, Number(s.vol ?? 1)));
+    t.muted = !!s.muted; t.solo = !!s.solo;
+    if (s.reverb) { t.fx = t.fx || {}; t.fx.reverb = { ...Effects.REVERB_DEFAULT, ...Effects.normReverb({ ...Effects.REVERB_DEFAULT, ...s.reverb }), on: !!s.reverb.on }; }
+    else if (t.fx && t.fx.reverb) t.fx.reverb.on = false;
+    if (t.mine && !t.locked && s.offsetMs != null && t.clip) t.offsetMs = Math.round(Number(s.offsetMs) || 0);
+  });
+  if (Array.isArray(st.order) && st.order.length) {
+    const pos = k => { const i = st.order.indexOf(k); return i === -1 ? 1e6 : i; };
+    tracks = tracks.map((t, i) => ({ t, i })).sort((a, b) => (pos(a.t.key) - pos(b.t.key)) || (a.i - b.i)).map(x => x.t);
+  }
+  if (Array.isArray(st.markers)) tl.markers.splice(0, tl.markers.length, ...st.markers.filter(m => isFinite(m)));
+  tl.render(); if (active && tracks.includes(active)) setActive(active); else if (tracks[0]) setActive(tracks[0]);
+  if (view && st.view) {
+    requestAnimationFrame(() => {
+      if (st.view.pps) { tl.zoomTo(st.view.pps, 0); tl.view.t0 = Number(st.view.t0) || 0; tl.draw(); }
+      if (isFinite(st.view.playhead)) seek(Number(st.view.playhead));
+    });
+  }
+  applyGains(); restartIfPlaying(); updateSaveState(); renderOverview();
+  return missing;
+}
+const stateJson = st => JSON.stringify(st);
+
+// --- automatiskt läge ---
+async function saveStateNow(force) {
+  if (!song || !tracks.length || stateBusy || rec || !me) return;
+  const st = captureState(), json = stateJson(st);
+  if (!force && stateSaved.song === song.id && stateSaved.json === json) return;
+  stateBusy = true;
+  try {
+    const { error } = await supabaseClient.from('studio_state').upsert({ member_id: me.id, song_id: song.id, state: st, updated_at: new Date().toISOString() });
+    if (!error) { stateSaved = { song: st.song_id, json, at: new Date() }; showAutoState(); }
+  } catch (e) { /* nästa varv försöker igen */ }
+  stateBusy = false;
+}
+function showAutoState() {
+  const el = document.getElementById('autoState'); if (!el) return;
+  el.textContent = stateSaved.at && stateSaved.song === (song && song.id)
+    ? '💾 Läget autosparat ' + stateSaved.at.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+// --- utkast: osparade spår laddas upp som privata utkast ---
+const draftCandidate = t => t.kind === 'rec' && t.mine && t.clip && !isEmpty(t) && !(rec && rec.track === t) && !t._uploading
+  && (!t.id || (t.draft && t.edited));
+async function uploadDraft(t) {
+  const songId = song.id, wasNew = !t.id, id = t.id || crypto.randomUUID(), clip = t.clip;
+  t._uploading = true;
+  try {
+    const blob = await AudioEdit.encodeMp3(clip, clip.channels.length > 1 ? 192 : 160);
+    const path = `${me.id}/${id}-${Date.now().toString(36)}.mp3`, old = t.path;
+    const { error } = await supabaseClient.storage.from(REC_BUCKET).upload(path, blob, { contentType: 'audio/mpeg' });
+    if (error) throw error;
+    const row = { title: t.label, offset_ms: t.offsetMs, visibility: 'private', draft: true, duration: Math.round(AudioEdit.duration(clip) * 100) / 100,
+      song_id: songId, path, updated_at: new Date().toISOString() };
+    const { error: e2 } = wasNew ? await supabaseClient.from('recordings').insert({ ...row, id }) : await supabaseClient.from('recordings').update(row).eq('id', id);
+    if (e2) { supabaseClient.storage.from(REC_BUCKET).remove([path]); throw e2; }
+    if (old && !wasNew) supabaseClient.storage.from(REC_BUCKET).remove([old]);
+    Object.assign(t, { id, key: 'rec-' + id, path, draft: true, visibility: 'private', savedVis: 'private', savedTitle: t.label, savedOffsetMs: t.offsetMs });
+    if (t.clip === clip) t.edited = false;   // ändrat under uppladdningen → laddas upp igen nästa varv
+    if (song && song.id === songId) { tl.render(); if (active) setActive(active); }
+  } finally { t._uploading = false; }
+}
+async function flushDrafts() {
+  if (draftBusy || !song || !me) return;
+  draftBusy = true;
+  try { for (const t of tracks.filter(draftCandidate)) { try { await uploadDraft(t); } catch (e) { console.warn('Utkast kunde inte sparas', e); } } }
+  finally { draftBusy = false; }
+}
+async function cleanOldDrafts() {
+  const before = new Date(Date.now() - DRAFT_DAYS * 864e5).toISOString();
+  const { data } = await supabaseClient.from('recordings').select('id, path').eq('member_id', me.id).eq('draft', true).lt('updated_at', before);
+  if (!data || !data.length) return;
+  await supabaseClient.from('recordings').delete().in('id', data.map(r => r.id));
+  supabaseClient.storage.from(REC_BUCKET).remove(data.map(r => r.path).filter(Boolean));
+}
+setInterval(() => { if (document.hidden) return; flushDrafts().then(() => saveStateNow()); }, 5000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveStateNow(); });
+
+// --- ögonblicksbilder ---
+const snapEl = id => document.getElementById(id);
+function snapStatus(html, warn) { const e = snapEl('snapStatus'); e.innerHTML = html || ''; e.classList.toggle('warn', !!warn); }
+async function loadSnapshots() {
+  if (!song) return;
+  const sid = song.id;
+  const { data, error } = await supabaseClient.from('studio_snapshots').select('*').eq('song_id', sid).order('created_at', { ascending: false });
+  if (!song || song.id !== sid) return;
+  if (error) { snapEl('snapList').innerHTML = `<span class="hint">Kunde inte hämta ögonblicksbilder: ${esc(error.message)}</span>`; return; }
+  snapshots = data || [];
+  const ids = [...new Set(snapshots.map(s => s.member_id))].filter(x => !names[x] && x !== me.id);
+  if (ids.length) { const { data: ms } = await supabaseClient.from('members').select('id, name').in('id', ids); (ms || []).forEach(m => { names[m.id] = m.name; }); }
+  renderSnapshots();
+}
+function renderSnapshots() {
+  const box = snapEl('snapList');
+  if (!snapshots.length) { box.innerHTML = '<span class="hint">Inga ögonblicksbilder för den här låten än.</span>'; return; }
+  box.innerHTML = snapshots.map(s => {
+    const mine = s.member_id === me.id, n = Object.keys((s.state && s.state.tracks) || {}).length;
+    return `<div class="snap-row" data-id="${s.id}">
+      <div class="snap-main"><b>${esc(s.name)}</b><span class="vis ${s.visibility}">${SNAP_VIS[s.visibility]}</span>
+        <small>${mine ? 'Du' : esc(names[s.member_id] || 'Någon')} · ${new Date(s.created_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })} · ${n} spår</small></div>
+      <div class="snap-act">
+        <button type="button" class="btn-outline" data-sa="view" aria-expanded="false">▤ Överblick</button>
+        <button type="button" data-sa="restore" title="Lägg på ögonblicksbildens inställningar (ljudfilerna ändras inte)">↺ Återställ</button>
+        <button type="button" class="btn-outline" data-sa="json" title="Ladda ner som JSON">⬇</button>
+        ${mine ? `<select data-sa="vis" title="Vem som ser ögonblicksbilden">${Object.entries(SNAP_VIS).map(([k, v]) => `<option value="${k}" ${k === s.visibility ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <button type="button" class="btn-outline" data-sa="del" title="Ta bort">${TRASH_SVG}</button>` : ''}
+      </div>
+      <div class="snap-ov" hidden></div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.snap-row').forEach(row => {
+    const s = snapshots.find(x => x.id === row.dataset.id);
+    row.querySelector('[data-sa=view]').addEventListener('click', e => {
+      const ov = row.querySelector('.snap-ov'); ov.hidden = !ov.hidden; e.currentTarget.setAttribute('aria-expanded', String(!ov.hidden));
+      if (!ov.hidden) ov.innerHTML = overviewTable(s.state, false);
+    });
+    row.querySelector('[data-sa=restore]').addEventListener('click', () => restoreSnapshot(s.state, s.name));
+    row.querySelector('[data-sa=json]').addEventListener('click', () => downloadJson({ ...s.state, name: s.name }, s.name));
+    const vs = row.querySelector('[data-sa=vis]');
+    if (vs) vs.addEventListener('change', async () => {
+      const v = vs.value;
+      if (v !== 'private' && !(await shareTracksFor(s.state, v))) { vs.value = s.visibility; return; }
+      const { error } = await supabaseClient.from('studio_snapshots').update({ visibility: v, updated_at: new Date().toISOString() }).eq('id', s.id);
+      if (error) { toast('Kunde inte ändra: ' + error.message); vs.value = s.visibility; return; }
+      s.visibility = v; renderSnapshots(); toast(`”${s.name}” – ${SNAP_VIS[v]}`);
+    });
+    const del = row.querySelector('[data-sa=del]');
+    if (del) del.addEventListener('click', async () => {
+      if (!confirm(`Ta bort ögonblicksbilden ”${s.name}”?`)) return;
+      const { error } = await supabaseClient.from('studio_snapshots').delete().eq('id', s.id);
+      if (error) { toast('Kunde inte ta bort: ' + error.message); return; }
+      snapshots = snapshots.filter(x => x !== s); renderSnapshots();
+    });
+  });
+}
+// delning: dina spår i ögonblicksbilden som andra inte kan höra (privata eller utkast) – fråga om de ska delas också
+async function shareTracksFor(st, vis) {
+  const keys = Object.keys((st && st.tracks) || {});
+  const priv = tracks.filter(t => keys.includes(t.key) && t.kind === 'rec' && t.mine && t.id && (t.draft || t.visibility === 'private'
+    || (vis === 'all' && t.visibility === 'leaders')) && !(st.tracks[t.key] || {}).muted);
+  if (!priv.length) return true;
+  const who = vis === 'all' ? 'hela kören' : 'körledningen';
+  const ok = confirm(`${priv.length} av dina spår i ögonblicksbilden kan ${who} inte höra:\n\n${priv.map(t => '• ' + t.label + (t.draft ? ' (utkast)' : ' (privat)')).join('\n')}\n\nDela dem också med ${who}?\n\nOK = dela spåren också · Avbryt = dela bara ögonblicksbilden`);
+  if (!ok) return true;
+  for (const t of priv) {
+    const { error } = await supabaseClient.from('recordings').update({ visibility: vis, draft: false, updated_at: new Date().toISOString() }).eq('id', t.id);
+    if (error) { toast(`Kunde inte dela ${t.label}: ${error.message}`, 6000); return false; }
+    Object.assign(t, { visibility: vis, savedVis: vis, draft: false });
+  }
+  tl.render(); if (active) setActive(active); loadMyRecs();
+  return true;
+}
+async function saveSnapshot() {
+  if (!song || !tracks.length) return;
+  const btn = snapEl('snapSave'); btn.disabled = true;
+  try {
+    snapStatus('Sparar osparade spår som utkast…');
+    await flushDrafts();
+    const left = tracks.filter(draftCandidate);
+    if (left.length) snapStatus(`${left.length} osparade spår kom inte med (kunde inte autosparas just nu).`, true);
+    const name = snapEl('snapName').value.trim() || `Ögonblicksbild ${new Date().toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}`;
+    const vis = snapEl('snapVis').value, st = captureState();
+    if (vis !== 'private' && !(await shareTracksFor(st, vis))) return;
+    const { data, error } = await supabaseClient.from('studio_snapshots').insert({ song_id: song.id, name, visibility: vis, state: st }).select().single();
+    if (error) throw error;
+    snapshots.unshift(data); renderSnapshots();
+    snapEl('snapName').value = '';
+    if (!left.length) snapStatus('');
+    toast(`📸 ”${name}” sparad – ${SNAP_VIS[vis]}`);
+  } catch (e) { snapStatus('Kunde inte spara: ' + esc(e.message || e), true); }
+  finally { btn.disabled = false; }
+}
+function restoreSnapshot(st, name) {
+  beforeRestore = captureState();
+  const missing = applyState(st);
+  snapStatus(`↺ ”${esc(name)}” återställd${missing ? ` – ${missing} spår finns inte här (privata, borttagna eller från en annan låt)` : ''}. <button type="button" class="btn-outline" id="undoRestore">↶ Tillbaka till före</button>`, !!missing);
+  snapEl('undoRestore').addEventListener('click', () => { if (beforeRestore) { applyState(beforeRestore); beforeRestore = null; snapStatus('Tillbaka till läget före återställningen.'); } });
+  saveStateNow(true);
+}
+function downloadJson(st, name) {
+  download(new Blob([JSON.stringify(st, null, 2)], { type: 'application/json' }), `${safeName(song ? song.title : 'studio')}-${safeName(name || 'ogonblicksbild')}.json`);
+}
+async function importJson(file) {
+  let st;
+  try { st = JSON.parse(await file.text()); } catch (e) { toast('Filen är inte en giltig JSON-fil'); return; }
+  if (!st || typeof st.tracks !== 'object') { toast('Filen ser inte ut som en ögonblicksbild från Studio'); return; }
+  if (st.song_id && song && String(st.song_id) !== String(song.id)) {
+    const s2 = songs.find(s => String(s.id) === String(st.song_id));
+    if (!s2) { toast(`Ögonblicksbilden hör till en annan låt${st.song ? ` (${st.song})` : ''} som inte finns här`, 6000); return; }
+    if (!confirm(`Ögonblicksbilden hör till ”${s2.title}”. Öppna den låten och lägg på inställningarna?`)) return;
+    if (unsaved() && !confirm('Du har osparade inspelningar. Byta låt ändå?')) return;
+    document.getElementById('songSelect').value = s2.id; await loadSong(s2.id);
+  }
+  restoreSnapshot(st, st.name || file.name.replace(/\.json$/i, ''));
+}
+
+// --- överblick ---
+function overviewTable(st, current) {
+  const byKey = new Map(tracks.map(t => [t.key, t]));
+  const keys = current ? tracks.map(t => t.key) : (st.order && st.order.length ? [...st.order, ...Object.keys(st.tracks).filter(k => !st.order.includes(k))] : Object.keys(st.tracks));
+  const anySolo = current ? tracks.some(t => t.solo) : Object.values(st.tracks).some(s => s.solo);
+  const rows = keys.map(k => {
+    const t = byKey.get(k), s = current ? { label: t.label, vol: t.vol ?? 1, muted: t.muted, solo: t.solo, offsetMs: t.offsetMs, reverb: t.fx && t.fx.reverb } : st.tracks[k];
+    if (!s) return '';
+    const heard = anySolo ? s.solo : !s.muted;
+    const rv = s.reverb && s.reverb.on ? `${Math.round(s.reverb.mix * 100)} % · ${String(Number(s.reverb.size).toFixed(1)).replace('.', ',')} s` : '–';
+    let status = '';
+    if (!t) status = '<span class="tag edit">saknas här</span>';
+    else if (current) status = t.kind === 'stem' ? '🔒 låtens stämma' : !t.mine ? esc(names[t.memberId] || 'Någon') + ' · ' + VIS[t.visibility]
+      : isEmpty(t) ? 'tomt' : !t.id ? '<span class="tag edit">osparad</span>' : t.draft ? 'utkast' : (t.edited || t.offsetMs !== t.savedOffsetMs) ? '<span class="tag edit">ändrad</span>' : VIS[t.visibility];
+    return `<tr class="${heard ? '' : 'muted'}"><td><i style="background:${t ? t.color : '#555'}"></i>${esc(s.label || (t && t.label) || k)}</td>
+      <td class="num">${Math.round((s.vol ?? 1) * 100)} %</td><td>${s.solo ? '<b class="solo">S solo</b>' : s.muted ? '🔇 tyst' : anySolo ? '(tyst – solo på annat)' : 'hörs'}</td>
+      <td class="num">${(s.offsetMs >= 0 ? '+' : '−') + fmt(Math.abs(s.offsetMs || 0) / 1000, true)}</td><td>${rv}</td><td>${status}</td></tr>`;
+  }).join('');
+  const meta = current ? '' : `<p class="hint" style="margin:0 0 0.4rem">Zoom ${st.view && st.view.pps ? (tl.el.clientWidth / st.view.pps).toFixed(0) + ' s synligt' : '–'} · spelhuvud ${st.view && isFinite(st.view.playhead) ? fmt(st.view.playhead, true) : '–'} · ${(st.markers || []).length} markörer</p>`;
+  return `${meta}<div class="ov-wrap"><table class="ov"><thead><tr><th>Spår</th><th class="num">Volym</th><th>Ljud</th><th class="num">Placering</th><th>Reverb</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function renderOverview() {
+  const el = snapEl('overview'); if (!el || !song || !tracks.length) return;
+  const sec = snapEl('secSnap'); if (sec && !sec.open) return;
+  el.innerHTML = overviewTable(null, true);
+}
+setInterval(() => { if (!document.hidden) renderOverview(); }, 1500);
+
+snapEl('snapSave').addEventListener('click', saveSnapshot);
+snapEl('snapExport').addEventListener('click', () => { if (song) downloadJson({ ...captureState(), name: snapEl('snapName').value.trim() || 'Nuvarande läge' }, snapEl('snapName').value.trim() || 'nuvarande-lage'); });
+snapEl('snapImport').addEventListener('click', () => snapEl('snapFile').click());
+snapEl('snapFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) importJson(f).finally(() => { e.target.value = ''; }); });
+(() => {
+  const d = snapEl('secSnap'), key = 'hv-studio-sec-secSnap';
+  try { d.open = localStorage.getItem(key) === '1'; } catch (e) {}
+  d.addEventListener('toggle', () => { try { localStorage.setItem(key, d.open ? '1' : '0'); } catch (e) {} if (d.open) renderOverview(); });
+})();
+
 (async () => {
   const member = await requireAuth();
   if (!member) return;
@@ -1851,7 +2172,7 @@ window.addEventListener('beforeunload', e => { if (rec || unsaved()) { e.prevent
   const sel = document.getElementById('songSelect');
   if (error) { sel.innerHTML = `<option>Fel: ${esc(error.message)}</option>`; return; }
   songs = (data || []).filter(s => isAdmin || (s.published !== false && stemListFor(s).length));   // admin ser även låtar utan spår (kan ladda in filer)
-  loadMyRecs();
+  loadMyRecs(); cleanOldDrafts().catch(() => {});
   if (!songs.length && !isAdmin) { sel.innerHTML = '<option value="">Inga låtar med stämfiler än</option>'; return; }
   fillSongSelect();
   const pre = new URLSearchParams(location.search).get('song');

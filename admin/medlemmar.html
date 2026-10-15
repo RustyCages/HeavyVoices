@@ -24,6 +24,9 @@
   .trash-btn:hover:not(:disabled) { background: #ef4444; border-color: #ef4444; color: #fff; }
   .trash-btn:disabled { opacity: 0.3; cursor: not-allowed; }
   .col-paid { width: 4.5rem; text-align: center; }
+  .col-reg { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  td.col-reg { color: var(--text-muted); font-size: 0.9rem; }
+  .reg-new { display: inline-block; margin-left: 0.3rem; padding: 0 0.4rem; border-radius: 999px; background: var(--accent); color: #111317; font-size: 0.72rem; font-weight: 700; }
   td.col-paid input[type="checkbox"] { accent-color: #4ade80; }
   th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
   th.sortable:hover { color: var(--text); }
@@ -93,11 +96,11 @@
         <thead>
           <tr>
             <th class="col-check"><input type="checkbox" id="checkAll" title="Markera alla"></th>
-            <th class="sortable" data-sort="name">Namn</th><th class="sortable" data-sort="email">E-post</th><th class="sortable" data-sort="stamma">Stämma</th><th class="sortable col-paid" data-sort="fee_paid">Betald</th><th class="sortable" data-sort="status">Status</th><th class="sortable" data-sort="role">Roll</th><th></th>
+            <th class="sortable" data-sort="name">Namn</th><th class="sortable" data-sort="email">E-post</th><th class="sortable" data-sort="stamma">Stämma</th><th class="sortable col-paid" data-sort="fee_paid">Betald</th><th class="sortable col-reg" data-sort="created_at" title="När kontot skapades (registrering eller inbjudan)">Registrerad</th><th class="sortable" data-sort="status">Status</th><th class="sortable" data-sort="role">Roll</th><th></th>
           </tr>
         </thead>
         <tbody id="membersTableBody">
-          <tr><td colspan="8" class="text-muted">Laddar...</td></tr>
+          <tr><td colspan="9" class="text-muted">Laddar...</td></tr>
         </tbody>
       </table>
     </div>
@@ -162,6 +165,8 @@ function stammaOptions(current) {
 function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+// Registrerad de senaste 14 dagarna
+function regNew(m) { return m.created_at && (Date.now() - Date.parse(m.created_at)) < 14 * 864e5; }
 function fmtDate(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('sv-SE');
@@ -170,14 +175,14 @@ function fmtDate(iso) {
 async function loadMembers() {
   const { data, error } = await supabaseClient
     .from('members')
-    .select('id, name, email, role, stamledare, stamma, status, fee_paid, fee_paid_at')
+    .select('id, name, email, role, stamledare, stamma, status, fee_paid, fee_paid_at, created_at')
     .order('status')
     .order('name');
 
   const tbody = document.getElementById('membersTableBody');
 
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="8" class="error">Kunde inte hämta medlemmar: ${esc(error.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="error">Kunde inte hämta medlemmar: ${esc(error.message)}</td></tr>`;
     return;
   }
 
@@ -200,6 +205,7 @@ const byName = (a, b) => collator.compare((a.name || '').trim(), (b.name || '').
 function sortValue(m, key) {
   if (key === 'status') return STATUS_ORDER[m.status] ?? 9;
   if (key === 'fee_paid') return m.fee_paid ? 1 : 0;
+  if (key === 'created_at') return m.created_at ? Date.parse(m.created_at) : '';
   // Roll sorteras som den visas: Admin, Stämledare, Medlem
   if (key === 'role') return m.role === 'admin' ? ROLE_ORDER.admin : (m.stamledare ? ROLE_ORDER.stamledare : ROLE_ORDER.medlem);
   return String(m[key] ?? '').trim();
@@ -237,7 +243,7 @@ function renderMembers() {
   sortMembers();
 
   if (!members.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="text-muted">Inga medlemmar än.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="text-muted">Inga medlemmar än.</td></tr>`;
     updateSelectionUi();
     return;
   }
@@ -255,6 +261,7 @@ function renderMembers() {
       <td class="col-paid">
         <input type="checkbox" class="paidCheck" data-id="${m.id}" ${m.fee_paid ? 'checked' : ''} title="${m.fee_paid && m.fee_paid_at ? 'Betald ' + fmtDate(m.fee_paid_at) : 'Ej betald'}" aria-label="Avgift betald för ${esc(m.name)}">
       </td>
+      <td class="col-reg" title="${m.created_at ? 'Registrerad ' + new Date(m.created_at).toLocaleString('sv-SE', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Stockholm' }) : ''}">${m.created_at ? fmtDate(m.created_at) : '—'}${regNew(m) ? ' <span class="reg-new">Ny</span>' : ''}</td>
       <td>
         <select data-id="${m.id}" class="statusSelect status-select st-${m.status}" ${self ? 'disabled title="Du kan inte ändra din egen status"' : ''}>${statusOpts}</select>
       </td>
@@ -417,9 +424,9 @@ function csvCell(v) {
 document.getElementById('exportCsvBtn').addEventListener('click', () => {
   const rows = selected.size ? members.filter(m => selected.has(m.id)) : members;
   if (!rows.length) { alert('Det finns inga medlemmar att exportera.'); return; }
-  const header = ['Namn', 'E-post', 'Stämma', 'Status', 'Roll', 'Avgift betald', 'Betald datum'];
+  const header = ['Namn', 'E-post', 'Stämma', 'Registrerad', 'Status', 'Roll', 'Avgift betald', 'Betald datum'];
   const lines = rows.map(m => [
-    m.name, m.email, m.stamma, STATUS_LABELS[m.status] || m.status,
+    m.name, m.email, m.stamma, m.created_at ? fmtDate(m.created_at) : '', STATUS_LABELS[m.status] || m.status,
     m.role === 'admin' ? 'Admin' : (m.stamledare ? 'Stämledare' : 'Medlem'),
     m.fee_paid ? 'Ja' : 'Nej', m.fee_paid ? fmtDate(m.fee_paid_at) : ''
   ].map(csvCell).join(';'));

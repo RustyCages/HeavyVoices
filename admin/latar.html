@@ -34,6 +34,10 @@
   select.stemTypeSel { width: auto; margin: 0; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
   .btn-danger { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
   details > summary { cursor: pointer; margin-top: 0.6rem; color: var(--text-muted); font-size: 0.85rem; }
+  /* Hela låtkortet öppnar/stänger redigeringen; innehållet i en öppen panel klickas som vanligt */
+  .song-item { cursor: pointer; transition: border-color 0.2s ease, background 0.2s ease; }
+  .song-item:hover { border-color: rgba(229, 169, 104, 0.45); }
+  .song-item > details[open] > :not(summary) { cursor: auto; }
   details.lyrics-fold { margin-bottom: 0.4rem; }
   details.lyrics-fold > summary { margin-top: 0.2rem; }
   details.lyrics-fold textarea { margin-top: 0.5rem; }
@@ -871,6 +875,22 @@ async function loadSongs() {
     }
   });
 });
+
+  // Klick var som helst på låtkortet fäller ut/ihop "Redigera text och filer".
+  // Knappar, fält och länkar fungerar som vanligt, och klick inne i den öppna panelen stänger den inte.
+  if (!listEl.dataset.cardClick) {
+    listEl.dataset.cardClick = '1';
+    listEl.addEventListener('click', (e) => {
+      const card = e.target.closest('.song-item');
+      if (!card) return;
+      const det = card.querySelector(':scope > details');
+      if (!det) return;
+      if (e.target.closest('button, a, input, select, textarea, label, summary, video, audio')) return;
+      if (det.open && det.contains(e.target)) return;
+      if (String(window.getSelection?.() || '').length) return; // markerar text
+      det.open = !det.open;
+    });
+  }
 
   document.querySelectorAll('.closeDetailsBtn').forEach(btn => {
     btn.addEventListener('click', (e) => {

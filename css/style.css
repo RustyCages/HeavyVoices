@@ -371,3 +371,19 @@ z-index: 2;
 @keyframes hvPageIn { from { opacity: 0; } to { opacity: 1; } }
 body { animation: hvPageIn 0.4s ease-out; }
 @media (prefers-reduced-motion: reduce) { body { animation: none; } }
+
+/* --- Ta bort-knappar: röd hover så att destruktiva val syns tydligt --- */
+button.btn-danger:hover,
+button.btn-outline[data-act="del"]:hover,
+button.btn-outline[data-op="del"]:hover,
+button.btn-outline[data-op="tdel"]:hover,
+button.btn-outline[data-sig-del]:hover,
+button.btn-outline.u-del:hover,
+button.btn-outline.danger:hover,
+button#recDelete:hover,
+button#tClear:hover {
+background: rgba(239, 68, 68, 0.15);
+border-color: #f87171;
+color: #fca5a5;
+box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
+}

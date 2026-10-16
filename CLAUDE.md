@@ -38,8 +38,16 @@ RLS: enkel rollcheck (admin/medlem), INGEN `get_my_choir_role()`-funktion
 behövs eftersom det bara finns en kör.
 
 ## Storage
-En bucket: `heavy-voices-stems`. Ingen `choir-[slug]`-prefixning
-(till skillnad från ChoirStudio).
+Ingen `choir-[slug]`-prefixning (till skillnad från ChoirStudio).
+
+- **Cloudflare R2** (bucket `heavy-voices`): stämmor (`stems/…`) och uppvärmningsvideor (`warmup/…`).
+  `js/supabase-config.js` pekar om `supabaseClient.storage.from('heavy-voices-stems' | 'heavy-voices-warmup')`
+  till Edge Function `r2-files`, med samma API som Supabase Storage. Sidorna anropar Storage som vanligt.
+  Sökvägarna i databasen är relativa till bucketen, precis som förut.
+  Skrivrätt: stems = admin eller stämledare, warmup = admin. Läsrätt: godkända medlemmar.
+- **Supabase Storage**: `heavy-voices-noter`, `heavy-voices-filer`, `heavy-voices-recordings`.
+- R2-secrets i Supabase: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
+- `r2-migrate` kopierade befintliga filer (okt 2026). Gamla Supabase-bucketarna för stems/warmup töms när R2 är verifierat.
 
 ## Arbetsrutin (för alla verktyg/chattar)
 Supabase-projekt: `scfudeyozwedohujsoua` ("heavy-voices").

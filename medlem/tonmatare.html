@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tonmätare — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .card.static:hover { transform: none; border-color: var(--border); box-shadow: var(--card-shadow); }
+  .hint { font-size: 0.88rem; color: var(--text-muted); margin: 0.25rem 0 1rem; }
+  .tm { display: grid; gap: 1rem; }
+  .tm-top { display: grid; grid-template-columns: minmax(200px, 1fr) 2fr; gap: 1rem; align-items: stretch; }
+  @media (max-width: 720px) { .tm-top { grid-template-columns: 1fr; } }
+  .readout { text-align: center; padding: 1rem 0.5rem 0.8rem; border: 1px solid var(--border); border-radius: 0.8rem; background: rgba(0,0,0,0.25); display: grid; align-content: center; gap: 0.2rem; }
+  .readout .note { font-family: 'Roboto Condensed', sans-serif; font-size: clamp(3.4rem, 10vw, 5.2rem); font-weight: 700; line-height: 1; color: var(--text); transition: color 0.15s; }
+  .readout .note sub { font-size: 0.42em; font-weight: 400; color: var(--text-muted); vertical-align: baseline; margin-left: 0.08em; }
+  .readout .note.ok { color: #4ade80; }
+  .readout .hz { font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: 0.95rem; }
+  .readout .cents { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; min-height: 1.4em; }
+  .readout .cents.ok { color: #4ade80; } .readout .cents.lo, .readout .cents.hi { color: var(--accent); }
+  .meter { position: relative; height: 44px; margin: 0.4rem 0.6rem 0; }
+  .meter .scale { position: absolute; left: 0; right: 0; top: 18px; height: 8px; border-radius: 4px;
+    background: linear-gradient(90deg, rgba(248,113,113,0.55), rgba(229,169,104,0.55) 30%, rgba(74,222,128,0.8) 45%, rgba(74,222,128,0.8) 55%, rgba(229,169,104,0.55) 70%, rgba(248,113,113,0.55)); }
+  .meter .tick { position: absolute; top: 12px; width: 1px; height: 20px; background: rgba(255,255,255,0.35); }
+  .meter .tick.mid { background: #fff; width: 2px; top: 8px; height: 28px; }
+  .meter .lbl { position: absolute; top: 34px; font-size: 0.68rem; color: var(--text-muted); transform: translateX(-50%); }
+  .meter .needle { position: absolute; top: 4px; width: 4px; height: 36px; margin-left: -2px; border-radius: 2px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.7); left: 50%; transition: left 0.08s linear, opacity 0.2s; opacity: 0.25; }
+  .graph-wrap { position: relative; border: 1px solid var(--border); border-radius: 0.8rem; overflow: hidden; background: rgba(0,0,0,0.3); min-height: 260px; }
+  #graph { display: block; width: 100%; height: 100%; min-height: 260px; cursor: pointer; }
+  .controls { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; align-items: center; }
+  .controls label { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-size: 0.88rem; color: var(--text-muted); width: auto; }
+  .controls select, .controls input[type=number] { width: auto; margin: 0; padding: 0.35rem 0.5rem; font-size: 0.88rem; }
+  .controls input[type=number] { width: 5rem; }
+  .controls input[type=checkbox] { width: auto; margin: 0; accent-color: var(--accent); }
+  #startBtn { min-width: 9.5rem; }
+  #startBtn.on { background: #ef4444; border-color: #ef4444; color: #fff; }
+  .level { width: 90px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); overflow: hidden; }
+  .level > div { height: 100%; width: 0; background: #4ade80; transition: width 0.08s; }
+  .status { font-size: 0.85rem; color: var(--text-muted); }
+  .status.warn { color: #facc15; }
+</style>
+<script src="/js/device.js"></script>
+</head>
+<body>
+<header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+<div class="container">
+  <a href="/medlem/" class="back-btn" id="backLink">&larr; Tillbaka</a>
+  <h1 style="margin:0.5rem 0;">🎵 Tonmätare</h1>
+  <p class="hint">Sjung eller spela en ton – sidan visar vilken ton det är och hur mycket du ligger för högt eller för lågt. Bra för uppvärmning, för att hitta starttonen eller kolla att du håller tonen. Klicka på en ton i grafen för att höra den.</p>
+
+  <div class="card static tm">
+    <div class="controls">
+      <button type="button" id="startBtn">🎤 Starta</button>
+      <span class="level" title="Mikrofonens nivå"><div id="level"></div></span>
+      <label title="Begränsar tonomfånget så att det blir färre felavläsningar">Röst
+        <select id="range">
+          <option value="all">Alla</option>
+          <option value="bas">Bas</option>
+          <option value="tenor">Tenor</option>
+          <option value="alt">Alt</option>
+          <option value="sopran">Sopran</option>
+        </select>
+      </label>
+      <label title="Stämtonen: vilken frekvens A4 har. 440 Hz är standard.">A4 = <input type="number" id="a4" value="440" min="415" max="466" step="1"> Hz</label>
+      <label title="Svenska tonnamn: H i stället för B, och B i stället för A#"><input type="checkbox" id="svNames"> Svenska tonnamn (H)</label>
+      <span class="status" id="status">Tryck Starta och tillåt mikrofonen.</span>
+    </div>
+    <div class="tm-top">
+      <div class="readout">
+        <div class="note" id="note">–</div>
+        <div class="hz" id="hz">– Hz</div>
+        <div class="meter" aria-hidden="true">
+          <div class="scale"></div>
+          <div class="tick" style="left:0%"></div><div class="tick" style="left:25%"></div><div class="tick mid" style="left:50%"></div><div class="tick" style="left:75%"></div><div class="tick" style="left:100%"></div>
+          <span class="lbl" style="left:0%">−50</span><span class="lbl" style="left:50%">0</span><span class="lbl" style="left:100%">+50</span>
+          <div class="needle" id="needle"></div>
+        </div>
+        <div class="cents" id="cents">&nbsp;</div>
+      </div>
+      <div class="graph-wrap"><canvas id="graph" title="Klicka på en ton för att höra den"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/pitch-analyze.js"></script>
+<script>
+const EN = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const SV = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'B', 'H'];
+const RANGES = { all: { fmin: 60, fmax: 1300 }, bas: { fmin: 60, fmax: 450 }, tenor: { fmin: 90, fmax: 650 }, alt: { fmin: 140, fmax: 1000 }, sopran: { fmin: 180, fmax: 1300 } };
+const HIST_SEC = 8, OK_CENTS = 10;
+let ctx = null, stream = null, det = null, levelAn = null, running = false, raf = null;
+let hist = [];            // [{ t, m }] – m = ton (MIDI med decimaler), null = tyst
+let view = { center: 60, span: 14 };
+const $ = id => document.getElementById(id);
+const names = () => ($('svNames').checked ? SV : EN);
+const a4Off = () => 12 * Math.log2((Number($('a4').value) || 440) / 440);   // halvtoner att dra av vid annan stämton
+const nameOf = m => { const r = Math.round(m); return names()[((r % 12) + 12) % 12] + (Math.floor(r / 12) - 1); };
+const hzOf = m => (Number($('a4').value) || 440) * Math.pow(2, (m - 69) / 12);
+
+async function start() {
+  try {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') await ctx.resume();
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+  } catch (e) {
+    setStatus(e && e.name === 'NotAllowedError' ? 'Mikrofonen är blockerad – tillåt den för heavyvoices.se i webbläsarens inställningar.' : 'Kunde inte starta mikrofonen: ' + (e.message || e), true);
+    return;
+  }
+  const r = RANGES[$('range').value] || RANGES.all;
+  det = PitchAnalyze.createLiveDetector(ctx, stream, { fmin: r.fmin, fmax: r.fmax });
+  const src = ctx.createMediaStreamSource(stream);
+  levelAn = ctx.createAnalyser(); levelAn.fftSize = 1024; src.connect(levelAn);
+  running = true; hist = [];
+  $('startBtn').textContent = '⏸ Stoppa'; $('startBtn').classList.add('on');
+  setStatus('Lyssnar… sjung en ton.');
+  try { localStorage.setItem('hv-tm-range', $('range').value); } catch (e) {}
+  loop();
+}
+function stop() {
+  running = false; cancelAnimationFrame(raf);
+  if (det) { det.stop(); det = null; }
+  stream = null; levelAn = null;
+  $('startBtn').textContent = '🎤 Starta'; $('startBtn').classList.remove('on');
+  $('level').style.width = '0';
+  setStatus('Stoppad.');
+}
+function setStatus(m, warn) { const s = $('status'); s.textContent = m || ''; s.classList.toggle('warn', !!warn); }
+
+const lvlBuf = new Float32Array(1024);
+function loop() {
+  if (!running) return;
+  const now = performance.now() / 1000;
+  let m = det.read();
+  if (m != null) m -= a4Off();
+  hist.push({ t: now, m });
+  while (hist.length && hist[0].t < now - HIST_SEC) hist.shift();
+  levelAn.getFloatTimeDomainData(lvlBuf);
+  let pk = 0; for (let i = 0; i < lvlBuf.length; i += 4) pk = Math.max(pk, Math.abs(lvlBuf[i]));
+  $('level').style.width = Math.min(100, Math.round(Math.sqrt(pk) * 100)) + '%';
+  showReadout(m);
+  draw(now);
+  raf = requestAnimationFrame(loop);
+}
+function showReadout(m) {
+  const noteEl = $('note'), cEl = $('cents'), nd = $('needle');
+  if (m == null) { nd.style.opacity = '0.25'; noteEl.classList.remove('ok'); return; }   // behåll senaste ton, tona ner nålen
+  const r = Math.round(m), c = Math.round((m - r) * 100), name = nameOf(m);
+  noteEl.innerHTML = name.replace(/(-?\d+)$/, '<sub>$1</sub>');
+  const ok = Math.abs(c) <= OK_CENTS;
+  noteEl.classList.toggle('ok', ok);
+  $('hz').textContent = hzOf(m).toFixed(1) + ' Hz';
+  cEl.textContent = ok ? 'Mitt i tonen ✓' : (c > 0 ? `${c} cent för högt` : `${-c} cent för lågt`);
+  cEl.className = 'cents ' + (ok ? 'ok' : c > 0 ? 'hi' : 'lo');
+  nd.style.left = (50 + Math.max(-50, Math.min(50, c))) + '%'; nd.style.opacity = '1';
+}
+
+// ---------- graf: tangenter till vänster, tonkurvan rullar åt vänster ----------
+const KEYW = 56;
+function draw(now) {
+  const c = $('graph'), dpr = window.devicePixelRatio || 1;
+  const W = Math.round(c.clientWidth * dpr), H = Math.round(c.clientHeight * dpr);
+  if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+  const g = c.getContext('2d'); g.clearRect(0, 0, W, H);
+  // följ rösten mjukt i höjdled
+  const voiced = hist.filter(h => h.m != null).slice(-20);
+  if (voiced.length) {
+    const last = voiced[voiced.length - 1].m, avg = voiced.reduce((a, h) => a + h.m, 0) / voiced.length;
+    if (Math.abs(last - view.center) > view.span * 0.45) view.center += (last - view.center) * 0.3;   // tonen utanför bild: hoppa dit snabbt
+    else if (Math.abs(avg - view.center) > view.span * 0.3) view.center += (avg - view.center) * 0.08;
+  }
+  const lo = view.center - view.span / 2, rowH = H / view.span, kw = KEYW * dpr;
+  const y = m => H - (m - lo) * rowH;
+  const cur = hist.length ? hist[hist.length - 1].m : null, curR = cur != null ? Math.round(cur) : null;
+  g.font = `${11 * dpr}px DM Sans, sans-serif`; g.textBaseline = 'middle';
+  for (let m = Math.floor(lo); m <= Math.ceil(lo + view.span); m++) {
+    const pc = ((m % 12) + 12) % 12, black = [1, 3, 6, 8, 10].includes(pc);
+    const top = y(m + 0.5);
+    g.fillStyle = black ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.025)'; g.fillRect(kw, top, W - kw, rowH);
+    g.fillStyle = m === curR ? 'rgba(229,169,104,0.9)' : black ? '#1d2026' : '#e8e6e3'; g.fillRect(0, top + 1, kw - 2 * dpr, rowH - 2);
+    if (pc === 0) { g.fillStyle = 'rgba(255,255,255,0.15)'; g.fillRect(kw, Math.round(y(m - 0.5)), W - kw, 1); }
+    g.fillStyle = m === curR ? '#111317' : black ? '#9aa0aa' : '#2a2d33';
+    if (rowH > 9 * dpr) g.fillText(nameOf(m), 6 * dpr, y(m));
+  }
+  // tonkurvan
+  const x = t => kw + (W - kw) * (1 - (now - t) / HIST_SEC);
+  g.lineWidth = 3 * dpr; g.lineCap = 'round'; g.lineJoin = 'round';
+  let prev = null;
+  hist.forEach(h => {
+    if (h.m == null) { prev = null; return; }
+    if (prev && Math.abs(h.m - prev.m) < 1.5) {
+      const dev = Math.abs(h.m - Math.round(h.m)) * 100;
+      g.strokeStyle = dev <= OK_CENTS ? '#4ade80' : dev <= 30 ? '#e5a968' : '#f87171';
+      g.beginPath(); g.moveTo(x(prev.t), y(prev.m)); g.lineTo(x(h.t), y(h.m)); g.stroke();
+    }
+    prev = h;
+  });
+  if (cur != null) { g.fillStyle = '#fff'; g.beginPath(); g.arc(W - 4 * dpr, y(cur), 5 * dpr, 0, Math.PI * 2); g.fill(); }
+  draw.geo = { lo, rowH, H, kw, dpr };
+}
+
+// klick i grafen: spela den tonen (referens)
+$('graph').addEventListener('click', async e => {
+  const geo = draw.geo; if (!geo) { drawIdle(); return; }
+  const r = e.currentTarget.getBoundingClientRect(), cy = (e.clientY - r.top) * geo.dpr;
+  const m = Math.round(geo.lo + (geo.H - cy) / geo.rowH);
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') await ctx.resume();
+  const t = ctx.currentTime + 0.01, osc = ctx.createOscillator(), gn = ctx.createGain();
+  osc.type = 'triangle'; osc.frequency.value = hzOf(m);
+  gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(0.25, t + 0.03); gn.gain.setValueAtTime(0.25, t + 0.9); gn.gain.linearRampToValueAtTime(0, t + 1.1);
+  osc.connect(gn); gn.connect(ctx.destination); osc.start(t); osc.stop(t + 1.15);
+  setStatus(`Spelar ${nameOf(m)} (${hzOf(m).toFixed(1)} Hz)`);
+});
+function drawIdle() { draw(performance.now() / 1000); }
+
+$('startBtn').addEventListener('click', () => (running ? stop() : start()));
+$('range').addEventListener('change', () => { try { localStorage.setItem('hv-tm-range', $('range').value); } catch (e) {} if (running) { stop(); start(); } });
+$('a4').addEventListener('change', () => { try { localStorage.setItem('hv-tm-a4', $('a4').value); } catch (e) {} if (!running) drawIdle(); });
+$('svNames').addEventListener('change', () => { try { localStorage.setItem('hv-tm-sv', $('svNames').checked ? '1' : '0'); } catch (e) {} if (!running) drawIdle(); });
+window.addEventListener('resize', () => { if (!running) drawIdle(); });
+window.addEventListener('pagehide', () => { if (running) stop(); });
+document.addEventListener('keydown', e => {
+  if (e.code !== 'Space' || e.target.matches('input:not([type=checkbox]), select, textarea')) return;
+  e.preventDefault(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  if (!e.repeat) $('startBtn').click();
+});
+try {
+  const r = localStorage.getItem('hv-tm-range'); if (r && RANGES[r]) $('range').value = r;
+  const a = Number(localStorage.getItem('hv-tm-a4')); if (a >= 415 && a <= 466) $('a4').value = a;
+  if (localStorage.getItem('hv-tm-sv') === '1') $('svNames').checked = true;
+} catch (e) {}
+drawIdle();
+
+(async () => {
+  if (new URLSearchParams(location.search).get('from') === 'admin') $('backLink').href = '/admin/';
+  const member = await requireAuth();
+  if (!member) return;
+  // förval: medlemmens egen stämma
+  const v = String(member.stamma || '').toLowerCase();
+  const own = ['bas', 'tenor', 'alt', 'sopran'].find(k => v.startsWith(k));
+  try { if (own && !localStorage.getItem('hv-tm-range')) $('range').value = own; } catch (e) {}
+})();
+</script>
+</body>
+</html>

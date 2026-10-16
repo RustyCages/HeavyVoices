@@ -372,7 +372,7 @@ z-index: 2;
 body { animation: hvPageIn 0.4s ease-out; }
 @media (prefers-reduced-motion: reduce) { body { animation: none; } }
 
-/* --- Ta bort-knappar: fyllda röda så att destruktiva val syns tydligt --- */
+/* --- Ta bort-knappar: röd ram och text, fylls röd när muspekaren är över --- */
 button.btn-danger,
 button.btn-outline[data-act="del"],
 button.btn-outline[data-op="del"],
@@ -382,9 +382,9 @@ button.btn-outline.u-del,
 button.btn-outline.danger,
 button#recDelete,
 button#tClear {
-background: #dc2626;
-border: 1px solid #dc2626;
-color: #ffffff;
+background: transparent;
+border: 1px solid #ef4444;
+color: #f87171;
 }
 
 button.btn-danger:hover,
@@ -396,8 +396,8 @@ button.btn-outline.u-del:hover,
 button.btn-outline.danger:hover,
 button#recDelete:hover,
 button#tClear:hover {
-background: #ef4444;
-border-color: #f87171;
+background: #dc2626;
+border-color: #dc2626;
 color: #ffffff;
 box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
 }

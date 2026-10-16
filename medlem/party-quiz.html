@@ -526,14 +526,30 @@ function reveal(pick) {
   } else {
     const chips = document.getElementById('whoChips');
     chips.innerHTML = teams.map((t, i) => `<button type="button" data-i="${i}" aria-pressed="false" style="border-left:6px solid ${TEAM_COLORS[i]}">${esc(t)}</button>`).join('');
-    chips.querySelectorAll('button').forEach(b => b.addEventListener('click', () => b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'))));
+    chips.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); startAutoNext(); }));
     document.getElementById('who').hidden = false;
   }
   document.getElementById('revealBtn').hidden = true;
-  const nb = document.getElementById('nextBtn');
-  nb.hidden = false; nb.textContent = qi + 1 < questions.length ? 'Nästa →' : '🏆 Se resultatet';
+  document.getElementById('nextBtn').hidden = false;
+  startAutoNext();
 }
+// går vidare automatiskt 5 s efter att svaret visats (oavsett om någon svarade rätt)
+const AUTO_NEXT_S = 5;
+let autoT = null;
+function startAutoNext() {
+  clearInterval(autoT);
+  const nb = document.getElementById('nextBtn'), label = qi + 1 < questions.length ? 'Nästa' : '🏆 Se resultatet';
+  let left = AUTO_NEXT_S;
+  const draw = () => { nb.textContent = `${label} (${left}) →`; };
+  draw();
+  autoT = setInterval(() => {
+    if (document.getElementById('play').hidden) { clearInterval(autoT); return; }
+    if (--left <= 0) { clearInterval(autoT); next(); } else draw();
+  }, 1000);
+}
+function stopAutoNext() { clearInterval(autoT); autoT = null; }
 function next() {
+  stopAutoNext();
   if (mode !== 'mobile' && teams.length > 1) {
     let any = false;
     document.querySelectorAll('#whoChips button').forEach(b => { if (b.getAttribute('aria-pressed') === 'true') { scores[+b.dataset.i]++; any = true; } });
@@ -709,7 +725,7 @@ document.getElementById('revealBtn').addEventListener('click', () => {
 });
 document.getElementById('nextBtn').addEventListener('click', next);
 document.getElementById('clipBtn').addEventListener('click', () => playClip(questions[qi]));
-document.getElementById('quitBtn').addEventListener('click', () => { if (confirm('Avsluta quizet?')) { stopClip(); cancelAnimationFrame(timerRaf); closeRoom(); show('setup'); renderTeams(); } });
+document.getElementById('quitBtn').addEventListener('click', () => { stopAutoNext(); if (confirm('Avsluta quizet?')) { stopClip(); cancelAnimationFrame(timerRaf); closeRoom(); show('setup'); renderTeams(); } else if (answered) startAutoNext(); });
 document.getElementById('setupBtn').addEventListener('click', closeRoom);
 document.addEventListener('keydown', e => {
   if (document.getElementById('play').hidden || e.target.matches('input, textarea')) return;

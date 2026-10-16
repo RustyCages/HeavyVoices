@@ -1,0 +1,31 @@
+// Party Mode – genrer för Bergsprängaren (radiokanaler via radio-browser-taggar) och Rock-TV (artister att söka videor på).
+// Standard är 'rock' (rock + hårdrock/metal). Rock-artisterna kommer från js/party-quiz-questions.js (ROCK_ARTISTS).
+window.PARTY_GENRES = [
+  { id: 'rock', emo: '🤘', name: 'Rock & metal',
+    tags: ['hard rock', 'heavy metal', 'classic rock', 'metal', '80s rock'], artists: null },
+  { id: 'punk', emo: '🧷', name: 'Punk',
+    tags: ['punk', 'punk rock', 'hardcore punk', 'pop punk', 'skate punk'],
+    artists: ['Ramones', 'Sex Pistols', 'The Clash', 'Green Day', 'The Offspring', 'Bad Religion', 'NOFX', 'Rancid', 'Dead Kennedys', 'Misfits',
+      'Social Distortion', 'Blink-182', 'Sum 41', 'Pennywise', 'Descendents', 'Buzzcocks', 'The Damned', 'Stiff Little Fingers', 'Ebba Grön', 'Millencolin',
+      'Refused', 'Rise Against', 'Dropkick Murphys', 'Anti-Flag', 'Bad Brains', 'Black Flag', 'Dead Boys', 'Iggy Pop', 'Pennywise', 'Turbonegro'] },
+  { id: 'stoner', emo: '🌵', name: 'Stoner',
+    tags: ['stoner rock', 'stoner', 'stoner metal', 'desert rock', 'doom metal', 'sludge'],
+    artists: ['Kyuss', 'Queens of the Stone Age', 'Fu Manchu', 'Sleep', 'Electric Wizard', 'Monster Magnet', 'Clutch', 'Truckfighters', 'Graveyard', 'Witchcraft',
+      'Spiritual Beggars', 'Orange Goblin', 'Red Fang', 'Mastodon', 'Baroness', 'High on Fire', 'Kadavar', 'Greenleaf', 'Dozer', 'Truckfighters',
+      'Monolord', 'Elder', 'Mars Red Sky', 'Black Label Society', 'Down', 'Corrosion of Conformity', 'Uncle Acid & the Deadbeats', 'Witch', 'Brant Bjork', 'Pentagram'] },
+  { id: 'oldies', emo: '🎷', name: '50–60-tal',
+    tags: ['50s', '60s', 'oldies', 'rock and roll', 'rockabilly', 'rock n roll'],
+    artists: ['Elvis Presley', 'Chuck Berry', 'Little Richard', 'Buddy Holly', 'Jerry Lee Lewis', 'Eddie Cochran', 'Bill Haley & His Comets', 'The Everly Brothers', 'Roy Orbison', 'Ricky Nelson',
+      'The Beatles', 'The Rolling Stones', 'The Kinks', 'The Who', 'The Animals', 'The Beach Boys', 'The Doors', 'Jimi Hendrix', 'Cream', 'The Byrds',
+      'The Yardbirds', 'Creedence Clearwater Revival', 'The Shadows', 'The Hep Stars', 'Dion', 'Del Shannon', 'Gene Vincent', 'Fats Domino', 'The Zombies', 'The Spotnicks'],
+    yt: a => `${a} official` },
+  { id: 'pop80', emo: '🕺', name: '80-talspop', tv: true,
+    artists: ['Madonna', 'Michael Jackson', 'Duran Duran', 'a-ha', 'Wham!', 'Cyndi Lauper', 'Tears for Fears', 'Eurythmics', 'Depeche Mode', 'Pet Shop Boys',
+      'Culture Club', 'Spandau Ballet', 'Whitney Houston', 'Prince', 'Bananarama', 'Roxette', 'Europe', 'Rick Astley', 'Kim Wilde', 'Simple Minds',
+      'Tears for Fears', 'Billy Idol', 'Huey Lewis and the News', 'Phil Collins', 'Bryan Adams', 'Laura Branigan', 'Erasure', 'Human League', 'Soft Cell', 'Toto'] },
+  { id: 'hiphop', emo: '🎤', name: 'Hiphop', tv: true,
+    artists: ['Run-D.M.C.', 'Beastie Boys', 'Public Enemy', 'N.W.A', 'Dr. Dre', 'Snoop Dogg', '2Pac', 'The Notorious B.I.G.', 'Wu-Tang Clan', 'Nas',
+      'Eminem', 'Jay-Z', 'OutKast', 'Cypress Hill', 'House of Pain', 'Ice Cube', 'LL Cool J', 'A Tribe Called Quest', 'De La Soul', 'Missy Elliott',
+      'Kanye West', 'Kendrick Lamar', '50 Cent', 'Busta Rhymes', 'Coolio', 'Salt-N-Pepa', 'The Fugees', 'Petter', 'Timbuktu', 'Looptroop Rockers'] },
+];
+window.partyGenre = id => window.PARTY_GENRES.find(g => g.id === id) || window.PARTY_GENRES[0];

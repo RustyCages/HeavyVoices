@@ -60,6 +60,9 @@
   .seg button { background: rgba(255,255,255,0.06); color: #d1d5db; border: 1px solid var(--border); }
   .seg button[aria-pressed="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
   .seg button:disabled { opacity: 0.4; }
+  .genres { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin-top: 0.9rem; }
+  .genres button { background: rgba(255,255,255,0.06); color: #d1d5db; border: 1px solid var(--border); padding: 0.5rem 0.9rem; }
+  .genres button[aria-pressed="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
   .note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.8rem; }
   @media (max-width: 640px) { .cabinet { grid-template-columns: 1fr; } .panel { grid-template-rows: none; grid-template-columns: auto auto 1fr auto; align-items: center; } .grille { min-height: 2.4rem; } .klabel { margin: 0; } }
   .tv-photo { position: relative; width: min(100%, 900px, calc((100dvh - 8rem) * 1.096)); margin: 0 auto; }
@@ -89,7 +92,7 @@
   <section>
     <div class="party-top"><a href="/medlem/party.html" class="back-btn">&larr; Party</a></div>
     <h1 class="party-title">Rock<span class="hot">-TV</span></h1>
-    <p class="party-sub">Slumpade hårdrocksvideor dygnet runt. Vrid på kanalratten för nästa video.</p>
+    <p class="party-sub">Slumpade musikvideor dygnet runt – välj genre under TV:n. Vrid på kanalratten för nästa video.</p>
 
     <div class="tv-stage">
       <div class="tv-photo" id="tvPhoto" hidden><img id="tvImg" alt="TV"><button type="button" class="hot builtin" id="hotTune" title="Vrid – nästa kanal" aria-label="Nästa kanal" style="left:86.9%;top:83.2%;width:5.83%;height:6.4%"></button><button type="button" class="hot builtin" id="hotPower" title="Ström" aria-label="Ström på/av" style="left:39.5%;top:86.4%;width:2.9%;height:4.4%;border-radius:0.2rem"></button><button type="button" class="hot builtin" id="hotVol" title="Ljud av/på" aria-label="Ljud av/på" style="left:79.4%;top:83.2%;width:5.83%;height:6.4%"></button></div>
@@ -124,6 +127,7 @@
         <button type="button" class="btn-outline" id="fullBtn">⛶ Helskärm</button>
         <button type="button" class="btn-outline" id="castHelpBtn">📡 Visa på TV</button>
       </div>
+      <div class="genres" id="genres" role="group" aria-label="Genre"></div>
       <details class="cast-help" id="castHelp">
         <summary><b>📡 Visa Rock-TV på en TV eller Chromecast</b></summary>
         <p class="text-muted">En webbsida kan inte själv starta skärmcastning, och hela YouTube-videor går inte att skicka vidare härifrån. Casta därför hela fliken eller skärmen – då följer allt med, både klipp och YouTube-videor, med ljud.</p>
@@ -148,6 +152,7 @@
 <script src="/js/party.js"></script>
 <script src="/js/party-quiz-questions.js"></script>
 <script src="/js/party-music.js"></script>
+<script src="/js/party-genres.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 function toast(msg, ms = 4000) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', ms); }
@@ -180,7 +185,17 @@ function osd(txt) { const o = $('osd'); o.textContent = txt; o.classList.add('on
 function caption(txt) { const c = $('cap'); c.textContent = txt; c.classList.add('on'); clearTimeout(caption._t); caption._t = setTimeout(() => c.classList.remove('on'), 7000); }
 
 // ---------- källor ----------
-function nextArtist() { if (!artists.length) artists = shuffle(window.ROCK_ARTISTS || []); return artists.pop(); }
+// genre (js/party-genres.js) – standard rock & metal
+let genre = PARTY_GENRES[0];
+function nextArtist() { if (!artists.length) artists = shuffle([...new Set(genre.artists || window.ROCK_ARTISTS || [])]); return artists.pop(); }
+function renderGenres() {
+  $('genres').innerHTML = PARTY_GENRES.map(g => `<button type="button" data-g="${g.id}" aria-pressed="${g === genre}">${g.emo} ${g.name}</button>`).join('');
+  $('genres').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    const g = partyGenre(b.dataset.g); if (g === genre) return;
+    genre = g; artists = []; renderGenres(); osd(g.name.toUpperCase());
+    if (on) next();
+  }));
+}
 // YouTube: hela musikvideor via Edge Function youtube-search (raw-läge)
 const ytCache = new Map();
 async function youtubeVideo() {
@@ -193,7 +208,7 @@ async function youtubeVideo() {
         const { data: { session } } = await supabaseClient.auth.getSession();
         const res = await fetch(`${SUPABASE_URL}/functions/v1/youtube-search`, {
           method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ q: `${a} official music video`, raw: true }),
+          body: JSON.stringify({ q: genre.yt ? genre.yt(a) : `${a} official music video`, raw: true }),
         });
         const out = await res.json().catch(() => ({}));
         // gammal version av funktionen / ingen nyckel / dagens YouTube-kvot slut
@@ -317,6 +332,7 @@ $('hotPower').addEventListener('click', () => $('pwrKnob').click());
 $('hotVol').addEventListener('click', () => { vid.muted = !vid.muted; try { if (ytPlayer) (vid.muted ? ytPlayer.mute() : ytPlayer.unMute()); } catch (e) {} toast(vid.muted ? '🔇 Ljudet av' : '🔊 Ljudet på', 1500); });
 $('chBtn2').addEventListener('click', () => $('chKnob').click());
 
+renderGenres();
 (async () => {
   const acc = await requirePartyAccess();
   if (!acc) return;

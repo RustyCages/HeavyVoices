@@ -157,7 +157,7 @@
   #playerScrubberRow { display:flex; align-items:center; gap:0.6rem; }
   #playerScrubberRow input[type=range] { flex:1; margin-bottom:0; }
   #playerScrubberRow span { font-size:0.75rem; color:var(--text-muted); min-width:38px; text-align:center; }
-  #repeatBtn.active, #karaokeBtn.active { color:var(--accent); box-shadow:0 0 8px rgba(229,169,104,0.4); }
+  #repeatBtn.active, #karaokeBtn.active, #mixerBtn.active, #lyricsDocBtn.active { color:var(--accent); box-shadow:0 0 8px rgba(229,169,104,0.4); border-color:var(--accent); }
   #karaokeBtn, #lyricsDocBtn { font-size:0.95rem; }
   #lyricsDocBtn.hidden, #splitBtn.hidden { display:none; }
   #splitBtn.active { color:var(--accent); box-shadow:0 0 8px rgba(229,169,104,0.4); }
@@ -247,6 +247,8 @@
   .k-line.k-counting { opacity:1; transform:scale(1); }
   .k-cd { display:inline-flex; align-items:center; gap:0.6em; vertical-align:middle; }
   .k-line.k-pause .k-cd { margin-left:0.4em; }
+  .k-cd-pre { margin-right:0.5em; font-size:0.8em; }
+  .k-line.k-counting-next { opacity:0.75; }
   .k-inst { font-size:1.15em; line-height:1; animation:k-strum 1.6s ease-in-out infinite; display:inline-block; }
   @keyframes k-strum { 0%, 100% { transform:rotate(-8deg); } 50% { transform:rotate(8deg) scale(1.06); } }
   .k-dots { display:inline-flex; gap:0.45em; vertical-align:middle; }
@@ -336,9 +338,9 @@
     <button class="btn-gold" id="playPauseBtn" title="Spela/Pausa"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
     <button class="btn-outline" id="nextBtn" title="Nästa"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="17.5" y="5" width="2.5" height="14" rx="1"/><path d="M4 5.9v12.2a1 1 0 0 0 1.5.86l9.9-6.1a1 1 0 0 0 0-1.72L5.5 5.04A1 1 0 0 0 4 5.9z"/></svg></button>
     <button class="btn-outline" id="karaokeBtn" title="Visa/dölj synkad text">🎤<span class="voice-badge"></span></button>
-    <button class="btn-outline" id="mixerBtn" title="Mixer – volym per stämma" aria-label="Mixer"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></button>
+    <button class="btn-outline hidden" id="lyricsDocBtn" title="Öppna sångtexten (dokument)" aria-label="Sångtext"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="4" y1="18" x2="14" y2="18"/></svg></button>
     <button class="btn-outline hidden" id="splitBtn" title="Alla stämmor samtidigt (delad skärm)" aria-pressed="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></button>
-    <button class="btn-outline hidden" id="lyricsDocBtn" title="Öppna sångtexten (dokument)">📄</button>
+    <button class="btn-outline" id="mixerBtn" title="Mixer – volym per stämma" aria-label="Mixer"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></button>
   </div>
 </div>
 
@@ -1536,34 +1538,40 @@ function buildKaraokeReel() {
 }
 
 // Nedräkning: när det är tyst (intro, ♪ eller tom rad) i minst 5 s visas ● ● ● ● som släcks en i taget
-// (från vänster) de sista 4 sekunderna före nästa textrad. Är uppehållet minst 10 s visas också en gitarr 🎸
+// (från vänster) de sista 4 sekunderna före nästa textrad. Står föregående rad kvar visas prickarna före nästa rad. Är uppehållet minst 10 s visas också en gitarr 🎸
 // under hela uppehållet (före prickarna). Används av både vanliga karaoken och delad skärm.
 const KC_MIN_GAP = 5, KC_SECS = 4, KC_INST_GAP = 10;
 function kCountdown(reel, lines, idx, t, st) {
   let n = idx + 1;
   while (n < lines.length && (!lines[n].text || lines[n].text === '♪')) n++;
-  let show = 0, inst = false, el = null;
+  let show = 0, inst = false, el = null, pre = false;
   if (n < lines.length) {
     const cur = idx >= 0 ? lines[idx] : null;
     const curIsText = !!(cur && cur.text && cur.text !== '♪');
     const gapStart = cur ? cur.time : 0, gap = lines[n].time - gapStart;
     const left = lines[n].time - t;
-    if (!curIsText && left > 0) {
+    if (left > 0 && !curIsText) {
       el = reel.children[idx + 1] || null;
       // ♪-rader har redan en not – gitarren läggs bara på tomma rader och introt
       inst = gap >= KC_INST_GAP && !!el && !el.classList.contains('k-pause');
       if (gap >= KC_MIN_GAP && left <= KC_SECS) show = Math.ceil(left);
       if (!inst && !show) el = null;
+    } else if (left > 0 && gap >= KC_MIN_GAP && left <= KC_SECS) {
+      // texten står kvar i mitten → prickarna visas först på nästa rad
+      show = Math.ceil(left); el = reel.children[n + 1] || null; pre = true;
     }
   }
   const key = el ? (inst ? 'g' : '') + show : '';
   if (st.el && (st.el !== el || !key)) {
     const d = st.el.querySelector('.k-cd'); if (d) d.remove();
-    st.el.classList.remove('k-counting'); st.el = null; st.key = '';
+    st.el.classList.remove('k-counting', 'k-counting-next'); st.el = null; st.key = '';
   }
   if (!el || !key) return;
   let d = el.querySelector('.k-cd');
-  if (!d) { d = document.createElement('span'); d.className = 'k-cd'; d.setAttribute('aria-hidden', 'true'); el.appendChild(d); el.classList.add('k-counting'); }
+  if (!d) {
+    d = document.createElement('span'); d.className = 'k-cd' + (pre ? ' k-cd-pre' : ''); d.setAttribute('aria-hidden', 'true');
+    if (pre) { el.insertBefore(d, el.firstChild); el.classList.add('k-counting-next'); } else { el.appendChild(d); el.classList.add('k-counting'); }
+  }
   if (st.key !== key) {
     // prickarna släcks från vänster till höger
     d.innerHTML = (inst ? '<span class="k-inst">🎸</span>' : '')
@@ -1636,6 +1644,12 @@ function closePlayerMenu() {
   const m = document.getElementById('playerMenu');
   m.hidden = true;
   playerMenuKind = null;
+  markMenuButtons();
+}
+// visa vilken meny som är öppen (mixer / sångtext)
+function markMenuButtons() {
+  document.getElementById('mixerBtn').classList.toggle('active', playerMenuKind === 'mixer');
+  document.getElementById('lyricsDocBtn').classList.toggle('active', playerMenuKind === 'docs');
 }
 
 // ---------- Mixer i spelaren: volym/tysta för stämmorna som spelas just nu ----------
@@ -1681,6 +1695,7 @@ function togglePlayerMenu(kind) {
   const ctrlTop = document.getElementById('playerControls').getBoundingClientRect().top;
   m.style.bottom = Math.max(8, window.innerHeight - ctrlTop + 8) + 'px';
   m.hidden = false;
+  markMenuButtons();
   m.querySelectorAll('[data-voice]').forEach(b => b.addEventListener('click', () => chooseKaraokeVoice(b.dataset.voice)));
   m.querySelectorAll('[data-split]').forEach(b => b.addEventListener('click', () => { if (!splitOn) document.getElementById('splitBtn').click(); else closePlayerMenu(); }));
   m.querySelectorAll('[data-split-off]').forEach(b => b.addEventListener('click', () => { if (splitOn) document.getElementById('splitBtn').click(); closePlayerMenu(); }));

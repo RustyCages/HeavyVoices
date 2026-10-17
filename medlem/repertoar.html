@@ -1608,9 +1608,9 @@ function buildKaraokeReel() {
   ).join('');
 }
 
-// Nedräkning: när det är tyst (intro, ♪ eller tom rad) i minst 4 s visas ● ● ● som släcks en i taget
-// de sista 3 sekunderna före nästa textrad. Används av både vanliga karaoken och delad skärm.
-const KC_MIN_GAP = 4, KC_SECS = 3;
+// Nedräkning: när det är tyst (intro, ♪ eller tom rad) i minst 5 s visas ● ● ● ● som släcks en i taget
+// (från vänster) de sista 4 sekunderna före nästa textrad. Används av både vanliga karaoken och delad skärm.
+const KC_MIN_GAP = 5, KC_SECS = 4;
 function kCountdown(reel, lines, idx, t, st) {
   let n = idx + 1;
   while (n < lines.length && (!lines[n].text || lines[n].text === '♪')) n++;
@@ -1630,8 +1630,9 @@ function kCountdown(reel, lines, idx, t, st) {
   }
   if (show && el) {
     let d = el.querySelector('.k-dots');
-    if (!d) { d = document.createElement('span'); d.className = 'k-dots'; d.setAttribute('aria-hidden', 'true'); d.innerHTML = '<i></i><i></i><i></i>'; el.appendChild(d); el.classList.add('k-counting'); }
-    if (st.n !== show) { d.querySelectorAll('i').forEach((x, k) => x.classList.toggle('on', k < show)); st.n = show; }
+    if (!d) { d = document.createElement('span'); d.className = 'k-dots'; d.setAttribute('aria-hidden', 'true'); d.innerHTML = '<i></i>'.repeat(KC_SECS); el.appendChild(d); el.classList.add('k-counting'); }
+    // släcks från vänster till höger
+    if (st.n !== show) { d.querySelectorAll('i').forEach((x, k) => x.classList.toggle('on', k >= KC_SECS - show)); st.n = show; }
     st.el = el;
   }
 }

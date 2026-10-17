@@ -37,6 +37,10 @@
   html.intro .nav-list > li:nth-child(5) .card-icon-box { animation-delay: 1.53s; }
   html.intro .nav-list > li:nth-child(6) .card-icon-box { animation-delay: 1.65s; }
   html.intro .nav-list > li:nth-child(7) .card-icon-box { animation-delay: 1.77s; }
+  html.intro .nav-list > li:nth-child(8) { animation-delay: 1.74s; }
+  html.intro .nav-list > li:nth-child(9) { animation-delay: 1.86s; }
+  html.intro .nav-list > li:nth-child(8) .card-icon-box { animation-delay: 1.89s; }
+  html.intro .nav-list > li:nth-child(9) .card-icon-box { animation-delay: 2.01s; }
   html.intro .page-footer, html.intro .container > div:last-child { animation: hvRise 0.7s ease 1.9s both; }
 
   /* Loggan lyser mjukt till och från */
@@ -47,7 +51,7 @@
   @keyframes hvWave { 0%, 14%, 100% { opacity: 0; transform: scale(1); } 6% { opacity: 1; transform: scale(1.12); } }
   .nav-item .card-icon-box { position: relative; }
   .nav-item .card-icon-box::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; box-shadow: 0 0 0 2px rgba(229,169,104,0.7), 0 0 18px rgba(229,169,104,0.55); animation: hvWave 9s ease-in-out infinite; animation-delay: calc(var(--i, 0) * 0.22s + 3s); }
-  .nav-list > li:nth-child(1) { --i: 0; } .nav-list > li:nth-child(2) { --i: 1; } .nav-list > li:nth-child(3) { --i: 2; } .nav-list > li:nth-child(4) { --i: 3; } .nav-list > li:nth-child(5) { --i: 4; } .nav-list > li:nth-child(6) { --i: 5; } .nav-list > li:nth-child(7) { --i: 6; }
+  .nav-list > li:nth-child(1) { --i: 0; } .nav-list > li:nth-child(2) { --i: 1; } .nav-list > li:nth-child(3) { --i: 2; } .nav-list > li:nth-child(4) { --i: 3; } .nav-list > li:nth-child(5) { --i: 4; } .nav-list > li:nth-child(6) { --i: 5; } .nav-list > li:nth-child(7) { --i: 6; } .nav-list > li:nth-child(8) { --i: 7; } .nav-list > li:nth-child(9) { --i: 8; }
   @media (prefers-reduced-motion: reduce) { .site-logo-img, .nav-item .card-icon-box::after { animation: none; } }
 </style>
 <style>

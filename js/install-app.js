@@ -71,7 +71,8 @@
 
   // ---------- Guide-ruta ----------
   function showGuide() {
-    let title = 'Installera Heavy Voices', intro, steps, arrow = false, note = '';
+    const appName = (document.querySelector('meta[name="apple-mobile-web-app-title"]') || {}).content || 'Heavy Voices';
+    let title = 'Installera ' + appName, intro, steps, arrow = false, note = '';
     if (isInAppBrowser) {
       intro = 'Du har öppnat sidan inuti en annan app. Öppna den i telefonens vanliga webbläsare först:';
       steps = [
@@ -83,7 +84,7 @@
       intro = 'På iPhone fungerar det bara i Safari (Apples webbläsare med den blå kompassen). Öppna den här sidan i Safari och tryck på knappen igen.';
       steps = [];
     } else if (isIOS) {
-      intro = 'Så här lägger du Heavy Voices på hemskärmen:';
+      intro = `Så här lägger du ${appName} på hemskärmen:`;
       steps = [
         `Tryck på <span class="ia-ico">${ICON_SHARE}</span> <strong>Dela</strong> – ${isIOSChrome ? 'uppe till höger bredvid adressen' : 'längst ner på skärmen'}`,
         `Hittar du den inte i listan? Tryck <strong>Visa mer</strong> eller dra upp listan. Tryck sedan på <span class="ia-ico">${ICON_ADD}</span> <strong>Lägg till på hemskärmen</strong>`,

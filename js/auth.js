@@ -37,6 +37,10 @@ async function requireAuth(requiredRole = null) {
   const member = await getCurrentMember();
 
   if (!member) {
+    // i en installerad app (t.ex. Bergsprängaren/Rock-TV) – kom tillbaka hit efter inloggningen
+    try {
+      if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) sessionStorage.setItem('hv-after-login', location.pathname + location.search);
+    } catch (_) {}
     window.location.href = '/logga-in.html';
     return null;
   }

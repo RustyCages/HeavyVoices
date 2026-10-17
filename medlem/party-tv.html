@@ -6,6 +6,14 @@
 <meta name="referrer" content="no-referrer">
 <title>Rock-TV — Party Mode</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&family=VT323&display=swap">
+<link rel="manifest" href="/medlem/party-tv.webmanifest">
+<link rel="apple-touch-icon" href="/icons/rocktv-apple-touch.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/rocktv-192.png">
+<meta name="theme-color" content="#121418">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rock-TV">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/party.css">
 <style>html.gate body { visibility: hidden; }</style>
@@ -90,7 +98,7 @@
 <header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
 <div class="container">
   <section>
-    <div class="party-top"><a href="/medlem/party.html" class="back-btn">&larr; Party</a></div>
+    <div class="party-top"><a href="/medlem/party.html" class="back-btn">&larr; Party</a><span data-install-app="Installera Rock-TV som app" hidden style="margin-left:auto"></span></div>
     <h1 class="party-title">Rock<span class="hot">-TV</span></h1>
     <p class="party-sub">Slumpade musikvideor dygnet runt – välj genre under TV:n. Vrid på kanalratten för nästa video.</p>
 
@@ -150,6 +158,7 @@
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/party.js"></script>
+<script src="/js/install-app.js" defer></script>
 <script src="/js/party-quiz-questions.js"></script>
 <script src="/js/party-music.js"></script>
 <script src="/js/party-genres.js"></script>

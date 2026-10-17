@@ -1214,6 +1214,7 @@ async function playTrackAt(index, offsetSeconds) {
 // "Minska rörelse" påslaget → ingen rullning, texten bryts på flera rader i stället.
 // =========================================================
 const reduceMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+const MQ_CYCLE_MS = 16000;   // gemensam cykellängd för alla rullande texter (synkade)
 const marqueeEls = new Set();
 const marqueeAnims = new WeakMap();
 const marqueeOpts = new WeakMap();
@@ -1245,17 +1246,20 @@ function updateMarquee(el) {
   if (dist <= 2) return;                            // får plats
   if ((reduceMotion && reduceMotion.matches) || !inner.animate) { el.classList.add('mq-wrap'); return; }
   el.classList.add('mq-on');
-  const speed = (marqueeOpts.get(el) || {}).speed || 30;   // px per sekund
-  const move = Math.max(1500, dist / speed * 1000);
+  // Alla rullningar delar samma cykellängd och startas utifrån klockan, så de
+  // står i samma fas för alla som är inloggade samtidigt (förutsatt rätt klocka).
   const pause = 1500;
-  const total = move + 2 * pause;
+  const total = MQ_CYCLE_MS;                                // en riktning
   const p = pause / total;
-  marqueeAnims.set(el, inner.animate([
+  const anim = inner.animate([
     { transform: 'translateX(0)', offset: 0 },
     { transform: 'translateX(0)', offset: p, easing: 'ease-in-out' },
     { transform: `translateX(-${dist}px)`, offset: 1 - p },
     { transform: `translateX(-${dist}px)`, offset: 1 },
-  ], { duration: total, iterations: Infinity, direction: 'alternate' }));
+  ], { duration: total, iterations: Infinity, direction: 'alternate' });
+  // Fram och tillbaka = 2 × total; sätt positionen efter klockan
+  anim.currentTime = Date.now() % (2 * total);
+  marqueeAnims.set(el, anim);
 }
 
 function refreshAllMarquees() {

@@ -232,6 +232,12 @@
   .k-seg-tag { font-size:0.5em; font-weight:700; vertical-align:super; margin-right:0.3em; padding:0 0.4em; border:1px solid currentColor; border-radius:0.6em; letter-spacing:0.04em; text-decoration:none; display:inline-block; }
   .k-line.k-active .k-seg { text-shadow:none; }
   .k-line.k-intro, .k-line.k-gap { min-height:1.3em; }
+  /* nedräkning (● ● ●) före första raden och efter längre pauser */
+  .k-line.k-counting { opacity:1; transform:scale(1); }
+  .k-dots { display:inline-flex; gap:0.45em; vertical-align:middle; margin-left:0.4em; }
+  .k-line.k-intro .k-dots, .k-line.k-gap .k-dots { margin-left:0; }
+  .k-dots i { width:0.55em; height:0.55em; border-radius:50%; background:var(--accent); opacity:0.18; transition:opacity 0.25s, transform 0.25s, box-shadow 0.25s; }
+  .k-dots i.on { opacity:1; transform:scale(1.1); box-shadow:0 0 10px rgba(229,169,104,0.7); }
   .k-line.k-active { color:var(--accent); opacity:1; transform:scale(1); text-shadow:0 0 18px rgba(229,169,104,0.35); }
   .k-line.k-past { opacity:0.2; }
   #karaoke.no-anim .k-reel, #karaoke.no-anim .k-line { transition:none; }
@@ -1584,6 +1590,35 @@ function buildKaraokeReel() {
   ).join('');
 }
 
+// Nedräkning: när det är tyst (intro, ♪ eller tom rad) i minst 4 s visas ● ● ● som släcks en i taget
+// de sista 3 sekunderna före nästa textrad. Används av både vanliga karaoken och delad skärm.
+const KC_MIN_GAP = 4, KC_SECS = 3;
+function kCountdown(reel, lines, idx, t, st) {
+  let n = idx + 1;
+  while (n < lines.length && (!lines[n].text || lines[n].text === '♪')) n++;
+  let show = 0, el = null;
+  if (n < lines.length) {
+    const cur = idx >= 0 ? lines[idx] : null;
+    const curIsText = !!(cur && cur.text && cur.text !== '♪');
+    const gapStart = cur ? cur.time : 0;
+    const left = lines[n].time - t;
+    if (!curIsText && lines[n].time - gapStart >= KC_MIN_GAP && left > 0 && left <= KC_SECS) {
+      show = Math.ceil(left); el = reel.children[idx + 1] || null;
+    }
+  }
+  if (st.el && (st.el !== el || !show)) {
+    const d = st.el.querySelector('.k-dots'); if (d) d.remove();
+    st.el.classList.remove('k-counting'); st.el = null; st.n = 0;
+  }
+  if (show && el) {
+    let d = el.querySelector('.k-dots');
+    if (!d) { d = document.createElement('span'); d.className = 'k-dots'; d.setAttribute('aria-hidden', 'true'); d.innerHTML = '<i></i><i></i><i></i>'; el.appendChild(d); el.classList.add('k-counting'); }
+    if (st.n !== show) { d.querySelectorAll('i').forEach((x, k) => x.classList.toggle('on', k < show)); st.n = show; }
+    st.el = el;
+  }
+}
+const kcMain = {};
+
 function renderKaraoke(force) {
   if (!karaokeOn || !karaokeLines.length) return;
   const box = document.getElementById('karaoke');
@@ -1593,6 +1628,7 @@ function renderKaraoke(force) {
   for (let i = 0; i < karaokeLines.length; i++) {
     if (karaokeLines[i].time <= t) idx = i; else break;
   }
+  kCountdown(box.querySelector('.k-reel'), karaokeLines, idx, t, kcMain);
   if (idx === karaokeIdx && !force) return;
 
   // Stora hopp (ny låt, scrubbing, visa igen) = flytta direkt utan animation
@@ -1796,7 +1832,7 @@ function buildSplit(song) {
       l.text === '♪' ? '<div class="k-line k-pause">♪</div>'
         : l.text ? `<div class="k-line">${pitchHtml(l.text, v.short || myVoiceLetter())}</div>`
         : '<div class="k-line k-gap"></div>').join('');
-    return { key: v.key, lines, idx: -2, box };
+    return { key: v.key, lines, idx: -2, box, kc: {} };
   });
   splitSong = song;
 }
@@ -1827,6 +1863,7 @@ function renderSplit(force) {
   splitPanels.forEach(p => {
     let idx = -1;
     for (let i = 0; i < p.lines.length; i++) { if (p.lines[i].time <= t) idx = i; else break; }
+    kCountdown(p.box.querySelector('.k-reel'), p.lines, idx, t, p.kc);
     if (idx === p.idx && !force) return;
     const jump = force || p.idx < -1 || Math.abs(idx - p.idx) > 2;
     p.idx = idx;

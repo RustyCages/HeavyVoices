@@ -996,7 +996,9 @@ let isLoadingTrack = false;   // true while stems are being fetched/decoded — 
 let playStartCtxTime = 0;     // audioCtx.currentTime when playback of current offset started
 let playStartOffset = 0;      // offset into the track (seconds) at playStartCtxTime
 let trackDuration = 0;
-let repeatOne = false;
+// Upprepa: 'off' → 'one' (låten) → 'all' (hela spellistan, bara när en lista med flera låtar spelas) → 'off'
+let repeatMode = 'off';
+try { repeatMode = localStorage.getItem('hv-repeat') || 'off'; if (!['off', 'one', 'all'].includes(repeatMode)) repeatMode = 'off'; } catch (e) {}
 let progressTimer = null;
 
 function setControlsDisabled(disabled) {
@@ -1144,6 +1146,7 @@ async function playTrackAt(index, offsetSeconds) {
   isPlaying = false;
 
   currentIndex = index;
+  renderRepeatBtn();
   if (playerMenuKind === 'mixer') { playerMenuKind = null; togglePlayerMenu('mixer'); }
   const item = items[index];
 
@@ -1315,12 +1318,14 @@ function schedulePlaybackFrom(item, offset) {
 }
 
 function handleTrackEnded() {
-  if (repeatOne) {
+  if (repeatMode === 'one') {
     playTrackAt(currentIndex, 0);
     return;
   }
   if (currentPlaylist && currentIndex < currentPlaylist.items.length - 1) {
     playTrackAt(currentIndex + 1, 0);
+  } else if (repeatMode === 'all' && currentPlaylist && currentPlaylist.items.length) {
+    playTrackAt(0, 0);   // börja om listan
   } else {
     isPlaying = false;
     setPlayPauseIcon(false);
@@ -1369,10 +1374,30 @@ document.getElementById('nextBtn').addEventListener('click', () => {
   playTrackAt(newIdx, 0);
 });
 
-document.getElementById('repeatBtn').addEventListener('click', (e) => {
-  repeatOne = !repeatOne;
-  e.currentTarget.classList.toggle('active', repeatOne);
+// ikoner: av = vanlig (dämpad), låt = med "1", lista = med listrader
+const REPEAT_ICONS = {
+  off: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>`,
+  one: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path><path d="M11 10.5l1.5-1v5.5" stroke-width="1.8"></path></svg>`,
+  all: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path><line x1="9" y1="10" x2="15" y2="10" stroke-width="1.6"></line><line x1="9" y1="12.5" x2="15" y2="12.5" stroke-width="1.6"></line><line x1="9" y1="15" x2="13" y2="15" stroke-width="1.6"></line></svg>`,
+};
+const REPEAT_TITLES = { off: 'Upprepa: av', one: 'Upprepa: låten', all: 'Upprepa: hela listan' };
+const isListPlaying = () => !!(currentPlaylist && currentPlaylist.pl && currentPlaylist.pl.id !== 'preview' && currentPlaylist.items.length > 1);
+function renderRepeatBtn() {
+  const b = document.getElementById('repeatBtn');
+  // spelas ingen lista visas "lista" som "låt"
+  const mode = repeatMode === 'all' && !isListPlaying() && currentPlaylist ? 'one' : repeatMode;
+  b.innerHTML = REPEAT_ICONS[mode];
+  b.classList.toggle('active', mode !== 'off');
+  b.title = REPEAT_TITLES[mode]; b.setAttribute('aria-label', REPEAT_TITLES[mode]);
+}
+document.getElementById('repeatBtn').addEventListener('click', () => {
+  const cur = repeatMode === 'all' && !isListPlaying() && currentPlaylist ? 'one' : repeatMode;
+  repeatMode = cur === 'off' ? 'one' : cur === 'one' && isListPlaying() ? 'all' : 'off';
+  try { localStorage.setItem('hv-repeat', repeatMode); } catch (e) {}
+  renderRepeatBtn();
+  toast(REPEAT_TITLES[repeatMode === 'all' && !isListPlaying() ? 'one' : repeatMode], 1500);
 });
+renderRepeatBtn();
 
 const scrubberEl = document.getElementById('scrubber');
 let scrubbing = false;

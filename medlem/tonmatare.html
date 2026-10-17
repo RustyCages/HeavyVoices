@@ -41,6 +41,11 @@
   .status.warn { color: #facc15; }
 </style>
 <script src="/js/device.js"></script>
+<script>if (new URLSearchParams(location.search).get('embed') === '1') document.documentElement.classList.add('embed');</script>
+<style>
+  .embed .site-header, .embed .back-btn, .embed h1, .embed .hint { display: none !important; }
+  .embed .container { padding-top: 0.75rem; }
+</style>
 </head>
 <body>
 <header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>

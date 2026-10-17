@@ -55,10 +55,6 @@
   .stage-msg div { font-family: 'Roboto Condensed', sans-serif; font-size: clamp(2.4rem, 9vw, 6rem); font-weight: 700; text-transform: uppercase; color: #fff; text-shadow: var(--party-glow); animation: intro-pop 0.8s cubic-bezier(.2,1.6,.4,1) both; }
 
   /* ---------- YouTube ---------- */
-  .k-tabs { display: flex; gap: 0.4rem; margin: -0.2rem 0 1.2rem; flex-wrap: wrap; }
-  .k-tabs a { padding: 0.6rem 1.1rem; border-radius: 999px; font-weight: 700; background: rgba(255,255,255,0.06); color: #d1d5db; border: 1px solid var(--border); }
-  .k-tabs a:hover { color: #fff; border-color: var(--accent); }
-  .k-tabs a[aria-current="true"] { background: var(--accent); color: #111317; border-color: var(--accent); }
   .yt-search { display: flex; gap: 0.5rem; flex-wrap: wrap; }
   .yt-search input { flex: 1; min-width: 200px; margin: 0; font-size: 1.05rem; padding: 0.8rem 1rem; }
   .yt-search button { padding: 0.8rem 1.3rem; font-size: 1rem; }
@@ -143,13 +139,9 @@
     <p class="party-sub">Ställ fram micken, dra upp volymen – välj vad ni vill göra.</p>
 
     <div class="party-tiles">
-      <a class="party-tile" href="#karaoke">
+      <a class="party-tile" href="#youtube">
         <span class="emo">🎤</span><h3>Karaoke</h3>
-        <p>Våra låtar med stor text och komp – eller tusentals färdiga karaokevideor från YouTube.</p>
-      </a>
-      <a class="party-tile" href="#tavla">
-        <span class="emo">🎯</span><h3>Sjung &amp; tävla</h3>
-        <p>Karaoke + notbana. Mikrofonen räknar hur bra du träffar tonerna.</p>
+        <p>Tusentals färdiga karaokevideor från YouTube – sök eller välj bland favoriterna.</p>
       </a>
       <a class="party-tile" href="/medlem/party-quiz.html">
         <span class="emo">🧠</span><h3>Rockquiz</h3>
@@ -176,24 +168,9 @@
     <div class="party-panel" id="adminPanel" hidden></div>
   </section>
 
-  <!-- ===== KARAOKE ===== -->
-  <section id="v-karaoke" data-view hidden>
-    <div class="view-head"><a href="#" class="back-btn" style="margin:0">&larr; Party</a><h2>🎤 Karaoke</h2></div>
-    <div class="k-tabs"><a href="#karaoke" aria-current="true">🎵 Våra låtar</a><a href="#youtube" aria-current="false">📺 YouTube-karaoke</a></div>
-    <div class="party-list" id="karaokeList"><p class="empty">Laddar låtar…</p></div>
-  </section>
-
-  <!-- ===== SJUNG & TÄVLA ===== -->
-  <section id="v-tavla" data-view hidden>
-    <div class="view-head"><a href="#" class="back-btn" style="margin:0">&larr; Party</a><h2>🎯 Sjung &amp; tävla</h2></div>
-    <p class="party-sub">Karaoketext och notbana samtidigt. Tryck på <b>🎤 Sjung med</b> – efter låten får du din träffprocent. 🎧 Hörlurar rekommenderas.</p>
-    <div class="party-list" id="tavlaList"><p class="empty">Laddar låtar…</p></div>
-  </section>
-
-  <!-- ===== YOUTUBE ===== -->
+  <!-- ===== KARAOKE (YouTube) ===== -->
   <section id="v-youtube" data-view hidden>
     <div class="view-head"><a href="#" class="back-btn" style="margin:0">&larr; Party</a><h2>🎤 Karaoke</h2></div>
-    <div class="k-tabs"><a href="#karaoke" aria-current="false">🎵 Våra låtar</a><a href="#youtube" aria-current="true">📺 YouTube-karaoke</a></div>
     <form class="yt-search" id="ytForm">
       <input type="search" id="ytQ" placeholder="Sök låt eller artist, t.ex. Bon Jovi Livin' on a prayer" autocomplete="off">
       <button type="submit">🔎 Sök</button>
@@ -487,7 +464,8 @@ soundBtn.addEventListener('click', () => { PartyFX.setSound(!PartyFX.sound); try
 
 // ---------- vyer (hash) ----------
 function route() {
-  const v = (location.hash || '').slice(1) || 'hub';
+  // gamla länkar: #karaoke → YouTube-karaoke, #tavla (Sjung & tävla, borttagen) → startsidan
+  const v = ({ karaoke: 'youtube', tavla: 'hub' })[(location.hash || '').slice(1)] || (location.hash || '').slice(1) || 'hub';
   document.querySelectorAll('[data-view]').forEach(s => s.hidden = s.id !== 'v-' + v);
   if (!document.getElementById('v-' + v)) document.getElementById('v-hub').hidden = false;
   window.scrollTo(0, 0);
@@ -566,34 +544,15 @@ async function loadSongs() {
     supabaseClient.from('songs').select('*').order('title'),
     supabaseClient.from('song_pitch').select('song_id'),
   ]);
-  if (error) { document.getElementById('karaokeList').innerHTML = `<p class="empty">Fel: ${esc(error.message)}</p>`; return; }
+  if (error) return;
   pitchIds = new Set((pr || []).map(r => String(r.song_id)));
   songs = (data || []).filter(s => s.published !== false || isAdmin);
-  renderKaraokeList(); renderTavlaList(); renderQuick();
+  renderQuick();
 }
 function metaTags(s, extra) {
   const t = [];
   if (s.published === false) t.push('<span class="hidden-tag">dold för medlemmar</span>');
   return t.concat(extra).join('');
-}
-function renderKaraokeList() {
-  const box = document.getElementById('karaokeList');
-  const list = songs.filter(s => parseLrc(lrcOf(s)).some(l => l.text) && karaokeTracks(s).length);
-  if (!list.length) { box.innerHTML = '<p class="empty">Inga låtar har synkad text än. Lägg till den under Admin → Låtar → Text-synk.</p>'; return; }
-  box.innerHTML = list.map(s => {
-    const tr = karaokeTracks(s);
-    const tags = [tr.some(x => /Utan/.test(x.name)) ? '<span>🎸 komp</span>' : '<span>🎤 med sång</span>'];
-    if (s.bg_video_path) tags.push('<span>🎬 video</span>');
-    if (pitchIds.has(String(s.id))) tags.push('<span>🎯 notbana</span>');
-    return `<button type="button" class="song-card" data-id="${s.id}"><strong>${esc(s.title)}</strong><span class="meta">${metaTags(s, tags)}</span></button>`;
-  }).join('');
-  box.querySelectorAll('.song-card').forEach(b => b.addEventListener('click', () => openStage(songs.find(s => String(s.id) === b.dataset.id))));
-}
-function renderTavlaList() {
-  const box = document.getElementById('tavlaList');
-  const list = songs.filter(s => pitchIds.has(String(s.id)));
-  if (!list.length) { box.innerHTML = '<p class="empty">Inga låtar har notbana än.</p>'; return; }
-  box.innerHTML = list.map(s => `<a class="song-card" href="/medlem/rostovning.html?party=1&song=${encodeURIComponent(s.id)}"><strong>${esc(s.title)}</strong><span class="meta">${metaTags(s, [s.bg_video_path ? '<span>🎬 video</span>' : '', parseLrc(lrcOf(s)).length ? '<span>📝 text</span>' : ''])}</span></a>`).join('');
 }
 
 // ---------- karaokescen ----------

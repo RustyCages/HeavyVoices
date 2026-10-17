@@ -131,7 +131,8 @@
     details.song-card { padding:0.65rem 0.8rem; }
     details.song-card summary h3 { font-size:1rem; }
   }
-  .pl-quick { padding:0.3rem 0.65rem; font-size:0.8rem; }
+  .pl-quick { display:inline-flex; align-items:center; justify-content:center; width:2.2rem; height:2.2rem; padding:0; border-radius:0.5rem; background:none; border:none; color:#cfc6b6; box-shadow:none; }
+  .pl-quick:hover, .pl-quick:focus-visible { color:var(--accent); background:rgba(255,255,255,0.06); transform:none; box-shadow:none; }
   .quick-create { display:flex; gap:0.6rem; margin-bottom:1.75rem; flex-wrap:wrap; }
   .quick-create input { width:auto; flex:1; margin-bottom:0; min-width:180px; }
 
@@ -786,7 +787,7 @@ function renderSongCard(s) {
 
   const summary = document.createElement('summary');
   summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}${s.published === false ? ' <span class="hidden-tag" title="Dold för medlemmar – syns bara för admin">Dold</span>' : ''}</h3>` +
-    `<span class="song-actions"><span class="sa-right"><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="sa-chev" aria-label="Visa/dölj"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span></span></span></div>`;
+    `<span class="song-actions"><span class="sa-right"><button type="button" class="pl-quick" title="Lägg till i spellista" aria-label="Lägg till i spellista"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="15" y2="6"/><line x1="3" y1="12" x2="11" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/><line x1="18" y1="9" x2="18" y2="15"/><line x1="15" y1="12" x2="21" y2="12"/></svg></button><span class="sa-chev" aria-label="Visa/dölj"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span></span></span></div>`;
   details.appendChild(summary);
   const playChecked = e => {
     e.preventDefault(); e.stopPropagation();

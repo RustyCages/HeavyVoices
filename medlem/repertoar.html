@@ -250,8 +250,6 @@
   .k-line.k-counting { opacity:1; transform:scale(1); }
   .k-cd { display:inline-flex; align-items:center; gap:0.6em; vertical-align:middle; }
   .k-line.k-pause .k-cd { margin-left:0.4em; }
-  .k-cd-pre { margin-right:0.5em; font-size:0.8em; }
-  .k-line.k-counting-next { opacity:0.75; }
   .k-inst { font-size:1.15em; line-height:1; animation:k-strum 1.6s ease-in-out infinite; display:inline-block; }
   @keyframes k-strum { 0%, 100% { transform:rotate(-8deg); } 50% { transform:rotate(8deg) scale(1.06); } }
   .k-dots { display:inline-flex; gap:0.45em; vertical-align:middle; }
@@ -1550,56 +1548,48 @@ function buildKaraokeReel() {
   ).join('');
 }
 
-// Nedräkning: ● ● ● ● släcks en i taget (från vänster) de sista 4 sekunderna före nästa textrad, om det är minst
-// 5 s sedan föregående rad började. Är uppehållet minst 10 s visas en gitarr 🎸 tills prickarna tar över
-// (aldrig båda samtidigt). På delad skärm räknar ALLA rutor ner samtidigt: tiderna tas från alla texter tillsammans.
+// Nedräkning: ● ● ● ● släcks en i taget (från vänster) de sista 4 sekunderna före nästa textrad – men bara när
+// det är TYST (aktuell rad är tom, ♪ eller introt) och uppehållet är minst 5 s. Är uppehållet minst 10 s visas en
+// gitarr 🎸 tills prickarna tar över (aldrig båda samtidigt). Allt visas i mitten där den tomma raden står.
+// Delad skärm: det räknas som tyst först när ALLA rutor är tysta, och då visas samma markering i alla rutor samtidigt.
 const KC_MIN_GAP = 5, KC_SECS = 4, KC_INST_GAP = 10;
 const isSung = l => !!(l && l.text && l.text !== '♪');
-// gemensamt läge för en eller flera texter vid tiden t → { show: prickar kvar (0–4), inst: visa gitarr }
-function kCue(lineSets, t) {
-  let prev = null, next = null;
-  lineSets.forEach(lines => lines.forEach(l => {
-    if (l.time <= t) { if (!prev || l.time >= prev.time) prev = l; }
-    else if (isSung(l) && (!next || l.time < next.time)) next = l;
-  }));
-  if (!next) return { show: 0, inst: false };
-  const gap = next.time - (prev ? prev.time : 0), left = next.time - t;
-  const show = gap >= KC_MIN_GAP && left <= KC_SECS ? Math.ceil(left) : 0;
-  return { show, inst: !show && !isSung(prev) && gap >= KC_INST_GAP };
+// sets = [{ lines, idx }] (idx = aktuell rad i den texten) → { show: prickar kvar (0–4), inst: visa gitarr }
+function kCue(sets, t) {
+  if (sets.some(s => isSung(s.lines[s.idx]))) return { show: 0, inst: false };   // någon sjunger
+  let start = 0, next = Infinity;
+  sets.forEach(({ lines, idx }) => {
+    if (idx >= 0) start = Math.max(start, lines[idx].time);
+    for (let i = idx + 1; i < lines.length; i++) if (isSung(lines[i])) { next = Math.min(next, lines[i].time); break; }
+  });
+  if (!isFinite(next)) return { show: 0, inst: false };
+  const gap = next - start, left = next - t;
+  const show = gap >= KC_MIN_GAP && left > 0 && left <= KC_SECS ? Math.ceil(left) : 0;
+  return { show, inst: !show && gap >= KC_INST_GAP };
 }
-// placerar markeringen i en ruta: i mitten om det är tyst där, annars före rutans nästa textrad
 function kPlace(reel, lines, idx, cue, st) {
-  let el = null, pre = false, show = cue.show, inst = cue.inst;
-  if (show || inst) {
-    if (!isSung(lines[idx])) {
-      el = reel.children[idx + 1] || null;
-      if (inst && el && el.classList.contains('k-pause')) inst = false;   // ♪-rader har redan en not
-    } else if (show) {
-      let n = idx + 1;
-      while (n < lines.length && !isSung(lines[n])) n++;
-      el = n < lines.length ? reel.children[n + 1] : null; pre = true; inst = false;
-    } else inst = false;
+  let el = null, show = cue.show, inst = cue.inst;
+  if ((show || inst) && !isSung(lines[idx])) {
+    el = reel.children[idx + 1] || null;
+    if (inst && el && el.classList.contains('k-pause')) inst = false;   // ♪-rader har redan en not
   }
-  const key = el && (show || inst) ? (pre ? 'p' : '') + (inst ? 'g' : '') + show : '';
-  if (st.el && (st.el !== el || !key || st.pre !== pre)) {
+  const key = el && (show || inst) ? (inst ? 'g' : '') + show : '';
+  if (st.el && (st.el !== el || !key)) {
     const d = st.el.querySelector('.k-cd'); if (d) d.remove();
-    st.el.classList.remove('k-counting', 'k-counting-next'); st.el = null; st.key = '';
+    st.el.classList.remove('k-counting'); st.el = null; st.key = '';
   }
   if (!key) return;
   let d = el.querySelector('.k-cd');
-  if (!d) {
-    d = document.createElement('span'); d.className = 'k-cd' + (pre ? ' k-cd-pre' : ''); d.setAttribute('aria-hidden', 'true');
-    if (pre) { el.insertBefore(d, el.firstChild); el.classList.add('k-counting-next'); } else { el.appendChild(d); el.classList.add('k-counting'); }
-  }
+  if (!d) { d = document.createElement('span'); d.className = 'k-cd'; d.setAttribute('aria-hidden', 'true'); el.appendChild(d); el.classList.add('k-counting'); }
   if (st.key !== key) {
     d.innerHTML = inst ? '<span class="k-inst">🎸</span>'
       : '<span class="k-dots">' + Array.from({ length: KC_SECS }, (_, k) => `<i class="${k >= KC_SECS - show ? 'on' : ''}"></i>`).join('') + '</span>';
     st.key = key;
   }
-  st.el = el; st.pre = pre;
+  st.el = el;
 }
 // en enda text (vanliga karaoken)
-function kCountdown(reel, lines, idx, t, st) { kPlace(reel, lines, idx, kCue([lines], t), st); }
+function kCountdown(reel, lines, idx, t, st) { kPlace(reel, lines, idx, kCue([{ lines, idx }], t), st); }
 const kcMain = {};
 
 function renderKaraoke(force) {
@@ -1884,10 +1874,11 @@ function renderSplit(force) {
   const wrap = document.getElementById('karaokeSplit');
   if (wrap.classList.contains('hidden')) return;
   const t = currentElapsed();
-  const cue = kCue(splitPanels.map(p => p.lines), t);   // samma nedräkning i alla rutor
-  splitPanels.forEach(p => {
-    let idx = -1;
-    for (let i = 0; i < p.lines.length; i++) { if (p.lines[i].time <= t) idx = i; else break; }
+  const idxOf = p => { let idx = -1; for (let i = 0; i < p.lines.length; i++) { if (p.lines[i].time <= t) idx = i; else break; } return idx; };
+  const idxs = splitPanels.map(idxOf);
+  const cue = kCue(splitPanels.map((p, k) => ({ lines: p.lines, idx: idxs[k] })), t);   // samma nedräkning i alla rutor
+  splitPanels.forEach((p, k) => {
+    const idx = idxs[k];
     kPlace(p.box.querySelector('.k-reel'), p.lines, idx, cue, p.kc);
     if (idx === p.idx && !force) return;
     const jump = force || p.idx < -1 || Math.abs(idx - p.idx) > 2;

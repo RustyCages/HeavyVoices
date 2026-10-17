@@ -245,8 +245,11 @@
   .k-line.k-intro, .k-line.k-gap { min-height:1.3em; }
   /* nedräkning (● ● ●) före första raden och efter längre pauser */
   .k-line.k-counting { opacity:1; transform:scale(1); }
-  .k-dots { display:inline-flex; gap:0.45em; vertical-align:middle; margin-left:0.4em; }
-  .k-line.k-intro .k-dots, .k-line.k-gap .k-dots { margin-left:0; }
+  .k-cd { display:inline-flex; align-items:center; gap:0.6em; vertical-align:middle; }
+  .k-line.k-pause .k-cd { margin-left:0.4em; }
+  .k-inst { font-size:1.15em; line-height:1; animation:k-strum 1.6s ease-in-out infinite; display:inline-block; }
+  @keyframes k-strum { 0%, 100% { transform:rotate(-8deg); } 50% { transform:rotate(8deg) scale(1.06); } }
+  .k-dots { display:inline-flex; gap:0.45em; vertical-align:middle; }
   .k-dots i { width:0.55em; height:0.55em; border-radius:50%; background:var(--accent); opacity:0.18; transition:opacity 0.25s, transform 0.25s, box-shadow 0.25s; }
   .k-dots i.on { opacity:1; transform:scale(1.1); box-shadow:0 0 10px rgba(229,169,104,0.7); }
   .k-line.k-active { color:var(--accent); opacity:1; transform:scale(1); text-shadow:0 0 18px rgba(229,169,104,0.35); }
@@ -1533,32 +1536,41 @@ function buildKaraokeReel() {
 }
 
 // Nedräkning: när det är tyst (intro, ♪ eller tom rad) i minst 5 s visas ● ● ● ● som släcks en i taget
-// (från vänster) de sista 4 sekunderna före nästa textrad. Används av både vanliga karaoken och delad skärm.
-const KC_MIN_GAP = 5, KC_SECS = 4;
+// (från vänster) de sista 4 sekunderna före nästa textrad. Är uppehållet minst 10 s visas också en gitarr 🎸
+// under hela uppehållet (före prickarna). Används av både vanliga karaoken och delad skärm.
+const KC_MIN_GAP = 5, KC_SECS = 4, KC_INST_GAP = 10;
 function kCountdown(reel, lines, idx, t, st) {
   let n = idx + 1;
   while (n < lines.length && (!lines[n].text || lines[n].text === '♪')) n++;
-  let show = 0, el = null;
+  let show = 0, inst = false, el = null;
   if (n < lines.length) {
     const cur = idx >= 0 ? lines[idx] : null;
     const curIsText = !!(cur && cur.text && cur.text !== '♪');
-    const gapStart = cur ? cur.time : 0;
+    const gapStart = cur ? cur.time : 0, gap = lines[n].time - gapStart;
     const left = lines[n].time - t;
-    if (!curIsText && lines[n].time - gapStart >= KC_MIN_GAP && left > 0 && left <= KC_SECS) {
-      show = Math.ceil(left); el = reel.children[idx + 1] || null;
+    if (!curIsText && left > 0) {
+      el = reel.children[idx + 1] || null;
+      // ♪-rader har redan en not – gitarren läggs bara på tomma rader och introt
+      inst = gap >= KC_INST_GAP && !!el && !el.classList.contains('k-pause');
+      if (gap >= KC_MIN_GAP && left <= KC_SECS) show = Math.ceil(left);
+      if (!inst && !show) el = null;
     }
   }
-  if (st.el && (st.el !== el || !show)) {
-    const d = st.el.querySelector('.k-dots'); if (d) d.remove();
-    st.el.classList.remove('k-counting'); st.el = null; st.n = 0;
+  const key = el ? (inst ? 'g' : '') + show : '';
+  if (st.el && (st.el !== el || !key)) {
+    const d = st.el.querySelector('.k-cd'); if (d) d.remove();
+    st.el.classList.remove('k-counting'); st.el = null; st.key = '';
   }
-  if (show && el) {
-    let d = el.querySelector('.k-dots');
-    if (!d) { d = document.createElement('span'); d.className = 'k-dots'; d.setAttribute('aria-hidden', 'true'); d.innerHTML = '<i></i>'.repeat(KC_SECS); el.appendChild(d); el.classList.add('k-counting'); }
-    // släcks från vänster till höger
-    if (st.n !== show) { d.querySelectorAll('i').forEach((x, k) => x.classList.toggle('on', k >= KC_SECS - show)); st.n = show; }
-    st.el = el;
+  if (!el || !key) return;
+  let d = el.querySelector('.k-cd');
+  if (!d) { d = document.createElement('span'); d.className = 'k-cd'; d.setAttribute('aria-hidden', 'true'); el.appendChild(d); el.classList.add('k-counting'); }
+  if (st.key !== key) {
+    // prickarna släcks från vänster till höger
+    d.innerHTML = (inst ? '<span class="k-inst">🎸</span>' : '')
+      + (show ? '<span class="k-dots">' + Array.from({ length: KC_SECS }, (_, k) => `<i class="${k >= KC_SECS - show ? 'on' : ''}"></i>`).join('') + '</span>' : '');
+    st.key = key;
   }
+  st.el = el;
 }
 const kcMain = {};
 

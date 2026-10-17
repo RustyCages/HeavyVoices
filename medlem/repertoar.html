@@ -121,10 +121,11 @@
   .song-actions { display:inline-flex; align-items:center; gap:0.6rem; flex-shrink:0; }
   /* smal skärm: knapparna bryts på flera rader i stället för att sticka ut till höger */
   .song-actions { flex-wrap:wrap; max-width:100%; min-width:0; }
+  .song-actions .sa-right { display:inline-flex; align-items:center; gap:0.6rem; margin-left:auto; }
   @media (max-width: 640px) {
     .song-actions { flex-shrink:1; width:100%; gap:0.45rem; }
     .song-actions .btn-outline { padding:0.4rem 0.7rem; font-size:0.85rem; }
-    .song-actions > .text-muted { margin-left:auto; }
+    .song-actions .sa-right { gap:0.45rem; }
     details.song-card { padding:1.1rem; }
   }
   .pl-quick { padding:0.3rem 0.65rem; font-size:0.8rem; }
@@ -814,9 +815,9 @@ function renderSongCard(s) {
 
   const summary = document.createElement('summary');
   summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}${s.published === false ? ' <span class="hidden-tag" title="Dold för medlemmar – syns bara för admin">Dold</span>' : ''}</h3>` +
-    `<span class="song-actions"><button type="button" class="btn-outline pl-play-all" title="Spela de bockade stämmorna med synkad text">▶ Spela ibockade</button><button type="button" class="btn-outline pl-mixer-toggle" title="Mixa stämmor">Mixer ▾</button><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="text-muted">Visa ▾</span></span></div>`;
+    `<span class="song-actions"><button type="button" class="btn-outline pl-mixer-toggle" title="Mixa stämmor">Mixer ▾</button><span class="sa-right"><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="text-muted">Visa ▾</span></span></span></div>`;
   details.appendChild(summary);
-  summary.querySelector('.pl-play-all').addEventListener('click', e => {
+  const playChecked = e => {
     e.preventDefault(); e.stopPropagation();
     // De bockade stämmorna i kortet + synkad text (delad skärm) direkt från repertoaren
     const keys = [...details.querySelectorAll('.stemCheck:checked')].map(c => c.value);
@@ -827,7 +828,7 @@ function renderSongCard(s) {
     document.getElementById('karaokeBtn').classList.add('active');
     try { localStorage.setItem('hv-karaoke', 'on'); localStorage.setItem('hv-karaoke-split', 'on'); } catch (err) {}
     playSongPreview(s, defs, 'preview-' + s.id + '-' + keys.join(','), mixState);
-  });
+  };
   summary.querySelector('.pl-quick').addEventListener('click', e => {
     e.preventDefault(); e.stopPropagation();
     details.open = true;
@@ -848,7 +849,7 @@ function renderSongCard(s) {
   // Stem checkboxes (fixed + extra) for adding to a playlist
   const stemDefs = getStemDefs(s);
   const stemsWrap = document.createElement('div');
-  stemsWrap.innerHTML = '<h4 style="margin-bottom:0.5rem;">Välj stämmor att lägga till</h4>';
+  stemsWrap.innerHTML = '<h4 style="margin-bottom:0.5rem;">Välj stämmor</h4>';
   const checksWrap = document.createElement('div');
   stemDefs.forEach(def => {
   const row = document.createElement('div');
@@ -868,6 +869,15 @@ function renderSongCard(s) {
   stemsWrap.appendChild(checksWrap);
   body.appendChild(stemsWrap);
 
+  // Spela de bockade stämmorna (direkt under stämlistan)
+  if (stemDefs.length) {
+    const playRow = document.createElement('div');
+    playRow.style.marginTop = '0.75rem';
+    playRow.innerHTML = '<button type="button" class="btn-gold pl-play-all" title="Spela de bockade stämmorna med synkad text">▶ Spela ibockade</button>';
+    playRow.querySelector('.pl-play-all').addEventListener('click', playChecked);
+    body.appendChild(playRow);
+  }
+
   // Add to playlist controls
   const addWrap = document.createElement('div');
   addWrap.className = 'add-row';
@@ -879,7 +889,7 @@ function renderSongCard(s) {
   addWrap.innerHTML = `
     <select class="targetPlaylistSelect" style="width:auto; flex:1; min-width:10rem; margin-bottom:0;" aria-label="Spellista">${playlistOptionsHtml()}</select>
     <input type="text" class="newPlName" placeholder="Namn på ny spellista" style="width:auto; flex:1; min-width:10rem; margin-bottom:0;" hidden>
-    <button class="btn-gold addToPlaylistBtn">Lägg till i spellista</button>
+    <button class="btn-outline addToPlaylistBtn">Lägg till i spellista</button>
   `;
   body.appendChild(addWrap);
   const plSel = addWrap.querySelector('.targetPlaylistSelect'), plName = addWrap.querySelector('.newPlName');

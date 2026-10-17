@@ -39,6 +39,38 @@
   <h1>Kalender</h1>
   <p style="margin:0 0 1rem;"><a href="https://meet.jit.si/HeavyVoices-Mote-k7r2q9" target="_blank" rel="noopener" class="btn btn-outline" title="Öppnar körens videomöte i Jitsi Meet (gratis, inget konto behövs för att delta)">📹 Videomöte</a></p>
 
+  <style>
+    .month-view { margin-bottom: 1.2rem; }
+    .month-view > summary { cursor: pointer; font-weight: 700; }
+    .month-nav { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 0.9rem 0 0.6rem; }
+    .month-nav strong { text-transform: capitalize; }
+    .month-nav button { padding: 0.35rem 0.8rem; }
+    .m-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.25rem; }
+    .m-dow { font-size: 0.72rem; color: var(--text-muted); text-align: center; padding: 0.2rem 0; }
+    .m-cell { min-width: 0; min-height: 2.8rem; padding: 0.25rem 0.1rem; border-radius: 0.5rem; border: 1px solid var(--border); background: rgba(255,255,255,0.03); color: var(--text); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 0.15rem; font: inherit; cursor: pointer; }
+    .m-cell.empty { border: none; background: none; cursor: default; }
+    .m-cell.today { border-color: var(--accent); }
+    .m-cell.sel { background: rgba(229,169,104,0.22); border-color: var(--accent); }
+    .m-num { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+    .m-dots { display: flex; gap: 0.2rem; min-height: 0.45rem; }
+    .m-dot { display: inline-block; width: 0.45rem; height: 0.45rem; border-radius: 50%; background: #9ca3af; flex-shrink: 0; }
+    .m-dot.rep { background: var(--accent); }
+    .m-dot.konsert { background: #a78bfa; }
+    .m-dot.ovrigt { background: #60a5fa; }
+    .m-day { margin-top: 0.8rem; }
+    .m-ev { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-top: 1px solid var(--border); font-size: 0.92rem; }
+  </style>
+  <details class="card month-view" id="monthView">
+    <summary>📅 Månadsvy</summary>
+    <div class="month-nav">
+      <button type="button" class="btn-outline" id="mPrev" aria-label="Föregående månad">‹</button>
+      <strong id="mTitle"></strong>
+      <button type="button" class="btn-outline" id="mNext" aria-label="Nästa månad">›</button>
+    </div>
+    <div class="m-grid" id="mGrid"></div>
+    <div class="m-day" id="mDay"></div>
+  </details>
+
   <div class="tabs">
     <button class="tab-btn active" id="tabRepBtn">Reptider</button>
     <button class="tab-btn" id="tabKonsertBtn">Konserter</button>
@@ -152,6 +184,46 @@ function renderGroup(containerEl, events, type) {
   });
 }
 
+// ---------- månadsvy (alla medlemmar, inkl. stämledare) ----------
+let monthEvents = [];
+let mYear = null, mMonth = null, mSelected = null;
+function renderMonth() {
+  if (mYear === null) { const t = new Date(); mYear = t.getFullYear(); mMonth = t.getMonth(); }
+  const todayYmd = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' });
+  const pad = n => String(n).padStart(2, '0');
+  const first = new Date(mYear, mMonth, 1);
+  const startDow = (first.getDay() + 6) % 7;                 // måndag = 0
+  const daysIn = new Date(mYear, mMonth + 1, 0).getDate();
+  const byDay = {};
+  monthEvents.forEach(ev => { (byDay[ev.event_date] = byDay[ev.event_date] || []).push(ev); });
+  document.getElementById('mTitle').textContent = first.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' });
+  let cells = ['Mån', 'Tis', 'Ons', 'Tors', 'Fre', 'Lör', 'Sön'].map(w => `<div class="m-dow">${w}</div>`).join('');
+  for (let i = 0; i < startDow; i++) cells += '<div class="m-cell empty"></div>';
+  for (let d = 1; d <= daysIn; d++) {
+    const k = `${mYear}-${pad(mMonth + 1)}-${pad(d)}`;
+    const types = [...new Set((byDay[k] || []).map(e => e.event_type || 'ovrigt'))];
+    const dots = types.map(t => `<span class="m-dot ${t}"></span>`).join('');
+    cells += `<button type="button" class="m-cell${k === todayYmd ? ' today' : ''}${k === mSelected ? ' sel' : ''}" data-day="${k}"><span class="m-num">${d}</span><span class="m-dots">${dots}</span></button>`;
+  }
+  document.getElementById('mGrid').innerHTML = cells;
+  document.querySelectorAll('#mGrid .m-cell[data-day]').forEach(b => b.addEventListener('click', () => {
+    mSelected = mSelected === b.dataset.day ? null : b.dataset.day; renderMonth();
+  }));
+  const dayEl = document.getElementById('mDay');
+  if (!mSelected) { dayEl.innerHTML = '<p class="text-muted">Tryck på en dag för att se vad som är inlagt.</p>'; }
+  else {
+    const evs = byDay[mSelected] || [];
+    dayEl.innerHTML = evs.length
+      ? evs.map(ev => `<div class="m-ev"><span class="m-dot ${ev.event_type || 'ovrigt'}"></span><span>${ev.event_time ? ev.event_time.slice(0, 5) + ' ' : ''}${escapeHtml(ev.title)}</span></div>`).join('')
+      : '<p class="text-muted">Inget inlagt denna dag.</p>';
+  }
+  if (!renderMonth.bound) {
+    renderMonth.bound = true;
+    document.getElementById('mPrev').addEventListener('click', () => { mMonth--; if (mMonth < 0) { mMonth = 11; mYear--; } mSelected = null; renderMonth(); });
+    document.getElementById('mNext').addEventListener('click', () => { mMonth++; if (mMonth > 11) { mMonth = 0; mYear++; } mSelected = null; renderMonth(); });
+  }
+}
+
 async function loadEvents() {
   const { data: events, error } = await supabaseClient
     .from('events').select('*').order('event_date').order('event_time');
@@ -171,6 +243,8 @@ async function loadEvents() {
   renderGroup(document.getElementById('listRep'), byType.rep, 'rep');
   renderGroup(document.getElementById('listKonsert'), byType.konsert, 'konsert');
   renderGroup(document.getElementById('listOvrigt'), byType.ovrigt, 'ovrigt');
+  monthEvents = events || [];
+  renderMonth();
 }
 
 (async () => {

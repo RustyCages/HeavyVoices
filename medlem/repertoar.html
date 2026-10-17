@@ -199,7 +199,9 @@
   #playerMenu .pm-dl:hover { color:var(--accent); border-color:var(--accent); }
   #playerMenu .pm-dl svg { width:15px; height:15px; }
   #playerMenu hr { border:none; border-top:1px solid var(--border); margin:0.3rem 0; }
-  @media (max-width: 420px) { #playerControls { gap:0.45rem; } }
+  @media (max-width: 420px) { #playerControls { gap:0.3rem; } #playerControls button { width:2.3rem; height:2.3rem; font-size:1rem; } }
+  #playerMenu .mixer-row { padding:0.2rem 0.4rem; margin-bottom:0.55rem; }
+  #playerMenu .pm-empty { padding:0.6rem; color:var(--text-muted); font-size:0.9rem; }
 
   /* Karaoke (synkad text) ovanför spelarkontrollerna */
   /* Rullande textremsa: alla rader ligger i .k-reel som flyttas med transform så att aktuell rad hamnar i mitten */
@@ -331,6 +333,7 @@
     <button class="btn-gold" id="playPauseBtn" title="Spela/Pausa"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
     <button class="btn-outline" id="nextBtn" title="Nästa"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="17.5" y="5" width="2.5" height="14" rx="1"/><path d="M4 5.9v12.2a1 1 0 0 0 1.5.86l9.9-6.1a1 1 0 0 0 0-1.72L5.5 5.04A1 1 0 0 0 4 5.9z"/></svg></button>
     <button class="btn-outline" id="karaokeBtn" title="Visa/dölj synkad text">🎤<span class="voice-badge"></span></button>
+    <button class="btn-outline" id="mixerBtn" title="Mixer – volym per stämma" aria-label="Mixer"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></button>
     <button class="btn-outline hidden" id="splitBtn" title="Alla stämmor samtidigt (delad skärm)" aria-pressed="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></button>
     <button class="btn-outline hidden" id="lyricsDocBtn" title="Öppna sångtexten (dokument)">📄</button>
   </div>
@@ -658,7 +661,6 @@ function renderTracksForPlaylist(pl, items, containerEl) {
     row.innerHTML = `
       <button class="track-play-btn" data-playlist-id="${pl.id}" data-row-id="${item.rowId}" title="Spela">${ICO.play}</button>
       <span class="track-title">${escapeHtml(item.song.title)}</span>
-      <button class="btn-outline mixerToggleBtn" style="font-size:0.75rem;">Mixer ▾</button>
                  <button class="btn-outline removeTrackBtn icon-btn" title="Ta bort från spellistan"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg></button>
     `;
 
@@ -678,43 +680,6 @@ function renderTracksForPlaylist(pl, items, containerEl) {
       handleTrackActivate();
     });
 
-    const mixer = document.createElement('div');
-    mixer.className = 'mixer';
-    mixer.style.display = 'none';
-    item.stemDefs.forEach(def => {
-      const mrow = document.createElement('div');
-      mrow.className = 'mixer-row';
-      mrow.innerHTML = `
-        <span class="label">${escapeHtml(def.label)}</span>
-        <input type="range" min="0" max="100" value="${item.volumes[def.key]}" class="volSlider" data-key="${def.key}">
-        <button class="btn-outline muteBtn" data-key="${def.key}" title="Tysta ${escapeHtml(def.label)}" aria-label="Tysta ${escapeHtml(def.label)}" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg></button>
-      `;
-      mrow.querySelector('.volSlider').addEventListener('input', (e) => {
-        const val = parseInt(e.target.value, 10);
-        item.volumes[def.key] = val;
-        applyGainForKey(item, def.key, val);
-        scheduleVolumeSave(item);
-      });
-      mrow.querySelector('.muteBtn').addEventListener('click', (e) => {
-        const k = def.key;
-        const btn = e.currentTarget;
-        if (item.muted.has(k)) item.muted.delete(k); else item.muted.add(k);
-        const isMuted = item.muted.has(k);
-        btn.classList.toggle('muted', isMuted);
-        btn.setAttribute('aria-pressed', isMuted);
-        applyGainForKey(item, k, item.volumes[k]);
-      });
-      attachMarquee(mrow.querySelector('.label'), { speed: 25 });
-      mixer.appendChild(mrow);
-    });
-
-    const mixerToggleBtn = row.querySelector('.mixerToggleBtn');
-    mixerToggleBtn.addEventListener('click', () => {
-      const willOpen = mixer.style.display === 'none';
-      mixer.style.display = willOpen ? 'block' : 'none';
-      mixerToggleBtn.textContent = willOpen ? 'Mixer ▴ (stäng)' : 'Mixer ▾';
-      mixerToggleBtn.classList.toggle('open', willOpen);
-    });
 
     row.querySelector('.removeTrackBtn').addEventListener('click', async () => {
       if (!confirm(`Ta bort "${item.song.title}" från spellistan?`)) return;
@@ -727,7 +692,6 @@ function renderTracksForPlaylist(pl, items, containerEl) {
     });
 
     containerEl.appendChild(row);
-    containerEl.appendChild(mixer);
   });
   updateTrackPlayIcons();
 }
@@ -815,7 +779,7 @@ function renderSongCard(s) {
 
   const summary = document.createElement('summary');
   summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}${s.published === false ? ' <span class="hidden-tag" title="Dold för medlemmar – syns bara för admin">Dold</span>' : ''}</h3>` +
-    `<span class="song-actions"><button type="button" class="btn-outline pl-mixer-toggle" title="Mixa stämmor">Mixer ▾</button><span class="sa-right"><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="text-muted">Visa ▾</span></span></span></div>`;
+    `<span class="song-actions"><span class="sa-right"><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="text-muted">Visa ▾</span></span></span></div>`;
   details.appendChild(summary);
   const playChecked = e => {
     e.preventDefault(); e.stopPropagation();
@@ -917,47 +881,6 @@ function renderSongCard(s) {
   addWrap.querySelector('.addToPlaylistBtn').addEventListener('click', doAdd);
   plName.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
 
-  // Mixer (samma utseende som i spellistan) – ligger överst i kortet
-  const mixer = document.createElement('div');
-  mixer.className = 'mixer';
-  mixer.style.display = 'none';
-  getStemDefs(s).forEach(def => {
-    const mrow = document.createElement('div');
-    mrow.className = 'mixer-row';
-    mrow.innerHTML = `
-      <span class="label">${escapeHtml(def.label)}</span>
-      <input type="range" min="0" max="100" value="${mixState.volumes[def.key] ?? 100}" class="volSlider" data-key="${def.key}">
-      <button class="btn-outline muteBtn" data-key="${def.key}" title="Tysta ${escapeHtml(def.label)}" aria-label="Tysta ${escapeHtml(def.label)}" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg></button>
-    `;
-    mrow.querySelector('.volSlider').addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10);
-      mixState.volumes[def.key] = val;
-      // Om just denna låt spelas: uppdatera ljudet direkt
-      const cur = currentPlaylist && currentPlaylist.items[currentIndex];
-      if (cur && cur.muted === mixState.muted) applyGainForKey(cur, def.key, val);
-    });
-    mrow.querySelector('.muteBtn').addEventListener('click', (e) => {
-      const k = def.key;
-      const btn = e.currentTarget;
-      if (mixState.muted.has(k)) mixState.muted.delete(k); else mixState.muted.add(k);
-      const isMuted = mixState.muted.has(k);
-      btn.classList.toggle('muted', isMuted);
-      btn.setAttribute('aria-pressed', isMuted);
-      const cur = currentPlaylist && currentPlaylist.items[currentIndex];
-      if (cur && cur.muted === mixState.muted) applyGainForKey(cur, k, mixState.volumes[k]);
-    });
-    attachMarquee(mrow.querySelector('.label'), { speed: 25 });
-    mixer.appendChild(mrow);
-  });
-  const mixerBtn = summary.querySelector('.pl-mixer-toggle');
-  mixerBtn.addEventListener('click', (e) => {
-    e.preventDefault(); e.stopPropagation();
-    const willOpen = mixer.style.display === 'none';
-    mixer.style.display = willOpen ? 'block' : 'none';
-    mixerBtn.textContent = willOpen ? 'Mixer ▴' : 'Mixer ▾';
-    mixerBtn.classList.toggle('open', willOpen);
-  });
-  body.insertBefore(mixer, body.firstChild);
 
   details.appendChild(body);
   return details;
@@ -1204,6 +1127,7 @@ async function playTrackAt(index, offsetSeconds) {
   isPlaying = false;
 
   currentIndex = index;
+  if (playerMenuKind === 'mixer') { playerMenuKind = null; togglePlayerMenu('mixer'); }
   const item = items[index];
 
   document.getElementById('playerBar').classList.remove('hidden');
@@ -1702,11 +1626,45 @@ function closePlayerMenu() {
   playerMenuKind = null;
 }
 
+// ---------- Mixer i spelaren: volym/tysta för stämmorna som spelas just nu ----------
+// (i Repertoaren = de ibockade stämmorna, i en spellista = stämmorna som lades till)
+const MUTE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>';
+function currentPlayerItem() { return currentPlaylist && currentIndex >= 0 ? currentPlaylist.items[currentIndex] : null; }
+function mixerMenuHtml() {
+  const item = currentPlayerItem();
+  if (!item || !item.stemDefs.length) return '<div class="pm-title">Mixer</div><div class="pm-empty">Starta en låt först.</div>';
+  return `<div class="pm-title">Mixer · ${escapeHtml(item.song.title)}</div>` + item.stemDefs.map(def => {
+    const muted = item.muted.has(def.key);
+    return `<div class="mixer-row"><span class="label">${escapeHtml(def.label)}</span>
+      <input type="range" min="0" max="100" value="${item.volumes[def.key] ?? 100}" class="volSlider" data-key="${escapeHtml(def.key)}">
+      <button class="btn-outline muteBtn${muted ? ' muted' : ''}" data-key="${escapeHtml(def.key)}" title="Tysta ${escapeHtml(def.label)}" aria-label="Tysta ${escapeHtml(def.label)}" aria-pressed="${muted}">${MUTE_SVG}</button></div>`;
+  }).join('');
+}
+function wireMixerMenu(m) {
+  const item = currentPlayerItem(); if (!item) return;
+  m.querySelectorAll('.volSlider').forEach(r => r.addEventListener('input', e => {
+    const k = r.dataset.key, val = parseInt(e.target.value, 10);
+    item.volumes[k] = val; applyGainForKey(item, k, val);
+    if (!item.isPreview) scheduleVolumeSave(item);   // spellistor sparar volymen
+  }));
+  m.querySelectorAll('.muteBtn').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    const k = b.dataset.key;
+    if (item.muted.has(k)) item.muted.delete(k); else item.muted.add(k);
+    const on = item.muted.has(k);
+    b.classList.toggle('muted', on); b.setAttribute('aria-pressed', on);
+    applyGainForKey(item, k, item.volumes[k] ?? 100);
+  }));
+  m.querySelectorAll('.mixer-row .label').forEach(l => { try { attachMarquee(l, { speed: 25 }); } catch (e) {} });
+}
+document.getElementById('mixerBtn').addEventListener('click', e => { e.stopPropagation(); togglePlayerMenu('mixer'); });
+
 function togglePlayerMenu(kind) {
   if (playerMenuKind === kind) { closePlayerMenu(); return; }
   const m = document.getElementById('playerMenu');
   playerMenuKind = kind;
-  m.innerHTML = kind === 'voice' ? voiceMenuHtml() : docsMenuHtml();
+  m.innerHTML = kind === 'voice' ? voiceMenuHtml() : kind === 'mixer' ? mixerMenuHtml() : docsMenuHtml();
+  if (kind === 'mixer') wireMixerMenu(m);
   // Placera precis ovanför knappraden (fungerar både i liten och utfälld spelare)
   const ctrlTop = document.getElementById('playerControls').getBoundingClientRect().top;
   m.style.bottom = Math.max(8, window.innerHeight - ctrlTop + 8) + 'px';

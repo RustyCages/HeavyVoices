@@ -133,9 +133,57 @@
   }
 
   // ---------- Rendera knappar ----------
+  // Egna småappar (data-install-own="radio" | "tv"): start_url har ?app=<namn>. Öppnas sidan inifrån en ANNAN
+  // installerad app (t.ex. Heavy Voices-appen) går det inte att installera därifrån – då visar knappen hur man
+  // öppnar sidan i webbläsaren i stället.
+  try { const a = new URLSearchParams(location.search).get('app'); if (a) sessionStorage.setItem('hv-app', a); } catch (e) {}
+  // iPhone sparar sidans adress som startadress när man lägger till på hemskärmen → se till att ?app= finns med
+  document.addEventListener('DOMContentLoaded', () => {
+    const own = document.querySelector('[data-install-own]');
+    if (own && !isStandalone() && !new URLSearchParams(location.search).get('app')) {
+      try { const u = new URL(location.href); u.searchParams.set('app', own.getAttribute('data-install-own')); history.replaceState(history.state, '', u); } catch (e) {}
+    }
+  });
+  const inOwnApp = slot => { try { return sessionStorage.getItem('hv-app') === slot.getAttribute('data-install-own'); } catch (e) { return false; } };
+  function showOpenInBrowser() {
+    const appName = (document.querySelector('meta[name="apple-mobile-web-app-title"]') || {}).content || 'appen';
+    const url = location.origin + location.pathname;
+    const wrap = document.createElement('div');
+    wrap.className = 'ia-backdrop';
+    wrap.innerHTML = `
+      <div class="ia-sheet" role="dialog" aria-modal="true" aria-label="Installera ${appName}">
+        <h3>Installera ${appName}</h3>
+        <p>Du är inne i Heavy Voices-appen – härifrån går det inte att installera en annan app. Gör så här:</p>
+        <ol class="ia-steps">
+          <li><span>Tryck <strong>Kopiera länken</strong> nedan</span></li>
+          <li><span>Öppna ${isIOS ? '<strong>Safari</strong>' : '<strong>Chrome</strong>'} och klistra in länken i adressfältet</span></li>
+          <li><span>${isIOS ? 'Logga in om du blir ombedd' : 'Är du utloggad – logga in'} och tryck <strong>Installera ${appName} som app</strong></span></li>
+        </ol>
+        <p class="ia-note" style="word-break:break-all"><strong>${url}</strong></p>
+        <button type="button" class="ia-copy" style="width:100%;margin-bottom:0.5rem">📋 Kopiera länken</button>
+        <button type="button" class="btn-outline ia-close">Stäng</button>
+      </div>`;
+    const close = () => wrap.remove();
+    wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+    wrap.querySelector('.ia-close').addEventListener('click', close);
+    wrap.querySelector('.ia-copy').addEventListener('click', async (e) => {
+      try { await navigator.clipboard.writeText(url); e.target.textContent = '✅ Kopierad – öppna webbläsaren och klistra in'; }
+      catch (_) { e.target.textContent = 'Markera och kopiera länken ovan'; }
+    });
+    document.body.appendChild(wrap);
+  }
+
   function render() {
     const show = !isStandalone() && (deferredPrompt || isIOS || isAndroid || isInAppBrowser);
     document.querySelectorAll('[data-install-app]').forEach(slot => {
+      if (isStandalone() && slot.hasAttribute('data-install-own') && !inOwnApp(slot) && (isIOS || isAndroid)) {
+        slot.hidden = false;
+        if (!slot.querySelector('.install-app-btn')) {
+          slot.innerHTML = `<button type="button" class="btn-outline install-app-btn">${ICON_DOWNLOAD}<span>${slot.getAttribute('data-install-app')}</span></button>`;
+          slot.querySelector('button').addEventListener('click', showOpenInBrowser);
+        }
+        return;
+      }
       slot.hidden = !show;
       if (!show) { slot.innerHTML = ''; return; }
       if (!slot.querySelector('.install-app-btn')) {

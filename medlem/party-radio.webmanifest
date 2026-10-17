@@ -4,7 +4,7 @@
   "description": "Riktiga radiokanaler med hårdrock, punk, stoner och 50–60-tal – från Heavy Voices.",
   "lang": "sv",
   "id": "/medlem/party-radio.html",
-  "start_url": "/medlem/party-radio.html",
+  "start_url": "/medlem/party-radio.html?app=radio",
   "scope": "/medlem/party-radio",
   "display": "standalone",
   "orientation": "any",

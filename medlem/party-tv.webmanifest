@@ -4,7 +4,7 @@
   "description": "En gammal TV som slumpar musikvideor – rock, metal, punk, stoner, 50–60-tal, 80-talspop och hiphop.",
   "lang": "sv",
   "id": "/medlem/party-tv.html",
-  "start_url": "/medlem/party-tv.html",
+  "start_url": "/medlem/party-tv.html?app=tv",
   "scope": "/medlem/party-tv",
   "display": "standalone",
   "orientation": "any",

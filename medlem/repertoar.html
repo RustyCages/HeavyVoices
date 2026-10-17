@@ -118,15 +118,18 @@
   .doc-chip button:hover, .doc-chip a:hover { background:rgba(255,255,255,0.05); color:var(--accent); }
   .doc-chip svg { width:14px; height:14px; }
 
-  .song-actions { display:inline-flex; align-items:center; gap:0.6rem; flex-shrink:0; }
-  /* smal skärm: knapparna bryts på flera rader i stället för att sticka ut till höger */
-  .song-actions { flex-wrap:wrap; max-width:100%; min-width:0; }
-  .song-actions .sa-right { display:inline-flex; align-items:center; gap:0.6rem; margin-left:auto; }
+  /* Låtkort: titel, ＋ Spellista och pil på samma rad – låg höjd så listan kan växa */
+  details.song-card { margin-bottom:0.6rem; padding:0.75rem 1rem; }
+  details.song-card summary .row-between { flex-wrap:nowrap; gap:0.6rem; }
+  details.song-card summary h3 { flex:1; min-width:0; font-size:1.1rem; line-height:1.25; }
+  .song-actions { display:inline-flex; align-items:center; gap:0.5rem; flex-shrink:0; }
+  .song-actions .sa-right { display:inline-flex; align-items:center; gap:0.5rem; }
+  .sa-chev { display:inline-flex; align-items:center; justify-content:center; width:2rem; height:2rem; color:var(--accent); transition:transform 0.25s ease; }
+  .sa-chev svg { width:22px; height:22px; }
+  details.song-card[open] .sa-chev { transform:rotate(180deg); }
   @media (max-width: 640px) {
-    .song-actions { flex-shrink:1; width:100%; gap:0.45rem; }
-    .song-actions .btn-outline { padding:0.4rem 0.7rem; font-size:0.85rem; }
-    .song-actions .sa-right { gap:0.45rem; }
-    details.song-card { padding:1.1rem; }
+    details.song-card { padding:0.65rem 0.8rem; }
+    details.song-card summary h3 { font-size:1rem; }
   }
   .pl-quick { padding:0.3rem 0.65rem; font-size:0.8rem; }
   .quick-create { display:flex; gap:0.6rem; margin-bottom:1.75rem; flex-wrap:wrap; }
@@ -350,6 +353,7 @@
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/bg-video.js"></script>
+<script src="/js/pdf-viewer.js"></script>
 <script>
 const NOTER_BUCKET = 'heavy-voices-noter';
 const STEMS_BUCKET = 'heavy-voices-stems';
@@ -755,7 +759,7 @@ function renderTexter() {
       const chip = document.createElement('span');
       chip.className = 'doc-chip';
       chip.innerHTML = `<a href="#">${escapeHtml(doc.label)}</a><button type="button" title="Ladda ner ${escapeHtml(doc.label)}" aria-label="Ladda ner ${escapeHtml(doc.label)}">${DL_SVG}</button>`;
-      chip.querySelector('a').addEventListener('click', e => { e.preventDefault(); openDoc(doc.path); });
+      chip.querySelector('a').addEventListener('click', e => { e.preventDefault(); openDoc(doc.path, doc.label); });
       chip.querySelector('button').addEventListener('click', () => downloadDoc(doc.path));
       links.appendChild(chip);
     });
@@ -784,7 +788,7 @@ function renderSongCard(s) {
 
   const summary = document.createElement('summary');
   summary.innerHTML = `<div class="row-between"><h3 style="margin:0;">${escapeHtml(s.title)}${s.published === false ? ' <span class="hidden-tag" title="Dold för medlemmar – syns bara för admin">Dold</span>' : ''}</h3>` +
-    `<span class="song-actions"><span class="sa-right"><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="text-muted">Visa ▾</span></span></span></div>`;
+    `<span class="song-actions"><span class="sa-right"><button type="button" class="btn-outline pl-quick" title="Lägg till i spellista">＋ Spellista</button><span class="sa-chev" aria-label="Visa/dölj"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span></span></span></div>`;
   details.appendChild(summary);
   const playChecked = e => {
     e.preventDefault(); e.stopPropagation();
@@ -906,7 +910,16 @@ function songDocs(s) {
 const DL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 
 // Öppnar i ny flik (docx via Office-visaren). Fönstret öppnas direkt i klicket så att popup-blockerare inte stoppar det.
-async function openDoc(path) {
+async function openDoc(path, label) {
+  // PDF: visas i sidan med val mellan vitt dokument och svart bakgrund (js/pdf-viewer.js)
+  if (/\.pdf$/i.test(path) && window.PdfViewer) {
+    const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(path, 3600);
+    if (error || !data) { toast('Kunde inte öppna dokumentet'); return; }
+    const doc = playerSong ? songDocs(playerSong).find(d => d.path === path) : null;
+    const title = label || (doc && doc.label) || (stemFilename(path) || 'Dokument').replace(/\.pdf$/i, '');
+    PdfViewer.open(data.signedUrl, title, { onDownload: () => downloadDoc(path) });
+    return;
+  }
   const win = window.open('', '_blank');
   const { data, error } = await supabaseClient.storage.from(NOTER_BUCKET).createSignedUrl(path, 3600);
   if (error || !data) { if (win) win.close(); toast('Kunde inte öppna dokumentet'); return; }
@@ -932,7 +945,7 @@ async function loadDocsForSong(s, container) {
     const chip = document.createElement('span');
     chip.className = 'doc-chip';
     chip.innerHTML = `<a href="#">${escapeHtml(doc.label)}</a><button type="button" title="Ladda ner ${escapeHtml(doc.label)}" aria-label="Ladda ner ${escapeHtml(doc.label)}">${DL_SVG}</button>`;
-    chip.querySelector('a').addEventListener('click', (e) => { e.preventDefault(); openDoc(doc.path); });
+    chip.querySelector('a').addEventListener('click', (e) => { e.preventDefault(); openDoc(doc.path, doc.label); });
     chip.querySelector('button').addEventListener('click', () => downloadDoc(doc.path));
     container.appendChild(chip);
   });
@@ -1538,7 +1551,8 @@ function buildKaraokeReel() {
 }
 
 // Nedräkning: när det är tyst (intro, ♪ eller tom rad) i minst 5 s visas ● ● ● ● som släcks en i taget
-// (från vänster) de sista 4 sekunderna före nästa textrad. Står föregående rad kvar visas prickarna före nästa rad. Är uppehållet minst 10 s visas också en gitarr 🎸
+// (från vänster) de sista 4 sekunderna före nästa textrad. Står föregående rad kvar visas prickarna före nästa rad.
+// Gitarren visas under uppehållet fram tills prickarna tar över. Är uppehållet minst 10 s visas också en gitarr 🎸
 // under hela uppehållet (före prickarna). Används av både vanliga karaoken och delad skärm.
 const KC_MIN_GAP = 5, KC_SECS = 4, KC_INST_GAP = 10;
 function kCountdown(reel, lines, idx, t, st) {
@@ -1555,6 +1569,7 @@ function kCountdown(reel, lines, idx, t, st) {
       // ♪-rader har redan en not – gitarren läggs bara på tomma rader och introt
       inst = gap >= KC_INST_GAP && !!el && !el.classList.contains('k-pause');
       if (gap >= KC_MIN_GAP && left <= KC_SECS) show = Math.ceil(left);
+      if (show) inst = false;          // gitarren byts mot prickarna – aldrig båda samtidigt
       if (!inst && !show) el = null;
     } else if (left > 0 && gap >= KC_MIN_GAP && left <= KC_SECS) {
       // texten står kvar i mitten → prickarna visas först på nästa rad

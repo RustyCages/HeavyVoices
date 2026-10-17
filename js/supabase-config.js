@@ -93,5 +93,21 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
     };
   }
 
-  storage.from = (bucket) => (R2_AREAS[bucket] ? r2Bucket(R2_AREAS[bucket]) : originalFrom(bucket));
+  // Party Mode-media (party/fireworks, party/fireworks-sound, party/intro-music) ligger kvar i
+  // Supabase Storage – de flyttades inte till R2. Sökvägar under party/ går därför mot Supabase.
+  const isParty = p => /^party(\/|$)/.test(String(p || ''));
+  function routed(bucket, area) {
+    const r2 = r2Bucket(area), sb = originalFrom(bucket);
+    const pick = p => (isParty(p) ? sb : r2);
+    return {
+      createSignedUrl: (path, ...a) => pick(path).createSignedUrl(path, ...a),
+      createSignedUrls: (paths, ...a) => ((paths || []).length && paths.every(isParty) ? sb : r2).createSignedUrls(paths, ...a),
+      upload: (path, ...a) => pick(path).upload(path, ...a),
+      remove: (paths) => ((paths || []).length && paths.every(isParty) ? sb : r2).remove(paths),
+      list: (prefix, ...a) => pick(prefix).list(prefix, ...a),
+      download: (path) => pick(path).download(path),
+    };
+  }
+
+  storage.from = (bucket) => (R2_AREAS[bucket] ? routed(bucket, R2_AREAS[bucket]) : originalFrom(bucket));
 })();

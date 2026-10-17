@@ -46,6 +46,8 @@ Ingen `choir-[slug]`-prefixning (till skillnad från ChoirStudio).
   Sökvägarna i databasen är relativa till bucketen, precis som förut.
   Skrivrätt: stems = admin eller stämledare, warmup = admin. Läsrätt: godkända medlemmar.
 - **Supabase Storage**: `heavy-voices-noter`, `heavy-voices-filer`, `heavy-voices-recordings`.
+  Undantag: Party Mode-media (`heavy-voices-stems/party/…` – fyrverkerivideor, smällar, intromusik) ligger kvar i
+  Supabase Storage. Wrappern skickar sökvägar under `party/` dit. Töm alltså inte `party/` i stems-bucketen.
 - R2-secrets i Supabase: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
 - `r2-migrate` kopierade befintliga filer (okt 2026). Gamla Supabase-bucketarna för stems/warmup töms när R2 är verifierat.
 

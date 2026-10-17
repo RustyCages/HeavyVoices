@@ -166,6 +166,8 @@
     .m-dot.rep { background: var(--accent); }
     .m-dot.konsert { background: #a78bfa; }
     .m-dot.ovrigt { background: #60a5fa; }
+    .m-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-top: 0.6rem; font-size: 0.8rem; color: var(--text-muted); }
+    .m-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
     .m-day { margin-top: 0.8rem; }
     .m-ev { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-top: 1px solid var(--border); font-size: 0.92rem; }
   </style>
@@ -177,6 +179,7 @@
       <button type="button" class="btn-outline" id="mNext" aria-label="Nästa månad">›</button>
     </div>
     <div class="m-grid" id="mGrid"></div>
+    <div class="m-legend"><span><i class="m-dot rep"></i>Repetition</span><span><i class="m-dot konsert"></i>Konsert</span><span><i class="m-dot ovrigt"></i>Övrigt</span></div>
     <div class="m-day" id="mDay"></div>
   </details>
 

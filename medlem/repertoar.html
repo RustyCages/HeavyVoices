@@ -119,6 +119,14 @@
   .doc-chip svg { width:14px; height:14px; }
 
   .song-actions { display:inline-flex; align-items:center; gap:0.6rem; flex-shrink:0; }
+  /* smal skärm: knapparna bryts på flera rader i stället för att sticka ut till höger */
+  .song-actions { flex-wrap:wrap; max-width:100%; min-width:0; }
+  @media (max-width: 640px) {
+    .song-actions { flex-shrink:1; width:100%; gap:0.45rem; }
+    .song-actions .btn-outline { padding:0.4rem 0.7rem; font-size:0.85rem; }
+    .song-actions > .text-muted { margin-left:auto; }
+    details.song-card { padding:1.1rem; }
+  }
   .pl-quick { padding:0.3rem 0.65rem; font-size:0.8rem; }
   .quick-create { display:flex; gap:0.6rem; margin-bottom:1.75rem; flex-wrap:wrap; }
   .quick-create input { width:auto; flex:1; margin-bottom:0; min-width:180px; }

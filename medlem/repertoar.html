@@ -1552,7 +1552,7 @@ function buildKaraokeReel() {
 // Nedräkning: ● ● ● ● släcks en i taget (från vänster) de sista 4 sekunderna före nästa textrad – men bara när
 // det är TYST (aktuell rad är tom, ♪ eller introt) och uppehållet är minst 5 s. Är uppehållet minst 10 s visas en
 // gitarr 🎸 tills prickarna tar över (aldrig båda samtidigt). Allt visas i mitten där den tomma raden står.
-// Delad skärm: det räknas som tyst först när ALLA rutor är tysta, och då visas samma markering i alla rutor samtidigt.
+// Delad skärm: varje text räknar ner individuellt efter sina egna tider.
 const KC_MIN_GAP = 5, KC_SECS = 4, KC_INST_GAP = 10;
 const isSung = l => !!(l && l.text && l.text !== '♪');
 // sets = [{ lines, idx }] (idx = aktuell rad i den texten) → { show: prickar kvar (0–4), inst: visa gitarr }
@@ -1877,10 +1877,10 @@ function renderSplit(force) {
   const t = currentElapsed();
   const idxOf = p => { let idx = -1; for (let i = 0; i < p.lines.length; i++) { if (p.lines[i].time <= t) idx = i; else break; } return idx; };
   const idxs = splitPanels.map(idxOf);
-  const cue = kCue(splitPanels.map((p, k) => ({ lines: p.lines, idx: idxs[k] })), t);   // samma nedräkning i alla rutor
   splitPanels.forEach((p, k) => {
     const idx = idxs[k];
-    kPlace(p.box.querySelector('.k-reel'), p.lines, idx, cue, p.kc);
+    // varje text räknar ner till sin egen nästa rad (texterna kan börja vid olika tider)
+    kPlace(p.box.querySelector('.k-reel'), p.lines, idx, kCue([{ lines: p.lines, idx }], t), p.kc);
     if (idx === p.idx && !force) return;
     const jump = force || p.idx < -1 || Math.abs(idx - p.idx) > 2;
     p.idx = idx;

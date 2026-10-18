@@ -85,3 +85,10 @@ async function requireAuth(requiredRole = null) {
     if (e.persisted) { document.body.style.transition = ''; document.body.style.opacity = ''; }
   });
 })();
+
+// Temafärgade listor (select) på mobil – laddas på alla sidor som använder auth.js
+(function () {
+  if (window.__themeSelectLoaded) return; window.__themeSelectLoaded = true;
+  var s = document.createElement('script'); s.src = '/js/theme-select.js'; s.defer = true;
+  (document.head || document.documentElement).appendChild(s);
+})();

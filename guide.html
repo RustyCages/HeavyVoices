@@ -101,6 +101,12 @@ button:focus-visible, .step:focus-visible { outline: 2px solid var(--accent); ou
 .btn.pressed { transform: scale(.94); filter: brightness(1.15); }
 
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rstrip { margin: -4px -4px 8px; padding: 3px 0; text-align: center; border-radius: 6px; background: linear-gradient(90deg, rgba(229,169,104,.12), rgba(229,169,104,.32), rgba(229,169,104,.12)); border-bottom: 1px solid rgba(229,169,104,.5); color: var(--accent); font: 700 9px var(--f-head); letter-spacing: .14em; text-transform: uppercase; }
+.rstrip span { color: #f3f4f6; opacity: .8; letter-spacing: .02em; text-transform: none; font-weight: 500; }
+.grp-h { margin: 8px 0 5px 2px; font: 700 9px var(--f-head); letter-spacing: .12em; text-transform: uppercase; color: var(--muted, #9ca3af); }
+.tiles.adm .tile .ic { background: var(--accent); color: #111317; }
+.tiles.adm .tile .ic svg { stroke: #111317; }
+.atag { font-style: normal; font-size: 8px; padding: 0 4px; border: 1px solid rgba(229,169,104,.6); border-radius: 999px; color: var(--accent); vertical-align: middle; }
 .tile { border-radius: 12px; border: 1px solid var(--line); background: linear-gradient(145deg, rgba(30,34,43,.9), rgba(22,25,32,.95)); padding: 12px 10px; display: flex; flex-direction: column; gap: 4px; transition: border-color .25s, box-shadow .25s, transform .15s; }
 .tile .ic { width: 26px; height: 26px; border-radius: 8px; background: rgba(229,169,104,.14); display: grid; place-items: center; }
 .tile .ic svg { width: 15px; height: 15px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -542,12 +548,14 @@ const MEMBER = [
 /* ======================= ADMIN ======================= */
 const ADMIN = [
  { t: 'Adminsidan', path: '/admin/', url: 'heavyvoices.se/<b>admin/</b>',
-   d: 'Admin har en egen startsida med verktyg för att sköta kören. Som admin kommer du också åt allt i medlemsvyn.',
-   tips: ['Bara godkända konton med rollen admin kommer in hit. Andra skickas vidare till medlemssidan.'],
-   html: `${bar('Niklas · Admin')}<h3 class="s-h">Admin</h3>
-     <div class="tiles">${tile('k1','users','Medlemmar','Godkänn, avgift, mejl')}${tile('k2','music','Repertoar','Stämfiler och text')}${tile('k3','cal','Kalender','Rep och konserter')}${tile('k4','info','Information','Nyheter till kören')}</div>
-     ${tile('k5','folder','Filer','Dela och organisera dokument i mappar')}`,
-   act: [['wait',500],['hot','#k2'],['wait',400],['hot','#k3'],['wait',400],['hot','#k4'],['wait',400],['hot','#k5'],['wait',400],['tap','#k1'],['hot','#k1'],['wait',900]] },
+   d: 'Admin har en egen startsida i två delar. Under Administrera ligger det bara admin har: Repertoar & texter, Kalender, Medlemmar, Information och Adminguide. Under Öva som medlem ligger samma sidor som medlemmarna ser – Röstövning och Studio är märkta + admin eftersom du har extra redigeringsverktyg där.',
+   tips: ['Den guldfärgade randen ”⚙ Adminläge” överst syns på alla sidor när du är inloggad som admin. Tryck på den för att komma till adminsidan.', 'Stämledare ser samma sak med texten ”Stämledarläge” – och bara låtverktygen.', 'Bara godkända konton med rollen admin (eller stämledare) kommer in hit. Andra skickas vidare till medlemssidan.'],
+   html: `<div class="rstrip">⚙ Adminläge <span>· Niklas</span></div>${bar('Niklas · Admin')}<h3 class="s-h">Admin</h3>
+     <p class="grp-h">Administrera</p>
+     <div class="tiles adm">${tile('k2','music','Repertoar','Stämfiler och text')}${tile('k3','cal','Kalender','Rep och konserter')}${tile('k1','users','Medlemmar','Godkänn, avgift, mejl')}${tile('k4','info','Information','Nyheter och filer')}</div>
+     <p class="grp-h">Öva som medlem</p>
+     <div class="tiles">${tile('k5','music','Röstövning <em class="atag">+ admin</em>','Noter och övning')}${tile('k6','folder','Studio <em class="atag">+ admin</em>','Spela in, stämfiler')}</div>`,
+   act: [['wait',500],['hot','#k2'],['wait',400],['hot','#k3'],['wait',400],['hot','#k4'],['wait',400],['hot','#k5'],['wait',400],['hot','#k6'],['wait',400],['tap','#k1'],['hot','#k1'],['wait',900]] },
 
  { t: 'Mejl vid ny registrering', path: 'mejl till admin', url: 'e-post',
    d: 'När någon registrerar sig får alla admins ett mejl direkt, med namn, e-post och stämma. Knappen i mejlet tar dig raka vägen till medlemslistan.',

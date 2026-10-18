@@ -60,7 +60,30 @@ async function requireAuth(requiredRole = null) {
     return null;
   }
 
+  showRoleStrip(member);
   return member;
+}
+
+// Guldrand överst på alla sidor för admin och stämledare: "⚙ Adminläge · Namn".
+// Visas inte i partyläget, i inbäddade vyer (iframe / ?embed) eller i fristående appfönster för party.
+function showRoleStrip(member) {
+  try {
+    if (!member || !isSongEditor(member)) return;
+    if (window.top !== window || /[?&]embed\b/.test(location.search) || /\/party/.test(location.pathname)) return;
+    if (document.querySelector('.role-strip')) return;
+    const add = () => {
+      const a = document.createElement('a');
+      a.className = 'role-strip';
+      a.href = '/admin/';
+      a.setAttribute('data-no-transition', '');
+      a.title = 'Du är inloggad med ' + (member.role === 'admin' ? 'admin' : 'stämledar') + 'behörighet – tryck för att gå till adminsidan';
+      const first = String(member.name || '').trim().split(/\s+/)[0];
+      a.innerHTML = '<b>⚙ ' + (member.role === 'admin' ? 'Adminläge' : 'Stämledarläge') + '</b>' + (first ? '<span>· ' + first.replace(/[&<>"']/g, '') + '</span>' : '');
+      document.body.prepend(a);
+      document.documentElement.style.setProperty('--strip-h', a.offsetHeight + 'px');   // sticky-element på sidan hamnar under randen
+    };
+    if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
+  } catch (_) {}
 }
 
 

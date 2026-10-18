@@ -401,3 +401,13 @@ border-color: #dc2626;
 color: #ffffff;
 box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
 }
+
+/* --- Admin-/stämledarläge: guldrand överst (läggs in av js/auth.js) --- */
+.role-strip { position: sticky; top: 0; z-index: 900; display: flex; align-items: center; justify-content: center; gap: 0.45rem;
+  height: 26px; padding-top: env(safe-area-inset-top, 0px); box-sizing: content-box;
+  background: linear-gradient(90deg, rgba(229,169,104,0.15), rgba(229,169,104,0.35), rgba(229,169,104,0.15)), #16191f;
+  border-bottom: 1px solid rgba(229,169,104,0.55); color: var(--accent); text-decoration: none; }
+.role-strip b { font: 700 0.72rem 'Roboto Condensed', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; }
+.role-strip span { color: var(--text); opacity: 0.8; font-size: 0.78rem; }
+.role-strip:hover b { color: var(--accent-hover); }
+@media print { .role-strip { display: none; } }

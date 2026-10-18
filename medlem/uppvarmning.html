@@ -53,6 +53,7 @@
   .add-form .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
   .add-form label { display: grid; gap: 0.25rem; font-size: 0.82rem; color: var(--text-muted); margin: 0; }
   .add-form input, .add-form select, .add-form textarea { margin: 0; }
+  #fCatNew { margin-top: 0.4rem; }
   .add-form textarea { min-height: 3.5rem; }
   .add-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
   .status { font-size: 0.82rem; color: var(--text-muted); }
@@ -119,7 +120,7 @@
     <p class="g-p">Bara admin ser formuläret och knapparna nedan. Medlemmarna ser videorna direkt när du sparat.</p>
     <ol>
       <li><div><b>Kopiera länken på YouTube (eller välj en egen fil)</b><p>Öppna videon på YouTube och kopiera adressen, eller tryck <em>Dela → Kopiera</em>. Alla vanliga format fungerar: <code>youtube.com/watch?v=…</code>, <code>youtu.be/…</code> och <code>youtube.com/shorts/…</code>.</p></div></li>
-      <li><div><b>Klistra in och fyll i</b><p>Klistra in länken i <em>YouTube-länk</em>. <em>Titel</em> kan lämnas tom – då hämtas videons namn från YouTube. Välj <em>Kategori</em> (eller skriv en egen, t.ex. "Andning") och <em>För stämma</em> om videon bara gäller en stämma. Skriv gärna en kort instruktion i <em>Beskrivning</em>. Tryck <b>Lägg till</b>.</p></div></li>
+      <li><div><b>Klistra in och fyll i</b><p>Klistra in länken i <em>YouTube-länk</em>. <em>Titel</em> kan lämnas tom – då hämtas videons namn från YouTube. Välj <em>Kategori</em> i listan (eller <em>➕ Ny kategori…</em> och skriv ett eget namn) och <em>För stämma</em> om videon bara gäller en stämma. Skriv gärna en kort instruktion i <em>Beskrivning</em>. Tryck <b>Lägg till</b>.</p></div></li>
       <li><div><b>Starta mitt i en video (valfritt)</b><p>Vill du att videon ska börja vid t.ex. 1:30? Högerklicka i YouTube-videon vid rätt ställe och välj <em>Kopiera videons webbadress vid aktuell tid</em>, eller lägg till <code>&amp;t=90s</code> i slutet av länken.</p></div></li>
       <li><div><b>Ändra eller ta bort</b><p>Under varje video finns <b>✎ Ändra</b> (formuläret fylls i – ändra och tryck <em>Spara ändringar</em>, eller <em>Avbryt</em>) och <b>🗑 Ta bort</b>.</p></div></li>
       <li><div><b>Ändra ordningen</b><p>▲ och ▼ flyttar videon upp eller ner inom sin kategori. Kategorierna visas i ordningen Andning, Uppvärmning, Skalövningar, Stämspecifikt, Övrigt – egna kategorier hamnar sist.</p></div></li>
@@ -145,9 +146,9 @@
         <span class="file-info" id="fFileInfo"></span></label>
       <div class="row">
         <label>Titel <input type="text" id="fTitle" maxlength="140" placeholder="Hämtas automatiskt från YouTube om fältet är tomt"></label>
-        <label>Kategori <input type="text" id="fCat" list="catList" value="Uppvärmning" maxlength="40"></label>
+        <label>Kategori <select id="fCat"></select>
+          <input type="text" id="fCatNew" maxlength="40" placeholder="Namn på ny kategori, t.ex. Andning för bas" hidden></label>
       </div>
-      <datalist id="catList"><option value="Andning"><option value="Uppvärmning"><option value="Skalövningar"><option value="Stämspecifikt"><option value="Övrigt"></datalist>
       <div class="row">
         <label>För stämma <select id="fVoice">
           <option value="">Alla stämmor</option><option value="sopran">Sopran</option><option value="alt">Alt</option><option value="tenor">Tenor</option><option value="bas">Bas</option>
@@ -207,6 +208,11 @@
 <script>
 const VOICES = { sopran: 'Sopran', alt: 'Alt', tenor: 'Tenor', bas: 'Bas' };
 const CAT_ORDER = ['Andning', 'Uppvärmning', 'Skalövningar', 'Stämspecifikt', 'Övrigt'];
+document.addEventListener('change', e => {
+  if (e.target.id !== 'fCat') return;
+  const inp = document.getElementById('fCatNew'), isNew = e.target.value === '__new';
+  inp.hidden = !isNew; if (isNew) inp.focus();
+});
 let isAdmin = false, myVoice = '', videos = [], filter = 'Alla', editing = null;
 let favs = [];   // egna favoriter (member_favorites), senast tillagda först
 const WARMUP_BUCKET = 'heavy-voices-warmup';   // egna videofiler + miniatyrer
@@ -234,7 +240,28 @@ function catSort(a, b) {
   return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, 'sv');
 }
 
+// Kategori i formuläret: lista med alla kategorier (fasta + egna som redan finns) och "Ny kategori…"
+function fillCatSelect() {
+  const sel = document.getElementById('fCat'); if (!sel) return;
+  const cur = sel.value || null;
+  const cats = [...new Set([...CAT_ORDER, ...videos.map(v => v.category).filter(Boolean)])].sort(catSort);
+  sel.innerHTML = cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('') + '<option value="__new">➕ Ny kategori…</option>';
+  sel.value = cur === '__new' || (cur && cats.includes(cur)) ? cur : 'Uppvärmning';   // pågående "Ny kategori" behålls
+}
+function setCat(c) {
+  const sel = document.getElementById('fCat'), inp = document.getElementById('fCatNew');
+  c = String(c || 'Uppvärmning');
+  if (![...sel.options].some(o => o.value === c)) { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.insertBefore(o, sel.querySelector('option[value="__new"]')); }
+  sel.value = c; inp.hidden = true; inp.value = '';
+}
+function catValue() {
+  const sel = document.getElementById('fCat');
+  if (sel.value === '__new') return document.getElementById('fCatNew').value.trim() || 'Uppvärmning';
+  return sel.value || 'Uppvärmning';
+}
+
 function render() {
+  fillCatSelect();
   // Medlemmar ser videor för alla + sin egen stämma; admin ser allt
   const visible = videos.filter(v => isAdmin || !v.voice || v.voice === myVoice);
   const cats = [...new Set(visible.map(v => v.category))].sort(catSort);
@@ -350,7 +377,7 @@ async function adminAct(act, id) {
     document.getElementById('fUrl').value = v.youtube_id ? `https://www.youtube.com/watch?v=${v.youtube_id}${v.start_sec ? '&t=' + v.start_sec + 's' : ''}` : '';
     document.getElementById('fFileInfo').textContent = v.video_path ? 'Nuvarande fil behålls om du inte väljer en ny.' : '';
     document.getElementById('fTitle').value = v.title;
-    document.getElementById('fCat').value = v.category;
+    setCat(v.category);
     document.getElementById('fVoice').value = v.voice || '';
     document.getElementById('fDesc').value = v.description || '';
     document.getElementById('formTitle').textContent = 'Ändra video';
@@ -501,7 +528,7 @@ function resetForm() {
   document.getElementById('addForm').reset();
   document.getElementById('fFileInfo').textContent = '';
   setSrc('yt');
-  document.getElementById('fCat').value = 'Uppvärmning';
+  setCat('Uppvärmning');
   document.getElementById('formTitle').textContent = 'Lägg till video';
   document.getElementById('fSave').textContent = 'Lägg till';
   document.getElementById('fCancel').hidden = true;
@@ -512,7 +539,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   const st = document.getElementById('fStatus');
   const saveBtn = document.getElementById('fSave');
   let title = document.getElementById('fTitle').value.trim();
-  const category = document.getElementById('fCat').value.trim() || 'Uppvärmning';
+  const category = catValue();
   const row = {
     title, category,
     voice: document.getElementById('fVoice').value || null,
@@ -678,7 +705,7 @@ function renderChannel() {
 }
 async function addFromChannel(id) {
   const v = cs().videos.find(x => x.id === id); if (!v) return;
-  const category = document.getElementById('fCat').value.trim() || 'Uppvärmning';
+  const category = catValue();
   const row = { youtube_id: id, title: v.title, category, voice: document.getElementById('fVoice').value || null, description: null, start_sec: 0 };
   row.position = Math.max(-1, ...videos.filter(x => x.category === category).map(x => x.position)) + 1;
   const { data, error } = await supabaseClient.from('warmup_videos').insert(row).select().single();

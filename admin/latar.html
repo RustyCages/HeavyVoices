@@ -14,6 +14,7 @@
   .song-title { font-family: 'Roboto Condensed', sans-serif; font-size: 1.3rem; }
   .song-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
   .song-item.is-hidden .song-title { color: var(--text-muted); }
+  .song-artist { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.1rem; }
   .pubBtn { padding: 0.3rem 0.75rem; font-size: 0.8rem; border-radius: 1rem; display: inline-flex; align-items: center; gap: 0.35rem; }
   .pubBtn.on { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.5); }
   .pubBtn.off { background: transparent; color: var(--text-muted); border: 1px dashed var(--border); }
@@ -93,6 +94,7 @@
     <h3>Lägg till ny låt</h3>
     <form id="addSongForm">
       <input type="text" id="newTitle" placeholder="Titel" required>
+      <input type="text" id="newArtist" placeholder="Artist (valfritt)">
       <button type="submit">Lägg till</button>
       <p class="error" id="addError"></p>
     </form>
@@ -747,7 +749,7 @@ async function loadSongs() {
   listEl.innerHTML = `<p class="pub-summary">${songs.length - hiddenCount} synliga för medlemmarna${hiddenCount ? ` · ${hiddenCount} dolda` : ''}</p>` + songs.map(s => `
     <div class="card song-item ${s.published === false ? 'is-hidden' : ''}">
       <div class="song-head">
-        <div class="song-title">${esc(s.title)}</div>
+        <div><div class="song-title">${esc(s.title)}</div>${s.artist ? `<div class="song-artist">${esc(s.artist)}</div>` : ''}</div>
         <button type="button" class="pubBtn ${s.published === false ? 'off' : 'on'}" data-id="${s.id}"
           title="${s.published === false ? 'Dold för medlemmar – klicka för att visa' : 'Synlig för medlemmar – klicka för att dölja'}">
           ${s.published === false ? '&#128065;&#8205;&#128488; Dold' : '&#128065; Synlig'}
@@ -756,6 +758,11 @@ async function loadSongs() {
 
       <details>
         <summary>Redigera text och filer</summary>
+
+        <div style="margin-top: 0.75rem;">
+          <label class="field-label" style="display:block; margin-bottom:0.35rem;">Artist</label>
+          <input type="text" class="artistInp" data-id="${s.id}" value="${esc(s.artist || '')}" placeholder="Artist" style="max-width:24rem;">
+        </div>
 
         <div style="margin-top: 0.75rem;">
           <h4 class="section-heading">Sångtext &amp; karaoke</h4>
@@ -909,14 +916,28 @@ async function loadSongs() {
   });
 }
 
+// Artist redigeras per låt (sparas när fältet lämnas)
+document.getElementById('songList').addEventListener('change', async (e) => {
+  const inp = e.target.closest('.artistInp');
+  if (!inp) return;
+  const artist = inp.value.trim() || null;
+  const { error } = await supabaseClient.from('songs').update({ artist }).eq('id', inp.dataset.id);
+  if (error) { alert('Kunde inte spara artisten: ' + error.message); return; }
+  loadSongs();
+});
+
 document.getElementById('addSongForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const title = document.getElementById('newTitle').value;
+  const artist = (document.getElementById('newArtist').value || '').trim() || null;
   const errorEl = document.getElementById('addError');
   errorEl.textContent = '';
 
   // Nya låtar är dolda för medlemmarna tills admin gör dem synliga
-  const { error } = await supabaseClient.from('songs').insert({ title, published: false });
+  let { error } = await supabaseClient.from('songs').insert({ title, artist, published: false });
+  if (error && /artist/i.test(error.message)) {   // kolumnen finns inte än – spara utan artist
+    ({ error } = await supabaseClient.from('songs').insert({ title, published: false }));
+  }
   if (error) {
     errorEl.textContent = error.message;
     return;

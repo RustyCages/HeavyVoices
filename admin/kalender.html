@@ -837,6 +837,7 @@ function renderEventNotes(evId, panel) {
     <div class="actions" style="margin-top:0.6rem; display:flex; gap:0.6rem;">
       <button type="button" class="mn-save">Spara anteckning</button>
       <button type="button" class="btn-outline mn-clear">Rensa</button>
+      <button type="button" class="btn-outline mn-close" style="margin-left:auto;">✕ Stäng</button>
       <span class="mn-err error"></span>
     </div>
     <div class="mn-saved">${saved.length ? `<h4 style="margin:0.6rem 0;">Sparade (${saved.length})</h4>` + saved.map(n => noteItemHtml(n, false)).join('') : '<p class="text-muted">Inga sparade anteckningar för den här händelsen.</p>'}</div>`;
@@ -855,19 +856,30 @@ function renderEventNotes(evId, panel) {
     startRecording(evId, area, recBtn, recWrap);
   };
   panel.querySelector('.mn-clear').onclick = () => { area.value = ''; };
+  panel.querySelector('.mn-close').onclick = () => {
+    if (area.value.trim() && !confirm('Stäng utan att spara? Texten i rutan försvinner.')) return;
+    closeNotePanel(evId, panel);
+  };
   panel.querySelector('.mn-save').onclick = async () => {
     const err = panel.querySelector('.mn-err'); err.textContent = '';
     const body = area.value.trim();
     if (!body) { err.textContent = 'Anteckningen är tom.'; return; }
     const { error } = await supabaseClient.from('meeting_notes').insert({ event_id: evId, body, created_by: adminId });
     if (error) { err.textContent = error.message; return; }
-    if (mnRecording === String(evId)) stopRecording();
     await loadNotes();
-    renderEventNotes(evId, panel);
     renderAllNotes();
     updateNoteCounts();
+    closeNotePanel(evId, panel);   // klart – stäng kortet
   };
   bindNoteDeletes(panel);
+}
+
+// Stänger anteckningspanelen för en händelse (avbryter ev. inspelning)
+function closeNotePanel(evId, panel) {
+  if (mnRecording === String(evId)) stopRecording();
+  panel.hidden = true;
+  const btn = document.querySelector(`.mn-open[data-id="${CSS.escape(String(evId))}"]`);
+  if (btn) btn.setAttribute('aria-expanded', 'false');
 }
 
 // Gör en slutgiltig fras läsbar: stor bokstav i början och punkt i slutet.

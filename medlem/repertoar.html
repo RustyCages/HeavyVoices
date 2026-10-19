@@ -69,6 +69,8 @@
   .move-btns { display:inline-flex; gap:0.2rem; flex-shrink:0; }
   .move-btns button { padding:0.2rem 0.45rem; font-size:0.7rem; line-height:1; }
   .move-btns button:disabled { opacity:0.3; cursor:default; }
+  .drag-handle { cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; color:var(--text-muted); font-size:1.15rem; line-height:1; padding:0.3rem 0.25rem; flex-shrink:0; }
+  .track-row.dragging { background:rgba(229,169,104,0.14); box-shadow:0 6px 16px rgba(0,0,0,0.45); position:relative; z-index:5; border-bottom-color:transparent; }
 
     /* Volume slider — the bare browser-default range input is only a few px tall and
      nearly impossible to grab on a touchscreen. Give it a visible track plus a large
@@ -98,7 +100,8 @@
 
   @media (max-width: 600px) {
     /* Mobil: en rad per låt – play | titel + artist (två textrader) | flytt och papperskorg */
-    .track-row { flex-wrap:nowrap; gap:0.5rem; padding:0.4rem 0.25rem; }
+    details.list-card { padding:1rem 0.6rem; }
+    .track-row { flex-wrap:nowrap; gap:0.5rem; padding:0.4rem 0; }
     .track-title { flex:1 1 0; min-width:0; order:1; }
     .track-play-btn { order:0; flex-shrink:0; width:2.3rem; height:2.3rem; padding:0; }
     .track-play-btn svg { width:14px; height:14px; }
@@ -686,8 +689,15 @@ async function loadPlaylistTracks(pl, containerEl) {
 async function movePlaylistItem(pl, items, idx, dir, containerEl) {
   const j = idx + dir;
   if (j < 0 || j >= items.length) return;
+  await moveTo(pl, items, idx, j, containerEl);
+}
+
+// Drar en låt från index "from" till "to" och sparar den nya ordningen
+async function moveTo(pl, items, from, to, containerEl) {
+  if (from === to) return;
   const playing = (currentPlaylist && activePlaylistId === pl.id) ? currentPlaylist.items[currentIndex] : null;
-  [items[idx], items[j]] = [items[j], items[idx]];
+  const [moved] = items.splice(from, 1);
+  items.splice(to, 0, moved);
   const updates = [];
   items.forEach((it, i) => {
     if (it.position !== i + 1) updates.push(supabaseClient.from('playlist_songs').update({ position: i + 1 }).eq('id', it.rowId));
@@ -709,7 +719,7 @@ function renderTracksForPlaylist(pl, items, containerEl) {
     row.innerHTML = `
       <button class="track-play-btn" data-playlist-id="${pl.id}" data-row-id="${item.rowId}" title="Spela">${ICO.play}</button>
       <span class="track-title"><span class="track-name">${escapeHtml(item.song.title)}</span>${item.song.artist ? `<span class="track-artist">${escapeHtml(item.song.artist)}</span>` : ''}</span>
-      ${playlistOrderSupported ? `<span class="move-btns"><button type="button" class="btn-outline icon-btn move-up" title="Flytta upp" aria-label="Flytta upp" ${idx === 0 ? 'disabled' : ''}>▲</button><button type="button" class="btn-outline icon-btn move-down" title="Flytta ner" aria-label="Flytta ner" ${idx === items.length - 1 ? 'disabled' : ''}>▼</button></span>` : ''}
+      ${playlistOrderSupported ? `<span class="drag-handle" title="Dra för att flytta" aria-label="Dra för att flytta" role="button">⠿</span><span class="move-btns"><button type="button" class="btn-outline icon-btn move-up" title="Flytta upp" aria-label="Flytta upp" ${idx === 0 ? 'disabled' : ''}>▲</button><button type="button" class="btn-outline icon-btn move-down" title="Flytta ner" aria-label="Flytta ner" ${idx === items.length - 1 ? 'disabled' : ''}>▼</button></span>` : ''}
                  <button class="btn-outline removeTrackBtn icon-btn" title="Ta bort från spellistan"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg></button>
     `;
 
@@ -746,7 +756,49 @@ function renderTracksForPlaylist(pl, items, containerEl) {
 
     containerEl.appendChild(row);
   });
+  if (playlistOrderSupported) bindPlaylistDrag(pl, items, containerEl);
   updateTrackPlayIcons();
+}
+
+// Drag & drop med handtaget ⠿ (pekhändelser → fungerar både med mus och på mobil)
+function bindPlaylistDrag(pl, items, containerEl) {
+  containerEl.querySelectorAll('.drag-handle').forEach(h => {
+    h.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const rows = [...containerEl.querySelectorAll('.track-row')];
+      const row = h.closest('.track-row');
+      const from = rows.indexOf(row);
+      const rowH = row.offsetHeight + 8;     // radhöjd inkl. mellanrum
+      const startY = e.clientY;
+      let to = from;
+      row.classList.add('dragging');
+      h.setPointerCapture(e.pointerId);
+      const onMove = (ev) => {
+        const dy = ev.clientY - startY;
+        row.style.transform = `translateY(${dy}px)`;
+        to = Math.max(0, Math.min(rows.length - 1, from + Math.round(dy / rowH)));
+        rows.forEach((r, i) => {
+          if (r === row) return;
+          let shift = 0;
+          if (from < to && i > from && i <= to) shift = -rowH;
+          if (from > to && i >= to && i < from) shift = rowH;
+          r.style.transition = 'transform 0.15s ease';
+          r.style.transform = shift ? `translateY(${shift}px)` : '';
+        });
+      };
+      const onUp = () => {
+        h.removeEventListener('pointermove', onMove);
+        h.removeEventListener('pointerup', onUp);
+        h.removeEventListener('pointercancel', onUp);
+        row.classList.remove('dragging');
+        if (to !== from) moveTo(pl, items, from, to, containerEl);
+        else renderTracksForPlaylist(pl, items, containerEl);
+      };
+      h.addEventListener('pointermove', onMove);
+      h.addEventListener('pointerup', onUp);
+      h.addEventListener('pointercancel', onUp);
+    });
+  });
 }
 
 let volumeSaveTimers = {};

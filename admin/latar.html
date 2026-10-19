@@ -760,6 +760,11 @@ async function loadSongs() {
         <summary>Redigera text och filer</summary>
 
         <div style="margin-top: 0.75rem;">
+          <label class="field-label" style="display:block; margin-bottom:0.35rem;">Låtnamn</label>
+          <input type="text" class="titleInp" data-id="${s.id}" value="${esc(s.title || '')}" placeholder="Låtnamn" style="max-width:24rem;">
+        </div>
+
+        <div style="margin-top: 0.75rem;">
           <label class="field-label" style="display:block; margin-bottom:0.35rem;">Artist</label>
           <input type="text" class="artistInp" data-id="${s.id}" value="${esc(s.artist || '')}" placeholder="Artist" style="max-width:24rem;">
         </div>
@@ -918,6 +923,15 @@ async function loadSongs() {
 
 // Artist redigeras per låt (sparas när fältet lämnas)
 document.getElementById('songList').addEventListener('change', async (e) => {
+  const titleEl = e.target.closest('.titleInp');
+  if (titleEl) {
+    const title = titleEl.value.trim();
+    if (!title) { alert('Låtnamnet får inte vara tomt.'); loadSongs(); return; }
+    const { error } = await supabaseClient.from('songs').update({ title }).eq('id', titleEl.dataset.id);
+    if (error) { alert('Kunde inte spara namnet: ' + error.message); return; }
+    loadSongs();
+    return;
+  }
   const inp = e.target.closest('.artistInp');
   if (!inp) return;
   const artist = inp.value.trim() || null;

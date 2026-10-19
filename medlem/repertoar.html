@@ -144,6 +144,11 @@
   .pl-quick:hover, .pl-quick:focus-visible { color:var(--accent); background:rgba(255,255,255,0.06); transform:none; box-shadow:none; }
   .quick-create { display:flex; gap:0.6rem; margin-bottom:1.75rem; flex-wrap:wrap; }
   .quick-create input { width:auto; flex:1; margin-bottom:0; min-width:180px; }
+  details.new-pl { margin-bottom:1.25rem; }
+  details.new-pl summary { list-style:none; cursor:pointer; display:inline-block; padding:0.5rem 0.9rem; border:1px solid rgba(229,169,104,0.45); border-radius:0.6rem; color:var(--accent); font-weight:600; }
+  details.new-pl summary::-webkit-details-marker { display:none; }
+  details.new-pl[open] summary { margin-bottom:0.75rem; }
+  details.new-pl .quick-create { margin-bottom:0; }
 
   h4 { margin:1rem 0 0.6rem; }
 
@@ -324,10 +329,13 @@
   </div>
 
   <div class="tab-panel" id="tabSpellistor">
-    <div class="quick-create">
-      <input type="text" id="newPlaylistName" placeholder="Namn på ny spellista">
-      <button class="btn-gold" id="createPlaylistBtn">Skapa ny spellista</button>
-    </div>
+    <details class="new-pl" id="newPlaylistDetails">
+      <summary class="new-pl-summary">+ Skapa ny spellista <span class="text-muted">▾</span></summary>
+      <div class="quick-create">
+        <input type="text" id="newPlaylistName" placeholder="Namn på ny spellista">
+        <button class="btn-gold" id="createPlaylistBtn">Skapa ny spellista</button>
+      </div>
+    </details>
     <div id="playlistList">Laddar...</div>
   </div>
 </div>
@@ -606,7 +614,7 @@ async function createPlaylist(name) {
 
 document.getElementById('createPlaylistBtn').addEventListener('click', async () => {
   const input = document.getElementById('newPlaylistName');
-  if (await createPlaylist(input.value)) input.value = '';
+  if (await createPlaylist(input.value)) { input.value = ''; document.getElementById('newPlaylistDetails').open = false; }
 });
 document.getElementById('newPlaylistName').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('createPlaylistBtn').click(); });
 

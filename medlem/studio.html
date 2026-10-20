@@ -110,7 +110,8 @@
   .tep-sec { border: 1px solid var(--border); border-radius: 0.55rem; background: rgba(255,255,255,0.02); }
   .tep-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.75rem; user-select: none; }
   .tep-sec > summary::-webkit-details-marker { display: none; }
-  .tep-sec > summary::before { content: '▸'; color: var(--accent); font-size: 0.9rem; transition: transform 0.15s; }
+  .tep-sec > summary::before { content: '\25B8\FE0E'; flex: none; width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: 0.4rem; background: rgba(229,169,104,0.12); color: var(--accent); font-size: 1.45rem; line-height: 1; transition: transform 0.15s, background 0.15s; }
+  .tep-sec > summary:hover::before { background: rgba(229,169,104,0.25); }
   .tep-sec[open] > summary::before { transform: rotate(90deg); }
   .tep-sec > summary:hover { background: rgba(255,255,255,0.04); border-radius: 0.55rem; }
   .tep-sec .sec-t { font-family: 'Roboto Condensed', sans-serif; font-weight: 700; font-size: 0.9rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); }

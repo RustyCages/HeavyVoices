@@ -43,6 +43,7 @@
       <div class="tool-row desktop-only">
         <span class="k">Kopiera</span>
         <button type="button" class="btn-outline" data-a="copy" title="Kopiera det markerade (Ctrl+C) – det går att markera i vilket spår som helst">⎘ Kopiera markerat</button>
+        ${o.onCopyToNew ? '<button type="button" class="btn-outline" data-a="cutNew" title="Flytta det markerade till ett nytt eget spår på samma plats – i originalet blir det tystnad, så resten ligger kvar i synk (Ctrl+Shift+X)">✂ Klipp ut till nytt spår</button>' : ''}
         ${o.onCopyToNew ? '<button type="button" class="btn-outline" data-a="copyNew" title="Lägg det markerade i ett nytt eget spår, på samma plats i låten (Ctrl+Shift+C) – fungerar även från låsta stämmor">⧉ Till nytt spår</button>' : ''}
         <select data-r="pmode" title="Hur biten läggs in i det valda spåret">
           <option value="replace">Ersätt</option>
@@ -159,6 +160,18 @@
         if (b - a < 0.01) { toast('Markeringen ligger utanför spårets ljud'); return; }
         o.onCopyToNew(tr, AudioEdit.crop(tr.clip, a, b), Math.round((tr.offsetMs || 0) + a * 1000), b - a);
       },
+      // klipp ut: markeringen till ett nytt spår på samma plats, tystnad kvar i originalet
+      cutNew() {
+        if (!o.onCopyToNew) return;
+        const s = o.getSelection(), tr = s && s.track;
+        if (!s || !tr || !tr.clip || Math.abs(s.b - s.a) < 0.01) { toast('Markera först ett område (▭ Markera och dra) i spåret du vill klippa ut från'); return; }
+        if (tr.readOnly) { toast('Spåret är låst – använd ⧉ Till nytt spår för att kopiera biten i stället'); return; }
+        const a = fileT(tr, Math.min(s.a, s.b)), b = fileT(tr, Math.max(s.a, s.b));
+        if (b - a < 0.01) { toast('Markeringen ligger utanför spårets ljud'); return; }
+        const part = AudioEdit.crop(tr.clip, a, b), off = Math.round((tr.offsetMs || 0) + a * 1000);
+        o.onEdit(tr, AudioEdit.silence(tr.clip, a, b), null, `${(b - a).toFixed(2)} s utklippt till nytt spår – tystnad kvar här`);
+        o.onCopyToNew(tr, part, off, b - a, { cut: true });
+      },
       paste() {
         const tr = o.getTrack();
         if (!clipboard) { toast('Kopiera först en bit (markera och ⎘ Kopiera markerat)'); return; }
@@ -212,7 +225,7 @@
       }
       selInfo();
     }
-    return { el, refresh, status, selInfo, cut: () => act.cut(), mute: () => act.mute(), copy: () => act.copy(), copyNew: () => act.copyNew(), paste: () => act.paste() };
+    return { el, refresh, status, selInfo, cut: () => act.cut(), mute: () => act.mute(), copy: () => act.copy(), copyNew: () => act.copyNew(), cutNew: () => act.cutNew(), paste: () => act.paste() };
   }
   root.TrackEditPanel = { mount };
 })(window);

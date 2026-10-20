@@ -217,7 +217,7 @@
     <h3>Vem hör min inspelning?</h3>
     <p class="g-p">🔒 <b>Privat</b> – bara du. 👥 <b>Körledningen</b> – du och körledningen, bra när du vill visa en idé. 🌍 <b>Alla</b> – hela kören kan lyssna på den i Studio. Du kan ändra valet när du vill och spara igen.</p>
     <div class="tips">
-      <b>Tips:</b> Sjung in en stämma i taget och lyssna på den tillsammans med originalstämman. Sänk låtens volym eller tysta sångspåren om du vill höra dig själv tydligare. <b>⬇ Mix av det som hörs</b> laddar ner allt som är påslaget som en ljudfil – bra att skicka till någon. Kortkommandon på dator: <b>R</b> = spela in, <b>mellanslag</b> = spela/stoppa, <b>Ctrl+Z</b> = ångra, <b>Ctrl+C / Ctrl+V</b> = kopiera markerat / klistra in vid spelhuvudet, <b>Ctrl+Shift+C</b> = markerat till nytt spår på samma plats. <b>📸 Ögonblicksbilder</b>: läget sparas automatiskt så du fortsätter där du var, osparade spår blir privata utkast, och du kan spara namngivna lägen och dela dem med körledningen.
+      <b>Tips:</b> Sjung in en stämma i taget och lyssna på den tillsammans med originalstämman. Sänk låtens volym eller tysta sångspåren om du vill höra dig själv tydligare. <b>⬇ Mix av det som hörs</b> laddar ner allt som är påslaget som en ljudfil – bra att skicka till någon. Kortkommandon på dator: <b>R</b> = spela in, <b>mellanslag</b> = spela/stoppa, <b>Ctrl+Z</b> = ångra, <b>Ctrl+C / Ctrl+V</b> = kopiera markerat / klistra in vid spelhuvudet, <b>Ctrl+Shift+C</b> = markerat till nytt spår på samma plats, <b>Ctrl+Shift+X</b> = klipp ut markerat till nytt spår. Dra i en markerings kant för att sträcka biten (ändrar tempot, inte tonhöjden). <b>📸 Ögonblicksbilder</b>: läget sparas automatiskt så du fortsätter där du var, osparade spår blir privata utkast, och du kan spara namngivna lägen och dela dem med körledningen.
     </div>
   </div>
 
@@ -516,6 +516,7 @@ const tl = WaveTimeline.create(document.getElementById('tl'), {
   onActive: t => setActive(t),
   onSelection: s => { sel = s; panel.selInfo(); },
   onView: v => { document.getElementById('zoomVal').textContent = document.getElementById('zoomVal2').textContent = v.spanLabel(); syncZoomRange(v); },
+  onStretch: (t, from, to) => stretchSelection(t, from, to),
   getBeats: () => songBpm() && document.getElementById('optGrid').checked
     ? { bpm: songBpm(), offset: Number(song.beat_offset) || 0, bpb: Math.max(1, Number(song.beats_per_bar) || 4) } : null,
   renderHead,
@@ -539,10 +540,12 @@ function setOffset(t, ms, live) {
 const panel = TrackEditPanel.mount(document.getElementById('panel'), {
   getTrack: () => active, getSelection: () => sel, getPosition: position, toast,
   onEdit: applyEdit, onUndo: undo, onOriginal: original,
-  onCopyToNew: (t, clip, offsetMs, len) => {
-    const c = addGenTrack(`${t.label} (${fmt(offsetMs / 1000, true)}–${fmt(offsetMs / 1000 + len, true)})`, clip, offsetMs);
+  onCopyToNew: (t, clip, offsetMs, len, opt) => {
+    const cut = !!(opt && opt.cut);
+    const c = addGenTrack(`${t.label} (${cut ? 'utklipp ' : ''}${fmt(offsetMs / 1000, true)}–${fmt(offsetMs / 1000 + len, true)})`, clip, offsetMs);
     c._row && c._row.scrollIntoView && c._row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    toast(`${len.toFixed(2)} s från ${t.label} i ett nytt spår – på samma plats i låten`);
+    toast(cut ? `${len.toFixed(2)} s utklippt från ${t.label} till ett nytt spår – markera det och dra i kanten för att ändra tempot`
+      : `${len.toFixed(2)} s från ${t.label} i ett nytt spår – på samma plats i låten`);
   },
   canUndo: t => !!(t && t.undo && t.undo.length), isEdited: t => !!(t && t.edited),
   extraRows: `
@@ -886,6 +889,28 @@ document.getElementById('bpmFit').addEventListener('click', async () => {
   } catch (e) { bpmStatus('Kunde inte ändra tempot: ' + (e.message || e), true); }
   b.disabled = false; updateSync();
 });
+// sträck det markerade (dragit i markeringens kant): biten får ny längd utan att tonhöjden ändras.
+// Höger kant: början ligger kvar, resten av spåret skjuts. Vänster kant: slutet ligger kvar, början av spåret flyttas.
+async function stretchSelection(t, from, to) {
+  if (!t || !t.clip || t.readOnly) return;
+  const off = offS(t), fa = Math.max(0, from.a - off), fb = Math.min(tDur(t), from.b - off);
+  if (fb - fa < 0.02) { toast('Markeringen ligger utanför spårets ljud'); return; }
+  const scale = (to.b - to.a) / (from.b - from.a), newLen = (fb - fa) * scale, rate = (fb - fa) / newLen;
+  const pct = (rate - 1) * 100, leftEdge = Math.abs(to.a - from.a) > 1e-6;
+  toast(`Sträcker ${(fb - fa).toFixed(2)} s… (kan ta någon sekund)`, 20000);
+  await new Promise(r => setTimeout(r, 30));
+  try {
+    const part = AudioEdit.timeStretch(AudioEdit.crop(t.clip, fa, fb), rate);
+    const realLen = AudioEdit.duration(part);
+    const clip = AudioEdit.paste(AudioEdit.cut(t.clip, fa, fb), fa, part, 'insert');
+    const newOff = leftEdge ? Math.round(t.offsetMs - (realLen - (fb - fa)) * 1000) : null;
+    applyEdit(t, clip, newOff, `Tempo ${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(1).replace('.', ',')} % på ${(fb - fa).toFixed(2)} s`);
+    // markeringen följer med, så att man kan fortsätta justera
+    const o2 = offS(t), s2 = { track: t, a: o2 + fa, b: o2 + fa + realLen };
+    sel = s2; tl.selection = s2; panel.selInfo();
+    toast(`Klart – tempo ${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(1).replace('.', ',')} % (↶ Ångra tar tillbaka)`);
+  } catch (e) { toast('Kunde inte sträcka: ' + (e.message || e), 6000); }
+}
 // egen kopia av ett spår (låtens stämma eller någon annans inspelning): nytt eget spår på samma plats i låten
 function cloneTrack(t) {
   if (!t || !t.clip || isEmpty(t) || !me) return;
@@ -1869,6 +1894,7 @@ document.addEventListener('keydown', e => {
   }
   if (e.target.matches('input, select, textarea')) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(active); return; }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'x' && sel) { e.preventDefault(); panel.cutNew(); return; }
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c' && sel) { e.preventDefault(); panel.copyNew(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && sel) { e.preventDefault(); panel.copy(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') { e.preventDefault(); panel.paste(); return; }

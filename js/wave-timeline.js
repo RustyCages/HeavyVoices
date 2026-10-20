@@ -8,6 +8,7 @@
 //     renderHead(track, headEl),   // knappar/namn ovanför vågformen (sidans egna)
 //     renderFoot(track, footEl),   // valfri rad under vågformen
 //     getBeats(),                  // valfritt: { bpm, offset, bpb } ritar taktrutnät i spåren
+//     onStretch(track, {a,b}, {a,b}),  // valfritt: dra i markeringens kant för att sträcka det markerade (låttid i s)
 //     onReorder(from, to),         // valfritt: handtag till vänster – dra spåret upp/ner (index i getTracks())
 //   });
 //   Spår: { key, color, clip:{sampleRate,channels}, peaks, offsetMs, locked? }  (locked = går inte att dra)
@@ -115,6 +116,12 @@
         const s0 = xOf(Math.min(sel.a, sel.b)) * dpr, s1 = xOf(Math.max(sel.a, sel.b)) * dpr;
         ctx.fillStyle = 'rgba(96,165,250,0.25)'; ctx.fillRect(s0, 0, s1 - s0, H);
         ctx.fillStyle = 'rgba(96,165,250,0.9)'; ctx.fillRect(s0, 0, dpr, H); ctx.fillRect(s1 - dpr, 0, dpr, H);
+        if (canStretch(tr) && !stretch) {   // handtag i kanterna: dra för att sträcka
+          ctx.fillStyle = 'rgba(96,165,250,0.95)';
+          [s0, s1].forEach(x => { ctx.fillRect(x - 3 * dpr, mid - 9 * dpr, 6 * dpr, 18 * dpr); });
+          ctx.fillStyle = 'rgba(17,19,23,0.9)';
+          [s0, s1].forEach(x => { ctx.fillRect(x - 1 * dpr, mid - 5 * dpr, 1 * dpr, 10 * dpr); ctx.fillRect(x + 0.5 * dpr, mid - 5 * dpr, 1 * dpr, 10 * dpr); });
+        }
       }
       const p = tr.peaks;
       if (p && tr.clip) {
@@ -146,6 +153,16 @@
         ctx.fillText(hint, 10 * dpr, mid - 10 * dpr);
       }
       ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, mid, W, 1);
+      if (stretch && stretch.track === tr) {   // förhandsvisning medan man drar: ny längd och tempo
+        const n0 = xOf(stretch.a) * dpr, n1 = xOf(stretch.b) * dpr;
+        ctx.fillStyle = 'rgba(229,169,104,0.22)'; ctx.fillRect(n0, 0, n1 - n0, H);
+        ctx.fillStyle = 'rgba(229,169,104,0.95)'; ctx.fillRect(n0, 0, 2 * dpr, H); ctx.fillRect(n1 - 2 * dpr, 0, 2 * dpr, H);
+        const label = stretchLabel(stretch);
+        ctx.font = `600 ${12 * dpr}px DM Sans, sans-serif`; ctx.textBaseline = 'top';
+        const tw = ctx.measureText(label).width + 12 * dpr, lx = Math.max(2 * dpr, Math.min(W - tw - 2 * dpr, (n0 + n1) / 2 - tw / 2));
+        ctx.fillStyle = 'rgba(17,19,23,0.92)'; ctx.fillRect(lx, 4 * dpr, tw, 20 * dpr);
+        ctx.fillStyle = '#E5A968'; ctx.fillText(label, lx + 6 * dpr, 8 * dpr);
+      }
       markers.forEach(m => { ctx.fillStyle = 'rgba(250,204,21,0.6)'; ctx.fillRect(Math.round(xOf(m) * dpr), 0, dpr, H); });
       if (tr.liveUntil != null) {   // inspelning pågår: röd kant där den växer
         const x = xOf(tr.liveUntil) * dpr;
@@ -159,10 +176,61 @@
     }
     function draw() { drawRuler(); tracks().forEach(drawTrack); placePlayhead(); if (o.onView) o.onView(api); }
 
+    // sträck markeringen: dra i dess vänstra eller högra kant (fäster mot slagen när taktrutnätet visas, Alt = fritt)
+    let stretch = null;
+    const canStretch = tr => !!(o.onStretch && tr.clip && !tr.readOnly);
+    const MIN_RATE = 0.5, MAX_RATE = 2;
+    function stretchEdgeAt(tr, x) {
+      if (!sel || sel.track !== tr || !canStretch(tr) || Math.abs(sel.b - sel.a) < 0.02) return null;
+      const a = Math.min(sel.a, sel.b), b = Math.max(sel.a, sel.b);
+      if (Math.abs(x - xOf(b)) <= 7) return 'r';
+      if (Math.abs(x - xOf(a)) <= 7) return 'l';
+      return null;
+    }
+    function snapT(t, free) {
+      const g = !free && o.getBeats && o.getBeats();
+      if (!g || !(g.bpm > 0)) return t;
+      const per = 60 / g.bpm, off = g.offset || 0, k = Math.round((t - off) / per), st = off + k * per;
+      return Math.abs(xOf(st) - xOf(t)) <= 12 ? st : t;   // fäst bara när man är nära ett slag
+    }
+    function stretchLabel(st) {
+      const len0 = st.b0 - st.a0, len = st.b - st.a, pct = (len0 / len - 1) * 100;
+      const g = o.getBeats && o.getBeats();
+      const beats = g && g.bpm > 0 ? ` · ${(len * g.bpm / 60).toFixed(1).replace('.', ',')} slag` : '';
+      return `${len0.toFixed(2).replace('.', ',')} → ${len.toFixed(2).replace('.', ',')} s · tempo ${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(1).replace('.', ',')} %${beats}`;
+    }
     function wire(tr, c) {
       let drag = null;
+      c.addEventListener('pointermove', e => {   // muspekaren visar ↔ över markeringens kanter
+        if (drag || stretch) return;
+        const edge = stretchEdgeAt(tr, e.clientX - c.getBoundingClientRect().left);
+        c.style.cursor = edge ? 'ew-resize' : '';
+        c.title = edge ? 'Dra för att sträcka det markerade (ändrar tempot, inte tonhöjden). Alt = utan att fästa mot slagen.' : '';
+      });
       c.addEventListener('pointerdown', e => {
         const r = c.getBoundingClientRect(), x = e.clientX - r.left;
+        const edge = !e.button && stretchEdgeAt(tr, x);
+        if (edge) {
+          e.preventDefault(); e.stopPropagation();
+          const a = Math.min(sel.a, sel.b), b = Math.max(sel.a, sel.b);
+          stretch = { track: tr, edge, a0: a, b0: b, a, b, x0: e.clientX };
+          c.setPointerCapture(e.pointerId); c.classList.add('dragging');
+          const mv = ev => {
+            const len0 = b - a, t = tOf(ev.clientX - r.left);
+            if (edge === 'r') { const nb = snapT(t, ev.altKey); stretch.b = Math.max(a + len0 / MAX_RATE, Math.min(a + len0 / MIN_RATE, nb)); stretch.a = a; }
+            else { const na = snapT(t, ev.altKey); stretch.a = Math.min(b - len0 / MAX_RATE, Math.max(b - len0 / MIN_RATE, na)); stretch.b = b; }
+            drawTrack(tr);
+          };
+          const up = () => {
+            c.removeEventListener('pointermove', mv); c.removeEventListener('pointerup', up); c.removeEventListener('pointercancel', up);
+            c.classList.remove('dragging');
+            const st = stretch; stretch = null;
+            if (st && Math.abs((st.b - st.a) - (st.b0 - st.a0)) > 0.005) o.onStretch(tr, { a: st.a0, b: st.b0 }, { a: st.a, b: st.b });
+            else drawTrack(tr);
+          };
+          c.addEventListener('pointermove', mv); c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+          return;
+        }
         if (o.onActive) o.onActive(tr);
         drag = { x0: e.clientX, t: tOf(x), off: tr.offsetMs || 0, t0: view.t0, moved: false };
         if (tool === 'select') { sel = { track: tr, a: drag.t, b: drag.t }; if (o.onSelection) o.onSelection(sel); }

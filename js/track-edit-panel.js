@@ -45,13 +45,17 @@
         <button type="button" class="btn-outline" data-a="copy" title="Kopiera det markerade (Ctrl+C) – det går att markera i vilket spår som helst">⎘ Kopiera markerat</button>
         ${o.onCopyToNew ? '<button type="button" class="btn-outline" data-a="cutNew" title="Flytta det markerade till ett nytt eget spår på samma plats – i originalet blir det tystnad, så resten ligger kvar i synk (Ctrl+Shift+X)">✂ Klipp ut till nytt spår</button>' : ''}
         ${o.onCopyToNew ? '<button type="button" class="btn-outline" data-a="copyNew" title="Lägg det markerade i ett nytt eget spår, på samma plats i låten (Ctrl+Shift+C) – fungerar även från låsta stämmor">⧉ Till nytt spår</button>' : ''}
-        <select data-r="pmode" title="Hur biten läggs in i det valda spåret">
+        <span class="status" data-r="clip">Inget kopierat</span>
+      </div>
+      <div class="tool-row desktop-only">
+        <span class="k">Klistra in</span>
+        <select data-r="pmode" title="Hur den kopierade biten läggs in i det valda spåret: Ersätt skriver över, Infoga skjuter resten framåt, Lägg ovanpå mixar ihop">
           <option value="replace">Ersätt</option>
           <option value="insert">Infoga</option>
           <option value="mix">Lägg ovanpå</option>
         </select>
         <button type="button" class="btn-outline" data-a="paste" title="Klistra in i det valda spåret där spelhuvudet står (Ctrl+V)">📋 Klistra in vid spelhuvudet</button>
-        <span class="status" data-r="clip">Inget kopierat</span>
+        <span class="status" data-r="pasteInfo"></span>
       </div>
       <div class="tool-row desktop-only" data-g="edit">
         <span class="k">Tystnad</span>
@@ -217,6 +221,8 @@
       el.querySelectorAll('[data-g=edit] button, [data-g=edit] input').forEach(b => { b.disabled = !editable; });
       $('[data-a=paste]').disabled = !editable || !clipboard;
       $('[data-r=pmode]').disabled = !editable;
+      $('[data-r=pasteInfo]').textContent = tr && tr.clip && tr.readOnly ? 'Välj ett eget spår att klistra in i – det valda spåret är låst'
+        : !clipboard ? 'Kopiera först en bit med ⎘ Kopiera markerat' : '';
       clipInfo();
       if (editable) {
         $('[data-a=undo]').disabled = !(o.canUndo && o.canUndo(tr));

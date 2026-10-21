@@ -29,6 +29,9 @@
     st.textContent = `
       .pdfv { position:fixed; inset:0; z-index:3000; display:flex; flex-direction:column; background:#1b1d22; }
       .pdfv[hidden] { display:none; }
+      /* I helskärm ritas visaren ensam på skärmen – ingen extra marginal från statusraden */
+      .pdfv:fullscreen { top:0; left:0; width:100%; height:100%; inset:0; }
+      .pdfv:fullscreen .pdfv-bar { padding-top:0.5rem; }
       .pdfv-bar { display:flex; align-items:center; gap:0.4rem; padding:calc(0.5rem + env(safe-area-inset-top,0px)) 0.6rem 0.5rem; background:#111317; border-bottom:1px solid rgba(255,255,255,0.08); }
       .pdfv-title { flex:1; min-width:0; font-weight:700; color:#f3f4f6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:0.95rem; }
       .pdfv-bar button { min-width:2.4rem; height:2.4rem; padding:0 0.6rem; border-radius:0.5rem; display:inline-flex; align-items:center; justify-content:center; gap:0.35rem; background:rgba(255,255,255,0.06); color:#f3f4f6; border:1px solid rgba(255,255,255,0.12); font-size:0.85rem; font-weight:600; }

@@ -1010,6 +1010,8 @@ async function openDoc(path, label) {
     if (error || !data) { toast('Kunde inte öppna dokumentet'); return; }
     const doc = playerSong ? songDocs(playerSong).find(d => d.path === path) : null;
     const title = label || (doc && doc.label) || (stemFilename(path) || 'Dokument').replace(/\.pdf$/i, '');
+    // Spelaren ska alltid synas under dokumentet när en låt är laddad
+    if (playerSong) document.getElementById('playerBar').classList.remove('hidden');
     PdfViewer.open(data.signedUrl, title, { onDownload: () => downloadDoc(path) });
     return;
   }

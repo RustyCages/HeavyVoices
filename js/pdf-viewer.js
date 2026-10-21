@@ -62,10 +62,16 @@
     let rt = null; window.addEventListener('resize', () => { if (ov.hidden) return; placeAbovePlayer(); clearTimeout(rt); rt = setTimeout(render, 250); });
   }
   // Visaren ligger ovanför spelarlisten (om den syns) så att reglagen fortfarande går att nå
+  let barObs = null;
   function placeAbovePlayer() {
     const bar = document.getElementById('playerBar');
     const h = bar && !bar.classList.contains('hidden') ? bar.offsetHeight : 0;
     ov.style.bottom = h + 'px';
+    // Spelarens höjd kan ändras medan dokumentet är öppet (t.ex. när sångtexten visas) – följ med
+    if (!barObs && bar && window.ResizeObserver) {
+      barObs = new ResizeObserver(() => { if (!ov.hidden) placeAbovePlayer(); });
+      barObs.observe(bar);
+    }
   }
   function setDark(on) {
     ov.classList.toggle('dark', on);

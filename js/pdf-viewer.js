@@ -59,7 +59,13 @@
     ov.querySelector('[data-a="dl"]').addEventListener('click', () => { if (dl) dl(); });
     ov.querySelector('[data-a="close"]').addEventListener('click', close);
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && ov && !ov.hidden) close(); });
-    let rt = null; window.addEventListener('resize', () => { if (ov.hidden) return; clearTimeout(rt); rt = setTimeout(render, 250); });
+    let rt = null; window.addEventListener('resize', () => { if (ov.hidden) return; placeAbovePlayer(); clearTimeout(rt); rt = setTimeout(render, 250); });
+  }
+  // Visaren ligger ovanför spelarlisten (om den syns) så att reglagen fortfarande går att nå
+  function placeAbovePlayer() {
+    const bar = document.getElementById('playerBar');
+    const h = bar && !bar.classList.contains('hidden') ? bar.offsetHeight : 0;
+    ov.style.bottom = h + 'px';
   }
   function setDark(on) {
     ov.classList.toggle('dark', on);
@@ -105,6 +111,7 @@
     zoom = 1;
     const box = ov.querySelector('.pdfv-pages');
     box.innerHTML = '<p class="pdfv-msg">Laddar dokumentet…</p>';
+    placeAbovePlayer();
     ov.hidden = false; document.documentElement.style.overflow = 'hidden';
     try {
       const lib = await loadLib();

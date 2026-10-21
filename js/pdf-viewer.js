@@ -21,6 +21,8 @@
     sun: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
     moon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
     dl: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>',
+    full: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
+    exit: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v3a2 2 0 0 1-2 2H4"/><path d="M15 3v3a2 2 0 0 0 2 2h3"/><path d="M9 21v-3a2 2 0 0 0-2-2H4"/><path d="M15 21v-3a2 2 0 0 1 2-2h3"/></svg>',
   };
   function build() {
     const st = document.createElement('style');
@@ -44,6 +46,7 @@
     ov.innerHTML = `<div class="pdfv-bar">
         <span class="pdfv-title"></span>
         <button type="button" data-a="mode" title="Växla vitt dokument / svart bakgrund"></button>
+        <button type="button" data-a="full" title="Helskärm" aria-label="Helskärm" aria-pressed="false">${ICON.full}</button>
         <button type="button" data-a="out" title="Mindre" aria-label="Mindre">−</button>
         <button type="button" data-a="in" title="Större" aria-label="Större">+</button>
         <button type="button" data-a="dl" title="Ladda ner" aria-label="Ladda ner">${ICON.dl}</button>
@@ -51,6 +54,16 @@
       </div><div class="pdfv-pages"></div>`;
     document.body.appendChild(ov);
     ov.querySelector('[data-a="mode"]').addEventListener('click', () => setDark(!ov.classList.contains('dark')));
+    ov.querySelector('[data-a="full"]').addEventListener('click', toggleFull);
+    document.addEventListener('fullscreenchange', () => {
+      const b = ov.querySelector('[data-a="full"]');
+      const on = document.fullscreenElement === ov;
+      b.innerHTML = on ? ICON.exit : ICON.full;
+      b.setAttribute('aria-pressed', String(on));
+      b.title = on ? 'Avsluta helskärm' : 'Helskärm';
+      b.setAttribute('aria-label', b.title);
+      if (!on && document.fullscreenElement === null && !ov.hidden) render();
+    });
     ov.querySelector('[data-a="in"]').addEventListener('click', () => { zoom = Math.min(3, +(zoom + 0.25).toFixed(2)); render(); });
     ov.querySelector('[data-a="out"]').addEventListener('click', () => { zoom = Math.max(0.5, +(zoom - 0.25).toFixed(2)); render(); });
     ov.querySelector('[data-a="dl"]').addEventListener('click', () => { if (dl) dl(); });
@@ -88,7 +101,15 @@
       await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
     }
   }
+  // Helskärm för hela visaren (dokument + knappar). iPhone saknar stöd för Fullscreen API på godtyckligt element – då gör knappen inget.
+  function toggleFull() {
+    try {
+      if (document.fullscreenElement === ov) { document.exitFullscreen(); return; }
+      if (ov.requestFullscreen) ov.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+    } catch (e) {}
+  }
   function close() {
+    if (document.fullscreenElement === ov && document.exitFullscreen) { try { document.exitFullscreen().catch(() => {}); } catch (e) {} }
     ov.hidden = true; renderToken++; document.documentElement.style.overflow = '';
     if (doc) { try { doc.destroy(); } catch (e) {} doc = null; }
   }

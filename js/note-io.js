@@ -2,6 +2,8 @@
 // Noter = [{ t: start i sekunder, d: längd i sekunder, n: MIDI-nummer }]
 // Format: Heavy Voices-JSON (.json) och standard-MIDI (.mid) – MIDI öppnas i
 // MuseScore, Logic, Cubase m.fl., och MIDI-filer från notprogram kan läsas in.
+// Import även från MusicXML (.musicxml/.xml/.mxl) och UltraStar (.txt).
+// Noter kan ha sångtext: syl = stavelsen, cont = ordet fortsätter på nästa stavelse.
 
 (function (root) {
   const FORMAT = 'heavyvoices-notes';
@@ -54,7 +56,7 @@
         const on = Math.round(x.t * TPS), off = Math.max(on + 1, Math.round((x.t + x.d) * TPS));
         const n = Math.max(0, Math.min(127, Math.round(x.n)));
         if (x.syl != null && String(x.syl).trim()) {
-          const ly = latin1(String(x.syl).replace(/^ /, '').replace(/~/g, ''));
+          const ly = latin1(String(x.syl).replace(/^ /, '').replace(/~/g, '') + (x.cont ? '-' : ''));
           ev.push({ tick: on, ord: 1, bytes: [0xFF, 0x05, ...vlq(ly.length), ...ly] });
         }
         ev.push({ tick: on, ord: 2, bytes: [0x90 | ch, n, 90] });
@@ -91,6 +93,7 @@
     const tempos = [];   // { tick, uspq }
     const raw = [];      // { track, name, ch, n, on, off }
     const names = [];
+    const lyr = [];      // { track, tick, text } – sångtext (lyric-händelser)
     for (let t = 0; t < ntrk && p < b.length; t++) {
       if (str(4) !== 'MTrk') throw new Error('Trasig MIDI-fil');
       p += 4; const len = u32(), end = p + len;
@@ -106,6 +109,7 @@
           const mt = b[p++]; let l = 0; do { c = b[p++]; l = (l << 7) | (c & 0x7F); } while (c & 0x80);
           if (mt === 0x51) tempos.push({ tick, uspq: b[p] << 16 | b[p + 1] << 8 | b[p + 2] });
           if (mt === 0x03 && !names[t]) { const raw = b.slice(p, p + l); try { names[t] = new TextDecoder('utf-8', { fatal: true }).decode(raw); } catch (e) { names[t] = new TextDecoder('windows-1252').decode(raw); } }
+          if (mt === 0x05) { const raw = b.slice(p, p + l); let tx; try { tx = new TextDecoder('utf-8', { fatal: true }).decode(raw); } catch (e) { tx = new TextDecoder('windows-1252').decode(raw); } lyr.push({ track: t, tick, text: tx }); }
           p += l;
         } else if (st === 0xF0 || st === 0xF7) {
           let l = 0; do { c = b[p++]; l = (l << 7) | (c & 0x7F); } while (c & 0x80); p += l;
@@ -128,13 +132,32 @@
     });
     const toSec = tk => { let s = segs[0]; for (const g of segs) { if (g.tick <= tk) s = g; else break; } return s.sec + (tk - s.tick) * s.spt; };
 
+    // sångtext: lyric-händelsen hör till noten som börjar på samma tick i samma spår
+    // ("lju-" = ordet fortsätter, "\" eller "/" först = ny rad i .kar-filer)
+    const lyrAt = new Map();
+    lyr.forEach(e => {
+      const tx = e.text.replace(/^[\\/\r\n]+/, '').replace(/[\r\n]+$/, '');
+      if (!tx.trim()) return;
+      lyrAt.set(e.track + ':' + e.tick, tx);
+    });
+    const used = new Set();
     const groups = new Map();
-    raw.forEach(x => {
+    raw.sort((a, b) => a.on - b.on || b.n - a.n).forEach(x => {
       if (x.ch === 9) return;  // trummor
       const k = fmt === 0 ? 'c' + x.ch : x.track + ':' + x.ch;
       if (!groups.has(k)) groups.set(k, { name: (names[x.track] || '').trim() || (fmt === 0 ? `Kanal ${x.ch + 1}` : `Spår ${x.track + 1}`) + (fmt === 0 ? '' : ` (kanal ${x.ch + 1})`), channel: x.ch, notes: [] });
       const t0 = toSec(x.on), t1 = toSec(x.off);
-      if (t1 - t0 > 0.02) groups.get(k).notes.push({ t: t0, d: t1 - t0, n: x.n });
+      if (t1 - t0 <= 0.02) return;
+      const note = { t: t0, d: t1 - t0, n: x.n };
+      // format 0: all text ligger i samma spår – den hör till kanalen som har en not på ticket
+      const lk = (fmt === 0 ? 0 : x.track) + ':' + x.on;
+      if (lyrAt.has(lk) && !used.has(lk)) {
+        used.add(lk);
+        const tx = lyrAt.get(lk);
+        note.cont = /-\s*$/.test(tx);
+        note.syl = tx.replace(/-\s*$/, '').trim();
+      }
+      groups.get(k).notes.push(note);
     });
     const out = [...groups.values()].filter(g => g.notes.length);
     if (!out.length) throw new Error('MIDI-filen innehåller inga noter');
@@ -145,7 +168,7 @@
   // ---------- hjälpare ----------
   function r2(v) { return Math.round(v * 100) / 100; }
   function clean(notes) {
-    return notes.map(x => ({ t: Math.max(0, r2(x.t)), d: Math.max(0.05, r2(x.d)), n: Math.round(x.n), ...(x.syl != null ? { syl: x.syl } : {}) }))
+    return notes.map(x => ({ t: Math.max(0, r2(x.t)), d: Math.max(0.05, r2(x.d)), n: Math.round(x.n), ...(x.syl != null ? { syl: x.syl, cont: !!x.cont } : {}) }))
       .sort((a, b) => a.t - b.t || b.n - a.n);
   }
   // Ackord i en stämma (flera toner samtidigt): behåll översta tonen
@@ -227,9 +250,22 @@
     const bpm = num(head.BPM), gap = (num(head.GAP) || 0) / 1000;
     if (!(bpm > 0)) throw new Error('UltraStar-filen saknar #BPM');
     const beat = 15 / bpm;
+    // stavelser: " ord" (blanksteg först) = nytt ord, utan blanksteg = samma ord, "~" = samma vokal (melisma)
+    tracks.forEach(t => {
+      const ns = t.notes;
+      ns.forEach((x, i) => {
+        const rawS = x.syl || '';
+        if (!rawS.replace(/~/g, '').trim()) { x.cleanSyl = null; return; }
+        x.cleanSyl = rawS.replace(/~/g, '').trim();
+        let j = i + 1; while (j < ns.length && !(ns[j].syl || '').replace(/~/g, '').trim()) j++;
+        const nx = j < ns.length ? ns[j].syl : null;
+        const brk = t.lines.some(b => b > x.beat && j < ns.length && b <= ns[j].beat);
+        x.cont = !!nx && !brk && !/\s$/.test(rawS) && !/^\s/.test(nx);
+      });
+    });
     const out = tracks.filter(t => t.notes.length).map(t => ({
       name: t.name,
-      notes: clean(t.notes.map(x => ({ t: gap + x.beat * beat, d: Math.max(0.05, x.len * beat), n: 60 + x.pitch, syl: x.syl }))),
+      notes: clean(t.notes.map(x => ({ t: gap + x.beat * beat, d: Math.max(0.05, x.len * beat), n: 60 + x.pitch, syl: x.cleanSyl == null ? undefined : x.cleanSyl, cont: x.cont }))),
       syllables: t.notes.map(x => x.syl),
       breaks: t.lines.map(b => Math.round((gap + b * beat) * 100) / 100),
     }));
@@ -243,6 +279,15 @@
   // roll), så det fungerar även om stämfilen har backvocals eller går i en annan tonart.
   // Ljudtid = offset + notTid × scale.
   async function autoSync(notes, midi, hop, opts = {}) {
+    // okänt tempo i filen (t.ex. MusicXML utan tempoangivelse): gissa först utifrån hur länge det sjungs
+    if (opts.guessTempo) {
+      let a = -1, z = -1;
+      for (let i = 0; i < midi.length; i++) if (midi[i] > 0) { if (a < 0) a = i; z = i; }
+      const n0 = Math.min(...notes.map(x => x.t)), n1 = Math.max(...notes.map(x => x.t + x.d));
+      const s0 = a >= 0 && n1 > n0 ? Math.max(0.25, Math.min(4, (z - a) * hop / (n1 - n0))) : 1;
+      const r = await autoSync(notes.map(x => ({ ...x, t: x.t * s0, d: x.d * s0 })), midi, hop, { ...opts, guessTempo: false, minScale: 0.8, maxScale: 1.2 });
+      return { ...r, scale: Math.round(r.scale * s0 * 1000) / 1000 };
+    }
     const minScale = opts.minScale ?? 0.85, maxScale = opts.maxScale ?? 1.15;
     const tick = opts.onProgress || (() => {});
     const audioDur = midi.length * hop;
@@ -326,6 +371,7 @@
       t: Math.round((r.offset + x.t * r.scale) * 100) / 100,
       d: Math.max(0.05, Math.round(x.d * r.scale * 100) / 100),
       n: x.n + r.transpose,
+      ...(x.syl != null ? { syl: x.syl, cont: !!x.cont } : {}),
     })).filter(x => x.t + x.d > 0).map(x => (x.t < 0 ? { ...x, d: Math.round((x.d + x.t) * 100) / 100, t: 0 } : x)).filter(x => x.d >= 0.05);
   }
 
@@ -339,7 +385,7 @@
     tr.notes.forEach(x => {
       while (bi < br.length && br[bi] <= x.t + 0.005) { cur = null; bi++; }
       if (!cur) { cur = { t: x.t, end: x.t + x.d, text: '' }; lines.push(cur); }
-      cur.text += String(x.syl || '').replace(/~/g, '');
+      if (x.syl) cur.text += String(x.syl).replace(/~/g, '') + (x.cont ? '' : ' ');
       cur.end = Math.max(cur.end, x.t + x.d);
     });
     const ts = sec => { const m = Math.floor(sec / 60), s = sec - m * 60; return `[${String(m).padStart(2, '0')}:${s.toFixed(2).padStart(5, '0')}]`; };
@@ -357,7 +403,405 @@
   }
   const isUltraStar = (text) => /^#BPM\s*:/mi.test(text) && /^[:*RG]\s*-?\d+\s+\d+\s+-?\d+/m.test(text);
 
-  const api = { ultraStarToLrc, isUltraStar, toJson, fromJson, toMidi, fromMidi, fromUltraStar, decodeText, autoSync, applySync, topLine, saveFile, FORMAT };
+  // ---------- MusicXML (.musicxml / .xml / .mxl) ----------
+  // Notsättarens fil: varje stämma för sig, sångtext per not, tempo, bundna noter och repriser/voltor
+  // (även D.C./D.S./Fine/Coda när filen har dem som <sound>). Repriser spelas ut i rätt ordning, och
+  // vers 2 under en reprisstreck används andra gången.
+  // Svar: { title, tempoKnown, bpm, tracks: [{ name, notes: [{ t, d, n, syl?, cont? }], chords }] }
+  async function unzipFirstXml(u8) {
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    let e = u8.length - 22;
+    while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+    if (e < 0) throw new Error('Trasig .mxl-fil');
+    const cnt = dv.getUint16(e + 10, true);
+    let p = dv.getUint32(e + 16, true);
+    const files = {};
+    for (let k = 0; k < cnt; k++) {
+      if (dv.getUint32(p, true) !== 0x02014b50) break;
+      const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+      const nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true);
+      const local = dv.getUint32(p + 42, true);
+      files[new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen))] = { method, csize, local };
+      p += 46 + nlen + xlen + clen;
+    }
+    const read = async (name) => {
+      const f = files[name], lp = f.local;
+      const start = lp + 30 + dv.getUint16(lp + 26, true) + dv.getUint16(lp + 28, true);
+      const data = u8.subarray(start, start + f.csize);
+      if (f.method === 0) return data;
+      if (f.method !== 8) throw new Error('Okänd komprimering i .mxl-filen');
+      if (typeof DecompressionStream === 'undefined') throw new Error('Webbläsaren kan inte packa upp .mxl – exportera som okomprimerad MusicXML (.musicxml)');
+      const ds = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      return new Uint8Array(await new Response(ds).arrayBuffer());
+    };
+    let rootName = null;
+    if (files['META-INF/container.xml']) {
+      const m = new TextDecoder().decode(await read('META-INF/container.xml')).match(/full-path="([^"]+)"/);
+      if (m && files[m[1]]) rootName = m[1];
+    }
+    if (!rootName) rootName = Object.keys(files).find(k => !/^META-INF\//.test(k) && /\.(musicxml|xml)$/i.test(k));
+    if (!rootName) throw new Error('Hittar ingen MusicXML i .mxl-filen');
+    return decodeText(await read(rootName));
+  }
+  const STEP = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  async function fromMusicXml(input) {
+    let xml;
+    if (typeof input === 'string') xml = input;
+    else {
+      const u8 = new Uint8Array(input);
+      xml = (u8[0] === 0x50 && u8[1] === 0x4B) ? await unzipFirstXml(u8) : decodeText(u8);
+    }
+    if (typeof DOMParser === 'undefined') throw new Error('DOMParser saknas');
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('Kunde inte läsa MusicXML-filen');
+    const root = doc.documentElement;
+    if (root.nodeName === 'score-timewise') throw new Error('Filen är "timewise" MusicXML – exportera som vanlig (partwise) MusicXML');
+    if (root.nodeName !== 'score-partwise') throw new Error('Inte en MusicXML-fil');
+    const kids = (el, tag) => el ? [...el.children].filter(c => c.nodeName === tag) : [];
+    const kid = (el, tag) => el ? ([...el.children].find(c => c.nodeName === tag) || null) : null;
+    const txt = (el, tag) => { const k = kid(el, tag); return k ? k.textContent.trim() : null; };
+    const num = (v, d = 0) => { const x = parseFloat(v); return isFinite(x) ? x : d; };
+
+    const title = txt(kid(root, 'work'), 'work-title') || txt(root, 'movement-title') || '';
+    const partNames = {};
+    kids(kid(root, 'part-list'), 'score-part').forEach(sp => {
+      partNames[sp.getAttribute('id')] = txt(sp, 'part-name') || txt(sp, 'part-abbreviation') || sp.getAttribute('id');
+    });
+
+    // ---- läs varje stämma takt för takt ----
+    const parts = kids(root, 'part').map(part => {
+      let divisions = 1, beats = 4, beatType = 4, transpose = 0;
+      const measures = kids(part, 'measure').map(meas => {
+        const m = { len: 0, notes: [], tempos: [], fwd: false, bwd: 0, endStart: null, endStop: false, segno: null, coda: null, dacapo: false, dalsegno: null, fine: false, tocoda: null };
+        let cur = 0, max = 0, lastStart = 0;
+        const sound = (el) => {
+          if (!el) return;
+          const tp = el.getAttribute('tempo'); if (tp && num(tp) > 0) m.tempos.push({ pos: cur / divisions, bpm: num(tp) });
+          if (el.hasAttribute('segno')) m.segno = el.getAttribute('segno') || 'segno';
+          if (el.hasAttribute('coda')) m.coda = el.getAttribute('coda') || 'coda';
+          if (el.getAttribute('dacapo') === 'yes') m.dacapo = true;
+          if (el.hasAttribute('dalsegno')) m.dalsegno = el.getAttribute('dalsegno') || 'segno';
+          if (el.hasAttribute('fine')) m.fine = true;
+          if (el.hasAttribute('tocoda')) m.tocoda = el.getAttribute('tocoda') || 'coda';
+        };
+        for (const el of meas.children) {
+          switch (el.nodeName) {
+            case 'attributes': {
+              const dv = txt(el, 'divisions'); if (dv) divisions = num(dv, 1) || 1;
+              const tm = kid(el, 'time'); if (tm) { beats = num(String(txt(tm, 'beats')).split('+').reduce((a, b) => a + num(b), 0), 4) || 4; beatType = num(txt(tm, 'beat-type'), 4) || 4; }
+              const tr = kid(el, 'transpose'); if (tr) transpose = num(txt(tr, 'chromatic')) + 12 * num(txt(tr, 'octave-change'));
+              break;
+            }
+            case 'backup': cur -= num(txt(el, 'duration')); if (cur < 0) cur = 0; break;
+            case 'forward': cur += num(txt(el, 'duration')); max = Math.max(max, cur); break;
+            case 'sound': sound(el); break;
+            case 'direction': {
+              sound(kid(el, 'sound'));
+              // metronom utan <sound tempo>
+              if (!kid(el, 'sound') || !kid(el, 'sound').hasAttribute('tempo')) {
+                kids(el, 'direction-type').forEach(dt => {
+                  const mt = kid(dt, 'metronome'); if (!mt) return;
+                  const pm = num(txt(mt, 'per-minute')); if (!(pm > 0)) return;
+                  const unit = { whole: 4, half: 2, quarter: 1, eighth: 0.5, '16th': 0.25 }[txt(mt, 'beat-unit')] || 1;
+                  m.tempos.push({ pos: cur / divisions, bpm: pm * unit * (kid(mt, 'beat-unit-dot') ? 1.5 : 1) });
+                });
+              }
+              kids(el, 'direction-type').forEach(dt => { if (kid(dt, 'segno') && !m.segno) m.segno = 'segno'; if (kid(dt, 'coda') && !m.coda) m.coda = 'coda'; });
+              break;
+            }
+            case 'barline': {
+              const rp = kid(el, 'repeat');
+              if (rp) { if (rp.getAttribute('direction') === 'forward') m.fwd = true; else m.bwd = Math.max(2, num(rp.getAttribute('times'), 2)); }
+              const en = kid(el, 'ending');
+              if (en) {
+                const ty = en.getAttribute('type');
+                if (ty === 'start') m.endStart = String(en.getAttribute('number') || '1').split(/[,\s]+/).map(Number).filter(x => x > 0);
+                else m.endStop = true;
+              }
+              sound(kid(el, 'sound'));
+              break;
+            }
+            case 'note': {
+              const dur = num(txt(el, 'duration'));
+              const isChord = !!kid(el, 'chord');
+              if (kid(el, 'grace') || kid(el, 'cue')) break;
+              const start = isChord ? lastStart : cur;
+              if (!isChord) { lastStart = cur; cur += dur; max = Math.max(max, cur); }
+              const pitch = kid(el, 'pitch');
+              if (!pitch || kid(el, 'rest') || dur <= 0) break;
+              const n = 12 * (num(txt(pitch, 'octave'), 4) + 1) + (STEP[txt(pitch, 'step')] ?? 0) + num(txt(pitch, 'alter')) + transpose;
+              const ties = kids(el, 'tie').map(t => t.getAttribute('type'));
+              const lyrics = {};
+              kids(el, 'lyric').forEach((ly, k) => {
+                const texts = kids(ly, 'text').map(t => t.textContent);
+                if (!texts.length) return;
+                lyrics[ly.getAttribute('number') || String(k + 1)] = { text: texts.join(' ').trim(), syb: txt(ly, 'syllabic') || 'single' };
+              });
+              m.notes.push({ pos: start / divisions, dur: dur / divisions, n, voice: txt(el, 'voice') || '1', staff: txt(el, 'staff') || '1',
+                tieStart: ties.includes('start'), tieStop: ties.includes('stop'), lyrics, chord: isChord });
+              break;
+            }
+          }
+        }
+        m.len = max > 0 ? max / divisions : beats * 4 / beatType;
+        return m;
+      });
+      return { id: part.getAttribute('id'), name: partNames[part.getAttribute('id')] || 'Stämma', measures };
+    });
+    if (!parts.length || !parts[0].measures.length) throw new Error('MusicXML-filen innehåller inga takter');
+
+    // ---- repriser/voltor/hopp: spela ut takternas ordning (från första stämman) ----
+    const meta = parts[0].measures.map((m, i) => {
+      const o = { fwd: false, bwd: 0, endStart: null, endStop: false, segno: null, coda: null, dacapo: false, dalsegno: null, fine: false, tocoda: null };
+      parts.forEach(p => { const x = p.measures[i]; if (!x) return; for (const k in o) if (x[k] && !o[k]) o[k] = x[k]; });
+      return o;
+    });
+    const M = meta.length, order = [];
+    let i = 0, guard = 0, repStart = 0, pass = 1, cameBack = false, afterJump = false;
+    while (i < M && guard++ < 20000) {
+      const m = meta[i];
+      if (m.fwd && !cameBack) { repStart = i; pass = 1; }
+      cameBack = false;
+      if (m.endStart) {
+        // volta: spela den här bara på rätt varv (efter D.C./D.S. den sista voltan)
+        let k = i; while (k < M - 1 && !meta[k].endStop) k++;
+        const lastEnding = !(meta[k + 1] && meta[k + 1].endStart);
+        const play = afterJump ? lastEnding : (m.endStart.includes(pass) || (lastEnding && pass > Math.max(...m.endStart) && !meta.slice(i, k + 1).some(x => x.bwd)));
+        if (!play) { i = k + 1; continue; }
+      }
+      order.push({ i, pass });
+      // sista voltan utan reprisstreck: avsnittet är klart
+      if (m.endStop && !m.bwd && !(meta[i + 1] && meta[i + 1].endStart)) { pass = 1; repStart = i + 1; }
+      if (m.bwd && !afterJump) {
+        if (pass < m.bwd) { pass++; i = repStart; cameBack = true; continue; }
+        pass = 1; repStart = i + 1;
+      }
+      if (m.fine && afterJump) break;
+      if (m.tocoda && afterJump) {
+        const c = meta.findIndex((x, k) => k > i && x.coda && (x.coda === m.tocoda || m.tocoda === 'coda' || x.coda === 'coda'));
+        if (c >= 0) { i = c; continue; }
+      }
+      if ((m.dacapo || m.dalsegno) && !afterJump) {
+        afterJump = true; pass = 1;
+        if (m.dacapo) { i = 0; continue; }
+        const sg = meta.findIndex(x => x.segno && (x.segno === m.dalsegno || m.dalsegno === 'segno' || x.segno === 'segno'));
+        i = sg >= 0 ? sg : 0; continue;
+      }
+      i++;
+    }
+
+    // ---- tidslinje i fjärdedelar, tempokarta ----
+    const qStart = []; let q = 0;
+    order.forEach(o => { qStart.push(q); q += parts[0].measures[o.i].len; });
+    const tempos = [];
+    order.forEach((o, k) => parts.forEach(p => { const m = p.measures[o.i]; if (m) m.tempos.forEach(tp => tempos.push({ q: qStart[k] + tp.pos, bpm: tp.bpm })); }));
+    tempos.sort((a, b) => a.q - b.q);
+    const tempoKnown = tempos.length > 0;
+    const tmap = [];
+    tempos.forEach(tp => { const l = tmap[tmap.length - 1]; if (l && Math.abs(l.q - tp.q) < 1e-6) l.bpm = tp.bpm; else if (!l || l.bpm !== tp.bpm) tmap.push({ q: tp.q, bpm: tp.bpm }); });
+    if (!tmap.length || tmap[0].q > 0) tmap.unshift({ q: 0, bpm: tmap.length ? tmap[0].bpm : 120 });
+    let sec = 0; tmap.forEach((s, k) => { if (k) sec += (s.q - tmap[k - 1].q) * 60 / tmap[k - 1].bpm; s.sec = sec; });
+    const toSec = qq => { let s = tmap[0]; for (const x of tmap) { if (x.q <= qq + 1e-9) s = x; else break; } return s.sec + (qq - s.q) * 60 / s.bpm; };
+
+    // ---- noter per stämma (och röst inom stämman) ----
+    const tracks = [];
+    parts.forEach(p => {
+      const groups = new Map();
+      order.forEach((o, k) => {
+        const m = p.measures[o.i]; if (!m) return;
+        m.notes.forEach(x => {
+          const key = x.staff + ':' + x.voice;
+          if (!groups.has(key)) groups.set(key, []);
+          const lk = Object.keys(x.lyrics);
+          const ly = x.lyrics[String(o.pass)] || x.lyrics['1'] || (lk.length ? x.lyrics[lk.sort()[0]] : null);
+          groups.get(key).push({ q: qStart[k] + x.pos, dq: x.dur, n: x.n, tieStart: x.tieStart, tieStop: x.tieStop, ly, chord: x.chord });
+        });
+      });
+      // små röster (t.ex. kort divisi) slås ihop med den största – översta tonen används då
+      let gs = [...groups.entries()].map(([key, ns]) => ({ key, ns }));
+      const total = gs.reduce((a, g) => a + g.ns.length, 0);
+      gs.sort((a, b) => b.ns.length - a.ns.length);
+      const big = gs.filter((g, k) => k === 0 || g.ns.length >= total * 0.15);
+      gs.filter(g => !big.includes(g)).forEach(g => big[0].ns.push(...g.ns));
+      big.forEach((g, gi) => {
+        const ns = g.ns.sort((a, b) => a.q - b.q || b.n - a.n);
+        const out = [];
+        ns.forEach(x => {
+          // bunden not: förläng föregående med samma ton
+          if (x.tieStop) {
+            const prev = [...out].reverse().find(y => y.n === x.n && Math.abs(y.q + y.dq - x.q) < 1e-3);
+            if (prev) { prev.dq += x.dq; if (!prev.ly && x.ly) prev.ly = x.ly; return; }
+          }
+          out.push({ ...x });
+        });
+        const notes = out.map(x => {
+          const t = toSec(x.q), d = toSec(x.q + x.dq) - t;
+          const o = { t, d, n: x.n };
+          if (x.ly && x.ly.text) { o.syl = x.ly.text; o.cont = x.ly.syb === 'begin' || x.ly.syb === 'middle'; }
+          return o;
+        });
+        if (!notes.length) return;
+        const name = big.length > 1 ? `${p.name} – röst ${gi + 1}` : p.name;
+        const c = clean(notes);
+        tracks.push({ name, notes: c, chords: hasChords(c) });
+      });
+    });
+    if (!tracks.length) throw new Error('MusicXML-filen innehåller inga noter');
+    return { title, tempoKnown, bpm: tmap[0].bpm, tracks };
+  }
+
+  // ---------- sångtext → textrutor och rader ----------
+  // Stavelserna på noterna slås ihop till ord: en ruta per ord, från första noten till sista (melismer räknas in).
+  function lyricBoxes(notes) {
+    const ns = (notes || []).slice().sort((a, b) => a.t - b.t);
+    const out = [];
+    let cur = null, open = false;
+    ns.forEach(x => {
+      const end = x.t + x.d, s = x.syl != null ? String(x.syl).trim() : '';
+      if (s) {
+        if (cur && open) { cur.w += s; cur.end = Math.max(cur.end, end); }
+        else { cur = { t: x.t, end, w: s }; out.push(cur); }
+        open = !!x.cont;
+      } else if (cur && x.t - cur.end < 0.3) cur.end = Math.max(cur.end, end);
+    });
+    const boxes = out.map(b => ({ t: r2(b.t), d: r2(Math.max(0.05, b.end - b.t)), w: b.w }));
+    for (let k = 0; k < boxes.length - 1; k++) if (boxes[k].t + boxes[k].d > boxes[k + 1].t) boxes[k].d = Math.max(0.05, r2(boxes[k + 1].t - boxes[k].t));
+    return boxes;
+  }
+  // textrutor → rader för karaoken: ny rad vid paus, efter skiljetecken eller stor bokstav efter ett andetag
+  function linesFromBoxes(boxes) {
+    const lines = [];
+    let cur = null;
+    (boxes || []).forEach((b, k) => {
+      const prev = boxes[k - 1];
+      const gap = prev ? b.t - (prev.t + prev.d) : 99;
+      const brk = !cur || gap > 0.9 || cur.words >= 10
+        || (cur.words >= 3 && /[.,!?;:]$/.test(prev.w))
+        || (cur.words >= 3 && gap > 0.25 && /^[A-ZÅÄÖ]/.test(b.w));
+      if (brk) { cur = { t: b.t, end: b.t + b.d, text: b.w, words: 1 }; lines.push(cur); }
+      else { cur.text += ' ' + b.w; cur.end = b.t + b.d; cur.words++; }
+    });
+    return lines.map(l => ({ t: r2(l.t), end: r2(l.end), text: l.text }));
+  }
+  function linesToLrc(lines, title) {
+    const ts = sec => { sec = Math.max(0, sec); const m = Math.floor(sec / 60), s = sec - m * 60; return `[${String(m).padStart(2, '0')}:${s.toFixed(2).padStart(5, '0')}]`; };
+    const out = title ? [`[ti:${title}]`] : [];
+    lines.forEach((l, k) => {
+      out.push(ts(l.t) + l.text);
+      const next = lines[k + 1];
+      if (!next || next.t - l.end > 2) out.push(ts(l.end + 0.3));
+    });
+    return out.join('\n') + '\n';
+  }
+
+  // ---------- finsynk: följ tempoändringar (ritardando, fermater, fritt tempo) ----------
+  // Efter autoSync ligger noterna rätt i stort. Här jämförs noterna och tonkurvan bit för bit (DTW,
+  // dynamisk tidsförvrängning inom ±band sekunder) och en tidskarta tas fram. Används bara om den
+  // ger bättre överensstämmelse än utan.
+  function matchScore(notes, midi, hop) {
+    let hit = 0, tot = 0;
+    const st = Math.max(1, Math.round(0.04 / hop));
+    const ns = notes.slice().sort((a, b) => a.t - b.t);
+    let k = 0;
+    for (let i = 0; i < midi.length; i += st) {
+      const m = midi[i]; if (!(m > 0)) continue;
+      const t = i * hop;
+      while (k < ns.length && ns[k].t + ns[k].d < t) k++;
+      let x = null;
+      for (let j = k; j < ns.length && ns[j].t <= t; j++) if (ns[j].t + ns[j].d >= t) { x = ns[j]; break; }
+      if (!x) continue;
+      tot++;
+      let dd = Math.abs(m - x.n) % 12; dd = Math.min(dd, 12 - dd);
+      if (dd <= 1) hit++;
+    }
+    return tot ? hit / tot : 0;
+  }
+  function warpMap(notes, midi, hop, opts = {}) {
+    const R = 0.05, B = Math.round((opts.band ?? 3) / R);
+    if (!notes.length) return null;
+    const t0 = Math.max(0, Math.min(...notes.map(x => x.t)) - 2);
+    const t1 = Math.min(midi.length * hop, Math.max(...notes.map(x => x.t + x.d)) + 2);
+    const N = Math.ceil((t1 - t0) / R);
+    if (N < 20) return null;
+    const S = new Float32Array(N), A = new Float32Array(N);
+    notes.forEach(x => { for (let k = Math.max(0, Math.floor((x.t - t0) / R)); k < Math.min(N, Math.ceil((x.t + x.d - t0) / R)); k++) S[k] = x.n; });
+    for (let j = 0; j < N; j++) {
+      // median av ramarna i fönstret (tål enstaka felaktiga tonhöjder)
+      const a = Math.floor((t0 + j * R) / hop), b = Math.max(a + 1, Math.floor((t0 + (j + 1) * R) / hop));
+      const v = []; for (let i = a; i < b && i < midi.length; i++) if (midi[i] > 0) v.push(midi[i]);
+      A[j] = v.length * 2 >= (b - a) ? v.sort((x, y) => x - y)[v.length >> 1] : 0;
+    }
+    const cost = (i, j) => {
+      const s = S[i], a = A[j];
+      if (!s && !a) return 0;
+      if (!s || !a) return 0.5;
+      let d = Math.abs(a - s) % 12; d = Math.min(d, 12 - d);
+      return Math.min(1, Math.max(0, d - 0.35) / 1.5);
+    };
+    const W = 2 * B + 1, INF = 1e18;
+    const D = new Float64Array(N * W).fill(INF), P = new Uint8Array(N * W);   // P: 0 diagonal, 1 från (i-1,j), 2 från (i,j-1)
+    const at = (i, j) => { const k = j - i + B; return k >= 0 && k < W ? i * W + k : -1; };
+    const PEN = 0.12;
+    for (let i = 0; i < N; i++) {
+      for (let j = Math.max(0, i - B); j <= Math.min(N - 1, i + B); j++) {
+        const c = cost(i, j), idx = at(i, j);
+        if (i === 0 && j === 0) { D[idx] = c; continue; }
+        let best = INF, from = 0;
+        const d1 = i && j ? at(i - 1, j - 1) : -1; if (d1 >= 0 && D[d1] + 2 * c < best) { best = D[d1] + 2 * c; from = 0; }
+        const d2 = i ? at(i - 1, j) : -1; if (d2 >= 0 && D[d2] + c + PEN < best) { best = D[d2] + c + PEN; from = 1; }
+        const d3 = j ? at(i, j - 1) : -1; if (d3 >= 0 && D[d3] + c + PEN < best) { best = D[d3] + c + PEN; from = 2; }
+        D[idx] = best; P[idx] = from;
+      }
+    }
+    // tillbaka längs bästa vägen: notram i → ljudram j
+    const sum = new Float64Array(N), cnt = new Uint16Array(N);
+    let i = N - 1, j = N - 1;
+    while (i >= 0 && j >= 0) {
+      sum[i] += j; cnt[i]++;
+      if (i === 0 && j === 0) break;
+      const f = P[at(i, j)];
+      if (f === 0) { i--; j--; } else if (f === 1) i--; else j--;
+    }
+    const raw = new Float64Array(N);
+    for (let k = 0; k < N; k++) raw[k] = cnt[k] ? sum[k] / cnt[k] : k;
+    // jämna ut (±0,5 s) och håll kartan stigande
+    const H = 10, M = new Float64Array(N);
+    for (let k = 0; k < N; k++) { let s = 0, n = 0; for (let q = Math.max(0, k - H); q <= Math.min(N - 1, k + H); q++) { s += raw[q]; n++; } M[k] = s / n; }
+    for (let k = 1; k < N; k++) if (M[k] < M[k - 1]) M[k] = M[k - 1];
+    const map = t => {
+      const u = (t - t0) / R;
+      if (u <= 0) return t + M[0] * R;
+      if (u >= N - 1) return t + (M[N - 1] - (N - 1)) * R;
+      const a = Math.floor(u), f = u - a;
+      return t0 + (M[a] * (1 - f) + M[a + 1] * f) * R;
+    };
+    const warped = applyWarp(notes, map);
+    const before = matchScore(notes, midi, hop), after = matchScore(warped, midi, hop);
+    let maxShift = 0; for (let k = 0; k < N; k++) maxShift = Math.max(maxShift, Math.abs(M[k] - k) * R);
+    return { map, before, after, better: after > before + 0.02, maxShift: r2(maxShift) };
+  }
+  // flera varv (varje varv rättar det förra) – svar: { map, before, after, passes } eller null om det inte blev bättre
+  function fineSync(notes, midi, hop) {
+    let cur = notes, maps = [], before = null, after = null;
+    for (let k = 0; k < 3; k++) {
+      const w = warpMap(cur, midi, hop, { band: 4 });
+      if (!w) break;
+      if (before == null) before = w.before;
+      if (!w.better) break;
+      maps.push(w.map); cur = applyWarp(cur, w.map); after = w.after;
+    }
+    if (!maps.length) return null;
+    return { map: t => maps.reduce((v, f) => f(v), t), before, after, passes: maps.length };
+  }
+  function applyWarp(notes, map) {
+    return notes.map(x => {
+      const t = map(x.t), e = map(x.t + x.d);
+      return { ...x, t: r2(Math.max(0, t)), d: r2(Math.max(0.05, e - t)) };
+    });
+  }
+
+  const api = { ultraStarToLrc, isUltraStar, toJson, fromJson, toMidi, fromMidi, fromUltraStar, fromMusicXml, decodeText, autoSync, applySync, topLine, saveFile,
+    lyricBoxes, linesFromBoxes, linesToLrc, warpMap, fineSync, applyWarp, matchScore, FORMAT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.NoteIO = api;
 })(typeof window !== 'undefined' ? window : globalThis);

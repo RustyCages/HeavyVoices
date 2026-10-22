@@ -524,10 +524,12 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
               <label>Transponera <input type="number" id="xTrans" value="0" step="1" min="-36" max="36"> halvtoner</label>
             </div>
             <label class="xfer-check"><input type="checkbox" id="xAutoSync" checked> <span><b>🎯 Synka automatiskt mot ljudet</b><br><small>Letar upp rätt starttid, tempo och tonart genom att jämföra noterna med stämmans tonkurva. Förskjut/Transponera ovan läggs på efteråt som finjustering.</small></span></label>
+            <label class="xfer-check"><input type="checkbox" id="xFineSync" checked> <span><b>🎚 Följ tempoändringar</b><br><small>Efter synken jämförs noterna med ljudet bit för bit, så att ritardando, fermater och fritt tempo hamnar rätt. Används bara om det blir bättre.</small></span></label>
+            <label class="xfer-check"><input type="checkbox" id="xMakeLrc" checked> <span><b>📝 Karaoketext från notbladet</b><br><small>Har filen sångtext (MusicXML, UltraStar eller MIDI med text) läggs orden vid noterna. Saknar låten synkad text skapas den också, så att karaoken fungerar direkt.</small></span></label>
             <small class="xfer-note">Noterna läggs in i redigeringen. Kontrollera och tryck <b>💾 Spara noter</b> för att medlemmarna ska se dem.</small>
             <div class="edit-tools">
-              <button type="button" class="btn-outline" id="xFromFile">📂 Från fil… (.json / .mid / UltraStar .txt)</button>
-              <input type="file" id="xFile" accept=".json,.mid,.midi,.txt,application/json,audio/midi,audio/x-midi,text/plain" hidden>
+              <button type="button" class="btn-outline" id="xFromFile" title="MusicXML från notprogrammet (MuseScore, Sibelius, Finale, Dorico), MIDI, UltraStar eller Heavy Voices-JSON">📂 Från fil… (MusicXML / .mid / UltraStar .txt / .json)</button>
+              <input type="file" id="xFile" accept=".musicxml,.mxl,.xml,.json,.mid,.midi,.txt,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml,application/xml,text/xml,application/json,audio/midi,audio/x-midi,text/plain" hidden>
               <button type="button" class="btn-outline" id="xSyncNow" title="Synka noterna som finns i notbanan just nu mot ljudet">🎯 Synka nuvarande noter</button>
             </div>
             <div class="edit-tools"><button type="button" class="btn-outline toggle-btn" id="usToggle" aria-expanded="false" aria-controls="usPanel">🔎 Sök UltraStar-fil online</button></div>
@@ -3574,25 +3576,55 @@ async function loadLibrary() {
 function applyImported(list, from, syncText) {
   const sh = Number(document.getElementById('xShift').value) || 0;
   const tr = Math.round(Number(document.getElementById('xTrans').value) || 0);
-  const notes = [];
+  const notes = [], withSyl = [];
   (list || []).forEach(x => {
     let t = Math.round((Number(x.t) + sh) * 100) / 100, d = Number(x.d);
     if (t < 0) { d += t; t = 0; }
-    if (d >= 0.05 && isFinite(t) && isFinite(Number(x.n))) notes.push({ t, d: Math.round(d * 100) / 100, n: Math.round(Number(x.n)) + tr });
+    if (d >= 0.05 && isFinite(t) && isFinite(Number(x.n))) {
+      notes.push({ t, d: Math.round(d * 100) / 100, n: Math.round(Number(x.n)) + tr });
+      withSyl.push({ t, d, n: 0, ...(x.syl != null ? { syl: x.syl, cont: x.cont } : {}) });
+    }
   });
+  const boxes = document.getElementById('xMakeLrc').checked && withSyl.some(x => x.syl) ? NoteIO.lyricBoxes(withSyl) : null;
   if (!notes.length) { xStatus('Inga noter att importera (kolla förskjutningen)'); return; }
   if (eNotes().length && !confirm(`Ersätt de ${eNotes().length} noterna i ${current.label} med ${notes.length} importerade noter?\n\n(Inget sparas förrän du trycker Spara noter – Ångra fungerar också.)`)) return;
   if (!editMode) setEditMode(true);
   snapshot();
   current.pitch.notes = notes;
+  if (boxes && boxes.length) current.pitch.lyr = boxes;   // sångtexten vid noterna (textrutorna)
   afterEdit(null);
   pausedPos = Math.max(0, notes[0].t - 1); if (!playing) tick();
   editStatus(`Importerat från ${from} – kontrollera och tryck 💾 Spara noter`);
-  xStatus(`${notes.length} noter importerade` + (syncText ? ' · ' + syncText : ''));
+  xStatus(`${notes.length} noter importerade` + (boxes && boxes.length ? ` · ${boxes.length} ord sångtext` : '') + (syncText ? ' · ' + syncText : ''));
   toast(`${notes.length} noter importerade – tryck 💾 Spara noter när det ser rätt ut`, 5000);
+  if (boxes && boxes.length) makeLrcFromBoxes(boxes, current);
+}
+// Låten saknar synkad text → skapa den från notbladets ord (radbrytning vid pauser och skiljetecken).
+// Textrutorna är i stämfilens tid; låtens text ligger på den gemensamma tidslinjen.
+async function makeLrcFromBoxes(boxes, st) {
+  if (!document.getElementById('xMakeLrc').checked || !boxes.length || song.lyrics_lrc) return;
+  const off = (Number((song.stem_offsets || {})[st.key]) || 0) / 1000;
+  const lines = NoteIO.linesFromBoxes(boxes.map(b => ({ ...b, t: b.t + off })));
+  if (!lines.length) return;
+  const patch = { lyrics_lrc: NoteIO.linesToLrc(lines, song.title) };
+  if (!(song.lyrics_plain || '').trim()) patch.lyrics_plain = lines.map(l => l.text).join('\n');
+  const { error } = await supabaseClient.from('songs').update(patch).eq('id', song.id);
+  if (error) { toast('Kunde inte spara karaoketexten: ' + error.message, 6000); return; }
+  Object.assign(song, patch);
+  setupKaraoke(); kIdx = -2;
+  toast(`Karaoketext skapad från notbladet (${lines.length} rader) – finjustera i Textsynk vid behov`, 6000);
+}
+// finsynk (följ tempoändringar) – svar: { notes, txt }
+function fineSyncNotes(ns, raw) {
+  if (!document.getElementById('xFineSync').checked || !raw || !raw.midi) return { notes: ns, map: null, txt: '' };
+  try {
+    const f = NoteIO.fineSync(ns, raw.midi, raw.hop || 0.02);
+    if (!f) return { notes: ns, map: null, txt: ' · tempoändringar: behövdes inte' };
+    return { notes: NoteIO.applyWarp(ns, f.map), map: f.map, txt: ` · tempoändringar följda (överensstämmelse ${Math.round(f.before * 100)} → ${Math.round(f.after * 100)} %)` };
+  } catch (e) { return { notes: ns, map: null, txt: '' }; }
 }
 // Synka noter mot stämmans tonkurva (analysen) och lägg sedan in dem
-async function syncAndImport(list, from) {
+async function syncAndImport(list, from, opts = {}) {
   const midi = current.raw && current.raw.midi;
   if (!document.getElementById('xAutoSync').checked) { applyImported(list, from); return; }
   if (!midi || !midi.some(v => v > 0)) { applyImported(list, from, 'ingen tonkurva att synka mot – analysera stämman först'); return; }
@@ -3600,12 +3632,14 @@ async function syncAndImport(list, from) {
   try {
     xStatus('Synkar mot ljudet… 0 %');
     const r = await NoteIO.autoSync(list, midi, current.raw.hop || 0.02,
-      { onProgress: p => xStatus(`Synkar mot ljudet… ${Math.round(p * 100)} %`) });
+      { guessTempo: !!opts.guessTempo, onProgress: p => xStatus(`Synkar mot ljudet… ${Math.round(p * 100)} %`) });
     const sure = r.confidence >= 1.35 && r.match >= 0.3;
     const txt = `synkat: start ${r.offset >= 0 ? '+' : ''}${r.offset.toFixed(2).replace('.', ',')} s · tempo ${Math.round(r.scale * 1000) / 10} %`
       + (r.transpose ? ` · ${r.transpose > 0 ? '+' : ''}${r.transpose} halvtoner` : '')
       + ` · överensstämmelse ${Math.round(r.match * 100)} %` + (sure ? ' ✓' : ' – osäker, kontrollera noga');
-    applyImported(NoteIO.applySync(list, r), from, txt);
+    xStatus('Följer tempoändringar…'); await new Promise(res => setTimeout(res, 0));
+    const fs = fineSyncNotes(NoteIO.applySync(list, r), current.raw);
+    applyImported(fs.notes, from, txt + fs.txt);
     if (!sure) toast('Synken är osäker – lyssna med referenstonen och justera vid behov', 6000);
   } catch (e) {
     applyImported(list, from, 'kunde inte synka: ' + (e.message || e));
@@ -3685,7 +3719,7 @@ function guessMapping(tracks, cands) {
   if (rest.length && rest.length <= free.length + 0) rest.forEach((x, k) => { if (free[k]) map[x.i] = free[k].key; });
   return map;
 }
-function midiMapUI(tracks, fileName) {
+function midiMapUI(tracks, fileName, iopts = {}) {
   const pick = document.getElementById('xMidiPick');
   const cands = stems.filter(singable);
   const map = guessMapping(tracks, cands);
@@ -3711,10 +3745,10 @@ function midiMapUI(tracks, fileName) {
     if (!pairs.length) { xStatus('Välj minst en stämma'); return; }
     const dup = pairs.map(x => x.st.key).find((k, i, a) => a.indexOf(k) !== i);
     if (dup) { xStatus(`Två spår går till samma stämma (${cands.find(c => c.key === dup).label}) – välj om`); return; }
-    importMidiAll(pairs, cands.find(c => c.key === refSel.value) || null, fileName);
+    importMidiAll(pairs, cands.find(c => c.key === refSel.value) || null, fileName, iopts);
   });
 }
-async function importMidiAll(pairs, ref, fileName) {
+async function importMidiAll(pairs, ref, fileName, opts = {}) {
   const replaced = pairs.filter(x => x.st.pitch && x.st.pitch.notes && x.st.pitch.notes.length).map(x => x.st.label + (x.st.raw && x.st.raw.edited_notes ? ' (redigerade noter)' : ''));
   if (pairs.some(x => x.st === current) && dirty && !confirm(`${current.label} har osparade ändringar som försvinner. Fortsätta?`)) return;
   if (replaced.length && !confirm(`Noterna ersätts i: ${replaced.join(', ')}.\n\nNotanalysen finns kvar (”Ta bort redigering” tar fram den igen) och tidigare redigerade noter sparas som säkerhetskopia. Fortsätta?`)) return;
@@ -3722,14 +3756,18 @@ async function importMidiAll(pairs, ref, fileName) {
   try {
     const offs = song.stem_offsets || {}, offOf = st => (Number(offs[st.key]) || 0) / 1000;
     const notesOf = tr => tr.chords ? NoteIO.topLine(tr.notes) : tr.notes;
-    let r = { offset: 0, scale: 1, transpose: 0 }, syncTxt = 'ingen synk';
+    let r = { offset: 0, scale: 1, transpose: 0 }, syncTxt = 'ingen synk', warp = null, lrcBoxes = null;
     if (ref) {
       const refPair = pairs.find(x => x.st === ref);
       xStatus('Synkar mot ljudet… 0 %');
-      r = await NoteIO.autoSync(notesOf(refPair.tr), ref.raw.midi, ref.raw.hop || 0.02, { onProgress: q => xStatus(`Synkar mot ljudet… ${Math.round(q * 100)} %`) });
+      r = await NoteIO.autoSync(notesOf(refPair.tr), ref.raw.midi, ref.raw.hop || 0.02, { guessTempo: !!opts.guessTempo, onProgress: q => xStatus(`Synkar mot ljudet… ${Math.round(q * 100)} %`) });
       const sure = r.confidence >= 1.35 && r.match >= 0.3;
       syncTxt = `synkat mot ${ref.label}: start ${r.offset >= 0 ? '+' : ''}${r.offset.toFixed(2).replace('.', ',')} s · tempo ${Math.round(r.scale * 1000) / 10} %`
         + (r.transpose ? ` · ${r.transpose > 0 ? '+' : ''}${r.transpose} halvtoner` : '') + ` · överensstämmelse ${Math.round(r.match * 100)} %` + (sure ? ' ✓' : ' – osäker, kontrollera noga');
+      // tempoändringar: tidskartan tas fram på referensstämman och används för alla
+      xStatus('Följer tempoändringar…'); await new Promise(res => setTimeout(res, 0));
+      const fs = fineSyncNotes(NoteIO.applySync(notesOf(refPair.tr), r), ref.raw);
+      warp = fs.map; syncTxt += fs.txt;
     }
     const sh = Number(document.getElementById('xShift').value) || 0;
     const trn = Math.round(Number(document.getElementById('xTrans').value) || 0);
@@ -3737,12 +3775,20 @@ async function importMidiAll(pairs, ref, fileName) {
     const done = [];
     for (const { tr, st } of pairs) {
       // samma flytt för alla, omräknad till varje stämfils egen tid (stämsynkens förskjutningar)
-      const rr = { offset: r.offset + (ref ? offOf(ref) - offOf(st) : 0) + sh, scale: r.scale, transpose: r.transpose + trn };
-      const notes = NoteIO.applySync(notesOf(tr), rr);
+      // i referensstämmans tid (med tempoändringarna), sedan flyttat till den här stämfilens tid
+      let notes = NoteIO.applySync(notesOf(tr), { offset: r.offset, scale: r.scale, transpose: r.transpose + trn });
+      if (warp) notes = NoteIO.applyWarp(notes, warp);
+      notes = NoteIO.applySync(notes, { offset: (ref ? offOf(ref) - offOf(st) : 0) + sh, scale: 1, transpose: 0 });
       if (!notes.length) continue;
       const data = { ...(st.raw || { v: 1, hop: 0.02, midi: [], notes: [] }) };
       if (data.edited_notes) data.edited_notes_backup = data.edited_notes;
       data.edited_notes = notes.map(n => ({ t: n.t, d: n.d, n: n.n }));
+      const boxes = document.getElementById('xMakeLrc').checked && notes.some(n => n.syl) ? NoteIO.lyricBoxes(notes) : null;
+      if (boxes && boxes.length) {
+        data.lyrics = boxes;
+        // karaoketexten tas från sopranen (eller första stämman med text)
+        if (!lrcBoxes || (voiceOf(st.label) === 's' && voiceOf(lrcBoxes.st.label) !== 's')) lrcBoxes = { boxes, st };
+      }
       data.edited_at = now; data.midi_import = { file: fileName, track: tr.name, at: now };
       xStatus(`Sparar ${st.label}…`);
       const { error } = await supabaseClient.from('song_pitch').upsert({ song_id: song.id, stem_key: st.key, stem_path: st.pitchPath || st.path, data, updated_at: st.pitchAt || now });
@@ -3752,6 +3798,7 @@ async function importMidiAll(pairs, ref, fileName) {
       done.push(`${st.label} (${notes.length})`);
     }
     document.getElementById('xMidiPick').hidden = true;
+    if (lrcBoxes) await makeLrcFromBoxes(lrcBoxes.boxes, lrcBoxes.st);
     xStatus(`Klart: ${done.join(', ')} · ${syncTxt}`);
     toast(`Noter sparade för ${done.length} stämmor – medlemmarna ser dem nu`, 5000);
     dirty = false;
@@ -3843,23 +3890,40 @@ document.getElementById('xSyncNow')?.addEventListener('click', () => {
   // nuvarande noter in igen, utan extra förskjutning/transponering
   const sh = document.getElementById('xShift'), trn = document.getElementById('xTrans'); const keep = [sh.value, trn.value];
   sh.value = 0; trn.value = 0;
-  syncAndImport(ns.map(x => ({ t: x.t, d: x.d, n: x.n })), 'notbanan').finally(() => { document.getElementById('xAutoSync').checked = was; sh.value = keep[0]; trn.value = keep[1]; });
+  // textrutorna följer med: varje ord läggs på noten där rutan börjar
+  const lyr = current.pitch.lyr || [];
+  const list = ns.map(x => ({ t: x.t, d: x.d, n: x.n }));
+  lyr.forEach(b => {
+    if (!b.w) return;
+    const i = list.findIndex(x => x.t + x.d > b.t + 0.02);
+    if (i >= 0) list[i].syl = list[i].syl ? list[i].syl + ' ' + b.w : b.w;
+  });
+  syncAndImport(list, 'notbanan').finally(() => { document.getElementById('xAutoSync').checked = was; sh.value = keep[0]; trn.value = keep[1]; });
 });
 document.getElementById('xFile')?.addEventListener('change', async (e) => {
   const f = e.target.files[0]; e.target.value = '';
   if (!f) return;
   const pick = document.getElementById('xMidiPick'); pick.hidden = true;
+  // flera spår/stämmor i filen: ett till den här stämman, eller alla till rätt stämma
+  const showTracks = (tracks, opts = {}) => {
+    const use = (tr) => syncAndImport(tr.chords ? NoteIO.topLine(tr.notes) : tr.notes, `${f.name} – ${tr.name}`, opts);
+    if (tracks.length === 1) { use(tracks[0]); return; }
+    const words = tr => tr.notes.filter(x => x.syl).length;
+    pick.innerHTML = `<div class="midi-all"><button type="button" id="xMidiAll">🎼 Alla spår till rätt stämma på en gång…</button><small>Fördelar filens spår på låtens stämmor och sparar noterna för alla.</small></div>` +
+      `<b>…eller bara ett spår till ${esc(current.label)}:</b>` + tracks.map((tr, i) =>
+      `<button type="button" class="btn-outline" data-i="${i}">${esc(tr.name)} · ${tr.notes.length} noter · ${nm(Math.min(...tr.notes.map(x => x.n)))}–${nm(Math.max(...tr.notes.map(x => x.n)))}${words(tr) ? ' · med text' : ''}${tr.chords ? ' · ackord (översta tonen används)' : ''}</button>`).join('');
+    pick.hidden = false;
+    pick.querySelectorAll('button[data-i]').forEach(b => b.addEventListener('click', () => { use(tracks[Number(b.dataset.i)]); pick.hidden = true; }));
+    document.getElementById('xMidiAll').addEventListener('click', () => midiMapUI(tracks, f.name, opts));
+  };
   try {
-    if (/\.midi?$/i.test(f.name)) {
-      const tracks = NoteIO.fromMidi(await f.arrayBuffer());
-      const use = (tr) => syncAndImport(tr.chords ? NoteIO.topLine(tr.notes) : tr.notes, `${f.name} – ${tr.name}`);
-      if (tracks.length === 1) { use(tracks[0]); return; }
-      pick.innerHTML = `<div class="midi-all"><button type="button" id="xMidiAll">🎼 Alla spår till rätt stämma på en gång…</button><small>Fördelar filens spår på låtens stämmor och sparar noterna för alla.</small></div>` +
-        `<b>…eller bara ett spår till ${esc(current.label)}:</b>` + tracks.map((tr, i) =>
-        `<button type="button" class="btn-outline" data-i="${i}">${esc(tr.name)} · ${tr.notes.length} noter · ${nm(Math.min(...tr.notes.map(x => x.n)))}–${nm(Math.max(...tr.notes.map(x => x.n)))}${tr.chords ? ' · ackord (översta tonen används)' : ''}</button>`).join('');
-      pick.hidden = false;
-      pick.querySelectorAll('button[data-i]').forEach(b => b.addEventListener('click', () => { use(tracks[Number(b.dataset.i)]); pick.hidden = true; }));
-      document.getElementById('xMidiAll').addEventListener('click', () => midiMapUI(tracks, f.name));
+    if (/\.(musicxml|mxl|xml)$/i.test(f.name)) {
+      xStatus('Läser notbladet…');
+      const sc = await NoteIO.fromMusicXml(await f.arrayBuffer());
+      xStatus(`${sc.title ? sc.title + ': ' : ''}${sc.tracks.length} stämm${sc.tracks.length === 1 ? 'a' : 'or'}` + (sc.tempoKnown ? ` · tempo ${Math.round(sc.bpm)}` : ' · inget tempo i filen – det räknas ut vid synken'));
+      showTracks(sc.tracks, { guessTempo: !sc.tempoKnown });
+    } else if (/\.midi?$/i.test(f.name)) {
+      showTracks(NoteIO.fromMidi(await f.arrayBuffer()));
     } else if (/\.txt$/i.test(f.name)) {
       importUltraStarText(NoteIO.decodeText(await f.arrayBuffer()), f.name);
     } else {

@@ -605,7 +605,7 @@
 
     // ---- noter per stämma (och röst inom stämman) ----
     const tracks = [];
-    parts.forEach(p => {
+    parts.forEach((p, partIndex) => {
       const groups = new Map();
       order.forEach((o, k) => {
         const m = p.measures[o.i]; if (!m) return;
@@ -643,11 +643,13 @@
         if (!notes.length) return;
         const name = big.length > 1 ? `${p.name} – röst ${gi + 1}` : p.name;
         const c = clean(notes);
-        tracks.push({ name, notes: c, chords: hasChords(c) });
+        tracks.push({ name, notes: c, chords: hasChords(c), part: partIndex });
       });
     });
     if (!tracks.length) throw new Error('MusicXML-filen innehåller inga noter');
-    return { title, tempoKnown, bpm: tmap[0].bpm, tracks };
+    // takterna i spelordning med tider (för notskriften i spelaren): i = taktens index i filen
+    const measures = order.map((o, k) => { const len = parts[0].measures[o.i].len; return { i: o.i, len, s0: r2(toSec(qStart[k]) * 1000) / 1000, s1: r2(toSec(qStart[k] + len) * 1000) / 1000 }; });
+    return { title, tempoKnown, bpm: tmap[0].bpm, tracks, measures, xml };
   }
 
   // ---------- sångtext → textrutor och rader ----------

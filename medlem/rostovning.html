@@ -1905,13 +1905,14 @@ async function saveNotes(removeEdits) {
     data.edited_notes = eNotes().map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w && !lyr ? { w: n.w } : {}), ...nExtra(n) }));
     if (lyr) data.lyrics = lyr.filter(b => b.w && b.w.trim()).map(b => ({ t: Math.round(b.t * 100) / 100, d: Math.round(b.d * 100) / 100, w: b.w.trim() }));
     data.edited_at = new Date().toISOString();
+    if (st._pendingScore !== undefined) { if (st._pendingScore) data.score = st._pendingScore; else delete data.score; }
   }
   editStatus('Sparar…');
   const { error } = await supabaseClient.from('song_pitch').upsert({
     song_id: song.id, stem_key: st.key, stem_path: st.pitchPath || st.path, data, updated_at: st.pitchAt || new Date().toISOString(),
   });
   if (error) { editStatus('Kunde inte spara: ' + error.message); return false; }
-  st.raw = data; st.pitchBase = prepPitch(data); dirty = false;
+  st.raw = data; st.pitchBase = prepPitch(data); dirty = false; delete st._pendingScore;
   if (removeEdits) { applyMerge(st); setEditMode(false); showStem(st); }
   else { st.pitch = { ...st.pitchBase, notes: st.pitchBase.notes.map(n => ({ ...n })), lyr: st.pitchBase.lyr ? st.pitchBase.lyr.map(b => ({ ...b })) : null }; selBox = -1; editStatus(); }
   toast(removeEdits ? 'Redigeringen borttagen – medlemmar ser notanalysen igen' : 'Noterna sparade – medlemmarna ser dem nu');
@@ -3573,7 +3574,7 @@ async function loadLibrary() {
     });
   });
 }
-function applyImported(list, from, syncText) {
+function applyImported(list, from, syncText, score) {
   const sh = Number(document.getElementById('xShift').value) || 0;
   const tr = Math.round(Number(document.getElementById('xTrans').value) || 0);
   const notes = [], withSyl = [];
@@ -3592,6 +3593,7 @@ function applyImported(list, from, syncText) {
   snapshot();
   current.pitch.notes = notes;
   if (boxes && boxes.length) current.pitch.lyr = boxes;   // sångtexten vid noterna (textrutorna)
+  current._pendingScore = score || null;   // notbladet (MusicXML) följer med när noterna sparas; annan import tar bort det
   afterEdit(null);
   pausedPos = Math.max(0, notes[0].t - 1); if (!playing) tick();
   editStatus(`Importerat från ${from} – kontrollera och tryck 💾 Spara noter`);
@@ -3614,6 +3616,12 @@ async function makeLrcFromBoxes(boxes, st) {
   setupKaraoke(); kIdx = -2;
   toast(`Karaoketext skapad från notbladet (${lines.length} rader) – finjustera i Textsynk vid behov`, 6000);
 }
+// notbladets takter (MusicXML-tid i sekunder) → stämfilens tid, för notskriften i spelaren
+function scoreInfo(score, part, toStem) {
+  if (!score || !score.path) return null;
+  const r3 = v => Math.round(v * 1000) / 1000;
+  return { path: score.path, part: part || 0, measures: score.measures.map(m => ({ i: m.i, len: m.len, a: r3(toStem(m.s0)), b: r3(toStem(m.s1)) })) };
+}
 // finsynk (följ tempoändringar) – svar: { notes, txt }
 function fineSyncNotes(ns, raw) {
   if (!document.getElementById('xFineSync').checked || !raw || !raw.midi) return { notes: ns, map: null, txt: '' };
@@ -3626,8 +3634,10 @@ function fineSyncNotes(ns, raw) {
 // Synka noter mot stämmans tonkurva (analysen) och lägg sedan in dem
 async function syncAndImport(list, from, opts = {}) {
   const midi = current.raw && current.raw.midi;
-  if (!document.getElementById('xAutoSync').checked) { applyImported(list, from); return; }
-  if (!midi || !midi.some(v => v > 0)) { applyImported(list, from, 'ingen tonkurva att synka mot – analysera stämman först'); return; }
+  const sh = Number(document.getElementById('xShift').value) || 0;
+  const plain = () => scoreInfo(opts.score, opts.part, x => x + sh);
+  if (!document.getElementById('xAutoSync').checked) { applyImported(list, from, '', plain()); return; }
+  if (!midi || !midi.some(v => v > 0)) { applyImported(list, from, 'ingen tonkurva att synka mot – analysera stämman först', plain()); return; }
   const btns = document.querySelectorAll('#xferPanel button'); btns.forEach(b => b.disabled = true);
   try {
     xStatus('Synkar mot ljudet… 0 %');
@@ -3639,10 +3649,11 @@ async function syncAndImport(list, from, opts = {}) {
       + ` · överensstämmelse ${Math.round(r.match * 100)} %` + (sure ? ' ✓' : ' – osäker, kontrollera noga');
     xStatus('Följer tempoändringar…'); await new Promise(res => setTimeout(res, 0));
     const fs = fineSyncNotes(NoteIO.applySync(list, r), current.raw);
-    applyImported(fs.notes, from, txt + fs.txt);
+    const sci = scoreInfo(opts.score, opts.part, x => { const v = r.offset + x * r.scale; return (fs.map ? fs.map(v) : v) + sh; });
+    applyImported(fs.notes, from, txt + fs.txt, sci);
     if (!sure) toast('Synken är osäker – lyssna med referenstonen och justera vid behov', 6000);
   } catch (e) {
-    applyImported(list, from, 'kunde inte synka: ' + (e.message || e));
+    applyImported(list, from, 'kunde inte synka: ' + (e.message || e), plain());
   } finally { btns.forEach(b => b.disabled = false); }
 }
 
@@ -3783,6 +3794,9 @@ async function importMidiAll(pairs, ref, fileName, opts = {}) {
       const data = { ...(st.raw || { v: 1, hop: 0.02, midi: [], notes: [] }) };
       if (data.edited_notes) data.edited_notes_backup = data.edited_notes;
       data.edited_notes = notes.map(n => ({ t: n.t, d: n.d, n: n.n }));
+      const shiftSt = (ref ? offOf(ref) - offOf(st) : 0) + sh;
+      const sci = scoreInfo(opts.score, tr.part, x => { const v = r.offset + x * r.scale; return (warp ? warp(v) : v) + shiftSt; });
+      if (sci) data.score = sci; else delete data.score;
       const boxes = document.getElementById('xMakeLrc').checked && notes.some(n => n.syl) ? NoteIO.lyricBoxes(notes) : null;
       if (boxes && boxes.length) {
         data.lyrics = boxes;
@@ -3898,7 +3912,10 @@ document.getElementById('xSyncNow')?.addEventListener('click', () => {
     const i = list.findIndex(x => x.t + x.d > b.t + 0.02);
     if (i >= 0) list[i].syl = list[i].syl ? list[i].syl + ' ' + b.w : b.w;
   });
-  syncAndImport(list, 'notbanan').finally(() => { document.getElementById('xAutoSync').checked = was; sh.value = keep[0]; trn.value = keep[1]; });
+  // notbladet (om det finns) synkas om på samma sätt
+  const ex = current._pendingScore !== undefined ? current._pendingScore : (current.raw && current.raw.score);
+  const opts = ex ? { score: { path: ex.path, measures: ex.measures.map(m => ({ i: m.i, len: m.len, s0: m.a, s1: m.b })) }, part: ex.part } : {};
+  syncAndImport(list, 'notbanan', opts).finally(() => { document.getElementById('xAutoSync').checked = was; sh.value = keep[0]; trn.value = keep[1]; });
 });
 document.getElementById('xFile')?.addEventListener('change', async (e) => {
   const f = e.target.files[0]; e.target.value = '';
@@ -3906,7 +3923,7 @@ document.getElementById('xFile')?.addEventListener('change', async (e) => {
   const pick = document.getElementById('xMidiPick'); pick.hidden = true;
   // flera spår/stämmor i filen: ett till den här stämman, eller alla till rätt stämma
   const showTracks = (tracks, opts = {}) => {
-    const use = (tr) => syncAndImport(tr.chords ? NoteIO.topLine(tr.notes) : tr.notes, `${f.name} – ${tr.name}`, opts);
+    const use = (tr) => syncAndImport(tr.chords ? NoteIO.topLine(tr.notes) : tr.notes, `${f.name} – ${tr.name}`, { ...opts, part: tr.part });
     if (tracks.length === 1) { use(tracks[0]); return; }
     const words = tr => tr.notes.filter(x => x.syl).length;
     pick.innerHTML = `<div class="midi-all"><button type="button" id="xMidiAll">🎼 Alla spår till rätt stämma på en gång…</button><small>Fördelar filens spår på låtens stämmor och sparar noterna för alla.</small></div>` +
@@ -3921,7 +3938,15 @@ document.getElementById('xFile')?.addEventListener('change', async (e) => {
       xStatus('Läser notbladet…');
       const sc = await NoteIO.fromMusicXml(await f.arrayBuffer());
       xStatus(`${sc.title ? sc.title + ': ' : ''}${sc.tracks.length} stämm${sc.tracks.length === 1 ? 'a' : 'or'}` + (sc.tempoKnown ? ` · tempo ${Math.round(sc.bpm)}` : ' · inget tempo i filen – det räknas ut vid synken'));
-      showTracks(sc.tracks, { guessTempo: !sc.tempoKnown });
+      // notbladet sparas på låten (okomprimerat), så att spelaren kan visa riktig notskrift
+      let score = null;
+      try {
+        const path = `${song.id}/score__${f.name.replace(/\.(musicxml|mxl|xml)$/i, '').replace(/[^\w.\-]+/g, '_').slice(0, 80)}.musicxml`;
+        const { error } = await supabaseClient.storage.from('heavy-voices-noter').upload(path, new Blob([sc.xml], { type: 'application/xml' }), { upsert: true, contentType: 'application/xml' });
+        if (error) throw error;
+        score = { path, measures: sc.measures };
+      } catch (e) { toast('Notbladet kunde inte sparas för spelaren: ' + (e.message || e), 6000); }
+      showTracks(sc.tracks, { guessTempo: !sc.tempoKnown, score });
     } else if (/\.midi?$/i.test(f.name)) {
       showTracks(NoteIO.fromMidi(await f.arrayBuffer()));
     } else if (/\.txt$/i.test(f.name)) {

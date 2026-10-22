@@ -273,6 +273,21 @@
   .k-line.k-active { color:var(--accent); opacity:1; transform:scale(1); text-shadow:0 0 18px rgba(229,169,104,0.35); }
   .k-line.k-past { opacity:0.2; }
   #karaoke.no-anim .k-reel, #karaoke.no-anim .k-line { transition:none; }
+  /* Rullande noter (Block / Noter) i stället för textraderna */
+  .k-roll { position:absolute; inset:0; display:none; }
+  #karaoke.roll-mode { height:10rem; }
+  #karaoke.roll-mode, #playerBar.expanded #karaoke.roll-mode {
+    -webkit-mask-image:linear-gradient(to right, transparent 0, #000 3%, #000 95%, transparent 100%);
+            mask-image:linear-gradient(to right, transparent 0, #000 3%, #000 95%, transparent 100%);
+  }
+  #karaoke.roll-mode .k-reel { display:none; }
+  #karaoke.roll-mode .k-roll { display:block; }
+  .k-modes { position:absolute; right:0.45rem; bottom:0.35rem; z-index:3; display:flex; gap:2px; padding:2px; border-radius:999px; background:rgba(10,12,16,0.6); border:1px solid var(--border); }
+  .k-modes[hidden] { display:none; }
+  .k-modes button { font-size:0.72rem; padding:0.12rem 0.55rem; border-radius:999px; background:transparent; color:var(--text-muted); border:0; box-shadow:none; transform:none; min-height:0; }
+  .k-modes button:hover { color:var(--text); box-shadow:none; transform:none; }
+  .k-modes button.on { background:var(--accent); color:#111317; }
+  #playerBar.expanded .k-modes button { font-size:0.85rem; padding:0.25rem 0.8rem; }
 
   /* Förstora texten: knapp uppe till höger i spelarlisten */
   #expandBtn {
@@ -345,7 +360,12 @@
 
 <div id="playerBar" class="hidden">
   <button type="button" id="expandBtn" class="hidden" title="Förstora texten">&#x26F6;</button>
-  <div class="k-frame"><div id="karaoke" class="hidden"><div class="k-reel"></div></div></div>
+  <div class="k-frame"><div id="karaoke" class="hidden"><div class="k-reel"></div><div class="k-roll" id="kRoll"></div></div>
+    <div class="k-modes" id="kModes" hidden role="group" aria-label="Visa som">
+      <button type="button" data-km="text" title="Synkad text rad för rad">Text</button>
+      <button type="button" data-km="blocks" title="Notblock som rullar in, orden ovanför">Block</button>
+      <button type="button" data-km="staff" title="Notrader som rullar in – riktig notskrift när notsättarens notblad finns">Noter</button>
+    </div></div>
   <div class="k-split hidden" id="karaokeSplit"></div>
   <div id="playerTitle">–</div>
   <div id="playerScrubberRow">
@@ -373,6 +393,8 @@
 <script src="/js/auth.js"></script>
 <script src="/js/bg-video.js"></script>
 <script src="/js/pdf-viewer.js"></script>
+<script src="/js/pitch-analyze.js"></script>
+<script src="/js/note-roll.js"></script>
 <script>
 const NOTER_BUCKET = 'heavy-voices-noter';
 const STEMS_BUCKET = 'heavy-voices-stems';
@@ -1639,6 +1661,7 @@ function setPlayerSong(song) {
   const btn = document.getElementById('karaokeBtn');
   btn.disabled = !hasSync;
   btn.title = hasSync ? 'Visa/dölj synkad text' : 'Ingen synkad text för den här låten';
+  loadRoll(song);   // noterna för Block/Noter (laddas i bakgrunden)
   buildKaraokeReel();
   document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
   updateExpandAvailability();
@@ -1750,6 +1773,8 @@ function renderKaraoke(force) {
 
 (function karaokeLoop() {
   renderKaraoke(false);
+  const kb = document.getElementById('karaoke');
+  if (roll && kb.classList.contains('roll-mode') && !kb.classList.contains('hidden')) roll.render(currentElapsed());
   kVideo.sync(currentElapsed(), isPlaying);
   requestAnimationFrame(karaokeLoop);
 })();
@@ -1761,8 +1786,7 @@ document.getElementById('karaokeBtn').addEventListener('click', (e) => {
   karaokeOn = !karaokeOn;
   try { localStorage.setItem('hv-karaoke', karaokeOn ? 'on' : 'off'); } catch (err) {}
   e.currentTarget.classList.toggle('active', karaokeOn);
-  const hasSync = karaokeLines.some(l => l.text);
-  document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
+  document.getElementById('karaoke').classList.toggle('hidden', !(kHasContent() && karaokeOn));
   syncSplit();
   karaokeIdx = -2;
   renderKaraoke(true);
@@ -1896,9 +1920,8 @@ function chooseKaraokeVoice(val) {
   closePlayerMenu();
   karaokeLines = parseLrc(lrcForSong(playerSong));
   buildKaraokeReel();
-  const hasSync = karaokeLines.some(l => l.text);
   document.getElementById('karaokeBtn').classList.toggle('active', karaokeOn);
-  document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
+  document.getElementById('karaoke').classList.toggle('hidden', !(kHasContent() && karaokeOn));
   if (val !== 'off' && splitOn) { splitOn = false; try { localStorage.setItem('hv-karaoke-split', 'off'); } catch (e) {} } // vald stämma → en ruta
   syncSplit();
   updateVoiceBadge();
@@ -1938,6 +1961,117 @@ function karaokeVisible() {
   return !document.getElementById('karaoke').classList.contains('hidden') ||
     !document.getElementById('karaokeSplit').classList.contains('hidden');
 }
+
+// ---------- Rullande noter i karaoken (Block / Noter) ----------
+// Noterna kommer från Röstövningen (song_pitch): redigerade noter, annars notanalysen. Notskrift från
+// notsättarens MusicXML visas när stämman har ett sparat notblad (data.score), annars notrader från noterna.
+let kMode = 'text';
+try { kMode = localStorage.getItem('hv-k-mode') || 'text'; } catch (e) {}
+var roll = null, rollStems = null, rollKey = '', rollReq = 0, rollSongId = null;   // var: karaokeLoop startar innan den här delen av skriptet har körts
+const scoreCache = new Map();
+const stemOff = (song, key) => (Number(((song && song.stem_offsets) || {})[key]) || 0) / 1000;
+async function loadRoll(song) {
+  const req = ++rollReq;
+  if (!song || song.id !== rollSongId) { rollStems = null; rollKey = ''; }
+  rollSongId = song ? song.id : null;
+  if (!song) { applyRoll(); return; }
+  const { data, error } = await supabaseClient.from('song_pitch')
+    .select('stem_key, edited:data->edited_notes, an:data->notes, lyrics:data->lyrics, score:data->score').eq('song_id', song.id);
+  if (req !== rollReq) return;
+  const m = new Map();
+  if (!error) (data || []).forEach(r => {
+    const edited = Array.isArray(r.edited) && r.edited.length;
+    let notes = edited ? r.edited : (Array.isArray(r.an) ? r.an : []);
+    if (!edited && notes.length && window.PitchAnalyze) { try { notes = PitchAnalyze.foldOctaves({ notes, hop: 0.02, midi: [] }).notes; } catch (e) {} }
+    notes = notes.filter(n => n && Number(n.d) > 0).map(n => ({ t: Number(n.t), d: Number(n.d), n: Number(n.n), ...(n.w ? { w: n.w } : {}) }));
+    if (notes.length && r.stem_key !== 'stem_backtrack_path') m.set(r.stem_key, { notes, lyr: Array.isArray(r.lyrics) ? r.lyrics : null, score: r.score && r.score.path ? r.score : null });
+  });
+  rollStems = m;
+  // låt utan synkad text men med noter: karaoken kan ändå visas (som Block/Noter)
+  const btn = document.getElementById('karaokeBtn');
+  if (rollAvailable() && btn.disabled) { btn.disabled = false; btn.title = 'Visa/dölj noterna'; }
+  syncSplit();
+}
+function rollStemKey(song) {
+  if (!rollStems || !rollStems.size) return '';
+  const v = (karaokeOn && song && effectiveVoice(song)) || voiceFromStamma(currentMember && currentMember.stamma);
+  const order = [v, 'sopran', 'alt', 'tenor', 'bas'].filter(Boolean).map(x => `stem_${x}_path`);
+  for (const k of order) if (rollStems.has(k)) return k;
+  return rollStems.keys().next().value || '';
+}
+const rollAvailable = () => !!(rollStems && rollStems.size);
+const kHasContent = () => karaokeLines.some(l => l.text) || rollAvailable();
+const splitActive = () => splitOn && karaokeOn && splitAvailable(playerSong);
+function kEffMode() {
+  if (!rollAvailable() || splitActive()) return 'text';
+  return kMode === 'text' && !karaokeLines.some(l => l.text) ? 'blocks' : kMode;
+}
+// ord vid noterna: textrutorna från Röstövningen, annars orden på noterna, annars textraderna fördelade på noterna
+function rollLyrics(st, off) {
+  if (st.lyr && st.lyr.length) return st.lyr;
+  if (st.notes.some(n => n.w)) return st.notes.filter(n => n.w).map(n => ({ t: n.t, d: n.d, w: n.w }));
+  const out = [];
+  karaokeLines.forEach((l, li) => {
+    if (!l.text || l.text === '♪') return;
+    const a = l.time - off, b = (li + 1 < karaokeLines.length ? karaokeLines[li + 1].time : l.time + 8) - off;
+    const ns = st.notes.filter(n => n.t + n.d / 2 >= a - 0.15 && n.t + n.d / 2 < b + 0.15);
+    const words = l.text.replace(/\[[SATB]{1,4}[↑↓]\]|\[\/\]|[↑↓]/g, '').split(/\s+/).filter(Boolean);
+    if (!ns.length || !words.length) return;
+    const W = words.length, N = ns.length;
+    if (W >= N) ns.forEach((n, k) => out.push({ t: n.t, d: n.d, w: words.slice(Math.floor(k * W / N), Math.floor((k + 1) * W / N)).join(' ') }));
+    else words.forEach((w, j) => { const n = ns[Math.floor(j * N / W)]; out.push({ t: n.t, d: n.d, w }); });
+  });
+  return out.filter(b => b.w);
+}
+async function fetchScore(path) {
+  if (!scoreCache.has(path)) scoreCache.set(path, (async () => {
+    const { data, error } = await supabaseClient.storage.from('heavy-voices-noter').createSignedUrl(path, 3600);
+    if (error || !data) throw new Error('hittar inte notbladet');
+    const r = await fetch(data.signedUrl); if (!r.ok) throw new Error('kunde inte hämta notbladet');
+    return r.text();
+  })().catch(e => { scoreCache.delete(path); throw e; }));
+  return scoreCache.get(path);
+}
+async function applyRoll() {
+  const box = document.getElementById('karaoke'), modes = document.getElementById('kModes');
+  rollKey = rollStemKey(playerSong);
+  const m = kEffMode();
+  modes.hidden = !rollAvailable() || splitActive();
+  modes.querySelector('[data-km="text"]').hidden = !karaokeLines.some(l => l.text);
+  modes.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.km === m));
+  box.classList.toggle('roll-mode', m !== 'text');
+  if (m === 'text' || !rollKey) return;
+  if (!roll) roll = NoteRoll.create(document.getElementById('kRoll'));
+  const song = playerSong, st = rollStems.get(rollKey), off = stemOff(song, rollKey);
+  roll.setData({
+    notes: st.notes, lyr: rollLyrics(st, off), offset: off,
+    others: [...rollStems].filter(([k]) => k !== rollKey).map(([k, v]) => ({ notes: v.notes, offset: stemOff(song, k) })),
+    bpm: Number(song.bpm) || 0, beatOffset: Number(song.beat_offset) || 0, beatsPerBar: Number(song.beats_per_bar) || 4,
+    key: window.PitchAnalyze ? PitchAnalyze.detectKey(st.notes) : null,
+  });
+  if (m === 'staff' && st.score) {
+    const want = rollKey + '|' + st.score.path + '|' + song.id;
+    if (roll._scoreFor === want) { roll.setMode('score'); return; }
+    roll.setMode('staff');   // notrader medan notbladet laddas
+    try {
+      const xml = await fetchScore(st.score.path);
+      if (rollKey + '|' + st.score.path + '|' + (playerSong && playerSong.id) !== want || kEffMode() !== 'staff') return;
+      await roll.setScore({ xml, part: st.score.part, measures: st.score.measures, offset: off });
+      roll._scoreFor = want;
+    } catch (e) {
+      roll._scoreFor = null; roll.setMode('staff');
+      toast('Notbladet kunde inte visas – visar notrader i stället');
+    }
+  } else roll.setMode(m === 'staff' ? 'staff' : 'blocks');
+}
+document.getElementById('kModes').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-km]'); if (!b) return;
+  e.stopPropagation();
+  kMode = b.dataset.km;
+  try { localStorage.setItem('hv-k-mode', kMode); } catch (err) {}
+  applyRoll();
+  karaokeIdx = -2; renderKaraoke(true);
+});
 
 // ---------- Alla stämmor (delad skärm) ----------
 let splitOn = false;
@@ -1991,9 +2125,9 @@ function syncSplit() {
     renderSplit(true);
   } else {
     wrap.classList.add('hidden');
-    const hasSync = karaokeLines.some(l => l.text);
-    document.getElementById('karaoke').classList.toggle('hidden', !(hasSync && karaokeOn));
+    document.getElementById('karaoke').classList.toggle('hidden', !(kHasContent() && karaokeOn));
   }
+  applyRoll();
   updateExpandAvailability();
 }
 function renderSplit(force) {

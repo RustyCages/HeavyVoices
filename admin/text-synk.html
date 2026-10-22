@@ -88,6 +88,9 @@
   .dwrap button:disabled { opacity: 0.25; }
   #tapBtn.holding { background: #4ade80; color: #111317; box-shadow: 0 0 0 3px rgba(74,222,128,0.3); }
   .line .txt { word-break: break-word; }
+  .line:not(.pause) .txt { cursor: text; }
+  .line .txt input.txt-edit { width: 100%; box-sizing: border-box; font: inherit; padding: 0.15rem 0.35rem; border-radius: 0.3rem;
+    border: 1px solid var(--accent); background: rgba(0,0,0,0.35); color: var(--text); }
   .line .acts { display: flex; gap: 0.25rem; opacity: 0.55; }
   .line:hover .acts, .line.cursor .acts { opacity: 1; }
   .line .acts button { padding: 0.2rem 0.45rem; font-size: 0.75rem; background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); }
@@ -176,6 +179,7 @@
           <tr><td><kbd>Mellanslag</kbd> håll</td><td>Tajma raden (start + slut)</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Slut här (spelar) / infoga paus (pausat)</td></tr>
           <tr><td><kbd>Backsteg</kbd></td><td>Ångra</td></tr>
+          <tr><td>Dubbelklick / <kbd>F2</kbd> / <kbd>E</kbd></td><td>Ändra texten på raden (tiden behålls). <kbd>|</kbd> delar raden, <kbd>Enter</kbd> klar, <kbd>Esc</kbd> avbryt</td></tr>
           <tr><td><kbd>P</kbd></td><td>Spela / pausa</td></tr>
           <tr><td><kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>Hoppa 3 s bakåt / framåt</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>&uarr;</kbd>/<kbd>&darr;</kbd></td><td>Infoga ↑ / ↓ i en textruta</td></tr>
@@ -415,6 +419,7 @@ let song = null;
 let rows = [];        // { text, time: number|null, skip: bool }
 let cursor = 0;       // index för nästa rad att tajma
 let dirty = false;
+let textEdited = false;   // texten på synkraderna har ändrats → skrivs tillbaka till Sångtext vid Spara synk
 let playingIdx = -1;
 let currentBlobUrl = null;
 let isScrubbing = false;
@@ -865,9 +870,74 @@ function setEndOfLast() {
 }
 
 const undoStack = [];
+// ---------- Ändra texten direkt på en synkrad ----------
+// Tiden och visningstiden ligger kvar. "|" delar raden: första delen behåller tiden, resten blir en ny otajmad rad.
+function editRowText(i) {
+  const r = rows[i];
+  if (!r || isPause(r)) return;
+  const li = $('lineList').children[i];
+  const span = li && li.querySelector('.txt');
+  if (!span || span.querySelector('input')) return;
+  const inp = document.createElement('input');
+  inp.className = 'txt-edit'; inp.value = r.text;
+  inp.title = 'Enter = klar, Esc = avbryt, | delar raden';
+  span.textContent = ''; span.append(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const finish = ok => {
+    if (done) return; done = true;
+    const val = inp.value.replace(/\s+/g, ' ').trim();
+    if (!ok || !val || val === r.text) { renderLines(); setCursor(i, false); return; }
+    const parts = val.split('|').map(x => x.trim()).filter(Boolean);
+    undoStack.push({ type: 'text', i, prevText: r.text, prevSkip: r.skip, added: parts.length - 1 });
+    r.text = parts[0];
+    parts.slice(1).forEach((t, k) => rows.splice(i + 1 + k, 0, { text: t, time: null, skip: HEADER_RE.test(t) }));
+    textEdited = true;
+    setDirty(true);
+    renderLines();
+    setCursor(i, false);
+    if (parts.length > 1) toast('Raden delad – tajma den nya raden');
+  };
+  inp.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  inp.addEventListener('blur', () => finish(true));
+}
+// Sångtexten med synkradernas text: raderna paras ihop med textens rader, tomrader (stycken) behålls
+function plainFromRows() {
+  const plain = (plainOf() || '').replace(/\r/g, '');
+  const lines = plain ? plain.split('\n') : [];
+  const rt = rows.filter(r => !isPause(r)).map(r => r.text);
+  // rubriker (Vers, Refräng …) som inte finns bland synkraderna står kvar orörda
+  const li = lines.map((l, k) => k).filter(k => lines[k].trim() &&
+    !(HEADER_RE.test(lines[k].trim()) && !rt.some(t => bareText(t) === bareText(lines[k]))));
+  const pairs = alignLines(li.map(k => lines[k]), rt);       // synkrad → textrad
+  const byPlain = new Map(); pairs.forEach((p, j) => byPlain.set(li[p], j));
+  const out = [];
+  let j = 0;
+  const flushTo = upto => { while (j < upto) { if (!pairs.has(j)) out.push(rt[j]); j++; } };
+  lines.forEach((l, k) => {
+    if (byPlain.has(k)) { const jj = byPlain.get(k); flushTo(jj); out.push(rt[jj]); j = jj + 1; }
+    else out.push(l);   // tomrad eller rad som inte finns bland synkraderna
+  });
+  flushTo(rt.length);
+  return normalizeLyrics(out.join('\n'));
+}
+
 function undo() {
   const u = undoStack.pop();
   if (!u) { toast('Inget att ångra'); return; }
+  if (u.type === 'text') {
+    rows.splice(u.i + 1, u.added);
+    rows[u.i].text = u.prevText;
+    rows[u.i].skip = u.prevSkip;
+    setDirty(true);
+    renderLines();
+    setCursor(u.i, false);
+    return;
+  }
   if (u.type === 'insert') {
     rows.splice(u.i, 1);
     setDirty(true);
@@ -971,6 +1041,7 @@ function applyEdit() {
   while (next.length && isPause(next[next.length - 1]) && next[next.length - 1].time == null) next.pop();
   if (next.length && !isPause(next[next.length - 1])) next.push({ text: '', time: null, skip: false }); // slutmarkör
   rows = next;
+  textEdited = true;
   undoStack.length = 0;
   closeEdit();
   setDirty(true);
@@ -990,21 +1061,41 @@ async function save() {
   if (missing && !confirm(`${missing} textrad(er) saknar tid och kommer inte med. Spara ändå?`)) return;
   if ($('lineList').querySelector('.order-warn') && !confirm('Några tider ligger i fel ordning (markerade rött). Raderna sorteras efter tid när de sparas. Fortsätt?')) return;
 
+  // ändrad text på synkraderna → skrivs tillbaka till Sångtext (stämmans egen text om en stämma är vald)
+  let textPatch = null;
+  if (textEdited) {
+    const text = plainFromRows();
+    if (text !== normalizeLyrics(plainOf() || '')) {
+      if (voice) {
+        const v = { ...(song.lyrics_plain_voices || {}) };
+        if (text && text !== song.lyrics_plain) v[voice] = text; else delete v[voice];
+        textPatch = { lyrics_plain_voices: v };
+      } else textPatch = { lyrics_plain: text || null };
+    }
+  }
+  const before = textPatch ? Object.fromEntries(Object.keys(textPatch).map(k => [k, song[k]])) : null;
+  if (textPatch) Object.assign(song, textPatch);   // fingeravtrycket i synken görs mot den nya texten
   const lrc = buildLrc();
   $('saveBtn').disabled = true;
   const patch = voice
     ? { lyrics_lrc_voices: { ...(song.lyrics_lrc_voices || {}), [voice]: lrc } }
     : { lyrics_lrc: lrc };
-  const { error } = await supabaseClient.from('songs').update(patch).eq('id', song.id);
+  const { error } = await supabaseClient.from('songs').update({ ...patch, ...(textPatch || {}) }).eq('id', song.id);
   $('saveBtn').disabled = false;
-  if (error) { alert('Kunde inte spara: ' + error.message); return; }
+  if (error) { if (before) Object.assign(song, before); alert('Kunde inte spara: ' + error.message); return; }
   Object.assign(song, patch);
+  if (textPatch) {
+    const x = allSongs.find(a => a.id === song.id);
+    if (x && !voice) { x.lyrics_plain = song.lyrics_plain; renderSongSelect(song.id); }
+    showTextCard();
+  }
+  textEdited = false;
   renderVoiceSelect();
   setDirty(false);
   refreshSongInList();
   checkTextChanged();
   $('saveInfo').textContent = `Sparat (${voiceLabel()}) ${new Date().toLocaleTimeString('sv-SE')} — ${lrc.split('\n').length - 2} rader.`;
-  toast('Synk sparad');
+  toast(textPatch ? 'Synk och sångtext sparade' : 'Synk sparad');
 }
 
 async function clearSync() {
@@ -1294,6 +1385,10 @@ function wireEvents() {
   });
   list.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.classList.contains('t') || e.target.classList.contains('d'))) e.target.blur(); });
 
+  list.addEventListener('dblclick', e => {
+    const t = e.target.closest('.txt'); if (!t || e.target.tagName === 'INPUT') return;
+    const li = t.closest('.line'); if (li) editRowText(+li.dataset.i);
+  });
   $('editLinesBtn').addEventListener('click', openEdit);
   $('cancelEditBtn').addEventListener('click', closeEdit);
   $('applyEditBtn').addEventListener('click', applyEdit);
@@ -1318,6 +1413,7 @@ function wireEvents() {
     else if (e.key === 'Backspace') { e.preventDefault(); undo(); }
     else if (e.key === 'Enter') { e.preventDefault(); tapGap(); }
     else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); togglePlay(); }
+    else if (e.key === 'F2' || e.key === 'e' || e.key === 'E') { e.preventDefault(); editRowText(cursor); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); seek(audio.currentTime - 3); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); seek(audio.currentTime + 3); }
   });
@@ -1456,8 +1552,9 @@ const timedCount = list => list.filter(r => !isPause(r) && !r.skip && r.time != 
 // Resultatet har .lost = antal tajmade rader som försvann, .kept = antal ändrade rader som behöll sin tid
 function mergeRows(newRows) {
   const old = rows.slice();
-  const oi = old.map((r, k) => k).filter(k => !isPause(old[k]));
-  const ni = newRows.map((r, k) => k).filter(k => !isPause(newRows[k]));
+  // rubriker/överhoppade rader har ingen tid → räknas inte i ihopparningen
+  const oi = old.map((r, k) => k).filter(k => !isPause(old[k]) && !old[k].skip);
+  const ni = newRows.map((r, k) => k).filter(k => !isPause(newRows[k]) && !newRows[k].skip);
   const pairs = alignLines(oi.map(k => old[k].text), ni.map(k => newRows[k].text));
   const out = [];
   let kept = 0;
@@ -1467,7 +1564,7 @@ function mergeRows(newRows) {
       if (!(out.length && isPause(out[out.length - 1]))) out.push(nr);
       return;
     }
-    const p = pairs.get(ni.indexOf(k));
+    const pos = ni.indexOf(k), p = pos < 0 ? null : pairs.get(pos);
     if (p == null) { out.push(nr); return; }
     let from = oi[p];
     const o = old[from];
@@ -1508,6 +1605,7 @@ async function saveLyricsText() {
   toast('Sångtext sparad');
 
   // Uppdatera synkraderna – tiderna följer med, även för rader som ändrats
+  textEdited = false;
   const hasTimes = rows.some(r => r.time != null);
   let autoSave = false;
   if (!hasTimes) {
@@ -1573,7 +1671,7 @@ function resetEditorState() {
   audio.load();
   if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
   $('scrubber').max = 0; $('scrubber').value = 0;
-  rows = []; cursor = 0; undoStack.length = 0; playingIdx = -2;
+  rows = []; cursor = 0; undoStack.length = 0; playingIdx = -2; textEdited = false;
   $('loadError').textContent = '';
   $('saveInfo').textContent = '';
   $('trackStatus').textContent = '';
@@ -1643,7 +1741,7 @@ function renderVoiceSelect() {
 // Läser in raderna för vald version (sparad synk, annars från texten)
 function loadVersion() {
   history.replaceState(null, '', `${location.pathname}?id=${encodeURIComponent(song.id)}${voice ? '&voice=' + voice : ''}`);
-  rows = []; cursor = 0; undoStack.length = 0; playingIdx = -2;
+  rows = []; cursor = 0; undoStack.length = 0; playingIdx = -2; textEdited = false;
   $('loadError').textContent = '';
   $('saveInfo').textContent = '';
   closeEdit();

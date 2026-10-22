@@ -144,8 +144,12 @@
   <div class="card" style="margin-bottom:1rem;">
     <div class="fd-form">
       <input type="file" id="fdInput" multiple>
+      <div>
+        <strong>Vem ska se filen?</strong>
+        <span class="fd-sub">Välj ett alternativ innan du laddar upp.</span>
+      </div>
       <div class="fd-audience" role="radiogroup" aria-label="Dela till">
-        <label><input type="radio" name="fdAud" value="alla" checked> Alla</label>
+        <label><input type="radio" name="fdAud" value="alla"> Alla</label>
         <label><input type="radio" name="fdAud" value="korledning"> Körledning</label>
         <label><input type="radio" name="fdAud" value="valda"> Valda medlemmar</label>
       </div>
@@ -716,7 +720,7 @@ const FD_BUCKET = 'heavy-voices-fildelning';
 const FD_AUD_LABEL = { alla: 'Alla', korledning: 'Körledning', valda: 'Valda' };
 let currentMemberId = null;
 
-const fdAudience = () => document.querySelector('input[name="fdAud"]:checked').value;
+const fdAudience = () => { const r = document.querySelector('input[name="fdAud"]:checked'); return r ? r.value : null; };
 document.querySelectorAll('input[name="fdAud"]').forEach(r => r.addEventListener('change', () => {
   document.getElementById('fdPicker').hidden = fdAudience() !== 'valda';
 }));
@@ -741,6 +745,7 @@ document.getElementById('fdUpload').addEventListener('click', async () => {
   const files = Array.from(document.getElementById('fdInput').files || []);
   if (!files.length) { errEl.textContent = 'Välj en eller flera filer först.'; return; }
   const aud = fdAudience();
+  if (!aud) { errEl.textContent = 'Välj vem filen ska delas till (Alla, Körledning eller Valda medlemmar).'; return; }
   const recipients = aud === 'valda' ? [...document.querySelectorAll('.fd-recipient:checked')].map(c => c.value) : [];
   if (aud === 'valda' && !recipients.length) { errEl.textContent = 'Välj minst en medlem.'; return; }
 

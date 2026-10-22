@@ -250,17 +250,13 @@ function renderBreadcrumbs() {
   const el = document.getElementById('breadcrumbs');
   el.innerHTML = '';
 
-  const rootLink = document.createElement('a');
-  rootLink.textContent = 'Filer';
-  rootLink.addEventListener('click', () => { currentPath = []; loadCurrent(); });
-  makeDropTarget(rootLink, '');
-  el.appendChild(rootLink);
-
   currentPath.forEach((seg, idx) => {
-    const sep = document.createElement('span');
-    sep.className = 'sep';
-    sep.textContent = ' / ';
-    el.appendChild(sep);
+    if (idx > 0) {
+      const sep = document.createElement('span');
+      sep.className = 'sep';
+      sep.textContent = ' / ';
+      el.appendChild(sep);
+    }
 
     if (idx === currentPath.length - 1) {
       const cur = document.createElement('span');

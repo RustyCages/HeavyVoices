@@ -57,6 +57,16 @@
     .row-actions { gap:0.25rem; }
   }
 
+  /* ---------- Fildelning ---------- */
+  .fd-form { display:flex; flex-direction:column; gap:0.75rem; }
+  .fd-form input[type=file] { width:100%; }
+  .fd-audience { display:flex; gap:1rem; flex-wrap:wrap; }
+  .fd-audience label { display:flex; align-items:center; gap:0.4rem; margin:0; cursor:pointer; }
+  #fdPicker { display:flex; flex-direction:column; gap:0.5rem; }
+  #fdMembers { max-height:260px; overflow-y:auto; border:1px solid var(--border); border-radius:0.5rem; padding:0.3rem 0.6rem; }
+  #fdMembers label { display:flex; align-items:center; gap:0.5rem; padding:0.35rem 0; margin:0; cursor:pointer; }
+  #fdMembers label[hidden] { display:none; }
+
   /* Flytta-dialog */
   .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:1000; padding:1rem; }
   .modal-backdrop[hidden] { display:none; }
@@ -127,6 +137,28 @@
 
   <div class="card">
     <div id="fileList"><p class="text-muted">Laddar...</p></div>
+  </div>
+
+  <h2 class="section-heading" id="fildelning">Fildelning</h2>
+  <p class="text-muted" style="font-size:0.85rem;">Filer du delar här raderas automatiskt 30 dagar efter uppladdningen. Alla filtyper går bra.</p>
+  <div class="card" style="margin-bottom:1rem;">
+    <div class="fd-form">
+      <input type="file" id="fdInput" multiple>
+      <div class="fd-audience" role="radiogroup" aria-label="Dela till">
+        <label><input type="radio" name="fdAud" value="alla" checked> Alla</label>
+        <label><input type="radio" name="fdAud" value="korledning"> Körledning</label>
+        <label><input type="radio" name="fdAud" value="valda"> Valda medlemmar</label>
+      </div>
+      <div id="fdPicker" hidden>
+        <input type="search" id="fdSearch" placeholder="Sök medlem…">
+        <div id="fdMembers"><p class="text-muted">Laddar medlemmar...</p></div>
+      </div>
+      <div><button type="button" class="btn-gold" id="fdUpload">Ladda upp</button></div>
+      <p class="error" id="fdError"></p>
+    </div>
+  </div>
+  <div class="card">
+    <div id="fdList"><p class="text-muted">Laddar...</p></div>
   </div>
 </div>
 
@@ -676,9 +708,131 @@ document.getElementById('upcomingSave').onclick = async () => {
   loadUpcomingEdit();
 };
 
+// =========================================================
+// Fildelning: filer till alla, körledningen eller valda medlemmar. Raderas 30 dagar efter uppladdning.
+// Själva filen ligger i bucketen heavy-voices-fildelning, metadata i tabellen shared_files (RLS styr vem som ser vad).
+// =========================================================
+const FD_BUCKET = 'heavy-voices-fildelning';
+const FD_AUD_LABEL = { alla: 'Alla', korledning: 'Körledning', valda: 'Valda' };
+let currentMemberId = null;
+
+const fdAudience = () => document.querySelector('input[name="fdAud"]:checked').value;
+document.querySelectorAll('input[name="fdAud"]').forEach(r => r.addEventListener('change', () => {
+  document.getElementById('fdPicker').hidden = fdAudience() !== 'valda';
+}));
+
+async function loadFdMembers() {
+  const wrap = document.getElementById('fdMembers');
+  const { data, error } = await supabaseClient.from('members').select('id, name').eq('status', 'approved').order('name');
+  if (error) { wrap.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`; return; }
+  wrap.innerHTML = (data || []).map(m => `<label><input type="checkbox" class="fd-recipient" value="${m.id}"> ${escapeHtml(m.name)}</label>`).join('');
+}
+document.getElementById('fdSearch').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('#fdMembers label').forEach(l => { l.hidden = !!q && !l.textContent.toLowerCase().includes(q); });
+});
+
+// Supabase Storage vill ha ASCII i sökvägen – originalnamnet sparas separat i shared_files.name
+const fdSafeName = name => name.normalize('NFC').replace(/[^A-Za-z0-9._-]/g, '_');
+
+document.getElementById('fdUpload').addEventListener('click', async () => {
+  const errEl = document.getElementById('fdError');
+  errEl.textContent = '';
+  const files = Array.from(document.getElementById('fdInput').files || []);
+  if (!files.length) { errEl.textContent = 'Välj en eller flera filer först.'; return; }
+  const aud = fdAudience();
+  const recipients = aud === 'valda' ? [...document.querySelectorAll('.fd-recipient:checked')].map(c => c.value) : [];
+  if (aud === 'valda' && !recipients.length) { errEl.textContent = 'Välj minst en medlem.'; return; }
+
+  const btn = document.getElementById('fdUpload');
+  btn.disabled = true;
+  const failed = [];
+  let ok = 0;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    btn.textContent = files.length > 1 ? `Laddar upp ${i + 1}/${files.length}…` : 'Laddar upp…';
+    const path = `${crypto.randomUUID()}/${fdSafeName(file.name)}`;
+    const { error: upErr } = await supabaseClient.storage.from(FD_BUCKET).upload(path, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
+    if (upErr) { failed.push(`${file.name}: ${friendlyUploadError(upErr)}`); continue; }
+    const { error: rowErr } = await supabaseClient.from('shared_files').insert({
+      path, name: file.name, size: file.size, mime: file.type || null,
+      audience: aud, recipients, uploaded_by: currentMemberId
+    });
+    if (rowErr) {
+      await supabaseClient.storage.from(FD_BUCKET).remove([path]);
+      failed.push(`${file.name}: ${rowErr.message}`);
+      continue;
+    }
+    ok++;
+  }
+  btn.disabled = false;
+  btn.textContent = 'Ladda upp';
+  document.getElementById('fdInput').value = '';
+  loadFildelning();
+  if (failed.length) alert('Följande filer kunde inte laddas upp:\n\n' + failed.join('\n'));
+  if (ok) toast(ok === 1 ? 'Fil uppladdad' : `${ok} filer uppladdade`);
+});
+
+async function fdSignedUrl(f, download) {
+  const { data, error } = await supabaseClient.storage.from(FD_BUCKET).createSignedUrl(f.path, 3600, download ? { download: f.name } : undefined);
+  if (error || !data) { toast('Fel: ' + (error ? error.message : 'kunde inte skapa länken')); return null; }
+  return data.signedUrl;
+}
+async function fdOpen(f) {
+  const win = window.open('', '_blank');
+  const url = await fdSignedUrl(f, false);
+  if (!url) { if (win) win.close(); return; }
+  const finalUrl = OFFICE_EXT.test(f.name) ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}` : url;
+  if (win) win.location.href = finalUrl; else window.location.href = finalUrl;
+}
+async function fdDownload(f) {
+  const url = await fdSignedUrl(f, true);
+  if (!url) return;
+  const a = document.createElement('a');
+  a.href = url; document.body.appendChild(a); a.click(); a.remove();
+}
+async function fdDelete(f) {
+  if (!confirm(`Radera "${f.name}" för alla mottagare?`)) return;
+  const { error: sErr } = await supabaseClient.storage.from(FD_BUCKET).remove([f.path]);
+  if (sErr) { toast('Fel: ' + sErr.message); return; }
+  const { error: dErr } = await supabaseClient.from('shared_files').delete().eq('id', f.id);
+  if (dErr) { toast('Fel: ' + dErr.message); return; }
+  toast('Fil raderad');
+  loadFildelning();
+}
+
+async function loadFildelning() {
+  const listEl = document.getElementById('fdList');
+  const { data, error } = await supabaseClient.from('shared_files').select('*').order('created_at', { ascending: false });
+  if (error) { listEl.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`; return; }
+  if (!data || !data.length) { listEl.innerHTML = '<p class="text-muted">Inga delade filer just nu.</p>'; return; }
+  listEl.innerHTML = '';
+  data.forEach(f => {
+    const who = f.audience === 'valda' ? `${(f.recipients || []).length} mottagare` : FD_AUD_LABEL[f.audience];
+    const row = document.createElement('div');
+    row.className = 'file-row clickable';
+    row.title = 'Öppna ' + f.name;
+    row.innerHTML = `
+      ${fileIconSvg}
+      <span class="file-name">${escapeHtml(f.name)}</span>
+      <span class="file-meta">${fmtSize(f.size)} · ${escapeHtml(who)} · raderas ${fmtDate(f.expires_at)}</span>
+      <div class="row-actions">
+        <button class="btn-outline icon-btn fdDownloadBtn" title="Ladda ner">${downloadIconSvg}</button>
+        <button class="danger icon-btn fdDeleteBtn" title="Radera">${trashIconSvg}</button>
+      </div>`;
+    row.addEventListener('click', e => { if (!e.target.closest('button')) fdOpen(f); });
+    row.querySelector('.fdDownloadBtn').addEventListener('click', () => fdDownload(f));
+    row.querySelector('.fdDeleteBtn').addEventListener('click', () => fdDelete(f));
+    listEl.appendChild(row);
+  });
+}
+
 (async () => {
   const member = await requireAuth('stamledare');
   if (!member) return;
+  currentMemberId = member.id;
+  loadFdMembers();
+  loadFildelning();
   document.getElementById('infoEditCard').style.display = 'block';
   document.getElementById('upcomingCard').style.display = 'block';
   loadUpcomingEdit();

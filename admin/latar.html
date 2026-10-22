@@ -450,9 +450,13 @@ area.querySelectorAll('.openLyricBtn').forEach(btn => {
   const fileInput = area.querySelector('.lyricAddFile');
 
   if (select) {
-    select.addEventListener('change', () => {
+    // "Annat..." kan vara förvalt (t.ex. när alla fasta platser är upptagna) → då kommer inget change-event
+    const showLabel = () => {
       customLabel.style.display = select.value === '__other__' ? 'inline-block' : 'none';
-    });
+      if (select.value === '__other__' && document.activeElement === select) customLabel.focus();
+    };
+    select.addEventListener('change', showLabel);
+    showLabel();
   }
 
   if (fileInput) {
@@ -678,9 +682,13 @@ function wireStemsArea(s) {
   const fileInput = area.querySelector('.stemAddFile');
 
   if (select) {
-    select.addEventListener('change', () => {
+    // "Annat..." kan vara förvalt (t.ex. när alla fasta platser är upptagna) → då kommer inget change-event
+    const showLabel = () => {
       customLabel.style.display = select.value === '__other__' ? 'inline-block' : 'none';
-    });
+      if (select.value === '__other__' && document.activeElement === select) customLabel.focus();
+    };
+    select.addEventListener('change', showLabel);
+    showLabel();
   }
 
   if (fileInput) {

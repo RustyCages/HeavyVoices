@@ -960,13 +960,12 @@ function closeEdit() {
 }
 function applyEdit() {
   const lines = $('editArea').value.split(/\r?\n/).map(l => l.trim());
-  // Behåll tider: matcha i ordning mot gamla rader med samma text
+  // Behåll tider: para ihop med de gamla raderna i ordning, även rader som ändrats
   const old = rows.slice();
-  let searchFrom = 0;
-  const next = lines.map(text => {
-    for (let k = searchFrom; k < old.length; k++) {
-      if (bareText(old[k].text) === bareText(text)) { searchFrom = k + 1; return { ...old[k], text }; }
-    }
+  const pairs = alignLines(old.map(r => r.text), lines);
+  const next = lines.map((text, j) => {
+    const k = pairs.get(j);
+    if (k != null) return { ...old[k], text };
     return { text, time: null, skip: text ? HEADER_RE.test(text) : true };
   });
   while (next.length && isPause(next[next.length - 1]) && next[next.length - 1].time == null) next.pop();
@@ -1391,28 +1390,95 @@ function showTextCard() {
   $('textStatus').textContent = '';
 }
 
-// Nya rader från texten, men behåll tid/hoppa-över för rader vars text inte ändrats
+// ---------- Behåll tiderna när texten ändras ----------
+// Gamla och nya rader paras ihop i ordning (som en diff). Samma text = säker träff, en rad med
+// rättat stavfel, ändrat ord eller tillagt/borttaget ord räknas också som samma rad och behåller sin tid.
+// Rader som står ensamma på samma plats mellan två träffar (t.ex. en helt omskriven rad) behåller också tiden.
+const simWords = t => bareText(t).toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+function lineSim(a, b) {
+  const A = simWords(a), B = simWords(b);
+  if (!A.length || !B.length) return A.length === B.length ? 1 : 0;
+  const sa = A.join(' '), sb = B.join(' ');
+  if (sa === sb) return 1;
+  // ord i samma ordning (LCS)
+  let prev = new Array(B.length + 1).fill(0);
+  for (let i = 1; i <= A.length; i++) {
+    const cur = [0];
+    for (let j = 1; j <= B.length; j++) cur[j] = A[i - 1] === B[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+    prev = cur;
+  }
+  const w = 2 * prev[B.length] / (A.length + B.length);
+  // bokstavspar (tål stavfel)
+  const bg = x => { const m = new Map(); for (let i = 0; i < x.length - 1; i++) { const k = x.slice(i, i + 2); m.set(k, (m.get(k) || 0) + 1); } return m; };
+  const ga = bg(sa), gb = bg(sb); let common = 0, na = 0, nb = 0;
+  ga.forEach((v, k) => { na += v; common += Math.min(v, gb.get(k) || 0); });
+  gb.forEach(v => { nb += v; });
+  const c = na + nb ? 2 * common / (na + nb) : 0;
+  return Math.max(w, c);
+}
+// oldT/newT = radtexter. Svar: Map(nytt index → gammalt index)
+function alignLines(oldT, newT) {
+  const m = oldT.length, n = newT.length;
+  const sim = Array.from({ length: m }, (_, i) => newT.map(t => {
+    const a = !String(oldT[i]).trim(), b = !String(t).trim();
+    if (a || b) return a && b ? 1 : 0;
+    return lineSim(oldT[i], t);
+  }));
+  const score = (i, j) => { const v = sim[i][j]; return v >= 0.999 ? 2 : v >= 0.45 ? v : -1; };
+  const S = Array.from({ length: m + 1 }, () => new Float64Array(n + 1));
+  for (let i = m - 1; i >= 0; i--) for (let j = n - 1; j >= 0; j--) {
+    const sc = score(i, j);
+    S[i][j] = Math.max(S[i + 1][j], S[i][j + 1], sc > 0 ? sc + S[i + 1][j + 1] : -Infinity);
+  }
+  const map = new Map(), anchors = [];
+  let i = 0, j = 0;
+  while (i < m && j < n) {
+    const sc = score(i, j);
+    if (sc > 0 && Math.abs(S[i][j] - (sc + S[i + 1][j + 1])) < 1e-9) { map.set(j, i); anchors.push([i, j]); i++; j++; }
+    else if (S[i][j] === S[i + 1][j]) i++;
+    else j++;
+  }
+  // luckor med lika många gamla och nya rader → para ihop dem i ordning (omskrivna rader)
+  const bounds = [[-1, -1], ...anchors, [m, n]];
+  for (let k = 0; k < bounds.length - 1; k++) {
+    const [i0, j0] = bounds[k], [i1, j1] = bounds[k + 1];
+    if (i1 - i0 === j1 - j0 && i1 - i0 > 1) {
+      let ok = true;
+      for (let d = 1; d < i1 - i0; d++) if (!String(oldT[i0 + d]).trim() !== !String(newT[j0 + d]).trim()) ok = false;
+      if (ok) for (let d = 1; d < i1 - i0; d++) map.set(j0 + d, i0 + d);
+    }
+  }
+  return map;
+}
+const timedCount = list => list.filter(r => !isPause(r) && !r.skip && r.time != null).length;
+
+// Nya rader från texten, men behåll tid/hoppa-över för rader som finns kvar (även om de ändrats)
+// Resultatet har .lost = antal tajmade rader som försvann, .kept = antal ändrade rader som behöll sin tid
 function mergeRows(newRows) {
   const old = rows.slice();
-  let from = 0;
+  const oi = old.map((r, k) => k).filter(k => !isPause(old[k]));
+  const ni = newRows.map((r, k) => k).filter(k => !isPause(newRows[k]));
+  const pairs = alignLines(oi.map(k => old[k].text), ni.map(k => newRows[k].text));
   const out = [];
-  newRows.forEach(nr => {
+  let kept = 0;
+  newRows.forEach((nr, k) => {
     if (isPause(nr)) {
       // Slutmarkör/paus från texten – hoppa över om en tajmad paus redan ligger sist
       if (!(out.length && isPause(out[out.length - 1]))) out.push(nr);
       return;
     }
-    for (let k = from; k < old.length; k++) {
-      if (!isPause(old[k]) && bareText(old[k].text) === bareText(nr.text)) {
-        out.push({ ...old[k], text: nr.text });
-        from = k + 1;
-        // Tajmade pausrader direkt efter raden (= radens sluttid) följer med
-        while (from < old.length && isPause(old[from]) && old[from].time != null) out.push(old[from++]);
-        return;
-      }
-    }
-    out.push(nr);
+    const p = pairs.get(ni.indexOf(k));
+    if (p == null) { out.push(nr); return; }
+    let from = oi[p];
+    const o = old[from];
+    if (bareText(o.text) !== bareText(nr.text) && o.time != null) kept++;
+    out.push({ ...o, text: nr.text });
+    from++;
+    // Tajmade pausrader direkt efter raden (= radens sluttid) följer med
+    while (from < old.length && isPause(old[from]) && old[from].time != null) out.push(old[from++]);
   });
+  out.lost = Math.max(0, timedCount(old) - timedCount(out));
+  out.kept = kept;
   return out;
 }
 
@@ -1441,21 +1507,31 @@ async function saveLyricsText() {
   $('textStatus').textContent = 'Sparat ✓';
   toast('Sångtext sparad');
 
-  // Uppdatera synkraderna
+  // Uppdatera synkraderna – tiderna följer med, även för rader som ändrats
   const hasTimes = rows.some(r => r.time != null);
+  let autoSave = false;
   if (!hasTimes) {
     rows = rowsFromPlain(text);
-  } else if (confirm('Uppdatera synkraderna med den nya texten?\nTider behålls för rader vars text inte ändrats.')) {
-    rows = mergeRows(rowsFromPlain(text));
-    setDirty(true);
   } else {
-    checkTextChanged();   // nej tack → visa bannern så att det går att uppdatera senare
-    return;
+    const merged = mergeRows(rowsFromPlain(text));
+    if (merged.lost && !confirm(`${merged.lost} tajmad(e) rad(er) finns inte kvar i den nya texten och tappar sin tid.\nÖvriga rader behåller sina tider. Uppdatera synken?`)) {
+      checkTextChanged();   // nej tack → visa bannern så att det går att uppdatera senare
+      return;
+    }
+    const wasDirty = dirty;
+    rows = merged;
+    setDirty(true);
+    // inget tappat och alla rader har tid → spara synken direkt, så att spelaren och karaoken hänger med
+    autoSave = !wasDirty && !merged.lost && !rows.some(r => !r.skip && !isPause(r) && r.time == null);
+    if (!autoSave) toast(rows.some(r => !r.skip && !isPause(r) && r.time == null)
+      ? 'Tiderna behölls – tajma de nya raderna och tryck Spara synk'
+      : 'Tiderna behölls – tryck Spara synk');
   }
   undoStack.length = 0;
   $('loadError').textContent = rows.length ? '' : $('loadError').textContent;
   renderLines();
   setCursor(firstUntimed(), false);
+  if (autoSave) { await save(); toast('Texten och synken sparade – tiderna behölls'); }
   checkTextChanged();
 }
 
@@ -1620,13 +1696,17 @@ function refreshSongInList() {
   $('guideCard').addEventListener('toggle', () => { try { localStorage.setItem('hv-synk-guide', $('guideCard').open ? 'open' : 'closed'); } catch (_) {} });
   wireSegTools();
   $('applyTextChangeBtn').addEventListener('click', () => {
-    rows = mergeRows(rowsFromPlain(plainOf()));
+    const merged = mergeRows(rowsFromPlain(plainOf()));
+    if (merged.lost && !confirm(`${merged.lost} tajmad(e) rad(er) finns inte kvar i texten och tappar sin tid. Fortsätt?`)) return;
+    rows = merged;
     undoStack.length = 0;
     setDirty(true);
     renderLines();
     setCursor(firstUntimed(), false);
     $('textChangedBanner').hidden = true;
-    toast('Raderna uppdaterade – tajma nya rader och tryck Spara synk');
+    toast(rows.some(r => !r.skip && !isPause(r) && r.time == null)
+      ? 'Tiderna behölls – tajma de nya raderna och tryck Spara synk'
+      : 'Tiderna behölls – tryck Spara synk');
   });
   $('ignoreTextChangeBtn').addEventListener('click', () => {
     $('textChangedBanner').dataset.ignored = '1';

@@ -704,25 +704,41 @@
   // ger bättre överensstämmelse än utan.
   // span = [a, b]: räkna mot ALL sång i det området (inte bara där noterna ligger), så att det inte
   // lönar sig att trycka ihop eller flytta bort noter
-  function matchScore(notes, midi, hop, span) {
+  // others = andra stämmors noter i samma tid: övningsfiler har ofta de andra stämmorna i bakgrunden,
+  // så en träff på en annan stämmas not räknas också (tonkurvan hoppar dit ibland)
+  function matchScore(notes, midi, hop, span, others) {
     let hit = 0, tot = 0;
     const st = Math.max(1, Math.round(0.04 / hop));
-    const ns = notes.slice().sort((a, b) => a.t - b.t);
-    let k = 0;
+    const lists = [notes, ...(others || [])].map(l => l.slice().sort((a, b) => a.t - b.t));
+    const ks = lists.map(() => 0);
+    const at = (li, t) => {
+      const ns = lists[li]; let k = ks[li];
+      while (k < ns.length && ns[k].t + ns[k].d < t) k++;
+      ks[li] = k;
+      for (let j = k; j < ns.length && ns[j].t <= t; j++) if (ns[j].t + ns[j].d >= t) return ns[j];
+      return null;
+    };
+    const ok = (m, x) => { let dd = Math.abs(m - x.n) % 12; dd = Math.min(dd, 12 - dd); return dd <= 1; };
     for (let i = 0; i < midi.length; i += st) {
       const m = midi[i]; if (!(m > 0)) continue;
       const t = i * hop;
       if (span && (t < span[0] || t > span[1])) continue;
-      while (k < ns.length && ns[k].t + ns[k].d < t) k++;
-      let x = null;
-      for (let j = k; j < ns.length && ns[j].t <= t; j++) if (ns[j].t + ns[j].d >= t) { x = ns[j]; break; }
+      const x = at(0, t);
       if (span) tot++;
-      if (!x) continue;
-      if (!span) tot++;
-      let dd = Math.abs(m - x.n) % 12; dd = Math.min(dd, 12 - dd);
-      if (dd <= 1) hit++;
+      else if (!x) continue;
+      else tot++;
+      if (x && ok(m, x)) { hit++; continue; }
+      for (let li = 1; li < lists.length; li++) { const y = at(li, t); if (y && ok(m, y)) { hit++; break; } }
     }
     return tot ? hit / tot : 0;
+  }
+  // kostnad för en ljudram a mot egen not s och andra stämmors noter os (tonklass, k = transponering)
+  function frameCost(s, a, os, k, soft) {
+    const pc = (x, y) => { let d = Math.abs(x - y - k) % 12; d = Math.min(d, 12 - d); return Math.min(1, Math.max(0, d - soft) / 1.5); };
+    if (!a) return s ? 0.5 : 0;
+    let c = s ? pc(a, s) : 0.6;
+    for (let q = 0; q < os.length; q++) { const o = os[q]; if (o) { const co = pc(a, o) + 0.2; if (co < c) c = co; } }
+    return c;
   }
   function warpMap(notes, midi, hop, opts = {}) {
     const R = 0.05, B = Math.round((opts.band ?? 3) / R);
@@ -732,7 +748,9 @@
     const N = Math.ceil((t1 - t0) / R);
     if (N < 20) return null;
     const S = new Float32Array(N), A = new Float32Array(N);
-    notes.forEach(x => { for (let k = Math.max(0, Math.floor((x.t - t0) / R)); k < Math.min(N, Math.ceil((x.t + x.d - t0) / R)); k++) S[k] = x.n; });
+    const grid = ns => { const g = new Float32Array(N); ns.forEach(x => { for (let k = Math.max(0, Math.floor((x.t - t0) / R)); k < Math.min(N, Math.ceil((x.t + x.d - t0) / R)); k++) g[k] = x.n; }); return g; };
+    S.set(grid(notes));
+    const O = (opts.others || []).map(grid), os = new Float32Array(O.length);
     for (let j = 0; j < N; j++) {
       // median av ramarna i fönstret (tål enstaka felaktiga tonhöjder)
       const a = Math.floor((t0 + j * R) / hop), b = Math.max(a + 1, Math.floor((t0 + (j + 1) * R) / hop));
@@ -740,11 +758,15 @@
       A[j] = v.length * 2 >= (b - a) ? v.sort((x, y) => x - y)[v.length >> 1] : 0;
     }
     const cost = (i, j) => {
-      const s = S[i], a = A[j];
-      if (!s && !a) return 0;
-      if (!s || !a) return 0.5;
-      let d = Math.abs(a - s) % 12; d = Math.min(d, 12 - d);
-      return Math.min(1, Math.max(0, d - 0.35) / 1.5);
+      if (!O.length) {
+        const s = S[i], a = A[j];
+        if (!s && !a) return 0;
+        if (!s || !a) return 0.5;
+        let d = Math.abs(a - s) % 12; d = Math.min(d, 12 - d);
+        return Math.min(1, Math.max(0, d - 0.35) / 1.5);
+      }
+      for (let q = 0; q < O.length; q++) os[q] = O[q][i];
+      return frameCost(S[i], A[j], os, 0, 0.35);
     };
     const W = 2 * B + 1, INF = 1e18;
     const D = new Float64Array(N * W).fill(INF), P = new Uint8Array(N * W);   // P: 0 diagonal, 1 från (i-1,j), 2 från (i,j-1)
@@ -784,17 +806,17 @@
       const a = Math.floor(u), f = u - a;
       return t0 + (M[a] * (1 - f) + M[a + 1] * f) * R;
     };
-    const warped = applyWarp(notes, map);
+    const warped = applyWarp(notes, map), oth = opts.others || [];
     const sp = [Math.min(...notes.map(x => x.t)), Math.max(...notes.map(x => x.t + x.d))];
-    const before = matchScore(notes, midi, hop, sp), after = matchScore(warped, midi, hop, sp);
+    const before = matchScore(notes, midi, hop, sp, oth), after = matchScore(warped, midi, hop, sp, oth.map(o => applyWarp(o, map)));
     let maxShift = 0; for (let k = 0; k < N; k++) maxShift = Math.max(maxShift, Math.abs(M[k] - k) * R);
     return { map, before, after, better: after > before + 0.03, maxShift: r2(maxShift) };
   }
   // flera varv (varje varv rättar det förra) – svar: { map, before, after, passes } eller null om det inte blev bättre
-  function fineSync(notes, midi, hop) {
-    let cur = notes, maps = [], before = null, after = null;
+  function fineSync(notes, midi, hop, others) {
+    let cur = notes, curO = others || [], maps = [], before = null, after = null;
     for (let k = 0; k < 3; k++) {
-      const w = warpMap(cur, midi, hop, { band: 4 });
+      const w = warpMap(cur, midi, hop, { band: 4, others: curO });
       if (!w) break;
       if (before == null) {
         before = w.before;
@@ -802,7 +824,7 @@
         if (before < 0.38) return null;
       }
       if (!w.better) break;
-      maps.push(w.map); cur = applyWarp(cur, w.map); after = w.after;
+      maps.push(w.map); cur = applyWarp(cur, w.map); curO = curO.map(o => applyWarp(o, w.map)); after = w.after;
     }
     if (!maps.length) return null;
     return { map: t => maps.reduce((v, f) => f(v), t), before, after, passes: maps.length };
@@ -825,8 +847,9 @@
     const sA = Math.max(0, n0 - 1), N = Math.ceil((n1 + 1 - sA) / R);
     const M = Math.ceil(midi.length * hop / R);
     if (N < 20 || M < 20) return null;
-    const S = new Float32Array(N);
-    notes.forEach(x => { for (let i = Math.max(0, Math.round((x.t - sA) / R)); i < Math.min(N, Math.round((x.t + x.d - sA) / R)); i++) S[i] = x.n; });
+    const grid = ns => { const g = new Float32Array(N); ns.forEach(x => { for (let i = Math.max(0, Math.round((x.t - sA) / R)); i < Math.min(N, Math.round((x.t + x.d - sA) / R)); i++) g[i] = x.n; }); return g; };
+    const S = grid(notes);
+    const O = (opts.others || []).map(grid), os = new Float32Array(O.length);
     const A = new Float32Array(M);
     for (let j = 0; j < M; j++) {
       const a = Math.floor(j * R / hop), b = Math.min(midi.length, Math.floor((j + 1) * R / hop));
@@ -852,8 +875,10 @@
       for (let j = 0; j < M; j++) { Dp[j] = cost(S[0], A[j]); P[j] = 2; }   // fri start i ljudet
       for (let i = 1; i < N; i++) {
         const row = i * M, prev = row - M, s = S[i];
+        let anyO = false;
+        for (let q = 0; q < O.length; q++) { os[q] = O[q][i]; if (os[q]) anyO = true; }
         for (let j = 0; j < M; j++) {
-          const a = A[j], c = cost(s, a), pen = (!s && !a) ? 0 : 0.3;
+          const a = A[j], c = anyO ? frameCost(s, a, os, k, 0.4) : cost(s, a), pen = (!s && !a) ? 0 : 0.3;
           let v = Dp[prev + j] + c + pen, f = 1;                         // noten fortsätter, ljudet står still
           if (j) {
             const dg = Dp[prev + j - 1] + c; if (dg <= v) { v = dg; f = 0; }   // båda går framåt
@@ -919,23 +944,27 @@
       cand.push({ how: 'lin', map: s => lin.offset + s * lin.scale, transpose: lin.transpose });
     } catch (e) { if (opts.follow === false) throw e; }
     if (opts.follow !== false) {
-      const dt = await dtwSync(notes, midi, hop, { res: opts.res, onProgress: p => prog(0.45 + p * 0.5) });
+      const dt = await dtwSync(notes, midi, hop, { res: opts.res, others: opts.others, onProgress: p => prog(0.45 + p * 0.5) });
       if (dt) cand.push({ how: 'dtw', map: dt.map, transpose: dt.transpose });
     }
     if (!cand.length) throw new Error('Tonkurvan har för lite sång att synka mot');
-    cand.forEach(c => { c.match = matchScore(mapNotes(notes, c.map, c.transpose), midi, hop, all); });
+    const oth = opts.others || [];
+    const score = (map, tr) => matchScore(mapNotes(notes, map, tr), midi, hop, all, oth.map(o => mapNotes(o, map, tr)));
+    cand.forEach(c => { c.match = score(c.map, c.transpose); });
     cand.sort((a, b) => b.match - a.match);
     let best = cand[0];
     if (opts.follow !== false) {
-      const ns = mapNotes(notes, best.map, best.transpose), f = fineSync(ns, midi, hop);
+      const ns = mapNotes(notes, best.map, best.transpose), f = fineSync(ns, midi, hop, oth.map(o => mapNotes(o, best.map, best.transpose)));
       if (f) {
         const m0 = best.map, m2 = s => f.map(m0(s));
-        const match = matchScore(mapNotes(notes, m2, best.transpose), midi, hop, all);
+        const match = score(m2, best.transpose);
         if (match > best.match) best = { ...best, map: m2, match, fine: true };
       }
     }
     prog(1);
-    return { map: best.map, transpose: best.transpose, how: best.how, fine: !!best.fine, match: best.match, lin,
+    // egen träffgrad (bara den här stämmans noter) för statusraden
+    const own = matchScore(mapNotes(notes, best.map, best.transpose), midi, hop, all);
+    return { map: best.map, transpose: best.transpose, how: best.how, fine: !!best.fine, match: best.match, own, withOthers: oth.length > 0, lin,
       linMatch: (cand.find(c => c.how === 'lin') || {}).match ?? null };
   }
 

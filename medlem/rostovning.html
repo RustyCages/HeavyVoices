@@ -3625,6 +3625,23 @@ function scoreInfo(score, part, toStem, match) {
     measures: score.measures.map(m => ({ i: m.i, len: m.len, s0: m.s0, s1: m.s1, a: r3(toStem(m.s0)), b: r3(toStem(m.s1)) })) };
 }
 const stemOffOf = st => (Number((song.stem_offsets || {})[st.key]) || 0) / 1000;
+// andra stämmors noter (samma notblad) omräknade till notbladets tid – övningsfiler har ofta de andra stämmorna
+// i bakgrunden, så synken får räkna dem som rätt ljud
+function othersInScoreTime(st, measures) {
+  return stems.filter(o => o !== st && o.raw && o.raw.score && Array.isArray(o.raw.edited_notes) && NoteIO.sameMeasures(o.raw.score.measures, measures))
+    .map(o => {
+      const tb = o.raw.score.measures;
+      const inv = t => {
+        let k = 0;
+        for (let i = 0; i < tb.length; i++) { if (tb[i].a <= t) k = i; else break; }
+        const m = tb[k], s0 = measures[k].s0, s1 = measures[k].s1;
+        if (t < m.a) return s0 + (t - m.a);
+        if (t >= m.b && k === tb.length - 1) return s1 + (t - m.b);
+        return s0 + (t - m.a) / Math.max(1e-6, m.b - m.a) * (s1 - s0);
+      };
+      return o.raw.edited_notes.map(n => { const a = inv(n.t), z = inv(n.t + n.d); return { t: a, d: Math.max(0.05, z - a), n: n.n }; });
+    });
+}
 // andra stämmor med samma notblad (samma takter): deras takttider omräknade till stämman st:s tid
 function otherScoreTables(st, measures) {
   return stems.filter(o => o !== st && o.raw && o.raw.score && NoteIO.sameMeasures(o.raw.score.measures, measures))
@@ -3645,7 +3662,8 @@ function syncLabel(b, prefix = 'synkat') {
   const how = b.how === 'dtw' ? 'följer inspelningen genom hela låten'
     : `start ${b.lin.offset >= 0 ? '+' : ''}${b.lin.offset.toFixed(2).replace('.', ',')} s · tempo ${Math.round(b.lin.scale * 1000) / 10} %`;
   return `${prefix}: ${how}` + (b.transpose ? ` · ${b.transpose > 0 ? '+' : ''}${b.transpose} halvtoner` : '')
-    + (b.fine ? ' · finjusterat' : '') + ` · överensstämmelse ${pct} %` + (sure ? ' ✓' : ' – osäker, kontrollera noga');
+    + (b.fine ? ' · finjusterat' : '') + ` · överensstämmelse ${pct} %`
+    + (b.withOthers ? ` (egna stämman ${Math.round(b.own * 100)} %, övriga räknade med andra stämmornas noter)` : '') + (sure ? ' ✓' : ' – osäker, kontrollera noga');
 }
 // Synka noter mot stämmans tonkurva (analysen) och lägg sedan in dem
 async function syncAndImport(list, from, opts = {}) {
@@ -3659,6 +3677,7 @@ async function syncAndImport(list, from, opts = {}) {
     xStatus('Synkar mot ljudet… 0 %');
     const b = await NoteIO.bestSync(list, midi, current.raw.hop || 0.02, {
       guessTempo: !!opts.guessTempo, follow: document.getElementById('xFineSync').checked,
+      others: opts.score ? othersInScoreTime(current, opts.score.measures) : undefined,
       onProgress: p => xStatus(`Synkar mot ljudet… ${Math.round(p * 100)} %`) });
     let map = b.map, label = syncLabel(b);
     // samma notblad finns redan på andra stämmor: takterna läggs där flertalet stämmor säger (median per takt)
@@ -3802,6 +3821,7 @@ async function importMidiAll(pairs, ref, fileName, opts = {}) {
       xStatus('Synkar mot ljudet… 0 %');
       const b = await NoteIO.bestSync(notesOf(refPair.tr), ref.raw.midi, ref.raw.hop || 0.02, {
         guessTempo: !!opts.guessTempo, follow: document.getElementById('xFineSync').checked,
+        others: pairs.filter(x => x !== refPair).map(x => notesOf(x.tr)),
         onProgress: q => xStatus(`Synkar mot ljudet… ${Math.round(q * 100)} %`) });
       map = b.map; transpose = b.transpose; syncTxt = syncLabel(b, `synkat mot ${ref.label}`); refMatch = b.match;
     }

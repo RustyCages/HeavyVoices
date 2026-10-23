@@ -471,9 +471,9 @@ function getStemDefs(song) {
 }
 
 // Låtens totala längd med hänsyn till stämsynk-förskjutningar (sätts i admin → Stämsynk)
-function timelineDuration(item) {
+function timelineDuration(item, bufs = currentBuffers) {
   return Math.max(0, ...item.stemDefs.map(def => {
-    const b = currentBuffers[def.key];
+    const b = bufs[def.key];
     return b ? b.duration + (def.offsetSec || 0) : 0;
   }));
 }
@@ -575,6 +575,7 @@ function renderPlaylistList() {
 
     playListBtn.addEventListener('click', async () => {
       if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
+      unlockAudio();   // före await – iOS kräver att ljudet låses upp direkt i trycket
 
       // Always (re)starts the playlist from track 1. Pausing/resuming a track in
       // progress is handled by each track's own play button + the floating player.
@@ -1100,24 +1101,72 @@ async function addToPlaylist(song, stemDefs, checkedKeys, playlistId) {
 }
 
 // =========================================================
-// Web Audio playback engine (sample-accurate multi-stem sync)
+// Uppspelningsmotor
+// Stämmorna avkodas och mixas offline (OfflineAudioContext) till en WAV-blob i minnet,
+// som spelas i ett vanligt <audio>-element. Skälet: iOS pausar Web Audio (AudioContext)
+// när man byter app eller låser skärmen, men låter ett <audio>-element spela vidare.
+// Mixen renderas om när volym/tysta ändras, och nästa låt i listan förrenderas så att
+// den kan starta direkt även när telefonen ligger låst.
 // =========================================================
-let audioCtx = null;
+const MIX_RATE = 22050;       // räcker gott för övningslyssning och halverar minnet
 let currentPlaylist = null;   // { pl, items }
 let activePlaylistId = null;  // id of the playlist currentPlaylist belongs to (kept even across pause)
 let currentIndex = -1;
-let currentBuffers = {};      // key -> AudioBuffer
-let currentSources = {};      // key -> AudioBufferSourceNode
-let gainNodesCurrent = {};    // key -> GainNode
+let currentBuffers = {};      // key -> AudioBuffer (för omrendering vid volymändring; laddas vid behov)
+let buffersItem = null;       // vilket item currentBuffers hör till
+let currentMixUrl = null;     // blob-URL för mixen som ligger i audioEl
 let isPlaying = false;
 let isLoadingTrack = false;   // true while stems are being fetched/decoded — guards against overlapping playback
-let playStartCtxTime = 0;     // audioCtx.currentTime when playback of current offset started
-let playStartOffset = 0;      // offset into the track (seconds) at playStartCtxTime
+let swappingMix = false;      // true medan en ny mix byts in mitt i uppspelningen
 let trackDuration = 0;
 // Upprepa: 'off' → 'one' (låten) → 'all' (hela spellistan, bara när en lista med flera låtar spelas) → 'off'
 let repeatMode = 'off';
 try { repeatMode = localStorage.getItem('hv-repeat') || 'off'; if (!['off', 'one', 'all'].includes(repeatMode)) repeatMode = 'off'; } catch (e) {}
 let progressTimer = null;
+
+const audioEl = document.createElement('audio');
+audioEl.preload = 'auto';
+audioEl.setAttribute('playsinline', '');
+audioEl.style.display = 'none';
+document.body.appendChild(audioEl);
+// Safari 17+: behandla sidan som mediauppspelning (ljudlös-knappen tystar inte spelaren)
+try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+
+const ownsAudio = () => !!currentMixUrl && audioEl.src === currentMixUrl;
+// Systemet kan pausa/starta (samtal, hörlurar ur, låsskärmen) — håll UI:t i synk
+audioEl.addEventListener('pause', () => {
+  if (!ownsAudio() || swappingMix || audioEl.ended || !isPlaying) return;
+  isPlaying = false;
+  setPlayPauseIcon(false);
+  clearInterval(progressTimer);
+  updateAllPlayButtons();
+  setMediaSessionState();
+});
+audioEl.addEventListener('play', () => {
+  if (!ownsAudio() || isPlaying || isLoadingTrack) return;
+  isPlaying = true;
+  setPlayPauseIcon(true);
+  startProgressTimer();
+  updateAllPlayButtons();
+  setMediaSessionState();
+});
+audioEl.addEventListener('ended', () => {
+  if (!ownsAudio() || !isPlaying) return;
+  handleTrackEnded();
+});
+
+// iOS kräver att ett mediaelement startas direkt i en användarhandling. Spelas det en gång
+// i ett tryck får samma element sedan starta programmatiskt (efter laddning, nästa låt osv.).
+let audioUnlocked = false;
+function unlockAudio() {
+  if (audioUnlocked || currentMixUrl) return;
+  audioUnlocked = true;
+  try {
+    audioEl.src = URL.createObjectURL(silentWavBlob());
+    const p = audioEl.play();
+    if (p && p.then) p.then(() => { if (!currentMixUrl) audioEl.pause(); }).catch(() => {});
+  } catch (e) {}
+}
 
 function setControlsDisabled(disabled) {
   document.getElementById('prevBtn').disabled = disabled;
@@ -1164,45 +1213,16 @@ function updateTrackPlayIcons() {
   });
 }
 
-async function ensureAudioCtx() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') {
-    // Mobile browsers aggressively suspend the AudioContext (e.g. after switching
-    // tabs/panels). If we don't wait for resume() before scheduling, source.start()
-    // can be scheduled against a context that isn't actually running yet, producing
-    // silent playback even though every JS variable looks "playing". Always await it.
-    try { await audioCtx.resume(); } catch (e) { /* ignored — we'll surface failures via decode/play errors */ }
-  }
-}
-
-// Stops/disconnects the currently-playing source + gain nodes WITHOUT throwing away
-// the already-decoded audio buffers. Use this for anything that reschedules the SAME
-// track (scrubbing, pause) — re-decoding on every scrub would also work but is slow
-// and was actually the cause of a real bug (see below).
-function stopCurrentSources() {
-  Object.values(currentSources).forEach(src => {
-    try { src.onended = null; src.stop(); } catch (e) {}
-    try { src.disconnect(); } catch (e) {}
+// ---------- Avkodning och offline-mix ----------
+const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+let decodeCtx = null;
+function decodeAudio(arrBuf) {
+  // Avkodning i en OfflineAudioContext på MIX_RATE ger samplingen direkt i rätt takt
+  if (!decodeCtx) decodeCtx = new OfflineCtx(2, 1, MIX_RATE);
+  return new Promise((resolve, reject) => {
+    const p = decodeCtx.decodeAudioData(arrBuf, resolve, reject);
+    if (p && p.then) p.then(resolve, reject);
   });
-  Object.values(gainNodesCurrent).forEach(g => {
-    try { g.disconnect(); } catch (e) {}
-  });
-  currentSources = {};
-  gainNodesCurrent = {};
-}
-
-// Full teardown before loading a DIFFERENT track — also drops the decoded buffers,
-// since they belong to the track we're leaving.
-function disconnectCurrentGainNodes() {
-  stopCurrentSources();
-  currentBuffers = {};
-}
-
-function applyGainForKey(item, key, val) {
-  const g = gainNodesCurrent[key];
-  if (!g) return;
-  const muted = item.muted.has(key);
-  g.gain.value = muted ? 0 : (val / 100);
 }
 
 async function fetchAndDecode(bucket, path) {
@@ -1210,9 +1230,196 @@ async function fetchAndDecode(bucket, path) {
   if (error) throw error;
   const resp = await fetch(data.signedUrl);
   if (!resp.ok) throw new Error(`Kunde inte hämta ljudfil (HTTP ${resp.status})`);
-  const arrBuf = await resp.arrayBuffer();
-  await ensureAudioCtx();
-  return await audioCtx.decodeAudioData(arrBuf);
+  return await decodeAudio(await resp.arrayBuffer());
+}
+
+async function decodeStems(item) {
+  const entries = await Promise.all(item.stemDefs.map(async def => [def.key, await fetchAndDecode(STEMS_BUCKET, def.path)]));
+  const bufs = {};
+  entries.forEach(([k, b]) => { bufs[k] = b; });
+  return bufs;
+}
+
+function writeWavHeader(dv, channels, rate, frames) {
+  const str = (o, t) => { for (let i = 0; i < t.length; i++) dv.setUint8(o + i, t.charCodeAt(i)); };
+  const dataLen = frames * channels * 2;
+  str(0, 'RIFF'); dv.setUint32(4, 36 + dataLen, true); str(8, 'WAVE');
+  str(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, channels, true);
+  dv.setUint32(24, rate, true); dv.setUint32(28, rate * channels * 2, true);
+  dv.setUint16(32, channels * 2, true); dv.setUint16(34, 16, true);
+  str(36, 'data'); dv.setUint32(40, dataLen, true);
+}
+function silentWavBlob() {
+  const frames = 2205;   // 0,1 s tystnad
+  const dv = new DataView(new ArrayBuffer(44 + frames * 2));
+  writeWavHeader(dv, 1, MIX_RATE, frames);
+  return new Blob([dv], { type: 'audio/wav' });
+}
+function wavBlob(buf) {
+  const ch = Math.min(2, buf.numberOfChannels), n = buf.length;
+  const dv = new DataView(new ArrayBuffer(44 + n * ch * 2));
+  writeWavHeader(dv, ch, buf.sampleRate, n);
+  const chans = [];
+  for (let c = 0; c < ch; c++) chans.push(buf.getChannelData(c));
+  let p = 44;
+  for (let i = 0; i < n; i++) {
+    for (let c = 0; c < ch; c++) {
+      let s = chans[c][i];
+      s = s < -1 ? -1 : s > 1 ? 1 : s;
+      dv.setInt16(p, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      p += 2;
+    }
+  }
+  return new Blob([dv], { type: 'audio/wav' });
+}
+
+// Mixar stämmorna med aktuella volymer/tysta/förskjutning → blob-URL
+async function renderMixUrl(item, bufs) {
+  const dur = timelineDuration(item, bufs);
+  const ctx = new OfflineCtx(2, Math.max(1, Math.ceil(dur * MIX_RATE)), MIX_RATE);
+  item.stemDefs.forEach(def => {
+    const b = bufs[def.key];
+    if (!b || item.muted.has(def.key)) return;
+    const vol = (item.volumes[def.key] ?? 100) / 100;
+    if (vol <= 0) return;
+    const src = ctx.createBufferSource();
+    src.buffer = b;
+    const g = ctx.createGain();
+    g.gain.value = vol;
+    src.connect(g);
+    g.connect(ctx.destination);
+    // Förskjutning: +o = stämman ligger o s senare i tidslinjen än filen.
+    const o = def.offsetSec || 0;
+    if (o >= 0) src.start(o, 0); else src.start(0, -o);
+  });
+  const rendered = await new Promise((resolve, reject) => {
+    ctx.oncomplete = e => resolve(e.renderedBuffer);
+    const p = ctx.startRendering();
+    if (p && p.then) p.then(resolve, reject);
+  });
+  return URL.createObjectURL(wavBlob(rendered));
+}
+
+const mixSig = item => JSON.stringify(item.stemDefs.map(d =>
+  [d.key, d.path, d.offsetSec || 0, item.muted.has(d.key) ? 0 : (item.volumes[d.key] ?? 100)]));
+
+// Lägger in en mix i audioEl och ställer positionen. offset kan vara en funktion (läses när mixen är laddad).
+function loadMix(url, offset) {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => { audioEl.removeEventListener('loadedmetadata', done); audioEl.removeEventListener('error', fail); };
+    function done() {
+      cleanup();
+      const t = typeof offset === 'function' ? offset() : (offset || 0);
+      try { audioEl.currentTime = Math.max(0, Math.min(t, (audioEl.duration || t) - 0.05)); } catch (e) {}
+      resolve();
+    }
+    function fail() { cleanup(); reject(new Error('Kunde inte läsa in mixen')); }
+    audioEl.addEventListener('loadedmetadata', done);
+    audioEl.addEventListener('error', fail);
+    const old = currentMixUrl;
+    currentMixUrl = url;
+    audioEl.src = url;
+    audioEl.load();
+    if (old && old !== url) setTimeout(() => URL.revokeObjectURL(old), 2000);
+  });
+}
+
+async function startElementPlayback() {
+  try {
+    await audioEl.play();
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    isPlaying = false;
+    setPlayPauseIcon(false);
+    clearInterval(progressTimer);
+    updateAllPlayButtons();
+    toast('Tryck på play för att starta uppspelningen');
+    return;
+  }
+  isPlaying = true;
+  setPlayPauseIcon(true);
+  startProgressTimer();
+  updateAllPlayButtons();
+  setMediaSessionState();
+}
+
+// ---------- Omrendering när volym/tysta ändras ----------
+let remixTimer = null, remixToken = 0;
+function applyGainForKey(item) {
+  if (item !== currentPlayerItem()) return;
+  clearTimeout(remixTimer);
+  remixTimer = setTimeout(() => remixCurrent(item), 350);
+}
+async function remixCurrent(item) {
+  if (isLoadingTrack || !currentMixUrl) return;
+  const tok = ++remixToken;
+  try {
+    if (buffersItem !== item) {   // låten startades från en förrenderad mix – hämta stämmorna nu
+      const bufs = await decodeStems(item);
+      if (tok !== remixToken || item !== currentPlayerItem()) return;
+      currentBuffers = bufs; buffersItem = item;
+    }
+    const url = await renderMixUrl(item, currentBuffers);
+    if (tok !== remixToken || item !== currentPlayerItem() || isLoadingTrack) { URL.revokeObjectURL(url); return; }
+    const wasPlaying = isPlaying;
+    const pos = audioEl.currentTime || 0;
+    const t0 = performance.now();
+    swappingMix = true;
+    try {
+      await loadMix(url, () => wasPlaying ? pos + (performance.now() - t0) / 1000 : pos);
+      if (wasPlaying) await startElementPlayback();
+    } finally { swappingMix = false; }
+  } catch (e) {
+    console.warn('remix failed:', e);
+  }
+}
+
+// ---------- Förrendering av nästa låt ----------
+let prepared = null;          // { item, sig, url, duration }
+let prepToken = 0, prepTimer = null;
+function dropPrepared() {
+  prepToken++;
+  clearTimeout(prepTimer);
+  if (prepared) URL.revokeObjectURL(prepared.url);
+  prepared = null;
+}
+function takePrepared(item) {
+  if (prepared && prepared.item === item && prepared.sig === mixSig(item)) {
+    const p = prepared; prepared = null; prepToken++;
+    return p;
+  }
+  dropPrepared();
+  return null;
+}
+function nextIndexToPrepare() {
+  if (!currentPlaylist || repeatMode === 'one') return -1;
+  const n = currentPlaylist.items.length;
+  if (currentIndex < n - 1) return currentIndex + 1;
+  if (repeatMode === 'all' && n > 1) return 0;
+  return -1;
+}
+function schedulePrepareNext() {
+  clearTimeout(prepTimer);
+  prepTimer = setTimeout(prepareNext, 4000);   // låt den aktuella låten komma igång först
+}
+async function prepareNext() {
+  const idx = nextIndexToPrepare();
+  if (idx < 0 || idx === currentIndex || isLoadingTrack) return;
+  const item = currentPlaylist.items[idx];
+  const sig = mixSig(item);
+  if (prepared && prepared.item === item && prepared.sig === sig) return;
+  dropPrepared();
+  const tok = prepToken;
+  try {
+    const bufs = await decodeStems(item);
+    if (tok !== prepToken) return;
+    const duration = timelineDuration(item, bufs);
+    const url = await renderMixUrl(item, bufs);
+    if (tok !== prepToken) { URL.revokeObjectURL(url); return; }
+    prepared = { item, sig, url, duration };
+  } catch (e) {
+    console.warn('prepareNext failed:', e);
+  }
 }
 
 let playRequestId = 0; // bumped on every playTrackAt call; lets a stale in-flight load bail out instead of clobbering a newer one
@@ -1255,18 +1462,23 @@ async function playTrackAt(index, offsetSeconds) {
   if (index < 0 || index >= items.length) return;
 
   const myRequestId = ++playRequestId;
+  unlockAudio();   // måste ske synkront i användarens tryck (iOS)
   isLoadingTrack = true;
   setControlsDisabled(true);
   updateAllPlayButtons();
 
-  disconnectCurrentGainNodes();
   clearInterval(progressTimer);
+  clearTimeout(remixTimer);
+  remixToken++;
   isPlaying = false;
+  if (currentMixUrl) audioEl.pause();
 
   currentIndex = index;
   renderRepeatBtn();
   if (playerMenuKind === 'mixer') { playerMenuKind = null; togglePlayerMenu('mixer'); }
   const item = items[index];
+  const prep = takePrepared(item);
+  if (!prep) { currentBuffers = {}; buffersItem = null; }
 
   document.getElementById('playerBar').classList.remove('hidden');
   setPlayerTitle(`${escapeHtml(item.song.title)} <span class="loading-tag">laddar...</span>`);
@@ -1278,24 +1490,27 @@ async function playTrackAt(index, offsetSeconds) {
   setPlayerSong(item.song);
 
   try {
-    await ensureAudioCtx();
+    let mixUrl, duration;
+    if (prep) {
+      // Förrenderad medan förra låten spelade – startar direkt, även i bakgrunden.
+      // Stämmorna hämtas först om någon ändrar volymen (remixCurrent).
+      mixUrl = prep.url; duration = prep.duration;
+      currentBuffers = {}; buffersItem = null;
+    } else {
+      const bufs = await decodeStems(item);
+      // A newer playTrackAt call has started while we were loading — discard this
+      // stale result instead of clobbering the track the user actually wants now.
+      if (myRequestId !== playRequestId) return;
+      currentBuffers = bufs; buffersItem = item;
+      duration = timelineDuration(item, bufs);
+      mixUrl = await renderMixUrl(item, bufs);
+      if (myRequestId !== playRequestId) { URL.revokeObjectURL(mixUrl); return; }
+    }
 
-    // Decode all stems in parallel
-    const bufferEntries = await Promise.all(item.stemDefs.map(async def => {
-      const buf = await fetchAndDecode(STEMS_BUCKET, def.path);
-      return [def.key, buf];
-    }));
-
-    // A newer playTrackAt call has started while we were loading — discard this
-    // stale result instead of overwriting/(re)connecting nodes for a track that's
-    // no longer the one the user wants. This is what could otherwise cause a
-    // "click, then click the next one" sequence to end in silence.
+    await loadMix(mixUrl, offsetSeconds || 0);
     if (myRequestId !== playRequestId) return;
 
-    currentBuffers = {};
-    bufferEntries.forEach(([k, b]) => { currentBuffers[k] = b; });
-
-    trackDuration = timelineDuration(item);
+    trackDuration = duration;
     document.getElementById('scrubber').max = trackDuration || 1;
     document.getElementById('durTime').textContent = fmtTime(trackDuration);
     setPlayerTitle(escapeHtml(item.song.title));
@@ -1304,14 +1519,9 @@ async function playTrackAt(index, offsetSeconds) {
     isLoadingTrack = false;
     setControlsDisabled(false);
 
-    // Belt-and-braces: some browsers re-suspend the context between the click and
-    // here if the tab was backgrounded mid-decode. Make sure it's really running
-    // right before we schedule the sources.
-    await ensureAudioCtx();
-    if (myRequestId !== playRequestId) return;
-
-    schedulePlaybackFrom(item, offsetSeconds || 0);
     updateMediaSession(item);
+    await startElementPlayback();
+    schedulePrepareNext();
   } catch (e) {
     console.error('playTrackAt failed:', e);
     toast('Kunde inte spela låten: ' + (e.message || e));
@@ -1400,82 +1610,53 @@ function markTrackRowLoading(rowId, loading) {
 }
 
 function schedulePlaybackFrom(item, offset) {
-  const startAt = audioCtx.currentTime + 0.15;
-  playStartCtxTime = startAt;
-  playStartOffset = offset;
+  if (!currentMixUrl) return;
+  try { audioEl.currentTime = Math.max(0, offset || 0); } catch (e) {}
+  startElementPlayback();
+}
 
-  let endKey = null, endTime = -Infinity;
-  item.stemDefs.forEach(def => {
-    const buffer = currentBuffers[def.key];
-    if (!buffer) return;
-    // Förskjutning: +o = stämman ligger o s senare i tidslinjen än filen.
-    const o = def.offsetSec || 0;
-    const posInFile = offset - o;
-    if (posInFile >= buffer.duration) return;              // den här stämman är redan slut
-    if (buffer.duration + o > endTime) { endTime = buffer.duration + o; endKey = def.key; }
-    const source = audioCtx.createBufferSource();
-    source.buffer = buffer;
-    const gain = audioCtx.createGain();
-    const muted = item.muted.has(def.key);
-    gain.gain.value = muted ? 0 : ((item.volumes[def.key] ?? 100) / 100);
-    source.connect(gain);
-    gain.connect(audioCtx.destination);
-    if (posInFile >= 0) source.start(startAt, posInFile);
-    else source.start(startAt - posInFile, 0);           // stämman börjar lite senare
-    currentSources[def.key] = source;
-    gainNodesCurrent[def.key] = gain;
-  });
-
-  // Lyssna på den stämma som slutar sist (inte bara den första) så att inget klipps av.
-  if (endKey && currentSources[endKey]) {
-    currentSources[endKey].onended = () => {
-      if (isPlaying) handleTrackEnded();
-    };
-  }
-
-  isPlaying = true;
-  setPlayPauseIcon(true);
-  startProgressTimer();
-  updateAllPlayButtons();
+// Spela om samma låt från början utan att hämta om något (fungerar även i bakgrunden)
+function restartCurrent() {
+  try { audioEl.currentTime = 0; } catch (e) {}
+  startElementPlayback();
 }
 
 function handleTrackEnded() {
+  const n = currentPlaylist ? currentPlaylist.items.length : 0;
   if (repeatMode === 'one') {
-    playTrackAt(currentIndex, 0);
+    restartCurrent();
     return;
   }
-  if (currentPlaylist && currentIndex < currentPlaylist.items.length - 1) {
+  if (currentPlaylist && currentIndex < n - 1) {
     playTrackAt(currentIndex + 1, 0);
-  } else if (repeatMode === 'all' && currentPlaylist && currentPlaylist.items.length) {
-    playTrackAt(0, 0);   // börja om listan
+  } else if (repeatMode === 'all' && n) {
+    if (n === 1) restartCurrent(); else playTrackAt(0, 0);   // börja om listan
   } else {
     isPlaying = false;
     setPlayPauseIcon(false);
     clearInterval(progressTimer);
     updateAllPlayButtons();
+    setMediaSessionState();
   }
 }
 
 function pauseAll() {
   if (!isPlaying) return;
-  const elapsed = playStartOffset + (audioCtx.currentTime - playStartCtxTime);
-  stopCurrentSources();
   isPlaying = false;
+  audioEl.pause();
   setPlayPauseIcon(false);
   clearInterval(progressTimer);
-  pausedOffset = Math.max(0, elapsed);
+  pausedOffset = Math.max(0, audioEl.currentTime || 0);
   updateAllPlayButtons();
+  setMediaSessionState();
 }
 
 let pausedOffset = 0;
 
 async function resumeAll() {
-  if (isPlaying || isLoadingTrack || !currentPlaylist) return;
-  const item = currentPlaylist.items[currentIndex];
-  if (!item) return;
-  await ensureAudioCtx();
-  if (isPlaying || !currentPlaylist) return; // state may have changed while awaiting resume
-  schedulePlaybackFrom(item, pausedOffset);
+  if (isPlaying || isLoadingTrack || !currentPlaylist || !currentMixUrl) return;
+  if (!currentPlaylist.items[currentIndex]) return;
+  await startElementPlayback();
 }
 
 document.getElementById('playPauseBtn').addEventListener('click', () => {
@@ -1517,6 +1698,7 @@ document.getElementById('repeatBtn').addEventListener('click', () => {
   repeatMode = cur === 'off' ? 'one' : cur === 'one' && isListPlaying() ? 'all' : 'off';
   try { localStorage.setItem('hv-repeat', repeatMode); } catch (e) {}
   renderRepeatBtn();
+  if (isPlaying) schedulePrepareNext();
   toast(REPEAT_TITLES[repeatMode === 'all' && !isListPlaying() ? 'one' : repeatMode], 1500);
 });
 renderRepeatBtn();
@@ -1531,22 +1713,17 @@ scrubberEl.addEventListener('change', () => {
   const val = parseFloat(scrubberEl.value);
   if (!currentPlaylist) return;
   const item = currentPlaylist.items[currentIndex];
-  if (!item || !Object.keys(currentBuffers).length) return; // nothing decoded yet to scrub within
-  // Reuses the already-decoded buffers for this track — must NOT clear currentBuffers here,
-  // only stop the old source nodes, otherwise schedulePlaybackFrom finds no buffers and
-  // silently plays nothing (this was the cause of the "scrubbing goes silent" bug).
-  stopCurrentSources();
-  clearInterval(progressTimer);
-  isPlaying = false;
+  if (!item || !currentMixUrl) return; // ingen mix laddad än
   pausedOffset = val;
-  schedulePlaybackFrom(item, val);
+  try { audioEl.currentTime = val; } catch (e) {}
+  if (!isPlaying) startElementPlayback();
 });
 
 function startProgressTimer() {
   clearInterval(progressTimer);
   progressTimer = setInterval(() => {
     if (!isPlaying || scrubbing) return;
-    const elapsed = playStartOffset + (audioCtx.currentTime - playStartCtxTime);
+    const elapsed = audioEl.currentTime || 0;
     document.getElementById('curTime').textContent = fmtTime(elapsed);
     scrubberEl.value = Math.min(elapsed, trackDuration);
     if (navigator.mediaSession && navigator.mediaSession.setPositionState) {
@@ -1584,6 +1761,17 @@ function updateMediaSession(item) {
     const newIdx = Math.min(currentPlaylist.items.length - 1, currentIndex + 1);
     playTrackAt(newIdx, 0);
   });
+  try {
+    navigator.mediaSession.setActionHandler('seekto', d => {
+      if (isLoadingTrack || !currentMixUrl || d.seekTime == null) return;
+      try { audioEl.currentTime = d.seekTime; } catch (e) {}
+    });
+  } catch (e) {}
+}
+
+function setMediaSessionState() {
+  if (!('mediaSession' in navigator)) return;
+  try { navigator.mediaSession.playbackState = isPlaying ? 'playing' : (currentMixUrl ? 'paused' : 'none'); } catch (e) {}
 }
 
 // =========================================================
@@ -1644,9 +1832,8 @@ function parseLrc(lrc) {
 }
 
 function currentElapsed() {
-  if (!audioCtx) return 0;
-  if (isPlaying) return Math.max(0, playStartOffset + (audioCtx.currentTime - playStartCtxTime));
-  return pausedOffset || 0;
+  if (isLoadingTrack || !currentMixUrl) return 0;
+  return audioEl.currentTime || 0;
 }
 
 const kVideo = BgVideo.create(document.querySelector('.k-frame'), { className: 'k-bg-video' });
@@ -1830,7 +2017,7 @@ function wireMixerMenu(m) {
   const item = currentPlayerItem(); if (!item) return;
   m.querySelectorAll('.volSlider').forEach(r => r.addEventListener('input', e => {
     const k = r.dataset.key, val = parseInt(e.target.value, 10);
-    item.volumes[k] = val; applyGainForKey(item, k, val);
+    item.volumes[k] = val; applyGainForKey(item);
     if (!item.isPreview) scheduleVolumeSave(item);   // spellistor sparar volymen
   }));
   m.querySelectorAll('.muteBtn').forEach(b => b.addEventListener('click', e => {
@@ -1839,7 +2026,7 @@ function wireMixerMenu(m) {
     if (item.muted.has(k)) item.muted.delete(k); else item.muted.add(k);
     const on = item.muted.has(k);
     b.classList.toggle('muted', on); b.setAttribute('aria-pressed', on);
-    applyGainForKey(item, k, item.volumes[k] ?? 100);
+    applyGainForKey(item);
   }));
   m.querySelectorAll('.mixer-row .label').forEach(l => { try { attachMarquee(l, { speed: 25 }); } catch (e) {} });
 }

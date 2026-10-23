@@ -531,7 +531,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
               <button type="button" class="btn-outline" id="xFromFile" title="MusicXML från notprogrammet (MuseScore, Sibelius, Finale, Dorico), MIDI, UltraStar eller Heavy Voices-JSON">📂 Från fil… (MusicXML / .mid / UltraStar .txt / .json)</button>
               <input type="file" id="xFile" accept=".musicxml,.mxl,.xml,.json,.mid,.midi,.txt,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml,application/xml,text/xml,application/json,audio/midi,audio/x-midi,text/plain" hidden>
               <button type="button" class="btn-outline" id="xSyncNow" title="Synka noterna som finns i notbanan just nu mot ljudet">🎯 Synka nuvarande noter</button>
-              <button type="button" class="btn-outline" id="xScoreAlign" title="Stämmor med samma notblad (MusicXML) får samma takttider – där flertalet stämmor är överens. Rättar en stämma vars ljud är svårt att synka mot.">🎼 Samsynka notbladens takter</button>
+              <button type="button" class="btn-outline" id="xScoreAlign" title="Alla stämmor med notblad (MusicXML) synkas på en gång mot allas ljud – takterna hamnar exakt lika i alla stämmor. Bäst för övningsfiler där de andra stämmorna hörs i bakgrunden.">🎼 Synka alla stämmor tillsammans</button>
             </div>
             <div class="edit-tools"><button type="button" class="btn-outline toggle-btn" id="usToggle" aria-expanded="false" aria-controls="usPanel">🔎 Sök UltraStar-fil online</button></div>
             <div class="us-search" id="usPanel" hidden>
@@ -3961,41 +3961,60 @@ document.getElementById('xSyncNow')?.addEventListener('click', () => {
   const opts = ex ? { score: { path: ex.path, measures: ex.measures.map(m => ({ i: m.i, len: m.len, s0: m.a, s1: m.b })) }, part: ex.part } : {};
   syncAndImport(list, 'notbanan', opts).finally(() => { document.getElementById('xAutoSync').checked = was; sh.value = keep[0]; trn.value = keep[1]; });
 });
-// Samsynka: alla stämmor med samma notblad får takttider = medianen av stämmornas egna synkar.
-// Noter, textrutor och notblad flyttas takt för takt (även handredigerade noter följer med).
+// Synka alla stämmor tillsammans: notbladen (MusicXML) hämtas igen och alla stämmor synkas på en gång mot
+// alla stämmors ljud – en gemensam tidskarta, så takterna ligger exakt lika i alla stämmor.
+const scoreXmlCache = new Map();
+async function loadScoreTracks(path) {
+  if (!scoreXmlCache.has(path)) scoreXmlCache.set(path, (async () => {
+    const { data, error } = await supabaseClient.storage.from('heavy-voices-noter').createSignedUrl(path, 600);
+    if (error || !data) throw new Error('hittar inte notbladet ' + path.split('/').pop());
+    const r = await fetch(data.signedUrl); if (!r.ok) throw new Error('kunde inte hämta notbladet');
+    return NoteIO.fromMusicXml(await r.text());
+  })().catch(e => { scoreXmlCache.delete(path); throw e; }));
+  return scoreXmlCache.get(path);
+}
 document.getElementById('xScoreAlign')?.addEventListener('click', async () => {
-  const withScore = stems.filter(st => st.raw && st.raw.score && st.raw.score.measures && st.raw.edited_notes);
+  const withScore = stems.filter(st => st.raw && st.raw.score && st.raw.score.path && st.raw.score.measures && st.raw.midi && st.raw.midi.some(v => v > 0));
   const groups = [];
   withScore.forEach(st => { const g = groups.find(g => NoteIO.sameMeasures(g[0].raw.score.measures, st.raw.score.measures)); if (g) g.push(st); else groups.push([st]); });
   const grp = groups.sort((a, b) => b.length - a.length)[0];
-  if (!grp || grp.length < 3) { xStatus('Minst tre stämmor behöver ha samma notblad importerat (MusicXML) – då syns vilken som avviker'); return; }
+  if (!grp || grp.length < 2) { xStatus('Minst två stämmor behöver ha notblad (MusicXML) importerat och en tonkurva för att synkas tillsammans'); return; }
   if (dirty && grp.includes(current) && !confirm(`${current.label} har osparade ändringar som försvinner. Fortsätta?`)) return;
-  if (!confirm(`Samsynka takterna för ${grp.map(s => s.label).join(', ')}?\n\nTakter där en stämma avviker från de andra flyttas dit flertalet är överens. Noter, textrutor och notblad flyttas och sparas direkt.`)) return;
+  if (!confirm(`Synka ${grp.map(s => s.label).join(', ')} tillsammans?\n\nNotbladen läses in igen och alla stämmor synkas på en gång mot allas ljud, så takterna hamnar exakt lika. Noter och textrutor ersätts (handgjorda ändringar i noterna försvinner) och sparas direkt.`)) return;
   const btns = document.querySelectorAll('#xferPanel button'); btns.forEach(b => b.disabled = true);
   try {
-    // alla tabeller i låtens tid
-    const songT = grp.map(st => st.raw.score.measures.map(m => ({ ...m, a: m.a + stemOffOf(st), b: m.b + stemOffOf(st) })));
-    const r2 = v => Math.round(v * 100) / 100, r3 = v => Math.round(v * 1000) / 1000;
-    let moved = 0;
-    for (let k = 0; k < grp.length; k++) {
-      // bara takter där stämman avviker från flertalet flyttas
-      const cons = NoteIO.consensusTable(songT[k], songT.filter((t, j) => j !== k));
-      const st = grp[k], off = stemOffOf(st), f = NoteIO.tableMap(songT[k], cons);
-      const tm = t => f(t + off) - off;
-      songT[k].forEach((m, j) => { moved = Math.max(moved, Math.abs(m.a - cons[j].a)); });
-      const mv = x => { const a = tm(x.t), z = tm(x.t + x.d); return { ...x, t: r2(Math.max(0, a)), d: r2(Math.max(0.05, z - a)) }; };
+    xStatus('Läser notbladen…');
+    const voices = [];
+    for (const st of grp) {
+      const sc = await loadScoreTracks(st.raw.score.path);
+      const part = st.raw.score.part || 0;
+      const tr = sc.tracks.find(t => t.part === part) || sc.tracks[0];
+      voices.push({ st, sc, notes: tr.chords ? NoteIO.topLine(tr.notes) : tr.notes, midi: st.raw.midi, hop: st.raw.hop || 0.02, off: stemOffOf(st) });
+    }
+    xStatus('Synkar alla stämmor… 0 %');
+    const js = await NoteIO.jointSync(voices, { onProgress: q => xStatus(`Synkar alla stämmor… ${Math.round(q * 100)} %`) });
+    if (!js) throw new Error('för lite sång att synka mot');
+    const r3 = v => Math.round(v * 1000) / 1000, now = new Date().toISOString(), done = [];
+    const mapped = voices.map((v, x) => NoteIO.mapNotes(v.notes, s => js.map(s) - v.off, js.transposes[x]));
+    for (let x = 0; x < voices.length; x++) {
+      const v = voices[x], st = v.st, notes = mapped[x];
+      const own = NoteIO.matchScore(notes, v.midi, v.hop, [0, 1e9]);
       const data = { ...st.raw };
-      data.edited_notes = data.edited_notes.map(mv);
-      if (Array.isArray(data.lyrics)) data.lyrics = data.lyrics.map(mv);
-      data.score = { ...data.score, measures: data.score.measures.map((m, j) => ({ ...m, a: r3(cons[j].a - off), b: r3(cons[j].b - off) })) };
-      data.edited_at = new Date().toISOString();
+      if (data.edited_notes) data.edited_notes_backup = data.edited_notes;
+      data.edited_notes = notes.map(n => ({ t: n.t, d: n.d, n: n.n }));
+      const boxes = notes.some(n => n.syl) ? NoteIO.lyricBoxes(notes) : null;
+      if (boxes && boxes.length) data.lyrics = boxes;
+      data.score = { ...data.score, match: Math.round(own * 100) / 100,
+        measures: v.sc.measures.map(m => ({ i: m.i, len: m.len, s0: m.s0, s1: m.s1, a: r3(js.map(m.s0) - v.off), b: r3(js.map(m.s1) - v.off) })) };
+      data.edited_at = now;
       xStatus(`Sparar ${st.label}…`);
-      const { error } = await supabaseClient.from('song_pitch').upsert({ song_id: song.id, stem_key: st.key, stem_path: st.pitchPath || st.path, data, updated_at: st.pitchAt || data.edited_at });
+      const { error } = await supabaseClient.from('song_pitch').upsert({ song_id: song.id, stem_key: st.key, stem_path: st.pitchPath || st.path, data, updated_at: st.pitchAt || now });
       if (error) throw new Error(`${st.label}: ${error.message}`);
       st.raw = data; st.pitch = st.pitchBase = prepPitch(data); st._gh = null; st._rr = null;
+      done.push(`${st.label} ${Math.round(own * 100)} %`);
     }
-    xStatus(`Samsynkat: ${grp.map(s => s.label).join(', ')} · största flytt ${moved.toFixed(2).replace('.', ',')} s`);
-    toast('Notbladens takter samsynkade och sparade', 5000);
+    xStatus(`Synkade tillsammans: ${done.join(', ')} (egna stämmans träff – resten är de andra stämmorna i bakgrunden)`);
+    toast('Alla stämmor synkade tillsammans och sparade', 5000);
     dirty = false; renderRows();
     if (current && grp.includes(current)) showStem(current);
   } catch (e) { xStatus('Det gick inte: ' + (e.message || e)); }

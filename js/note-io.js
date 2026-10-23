@@ -840,45 +840,37 @@
   // Jämför notbladet och tonkurvan (tonklass, 0,1 s-steg) och hittar bästa vägen genom båda –
   // klarar annan starttid, annat tempo, ritardando, fermater och mellanspel av annan längd.
   // Svar: { map: notbladstid → ljudtid, transpose, cost } eller null
-  async function dtwSync(notes, midi, hop, opts = {}) {
-    const R = opts.res || 0.1, tick = opts.onProgress || (() => {});
-    if (!notes.length) return null;
-    const n0 = Math.min(...notes.map(x => x.t)), n1 = Math.max(...notes.map(x => x.t + x.d));
-    const sA = Math.max(0, n0 - 1), N = Math.ceil((n1 + 1 - sA) / R);
-    const M = Math.ceil(midi.length * hop / R);
-    if (N < 20 || M < 20) return null;
-    const grid = ns => { const g = new Float32Array(N); ns.forEach(x => { for (let i = Math.max(0, Math.round((x.t - sA) / R)); i < Math.min(N, Math.round((x.t + x.d - sA) / R)); i++) g[i] = x.n; }); return g; };
-    const S = grid(notes);
-    const O = (opts.others || []).map(grid), os = new Float32Array(O.length);
+  // tonkurva → rutnät med R sekunder (median, 0 = tyst); off = förskjutning till gemensam tid
+  function audioGrid(midi, hop, R, M, off = 0) {
     const A = new Float32Array(M);
     for (let j = 0; j < M; j++) {
-      const a = Math.floor(j * R / hop), b = Math.min(midi.length, Math.floor((j + 1) * R / hop));
-      const v = []; for (let i = a; i < b; i++) if (midi[i] > 0) v.push(midi[i]);
-      A[j] = v.length >= 0.4 * (b - a) && v.length ? v.sort((x, y) => x - y)[v.length >> 1] : 0;
+      const t = j * R - off;
+      const a = Math.floor(t / hop), b = Math.min(midi.length, Math.floor((t + R) / hop));
+      if (b <= 0 || a >= midi.length) continue;
+      const v = []; for (let i = Math.max(0, a); i < b; i++) if (midi[i] > 0) v.push(midi[i]);
+      A[j] = v.length && v.length >= 0.4 * (b - Math.max(0, a)) ? v.sort((x, y) => x - y)[v.length >> 1] : 0;
     }
-    // transponering: jämför tonklass-histogrammen, prova de två bästa
-    const hS = new Float64Array(12), hA = new Float64Array(12);
-    S.forEach(s => { if (s) hS[((Math.round(s) % 12) + 12) % 12]++; });
-    A.forEach(a => { if (a) hA[((Math.round(a) % 12) + 12) % 12]++; });
-    const ks = [...Array(12).keys()].map(k => { let c = 0; for (let p = 0; p < 12; p++) c += hS[p] * hA[(p + k) % 12]; return [k, c]; })
-      .sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
-    const Dp = new Float32Array(N * M), P = new Uint8Array(N * M);
+    return A;
+  }
+  function scoreGrid(notes, sA, R, N) {
+    const g = new Float32Array(N);
+    notes.forEach(x => { for (let i = Math.max(0, Math.round((x.t - sA) / R)); i < Math.min(N, Math.round((x.t + x.d - sA) / R)); i++) g[i] = x.n; });
+    return g;
+  }
+  const pcHist = (arrs) => { const h = new Float64Array(12); arrs.forEach(g => g.forEach(v => { if (v) h[((Math.round(v) % 12) + 12) % 12]++; })); return h; };
+  // kärnan: costRow(i, k, out) fyller kostnaden för notram i mot alla ljudramar. Svar { k, raw, total }
+  async function dtwCore(N, M, ks, costRow, tick) {
+    const Dp = new Float32Array(N * M), P = new Uint8Array(N * M), C = new Float32Array(M);
     let best = null, last = Date.now();
     for (let ci = 0; ci < ks.length; ci++) {
       const k = ks[ci];
-      const cost = (s, a) => {
-        if (!s && !a) return 0;
-        if (!s || !a) return 0.6;
-        let d = Math.abs(a - s - k) % 12; d = Math.min(d, 12 - d);
-        return Math.min(1, Math.max(0, d - 0.4) / 1.6);
-      };
-      for (let j = 0; j < M; j++) { Dp[j] = cost(S[0], A[j]); P[j] = 2; }   // fri start i ljudet
+      costRow(0, k, C);
+      for (let j = 0; j < M; j++) { Dp[j] = C[j]; P[j] = 2; }   // fri start i ljudet
       for (let i = 1; i < N; i++) {
-        const row = i * M, prev = row - M, s = S[i];
-        let anyO = false;
-        for (let q = 0; q < O.length; q++) { os[q] = O[q][i]; if (os[q]) anyO = true; }
+        const row = i * M, prev = row - M;
+        const silentRow = costRow(i, k, C);
         for (let j = 0; j < M; j++) {
-          const a = A[j], c = anyO ? frameCost(s, a, os, k, 0.4) : cost(s, a), pen = (!s && !a) ? 0 : 0.3;
+          const c = C[j], pen = (silentRow && c === 0) ? 0 : 0.3;
           let v = Dp[prev + j] + c + pen, f = 1;                         // noten fortsätter, ljudet står still
           if (j) {
             const dg = Dp[prev + j - 1] + c; if (dg <= v) { v = dg; f = 0; }   // båda går framåt
@@ -891,7 +883,6 @@
       let jEnd = 0; for (let j = 1; j < M; j++) if (Dp[(N - 1) * M + j] < Dp[(N - 1) * M + jEnd]) jEnd = j;
       const total = Dp[(N - 1) * M + jEnd] / N;
       if (best && total >= best.total) continue;
-      // tillbaka längs vägen
       const sum = new Float64Array(N), cnt = new Uint32Array(N);
       let i = N - 1, j = jEnd;
       while (i >= 0) {
@@ -906,26 +897,84 @@
       best = { total, k, raw };
     }
     tick(1);
-    if (!best) return null;
-    // jämna ut (±0,5 s), stigande och lagom brant (tempot högst ¼–4 gånger lokalt)
+    return best;
+  }
+  // vägen → jämn, stigande karta (±0,5 s, tempot högst ¼–4 gånger lokalt)
+  function pathMap(raw, N, R, sA) {
     const H = Math.round(0.5 / R), Mp = new Float64Array(N);
-    for (let q = 0; q < N; q++) { let s = 0, c = 0; for (let r = Math.max(0, q - H); r <= Math.min(N - 1, q + H); r++) { s += best.raw[r]; c++; } Mp[q] = s / c; }
-    for (let q = 1; q < N; q++) Mp[q] = Math.min(Mp[q - 1] + 4, Math.max(Mp[q - 1] + 0.25, Mp[q]));   // (per steg)
-    const map = s => {
+    for (let q = 0; q < N; q++) { let s = 0, c = 0; for (let r = Math.max(0, q - H); r <= Math.min(N - 1, q + H); r++) { s += raw[r]; c++; } Mp[q] = s / c; }
+    for (let q = 1; q < N; q++) Mp[q] = Math.min(Mp[q - 1] + 4, Math.max(Mp[q - 1] + 0.25, Mp[q]));
+    return s => {
       const u = (s - sA) / R;
       if (u <= 0) return Mp[0] * R + u * R;
       if (u >= N - 1) return Mp[N - 1] * R + (u - (N - 1)) * R;
       const a = Math.floor(u), f = u - a;
       return (Mp[a] * (1 - f) + Mp[a + 1] * f) * R;
     };
-    // oktav: närmast stämmans läge
+  }
+  // oktav: notbladets oktav gäller – byt bara om ljudet tydligt ligger i en annan (t.ex. en herre som sjunger sopran);
+  // tonkurvan har ofta enstaka oktavfel och läckage från andra stämmor som drar ner medianen
+  function octaveFor(k, notes, A) {
     const med = a => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
-    const audioMed = med([...A].filter(Boolean)), noteMed = med(notes.map(x => x.n));
-    let tr = best.k > 6 ? best.k - 12 : best.k;
-    // notbladets oktav gäller – byt bara oktav om ljudet tydligt ligger i en annan (t.ex. en herre som sjunger sopran);
-    // tonkurvan har ofta enstaka oktavfel och läckage från andra stämmor som drar ner medianen
-    { const dd = audioMed - (noteMed + tr); if (Math.abs(dd) > 12) tr += 12 * Math.round(dd / 12); }
-    return { map, transpose: tr, cost: best.total };
+    const av = [...A].filter(Boolean);
+    let tr = k > 6 ? k - 12 : k;
+    if (!av.length || !notes.length) return tr;
+    const dd = med(av) - (med(notes.map(x => x.n)) + tr);
+    if (Math.abs(dd) > 12) tr += 12 * Math.round(dd / 12);
+    return tr;
+  }
+  async function dtwSync(notes, midi, hop, opts = {}) {
+    const R = opts.res || 0.1, tick = opts.onProgress || (() => {});
+    if (!notes.length) return null;
+    const n0 = Math.min(...notes.map(x => x.t)), n1 = Math.max(...notes.map(x => x.t + x.d));
+    const sA = Math.max(0, n0 - 1), N = Math.ceil((n1 + 1 - sA) / R);
+    const M = Math.ceil(midi.length * hop / R);
+    if (N < 20 || M < 20) return null;
+    const S = scoreGrid(notes, sA, R, N), A = audioGrid(midi, hop, R, M);
+    const O = (opts.others || []).map(o => scoreGrid(o, sA, R, N)), os = new Float32Array(O.length);
+    const hS = pcHist([S]), hA = pcHist([A]);
+    const ks = [...Array(12).keys()].map(k => { let c = 0; for (let p = 0; p < 12; p++) c += hS[p] * hA[(p + k) % 12]; return [k, c]; })
+      .sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
+    const best = await dtwCore(N, M, ks, (i, k, C) => {
+      const s = S[i];
+      let anyO = false;
+      for (let q = 0; q < O.length; q++) { os[q] = O[q][i]; if (os[q]) anyO = true; }
+      for (let j = 0; j < M; j++) C[j] = frameCost(s, A[j], anyO ? os : [], k, 0.4);
+      return !s;
+    }, tick);
+    if (!best) return null;
+    return { map: pathMap(best.raw, N, R, sA), transpose: octaveFor(best.k, notes, A), cost: best.total };
+  }
+  // alla stämmor tillsammans: voices = [{ notes (notbladstid), midi, hop, off (stämmans förskjutning till låtens tid) }]
+  // – en gemensam karta (notbladstid → låtens tid). Varje stämmas ljud jämförs med alla stämmors noter, så
+  // övningsfiler med de andra stämmorna i bakgrunden hjälper i stället för att störa.
+  async function jointSync(voices, opts = {}) {
+    const R = opts.res || 0.1, tick = opts.onProgress || (() => {});
+    const all = voices.flatMap(v => v.notes);
+    if (!all.length) return null;
+    const n0 = Math.min(...all.map(x => x.t)), n1 = Math.max(...all.map(x => x.t + x.d));
+    const sA = Math.max(0, n0 - 1), N = Math.ceil((n1 + 1 - sA) / R);
+    const M = Math.max(...voices.map(v => Math.ceil((v.midi.length * v.hop + Math.max(0, v.off || 0)) / R)));
+    const S = voices.map(v => scoreGrid(v.notes, sA, R, N));
+    const A = voices.map(v => audioGrid(v.midi, v.hop, R, M, v.off || 0));
+    const hS = pcHist(S), hA = pcHist(A);
+    const ks = [...Array(12).keys()].map(k => { let c = 0; for (let p = 0; p < 12; p++) c += hS[p] * hA[(p + k) % 12]; return [k, c]; })
+      .sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
+    const V = voices.length, os = voices.map(() => new Float32Array(V - 1));
+    const best = await dtwCore(N, M, ks, (i, k, C) => {
+      C.fill(0);
+      let silent = true;
+      for (let v = 0; v < V; v++) {
+        const s = S[v][i]; if (s) silent = false;
+        let q = 0, anyO = false; for (let w = 0; w < V; w++) if (w !== v) { os[v][q] = S[w][i]; if (os[v][q]) anyO = true; q++; }
+        const Av = A[v];
+        for (let j = 0; j < M; j++) C[j] += frameCost(s, Av[j], anyO ? os[v] : [], k, 0.4) / V;
+      }
+      return silent;
+    }, tick);
+    if (!best) return null;
+    const map = pathMap(best.raw, N, R, sA);
+    return { map, transposes: voices.map((v, x) => octaveFor(best.k, v.notes, A[x])), cost: best.total };
   }
   function mapNotes(notes, map, tr = 0) {
     return notes.map(x => {
@@ -1008,7 +1057,7 @@
   }
 
   const api = { ultraStarToLrc, isUltraStar, toJson, fromJson, toMidi, fromMidi, fromUltraStar, fromMusicXml, decodeText, autoSync, applySync, topLine, saveFile,
-    lyricBoxes, linesFromBoxes, linesToLrc, warpMap, fineSync, applyWarp, matchScore, dtwSync, bestSync, mapNotes, sameMeasures, medianTable, consensusTable, tableMap, scoreMap, FORMAT };
+    lyricBoxes, linesFromBoxes, linesToLrc, warpMap, fineSync, applyWarp, matchScore, dtwSync, jointSync, bestSync, mapNotes, sameMeasures, medianTable, consensusTable, tableMap, scoreMap, FORMAT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.NoteIO = api;
 })(typeof window !== 'undefined' ? window : globalThis);

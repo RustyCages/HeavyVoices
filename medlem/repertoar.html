@@ -1156,8 +1156,8 @@ document.body.appendChild(audioEl);
 
 // ---------- Hastighet ----------
 // Gäller tills man ändrar den eller laddar om sidan – följer med mellan låtarna.
-const SPEED_MIN = 0.5, SPEED_MAX = 1.2;
-const SPEED_PRESETS = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1];
+const SPEED_MIN = 0.7, SPEED_MAX = 1.2;            // under 70 % blir ljudet för förvrängt
+const SPEED_PRESETS = [0.7, 0.8, 0.9, 1, 1.1];
 let playbackSpeed = 1;
 function applySpeed() {
   audioEl.defaultPlaybackRate = playbackSpeed;   // överlever byte av mix (src)

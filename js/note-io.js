@@ -812,8 +812,131 @@
     });
   }
 
+  // ---------- helsynk med DTW: följer inspelningen genom hela låten ----------
+  // Jämför notbladet och tonkurvan (tonklass, 0,1 s-steg) och hittar bästa vägen genom båda –
+  // klarar annan starttid, annat tempo, ritardando, fermater och mellanspel av annan längd.
+  // Svar: { map: notbladstid → ljudtid, transpose, cost } eller null
+  async function dtwSync(notes, midi, hop, opts = {}) {
+    const R = 0.1, tick = opts.onProgress || (() => {});
+    if (!notes.length) return null;
+    const n0 = Math.min(...notes.map(x => x.t)), n1 = Math.max(...notes.map(x => x.t + x.d));
+    const sA = Math.max(0, n0 - 1), N = Math.ceil((n1 + 1 - sA) / R);
+    const M = Math.ceil(midi.length * hop / R);
+    if (N < 20 || M < 20) return null;
+    const S = new Float32Array(N);
+    notes.forEach(x => { for (let i = Math.max(0, Math.round((x.t - sA) / R)); i < Math.min(N, Math.round((x.t + x.d - sA) / R)); i++) S[i] = x.n; });
+    const A = new Float32Array(M);
+    for (let j = 0; j < M; j++) {
+      const a = Math.floor(j * R / hop), b = Math.min(midi.length, Math.floor((j + 1) * R / hop));
+      const v = []; for (let i = a; i < b; i++) if (midi[i] > 0) v.push(midi[i]);
+      A[j] = v.length >= 0.4 * (b - a) && v.length ? v.sort((x, y) => x - y)[v.length >> 1] : 0;
+    }
+    // transponering: jämför tonklass-histogrammen, prova de två bästa
+    const hS = new Float64Array(12), hA = new Float64Array(12);
+    S.forEach(s => { if (s) hS[((Math.round(s) % 12) + 12) % 12]++; });
+    A.forEach(a => { if (a) hA[((Math.round(a) % 12) + 12) % 12]++; });
+    const ks = [...Array(12).keys()].map(k => { let c = 0; for (let p = 0; p < 12; p++) c += hS[p] * hA[(p + k) % 12]; return [k, c]; })
+      .sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
+    const Dp = new Float32Array(N * M), P = new Uint8Array(N * M);
+    let best = null, last = Date.now();
+    for (let ci = 0; ci < ks.length; ci++) {
+      const k = ks[ci];
+      const cost = (s, a) => {
+        if (!s && !a) return 0;
+        if (!s || !a) return 0.6;
+        let d = Math.abs(a - s - k) % 12; d = Math.min(d, 12 - d);
+        return Math.min(1, Math.max(0, d - 0.4) / 1.6);
+      };
+      for (let j = 0; j < M; j++) { Dp[j] = cost(S[0], A[j]); P[j] = 2; }   // fri start i ljudet
+      for (let i = 1; i < N; i++) {
+        const row = i * M, prev = row - M, s = S[i];
+        for (let j = 0; j < M; j++) {
+          const a = A[j], c = cost(s, a), pen = (!s && !a) ? 0 : 0.3;
+          let v = Dp[prev + j] + c + pen, f = 1;                         // noten fortsätter, ljudet står still
+          if (j) {
+            const dg = Dp[prev + j - 1] + c; if (dg <= v) { v = dg; f = 0; }   // båda går framåt
+            const h = Dp[row + j - 1] + c + pen; if (h < v) { v = h; f = 2; }  // ljudet går framåt
+          }
+          Dp[row + j] = v; P[row + j] = f;
+        }
+        if (Date.now() - last > 40) { tick((ci + i / N) / ks.length); await new Promise(r => setTimeout(r, 0)); last = Date.now(); }
+      }
+      let jEnd = 0; for (let j = 1; j < M; j++) if (Dp[(N - 1) * M + j] < Dp[(N - 1) * M + jEnd]) jEnd = j;
+      const total = Dp[(N - 1) * M + jEnd] / N;
+      if (best && total >= best.total) continue;
+      // tillbaka längs vägen
+      const sum = new Float64Array(N), cnt = new Uint32Array(N);
+      let i = N - 1, j = jEnd;
+      while (i >= 0) {
+        sum[i] += j; cnt[i]++;
+        const f = P[i * M + j];
+        if (i === 0) break;
+        if (f === 0) { i--; j--; } else if (f === 1) i--; else j--;
+        if (j < 0) j = 0;
+      }
+      const raw = new Float64Array(N);
+      for (let q = 0; q < N; q++) raw[q] = cnt[q] ? sum[q] / cnt[q] : (q ? raw[q - 1] : 0);
+      best = { total, k, raw };
+    }
+    tick(1);
+    if (!best) return null;
+    // jämna ut (±0,5 s), stigande och lagom brant (tempot högst ¼–4 gånger lokalt)
+    const H = 5, Mp = new Float64Array(N);
+    for (let q = 0; q < N; q++) { let s = 0, c = 0; for (let r = Math.max(0, q - H); r <= Math.min(N - 1, q + H); r++) { s += best.raw[r]; c++; } Mp[q] = s / c; }
+    for (let q = 1; q < N; q++) Mp[q] = Math.min(Mp[q - 1] + 4, Math.max(Mp[q - 1] + 0.25, Mp[q]));
+    const map = s => {
+      const u = (s - sA) / R;
+      if (u <= 0) return Mp[0] * R + u * R;
+      if (u >= N - 1) return Mp[N - 1] * R + (u - (N - 1)) * R;
+      const a = Math.floor(u), f = u - a;
+      return (Mp[a] * (1 - f) + Mp[a + 1] * f) * R;
+    };
+    // oktav: närmast stämmans läge
+    const med = a => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
+    const audioMed = med([...A].filter(Boolean)), noteMed = med(notes.map(x => x.n));
+    let tr = best.k > 6 ? best.k - 12 : best.k;
+    tr += 12 * Math.round((audioMed - (noteMed + tr)) / 12);
+    return { map, transpose: tr, cost: best.total };
+  }
+  function mapNotes(notes, map, tr = 0) {
+    return notes.map(x => {
+      let a = map(x.t), b = map(x.t + x.d);
+      if (a < 0) a = 0;
+      return { ...x, t: r2(a), d: r2(Math.max(0.05, b - a)), n: x.n + tr };
+    }).filter(x => x.t + x.d > 0.05);
+  }
+  // bästa synken: rak (start + tempo) eller DTW, sedan finjustering. Svar: { map, transpose, how, fine, match, lin }
+  async function bestSync(notes, midi, hop, opts = {}) {
+    const prog = opts.onProgress || (() => {});
+    const all = [0, 1e9], cand = [];
+    let lin = null;
+    try {
+      lin = await autoSync(notes, midi, hop, { guessTempo: opts.guessTempo, onProgress: p => prog(p * (opts.follow === false ? 0.95 : 0.45)) });
+      cand.push({ how: 'lin', map: s => lin.offset + s * lin.scale, transpose: lin.transpose });
+    } catch (e) { if (opts.follow === false) throw e; }
+    if (opts.follow !== false) {
+      const dt = await dtwSync(notes, midi, hop, { onProgress: p => prog(0.45 + p * 0.5) });
+      if (dt) cand.push({ how: 'dtw', map: dt.map, transpose: dt.transpose });
+    }
+    if (!cand.length) throw new Error('Tonkurvan har för lite sång att synka mot');
+    cand.forEach(c => { c.match = matchScore(mapNotes(notes, c.map, c.transpose), midi, hop, all); });
+    cand.sort((a, b) => b.match - a.match);
+    let best = cand[0];
+    if (opts.follow !== false) {
+      const ns = mapNotes(notes, best.map, best.transpose), f = fineSync(ns, midi, hop);
+      if (f) {
+        const m0 = best.map, m2 = s => f.map(m0(s));
+        const match = matchScore(mapNotes(notes, m2, best.transpose), midi, hop, all);
+        if (match > best.match) best = { ...best, map: m2, match, fine: true };
+      }
+    }
+    prog(1);
+    return { map: best.map, transpose: best.transpose, how: best.how, fine: !!best.fine, match: best.match, lin,
+      linMatch: (cand.find(c => c.how === 'lin') || {}).match ?? null };
+  }
+
   const api = { ultraStarToLrc, isUltraStar, toJson, fromJson, toMidi, fromMidi, fromUltraStar, fromMusicXml, decodeText, autoSync, applySync, topLine, saveFile,
-    lyricBoxes, linesFromBoxes, linesToLrc, warpMap, fineSync, applyWarp, matchScore, FORMAT };
+    lyricBoxes, linesFromBoxes, linesToLrc, warpMap, fineSync, applyWarp, matchScore, dtwSync, bestSync, mapNotes, FORMAT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.NoteIO = api;
 })(typeof window !== 'undefined' ? window : globalThis);

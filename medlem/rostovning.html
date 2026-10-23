@@ -531,6 +531,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
               <button type="button" class="btn-outline" id="xFromFile" title="MusicXML från notprogrammet (MuseScore, Sibelius, Finale, Dorico), MIDI, UltraStar eller Heavy Voices-JSON">📂 Från fil… (MusicXML / .mid / UltraStar .txt / .json)</button>
               <input type="file" id="xFile" accept=".musicxml,.mxl,.xml,.json,.mid,.midi,.txt,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml,application/xml,text/xml,application/json,audio/midi,audio/x-midi,text/plain" hidden>
               <button type="button" class="btn-outline" id="xSyncNow" title="Synka noterna som finns i notbanan just nu mot ljudet">🎯 Synka nuvarande noter</button>
+              <button type="button" class="btn-outline" id="xScoreAlign" title="Stämmor med samma notblad (MusicXML) får samma takttider – där flertalet stämmor är överens. Rättar en stämma vars ljud är svårt att synka mot.">🎼 Samsynka notbladens takter</button>
             </div>
             <div class="edit-tools"><button type="button" class="btn-outline toggle-btn" id="usToggle" aria-expanded="false" aria-controls="usPanel">🔎 Sök UltraStar-fil online</button></div>
             <div class="us-search" id="usPanel" hidden>
@@ -3617,10 +3618,17 @@ async function makeLrcFromBoxes(boxes, st) {
   toast(`Karaoketext skapad från notbladet (${lines.length} rader) – finjustera i Textsynk vid behov`, 6000);
 }
 // notbladets takter (MusicXML-tid i sekunder) → stämfilens tid, för notskriften i spelaren
-function scoreInfo(score, part, toStem) {
+function scoreInfo(score, part, toStem, match) {
   if (!score || !score.path) return null;
   const r3 = v => Math.round(v * 1000) / 1000;
-  return { path: score.path, part: part || 0, measures: score.measures.map(m => ({ i: m.i, len: m.len, a: r3(toStem(m.s0)), b: r3(toStem(m.s1)) })) };
+  return { path: score.path, part: part || 0, ...(match != null ? { match: Math.round(match * 100) / 100 } : {}),
+    measures: score.measures.map(m => ({ i: m.i, len: m.len, s0: m.s0, s1: m.s1, a: r3(toStem(m.s0)), b: r3(toStem(m.s1)) })) };
+}
+const stemOffOf = st => (Number((song.stem_offsets || {})[st.key]) || 0) / 1000;
+// andra stämmor med samma notblad (samma takter): deras takttider omräknade till stämman st:s tid
+function otherScoreTables(st, measures) {
+  return stems.filter(o => o !== st && o.raw && o.raw.score && NoteIO.sameMeasures(o.raw.score.measures, measures))
+    .map(o => ({ st: o, table: o.raw.score.measures.map(m => ({ ...m, a: m.a + stemOffOf(o) - stemOffOf(st), b: m.b + stemOffOf(o) - stemOffOf(st) })) }));
 }
 // finsynk (följ tempoändringar) – svar: { notes, txt }
 function fineSyncNotes(ns, raw) {
@@ -3652,9 +3660,25 @@ async function syncAndImport(list, from, opts = {}) {
     const b = await NoteIO.bestSync(list, midi, current.raw.hop || 0.02, {
       guessTempo: !!opts.guessTempo, follow: document.getElementById('xFineSync').checked,
       onProgress: p => xStatus(`Synkar mot ljudet… ${Math.round(p * 100)} %`) });
+    let map = b.map, label = syncLabel(b);
+    // samma notblad finns redan på andra stämmor: takterna läggs där flertalet stämmor säger (median per takt)
+    if (opts.score && document.getElementById('xFineSync').checked) {
+      const others = otherScoreTables(current, opts.score.measures);
+      if (others.length >= 2) {
+        const own = opts.score.measures.map(m => ({ ...m, a: b.map(m.s0), b: b.map(m.s1) }));
+        const cons = NoteIO.consensusTable(own, others.map(o => o.table));
+        const fixed = cons.filter((m, k) => Math.abs(m.a - own[k].a) > 0.01).length;
+        if (fixed) {
+          // stämmans egen synk inom takterna, men avvikande takter flyttas dit de andra stämmorna säger
+          const tm = NoteIO.tableMap(own, cons), m0 = b.map;
+          map = s => tm(m0(s));
+          label += ` · ${fixed} takt${fixed === 1 ? '' : 'er'} rättade efter ${others.map(o => o.st.label).join(', ')}`;
+        }
+      }
+    }
     const sure = b.match >= 0.4;
-    const sci = scoreInfo(opts.score, opts.part, x => b.map(x) + sh);
-    applyImported(NoteIO.mapNotes(list, b.map, b.transpose), from, syncLabel(b), sci);
+    const sci = scoreInfo(opts.score, opts.part, x => map(x) + sh, b.match);
+    applyImported(NoteIO.mapNotes(list, map, b.transpose), from, label, sci);
     if (!sure) toast('Synken är osäker – lyssna med referenstonen och justera vid behov', 6000);
   } catch (e) {
     applyImported(list, from, 'kunde inte synka: ' + (e.message || e), plain());
@@ -3772,14 +3796,14 @@ async function importMidiAll(pairs, ref, fileName, opts = {}) {
     const offs = song.stem_offsets || {}, offOf = st => (Number(offs[st.key]) || 0) / 1000;
     const notesOf = tr => tr.chords ? NoteIO.topLine(tr.notes) : tr.notes;
     // tidskartan (notbladstid → referensstämmans tid) tas fram på en stämma och används för alla
-    let map = x => x, transpose = 0, syncTxt = 'ingen synk', lrcBoxes = null;
+    let map = x => x, transpose = 0, syncTxt = 'ingen synk', lrcBoxes = null, refMatch = null;
     if (ref) {
       const refPair = pairs.find(x => x.st === ref);
       xStatus('Synkar mot ljudet… 0 %');
       const b = await NoteIO.bestSync(notesOf(refPair.tr), ref.raw.midi, ref.raw.hop || 0.02, {
         guessTempo: !!opts.guessTempo, follow: document.getElementById('xFineSync').checked,
         onProgress: q => xStatus(`Synkar mot ljudet… ${Math.round(q * 100)} %`) });
-      map = b.map; transpose = b.transpose; syncTxt = syncLabel(b, `synkat mot ${ref.label}`);
+      map = b.map; transpose = b.transpose; syncTxt = syncLabel(b, `synkat mot ${ref.label}`); refMatch = b.match;
     }
     const sh = Number(document.getElementById('xShift').value) || 0;
     const trn = Math.round(Number(document.getElementById('xTrans').value) || 0);
@@ -3795,7 +3819,7 @@ async function importMidiAll(pairs, ref, fileName, opts = {}) {
       if (data.edited_notes) data.edited_notes_backup = data.edited_notes;
       data.edited_notes = notes.map(n => ({ t: n.t, d: n.d, n: n.n }));
       const shiftSt = (ref ? offOf(ref) - offOf(st) : 0) + sh;
-      const sci = scoreInfo(opts.score, tr.part, x => map(x) + shiftSt);
+      const sci = scoreInfo(opts.score, tr.part, x => map(x) + shiftSt, refMatch);
       if (sci) data.score = sci; else delete data.score;
       const boxes = document.getElementById('xMakeLrc').checked && notes.some(n => n.syl) ? NoteIO.lyricBoxes(notes) : null;
       if (boxes && boxes.length) {
@@ -3916,6 +3940,46 @@ document.getElementById('xSyncNow')?.addEventListener('click', () => {
   const ex = current._pendingScore !== undefined ? current._pendingScore : (current.raw && current.raw.score);
   const opts = ex ? { score: { path: ex.path, measures: ex.measures.map(m => ({ i: m.i, len: m.len, s0: m.a, s1: m.b })) }, part: ex.part } : {};
   syncAndImport(list, 'notbanan', opts).finally(() => { document.getElementById('xAutoSync').checked = was; sh.value = keep[0]; trn.value = keep[1]; });
+});
+// Samsynka: alla stämmor med samma notblad får takttider = medianen av stämmornas egna synkar.
+// Noter, textrutor och notblad flyttas takt för takt (även handredigerade noter följer med).
+document.getElementById('xScoreAlign')?.addEventListener('click', async () => {
+  const withScore = stems.filter(st => st.raw && st.raw.score && st.raw.score.measures && st.raw.edited_notes);
+  const groups = [];
+  withScore.forEach(st => { const g = groups.find(g => NoteIO.sameMeasures(g[0].raw.score.measures, st.raw.score.measures)); if (g) g.push(st); else groups.push([st]); });
+  const grp = groups.sort((a, b) => b.length - a.length)[0];
+  if (!grp || grp.length < 3) { xStatus('Minst tre stämmor behöver ha samma notblad importerat (MusicXML) – då syns vilken som avviker'); return; }
+  if (dirty && grp.includes(current) && !confirm(`${current.label} har osparade ändringar som försvinner. Fortsätta?`)) return;
+  if (!confirm(`Samsynka takterna för ${grp.map(s => s.label).join(', ')}?\n\nTakter där en stämma avviker från de andra flyttas dit flertalet är överens. Noter, textrutor och notblad flyttas och sparas direkt.`)) return;
+  const btns = document.querySelectorAll('#xferPanel button'); btns.forEach(b => b.disabled = true);
+  try {
+    // alla tabeller i låtens tid
+    const songT = grp.map(st => st.raw.score.measures.map(m => ({ ...m, a: m.a + stemOffOf(st), b: m.b + stemOffOf(st) })));
+    const r2 = v => Math.round(v * 100) / 100, r3 = v => Math.round(v * 1000) / 1000;
+    let moved = 0;
+    for (let k = 0; k < grp.length; k++) {
+      // bara takter där stämman avviker från flertalet flyttas
+      const cons = NoteIO.consensusTable(songT[k], songT.filter((t, j) => j !== k));
+      const st = grp[k], off = stemOffOf(st), f = NoteIO.tableMap(songT[k], cons);
+      const tm = t => f(t + off) - off;
+      songT[k].forEach((m, j) => { moved = Math.max(moved, Math.abs(m.a - cons[j].a)); });
+      const mv = x => { const a = tm(x.t), z = tm(x.t + x.d); return { ...x, t: r2(Math.max(0, a)), d: r2(Math.max(0.05, z - a)) }; };
+      const data = { ...st.raw };
+      data.edited_notes = data.edited_notes.map(mv);
+      if (Array.isArray(data.lyrics)) data.lyrics = data.lyrics.map(mv);
+      data.score = { ...data.score, measures: data.score.measures.map((m, j) => ({ ...m, a: r3(cons[j].a - off), b: r3(cons[j].b - off) })) };
+      data.edited_at = new Date().toISOString();
+      xStatus(`Sparar ${st.label}…`);
+      const { error } = await supabaseClient.from('song_pitch').upsert({ song_id: song.id, stem_key: st.key, stem_path: st.pitchPath || st.path, data, updated_at: st.pitchAt || data.edited_at });
+      if (error) throw new Error(`${st.label}: ${error.message}`);
+      st.raw = data; st.pitch = st.pitchBase = prepPitch(data); st._gh = null; st._rr = null;
+    }
+    xStatus(`Samsynkat: ${grp.map(s => s.label).join(', ')} · största flytt ${moved.toFixed(2).replace('.', ',')} s`);
+    toast('Notbladens takter samsynkade och sparade', 5000);
+    dirty = false; renderRows();
+    if (current && grp.includes(current)) showStem(current);
+  } catch (e) { xStatus('Det gick inte: ' + (e.message || e)); }
+  finally { btns.forEach(b => b.disabled = false); }
 });
 document.getElementById('xFile')?.addEventListener('change', async (e) => {
   const f = e.target.files[0]; e.target.value = '';

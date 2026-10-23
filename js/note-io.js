@@ -355,7 +355,9 @@
     const med = a => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
     const audioMed = med(fF.map(f => f[1])), noteMed = med(notes.map(x => x.n));
     let tr = fine.b > 6 ? fine.b - 12 : fine.b;
-    tr += 12 * Math.round((audioMed - (noteMed + tr)) / 12);
+    // notbladets oktav gäller – byt bara oktav om ljudet tydligt ligger i en annan (t.ex. en herre som sjunger sopran);
+    // tonkurvan har ofta enstaka oktavfel och läckage från andra stämmor som drar ner medianen
+    { const dd = audioMed - (noteMed + tr); if (Math.abs(dd) > 12) tr += 12 * Math.round(dd / 12); }
     // träffgrad bland röstade ramar inom notområdet
     const covered = fF.filter(f => { const u = (f[0] - fine.off) / fine.sc; return u >= nStart && u <= nEnd; }).length || 1;
     return {
@@ -817,7 +819,7 @@
   // klarar annan starttid, annat tempo, ritardando, fermater och mellanspel av annan längd.
   // Svar: { map: notbladstid → ljudtid, transpose, cost } eller null
   async function dtwSync(notes, midi, hop, opts = {}) {
-    const R = 0.1, tick = opts.onProgress || (() => {});
+    const R = opts.res || 0.1, tick = opts.onProgress || (() => {});
     if (!notes.length) return null;
     const n0 = Math.min(...notes.map(x => x.t)), n1 = Math.max(...notes.map(x => x.t + x.d));
     const sA = Math.max(0, n0 - 1), N = Math.ceil((n1 + 1 - sA) / R);
@@ -881,9 +883,9 @@
     tick(1);
     if (!best) return null;
     // jämna ut (±0,5 s), stigande och lagom brant (tempot högst ¼–4 gånger lokalt)
-    const H = 5, Mp = new Float64Array(N);
+    const H = Math.round(0.5 / R), Mp = new Float64Array(N);
     for (let q = 0; q < N; q++) { let s = 0, c = 0; for (let r = Math.max(0, q - H); r <= Math.min(N - 1, q + H); r++) { s += best.raw[r]; c++; } Mp[q] = s / c; }
-    for (let q = 1; q < N; q++) Mp[q] = Math.min(Mp[q - 1] + 4, Math.max(Mp[q - 1] + 0.25, Mp[q]));
+    for (let q = 1; q < N; q++) Mp[q] = Math.min(Mp[q - 1] + 4, Math.max(Mp[q - 1] + 0.25, Mp[q]));   // (per steg)
     const map = s => {
       const u = (s - sA) / R;
       if (u <= 0) return Mp[0] * R + u * R;
@@ -895,7 +897,9 @@
     const med = a => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
     const audioMed = med([...A].filter(Boolean)), noteMed = med(notes.map(x => x.n));
     let tr = best.k > 6 ? best.k - 12 : best.k;
-    tr += 12 * Math.round((audioMed - (noteMed + tr)) / 12);
+    // notbladets oktav gäller – byt bara oktav om ljudet tydligt ligger i en annan (t.ex. en herre som sjunger sopran);
+    // tonkurvan har ofta enstaka oktavfel och läckage från andra stämmor som drar ner medianen
+    { const dd = audioMed - (noteMed + tr); if (Math.abs(dd) > 12) tr += 12 * Math.round(dd / 12); }
     return { map, transpose: tr, cost: best.total };
   }
   function mapNotes(notes, map, tr = 0) {
@@ -915,7 +919,7 @@
       cand.push({ how: 'lin', map: s => lin.offset + s * lin.scale, transpose: lin.transpose });
     } catch (e) { if (opts.follow === false) throw e; }
     if (opts.follow !== false) {
-      const dt = await dtwSync(notes, midi, hop, { onProgress: p => prog(0.45 + p * 0.5) });
+      const dt = await dtwSync(notes, midi, hop, { res: opts.res, onProgress: p => prog(0.45 + p * 0.5) });
       if (dt) cand.push({ how: 'dtw', map: dt.map, transpose: dt.transpose });
     }
     if (!cand.length) throw new Error('Tonkurvan har för lite sång att synka mot');
@@ -935,8 +939,47 @@
       linMatch: (cand.find(c => c.how === 'lin') || {}).match ?? null };
   }
 
+  // ---------- takttabeller: { a, b } per takt (ljudtid) – samma notblad i flera stämmor ----------
+  const sameMeasures = (x, y) => x && y && x.length === y.length && x.every((m, k) => m.i === y[k].i && Math.abs(m.len - y[k].len) < 1e-6);
+  // median per takt av flera tabeller (alla i samma tid)
+  function medianTable(tables) {
+    const med = v => { const s = v.slice().sort((p, q) => p - q), n = s.length; return n % 2 ? s[n >> 1] : (s[n / 2 - 1] + s[n / 2]) / 2; };
+    return tables[0].map((m, k) => ({ ...m, a: med(tables.map(t => t[k].a)), b: med(tables.map(t => t[k].b)) }));
+  }
+  // rätta bara de takter där stämman avviker från flertalet (> tol s från medianen); kräver minst två andra stämmor
+  function consensusTable(own, others, tol = 0.4) {
+    if (!others || others.length < 2) return own;
+    const med = medianTable([own, ...others]);
+    const as = own.map((m, k) => Math.abs(m.a - med[k].a) > tol ? med[k].a : m.a);
+    for (let k = 1; k < as.length; k++) if (as[k] < as[k - 1] + 0.05) as[k] = as[k - 1] + 0.05;
+    return own.map((m, k) => ({ ...m, a: as[k], b: k + 1 < as.length ? as[k + 1] : (Math.abs(m.b - med[k].b) > tol ? med[k].b : m.b) }));
+  }
+  // tid enligt en tabell → tid enligt en annan (takt för takt, rakt inom takten)
+  function tableMap(from, to) {
+    return t => {
+      let k = 0;
+      for (let i = 0; i < from.length; i++) { if (from[i].a <= t) k = i; else break; }
+      const f = from[k], g = to[k];
+      if (t < f.a) return t + (g.a - f.a);
+      if (t >= f.b && k === from.length - 1) return t + (g.b - f.b);
+      const u = f.b > f.a ? (t - f.a) / (f.b - f.a) : 0;
+      return g.a + Math.min(1, u) * (g.b - g.a);
+    };
+  }
+  // notbladstid (s0/s1 per takt) → ljudtid enligt tabellen
+  function scoreMap(table) {
+    return s => {
+      let k = 0;
+      for (let i = 0; i < table.length; i++) { if (table[i].s0 <= s) k = i; else break; }
+      const m = table[k];
+      if (s < m.s0) return m.a + (s - m.s0);
+      if (s >= m.s1 && k === table.length - 1) return m.b + (s - m.s1);
+      return m.a + (s - m.s0) / Math.max(1e-6, m.s1 - m.s0) * (m.b - m.a);
+    };
+  }
+
   const api = { ultraStarToLrc, isUltraStar, toJson, fromJson, toMidi, fromMidi, fromUltraStar, fromMusicXml, decodeText, autoSync, applySync, topLine, saveFile,
-    lyricBoxes, linesFromBoxes, linesToLrc, warpMap, fineSync, applyWarp, matchScore, dtwSync, bestSync, mapNotes, FORMAT };
+    lyricBoxes, linesFromBoxes, linesToLrc, warpMap, fineSync, applyWarp, matchScore, dtwSync, bestSync, mapNotes, sameMeasures, medianTable, consensusTable, tableMap, scoreMap, FORMAT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.NoteIO = api;
 })(typeof window !== 'undefined' ? window : globalThis);

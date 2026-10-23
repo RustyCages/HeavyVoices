@@ -700,7 +700,9 @@
   // Efter autoSync ligger noterna rätt i stort. Här jämförs noterna och tonkurvan bit för bit (DTW,
   // dynamisk tidsförvrängning inom ±band sekunder) och en tidskarta tas fram. Används bara om den
   // ger bättre överensstämmelse än utan.
-  function matchScore(notes, midi, hop) {
+  // span = [a, b]: räkna mot ALL sång i det området (inte bara där noterna ligger), så att det inte
+  // lönar sig att trycka ihop eller flytta bort noter
+  function matchScore(notes, midi, hop, span) {
     let hit = 0, tot = 0;
     const st = Math.max(1, Math.round(0.04 / hop));
     const ns = notes.slice().sort((a, b) => a.t - b.t);
@@ -708,11 +710,13 @@
     for (let i = 0; i < midi.length; i += st) {
       const m = midi[i]; if (!(m > 0)) continue;
       const t = i * hop;
+      if (span && (t < span[0] || t > span[1])) continue;
       while (k < ns.length && ns[k].t + ns[k].d < t) k++;
       let x = null;
       for (let j = k; j < ns.length && ns[j].t <= t; j++) if (ns[j].t + ns[j].d >= t) { x = ns[j]; break; }
+      if (span) tot++;
       if (!x) continue;
-      tot++;
+      if (!span) tot++;
       let dd = Math.abs(m - x.n) % 12; dd = Math.min(dd, 12 - dd);
       if (dd <= 1) hit++;
     }
@@ -769,7 +773,8 @@
     // jämna ut (±0,5 s) och håll kartan stigande
     const H = 10, M = new Float64Array(N);
     for (let k = 0; k < N; k++) { let s = 0, n = 0; for (let q = Math.max(0, k - H); q <= Math.min(N - 1, k + H); q++) { s += raw[q]; n++; } M[k] = s / n; }
-    for (let k = 1; k < N; k++) if (M[k] < M[k - 1]) M[k] = M[k - 1];
+    // stigande, och lagom brant: tempot får som mest halveras/fördubblas lokalt (annars trycks noter ihop)
+    for (let k = 1; k < N; k++) M[k] = Math.min(M[k - 1] + 2, Math.max(M[k - 1] + 0.5, M[k]));
     const map = t => {
       const u = (t - t0) / R;
       if (u <= 0) return t + M[0] * R;
@@ -778,9 +783,10 @@
       return t0 + (M[a] * (1 - f) + M[a + 1] * f) * R;
     };
     const warped = applyWarp(notes, map);
-    const before = matchScore(notes, midi, hop), after = matchScore(warped, midi, hop);
+    const sp = [Math.min(...notes.map(x => x.t)), Math.max(...notes.map(x => x.t + x.d))];
+    const before = matchScore(notes, midi, hop, sp), after = matchScore(warped, midi, hop, sp);
     let maxShift = 0; for (let k = 0; k < N; k++) maxShift = Math.max(maxShift, Math.abs(M[k] - k) * R);
-    return { map, before, after, better: after > before + 0.02, maxShift: r2(maxShift) };
+    return { map, before, after, better: after > before + 0.03, maxShift: r2(maxShift) };
   }
   // flera varv (varje varv rättar det förra) – svar: { map, before, after, passes } eller null om det inte blev bättre
   function fineSync(notes, midi, hop) {
@@ -788,7 +794,11 @@
     for (let k = 0; k < 3; k++) {
       const w = warpMap(cur, midi, hop, { band: 4 });
       if (!w) break;
-      if (before == null) before = w.before;
+      if (before == null) {
+        before = w.before;
+        // stämmer den vanliga synken för dåligt finns inget pålitligt att finjustera mot
+        if (before < 0.38) return null;
+      }
       if (!w.better) break;
       maps.push(w.map); cur = applyWarp(cur, w.map); after = w.after;
     }

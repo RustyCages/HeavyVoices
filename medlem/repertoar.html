@@ -169,7 +169,7 @@
   #playerTitle { font-weight:700; text-align:center; font-family:'Roboto Condensed', sans-serif; overflow:hidden; white-space:nowrap; }
   #playerTitle.mq-on { text-align:left; }
   #playerTitle .loading-tag { color:var(--accent); font-weight:500; font-size:0.8rem; margin-left:0.5rem; }
-  #playerControls { display:flex; align-items:center; justify-content:center; gap:1rem; }
+  #playerControls { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:1rem; }
   #playerControls button { font-size:1.1rem; width:2.6rem; height:2.6rem; padding:0; border-radius:50%; display:flex; align-items:center; justify-content:center; }
   #playerControls button:disabled { opacity:0.4; cursor:wait; }
   #playerScrubberRow { display:flex; align-items:center; gap:0.6rem; }
@@ -199,6 +199,14 @@
   #karaokeBtn { position:relative; }
   #karaokeBtn .voice-badge { position:absolute; bottom:-0.35rem; right:-0.45rem; font-size:0.6rem; font-weight:700; background:var(--accent); color:#111317; border-radius:0.6rem; padding:0.05rem 0.3rem; line-height:1.2; pointer-events:none; }
   #karaokeBtn .voice-badge:empty { display:none; }
+  #speedBtn { position:relative; }
+  #speedBtn .speed-badge { position:absolute; bottom:-0.35rem; right:-0.55rem; font-size:0.6rem; font-weight:700; background:var(--accent); color:#111317; border-radius:0.6rem; padding:0.05rem 0.3rem; line-height:1.2; pointer-events:none; }
+  #speedBtn .speed-badge:empty { display:none; }
+  #playerMenu .speed-val { font-weight:700; font-size:0.95rem; min-width:3.2rem; text-align:right; font-variant-numeric:tabular-nums; }
+  #playerMenu .speed-presets { display:flex; flex-wrap:wrap; gap:0.35rem; padding:0 0.6rem 0.5rem; }
+  #playerMenu .speed-presets button { flex:1 0 2.9rem; padding:0.4rem 0; border-radius:0.4rem; font-size:0.85rem; font-variant-numeric:tabular-nums; }
+  #playerMenu .speed-presets button.on { background:var(--accent); color:#111317; border-color:var(--accent); }
+  #playerMenu .speed-note { font-size:0.75rem; color:var(--text-muted); padding:0 0.6rem 0.45rem; }
 
   /* Popup-meny i spelaren (textversion / dokument) */
   #playerMenu { position:fixed; bottom:6rem; left:50%; transform:translateX(-50%); width:min(92vw, 340px); max-height:60vh; overflow-y:auto; background:var(--bg); border:1px solid var(--border); border-radius:0.7rem; box-shadow:var(--card-shadow); padding:0.4rem; z-index:120; }
@@ -217,7 +225,7 @@
   #playerMenu .pm-dl:hover { color:var(--accent); border-color:var(--accent); }
   #playerMenu .pm-dl svg { width:15px; height:15px; }
   #playerMenu hr { border:none; border-top:1px solid var(--border); margin:0.3rem 0; }
-  @media (max-width: 420px) { #playerControls { gap:0.3rem; } #playerControls button { width:2.3rem; height:2.3rem; font-size:1rem; } }
+  @media (max-width: 420px) { #playerControls { gap:0.25rem; } #playerControls button { width:2.2rem; height:2.2rem; font-size:1rem; } }
   #playerMenu .mixer-row { padding:0.2rem 0.4rem; margin-bottom:0.55rem; }
   #playerMenu .pm-empty { padding:0.6rem; color:var(--text-muted); font-size:0.9rem; }
 
@@ -383,6 +391,7 @@
     <button class="btn-outline hidden" id="lyricsDocBtn" title="Öppna sångtexten (dokument)" aria-label="Sångtext"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="4" y1="18" x2="14" y2="18"/></svg></button>
     <button class="btn-outline hidden" id="splitBtn" title="Alla stämmor samtidigt (delad skärm)" aria-pressed="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></button>
     <button class="btn-outline" id="mixerBtn" title="Mixer – volym per stämma" aria-label="Mixer"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></button>
+    <button class="btn-outline" id="speedBtn" title="Hastighet – spela långsammare eller snabbare" aria-label="Hastighet"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 18a9 9 0 1 1 15 0"/><line x1="12" y1="14" x2="16.5" y2="8.5"/><circle cx="12" cy="14" r="1.3" fill="currentColor"/></svg><span class="speed-badge"></span></button>
   </div>
 </div>
 
@@ -1128,7 +1137,27 @@ const audioEl = document.createElement('audio');
 audioEl.preload = 'auto';
 audioEl.setAttribute('playsinline', '');
 audioEl.style.display = 'none';
+// Behåll tonhöjden när hastigheten ändras (stämmorna ska låta som vanligt, bara långsammare)
+audioEl.preservesPitch = true; audioEl.webkitPreservesPitch = true; audioEl.mozPreservesPitch = true;
 document.body.appendChild(audioEl);
+
+// ---------- Hastighet ----------
+// Gäller tills man ändrar den eller laddar om sidan – följer med mellan låtarna.
+const SPEED_MIN = 0.5, SPEED_MAX = 1.2;
+const SPEED_PRESETS = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1];
+let playbackSpeed = 1;
+function applySpeed() {
+  audioEl.defaultPlaybackRate = playbackSpeed;   // överlever byte av mix (src)
+  audioEl.playbackRate = playbackSpeed;
+  const badge = document.querySelector('#speedBtn .speed-badge');
+  if (badge) badge.textContent = playbackSpeed === 1 ? '' : Math.round(playbackSpeed * 100) + '%';
+  const btn = document.getElementById('speedBtn');
+  if (btn) btn.classList.toggle('active', playbackSpeed !== 1 || playerMenuKind === 'speed');
+}
+function setSpeed(v) {
+  playbackSpeed = Math.round(Math.min(SPEED_MAX, Math.max(SPEED_MIN, v)) * 100) / 100;
+  applySpeed();
+}
 // Safari 17+: behandla sidan som mediauppspelning (ljudlös-knappen tystar inte spelaren)
 try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
 
@@ -1311,6 +1340,7 @@ function loadMix(url, offset) {
       cleanup();
       const t = typeof offset === 'function' ? offset() : (offset || 0);
       try { audioEl.currentTime = Math.max(0, Math.min(t, (audioEl.duration || t) - 0.05)); } catch (e) {}
+      audioEl.playbackRate = playbackSpeed;
       resolve();
     }
     function fail() { cleanup(); reject(new Error('Kunde inte läsa in mixen')); }
@@ -1326,6 +1356,7 @@ function loadMix(url, offset) {
 
 async function startElementPlayback() {
   try {
+    audioEl.playbackRate = playbackSpeed;
     await audioEl.play();
   } catch (e) {
     if (e && e.name === 'AbortError') return;
@@ -1366,7 +1397,7 @@ async function remixCurrent(item) {
     const t0 = performance.now();
     swappingMix = true;
     try {
-      await loadMix(url, () => wasPlaying ? pos + (performance.now() - t0) / 1000 : pos);
+      await loadMix(url, () => wasPlaying ? pos + playbackSpeed * (performance.now() - t0) / 1000 : pos);
       if (wasPlaying) await startElementPlayback();
     } finally { swappingMix = false; }
   } catch (e) {
@@ -1730,7 +1761,7 @@ function startProgressTimer() {
       try {
         navigator.mediaSession.setPositionState({
           duration: trackDuration || 0,
-          playbackRate: 1,
+          playbackRate: playbackSpeed,
           position: Math.min(elapsed, trackDuration || 0)
         });
       } catch (e) {}
@@ -1962,7 +1993,7 @@ function renderKaraoke(force) {
   renderKaraoke(false);
   const kb = document.getElementById('karaoke');
   if (roll && kb.classList.contains('roll-mode') && !kb.classList.contains('hidden')) roll.render(currentElapsed());
-  kVideo.sync(currentElapsed(), isPlaying);
+  kVideo.sync(currentElapsed(), isPlaying, playbackSpeed);
   requestAnimationFrame(karaokeLoop);
 })();
 
@@ -1996,6 +2027,7 @@ function closePlayerMenu() {
 // visa vilken meny som är öppen (mixer / sångtext)
 function markMenuButtons() {
   document.getElementById('mixerBtn').classList.toggle('active', playerMenuKind === 'mixer');
+  document.getElementById('speedBtn').classList.toggle('active', playerMenuKind === 'speed' || playbackSpeed !== 1);
   document.getElementById('lyricsDocBtn').classList.toggle('active', playerMenuKind === 'docs');
 }
 
@@ -2032,12 +2064,42 @@ function wireMixerMenu(m) {
 }
 document.getElementById('mixerBtn').addEventListener('click', e => { e.stopPropagation(); togglePlayerMenu('mixer'); });
 
+// ---------- Hastighetsmeny ----------
+function speedMenuHtml() {
+  const pct = Math.round(playbackSpeed * 100);
+  return `<div class="pm-title">Hastighet</div>
+    <div class="mixer-row" style="padding:0 0.6rem;margin-bottom:0.4rem;">
+      <input type="range" min="${SPEED_MIN * 100}" max="${SPEED_MAX * 100}" step="5" value="${pct}" class="speedSlider" aria-label="Hastighet i procent">
+      <span class="speed-val">${pct}%</span>
+    </div>
+    <div class="speed-presets">${SPEED_PRESETS.map(v => {
+      const p = Math.round(v * 100);
+      return `<button type="button" class="btn-outline${p === pct ? ' on' : ''}" data-speed="${v}">${p}%</button>`;
+    }).join('')}</div>
+    <div class="speed-note">Tonhöjden ändras inte. Gäller alla låtar tills du ändrar tillbaka.</div>`;
+}
+function wireSpeedMenu(m) {
+  const slider = m.querySelector('.speedSlider'), val = m.querySelector('.speed-val');
+  const mark = () => {
+    const pct = Math.round(playbackSpeed * 100);
+    slider.value = pct; val.textContent = pct + '%';
+    m.querySelectorAll('[data-speed]').forEach(b => b.classList.toggle('on', Math.round(parseFloat(b.dataset.speed) * 100) === pct));
+  };
+  slider.addEventListener('input', () => { setSpeed(parseInt(slider.value, 10) / 100); mark(); });
+  m.querySelectorAll('[data-speed]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    setSpeed(parseFloat(b.dataset.speed)); mark();
+  }));
+}
+document.getElementById('speedBtn').addEventListener('click', e => { e.stopPropagation(); togglePlayerMenu('speed'); });
+
 function togglePlayerMenu(kind) {
   if (playerMenuKind === kind) { closePlayerMenu(); return; }
   const m = document.getElementById('playerMenu');
   playerMenuKind = kind;
-  m.innerHTML = kind === 'voice' ? voiceMenuHtml() : kind === 'mixer' ? mixerMenuHtml() : docsMenuHtml();
+  m.innerHTML = kind === 'voice' ? voiceMenuHtml() : kind === 'mixer' ? mixerMenuHtml() : kind === 'speed' ? speedMenuHtml() : docsMenuHtml();
   if (kind === 'mixer') wireMixerMenu(m);
+  if (kind === 'speed') wireSpeedMenu(m);
   // Placera precis ovanför knappraden (fungerar både i liten och utfälld spelare)
   const ctrlTop = document.getElementById('playerControls').getBoundingClientRect().top;
   m.style.bottom = Math.max(8, window.innerHeight - ctrlTop + 8) + 'px';

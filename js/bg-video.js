@@ -37,11 +37,11 @@
       vid = v;
     }
 
-    // t = låtens tid i sekunder, playing = spelar just nu.
+    // t = låtens tid i sekunder, playing = spelar just nu, rate = ljudets uppspelningshastighet (1 = normal).
     // Kontrolleras högst ~4 gånger/s under uppspelning (tätare kontroller och ständiga
     // tempoändringar får texten ovanpå att hacka).
     let lastCheck = 0, wasPlaying = false;
-    function sync(t, playing) {
+    function sync(t, playing, rate = 1) {
       if (!vid || vid.readyState < 1 || !song) return;
       const now = performance.now();
       if (playing && wasPlaying && now - lastCheck < 250) return;
@@ -57,9 +57,10 @@
       if (playing) {
         if (vid.paused) vid.play().catch(() => {});
         const ad = Math.abs(diff);
-        if (ad > 0.5) { if (!vid.seeking) { vid.playbackRate = 1; vid.currentTime = tgt; } }
-        else if (ad > 0.12) { const r = diff > 0 ? 0.97 : 1.03; if (vid.playbackRate !== r) vid.playbackRate = r; }
-        else if (ad < 0.04 && vid.playbackRate !== 1) vid.playbackRate = 1;
+        if (ad > 0.5) { if (!vid.seeking) { vid.playbackRate = rate; vid.currentTime = tgt; } }
+        else if (ad > 0.12) { const r = rate * (diff > 0 ? 0.97 : 1.03); if (vid.playbackRate !== r) vid.playbackRate = r; }
+        else if (ad < 0.04 && vid.playbackRate !== rate) vid.playbackRate = rate;
+        else if (ad >= 0.04 && vid.playbackRate !== rate && Math.abs(vid.playbackRate - rate) > 0.04 * rate) vid.playbackRate = rate;
       } else {
         if (!vid.paused) vid.pause();
         if (Math.abs(diff) > 0.06 && !vid.seeking) vid.currentTime = tgt;

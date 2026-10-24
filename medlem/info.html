@@ -74,6 +74,26 @@
   <div class="card">
     <div id="fdList"><p class="text-muted">Laddar...</p></div>
   </div>
+
+  <div class="card faq-card" style="margin-top: 1.5rem;">
+    <h3>Fråga om kören</h3>
+    <p class="text-muted">Sök i guiderna och körinfon. Svaren är hämtade direkt ur dokumenten.</p>
+    <form id="faqForm" class="faq-form" role="search">
+      <input id="faqInput" type="search" maxlength="200" placeholder="T.ex. hur kalibrerar jag" aria-label="Sök i kårens dokument" autocomplete="off">
+      <button type="submit" class="btn-gold">Sök</button>
+    </form>
+    <div id="faqResults" class="faq-results" aria-live="polite"></div>
+    <p class="text-muted faq-fallback">Hittar du inte svaret? Fråga körledningen.</p>
+  </div>
+  <style>
+    .faq-form { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+    .faq-form input { flex: 1; min-width: 0; font-size: 1rem; padding: 0.55rem 0.7rem; }
+    .faq-results { margin-top: 0.9rem; display: grid; gap: 0.7rem; }
+    .faq-hit { border-left: 3px solid var(--gold, #E5A968); padding: 0.1rem 0 0.1rem 0.7rem; }
+    .faq-hit p { margin: 0.25rem 0; white-space: pre-line; }
+    .faq-hit small { display: block; }
+    .faq-fallback { font-size: 0.9rem; margin-top: 0.9rem; }
+  </style>
 </div>
 
 <div id="toast" style="position:fixed; bottom:1.5rem; right:1.5rem; background:var(--accent); color:#111317; padding:0.7rem 1.2rem; border-radius:0.6rem; font-weight:600; box-shadow:var(--card-shadow); z-index:999; display:none;"></div>
@@ -81,6 +101,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
+<script src="/js/faq.js" defer></script>
 <script>
 const MIC_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>';
 // Visas om databasen inte har kolumnen än (före migrationen)

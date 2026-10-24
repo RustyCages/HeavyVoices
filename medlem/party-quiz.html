@@ -263,7 +263,7 @@ function cleanTitle(t) {
 const songCache = new Map();
 async function artistSongs(artist) {
   if (songCache.has(artist)) return songCache.get(artist);
-  const url = 'https://itunes.apple.com/search?' + new URLSearchParams({ term: artist, entity: 'song', attribute: 'artistTerm', limit: '40', country: 'se' });
+  const url = 'https://itunes.apple.com/search?' + new URLSearchParams({ term: artist, entity: 'song', attribute: 'artistTerm', limit: '100', country: 'se' });
   const data = await jsonp(url);
   const want = norm(artist), seen = new Set(), out = [];
   (data.results || []).forEach(r => {
@@ -282,7 +282,7 @@ async function artistSongs(artist) {
 async function songPool(nArtists) {
   const picks = shuffle(window.ROCK_ARTISTS).slice(0, nArtists);
   const res = await Promise.allSettled(picks.map(artistSongs));
-  return res.map((r, i) => ({ artist: picks[i], songs: r.status === 'fulfilled' ? r.value.slice(0, 15) : [] })).filter(x => x.songs.length >= 2);
+  return res.map((r, i) => ({ artist: picks[i], songs: r.status === 'fulfilled' ? r.value.slice(0, 30) : [] })).filter(x => x.songs.length >= 2);
 }
 
 // ---------- frågor ----------
@@ -321,8 +321,8 @@ async function makeGuessOnline(n) {
   for (let k = 0; k < n && k < pool.length; k++) {
     const A = pool[k];
     const fresh = A.songs.filter(x => !seen.has(x.id));
-    const s = (fresh.length ? fresh : A.songs)[Math.floor(Math.random() * Math.min(8, (fresh.length ? fresh : A.songs).length))];
-    const others = shuffle(pool.filter(x => x !== A)).slice(0, 3).map(B => B.songs[Math.floor(Math.random() * Math.min(8, B.songs.length))]);
+    const s = (fresh.length ? fresh : A.songs)[Math.floor(Math.random() * Math.min(15, (fresh.length ? fresh : A.songs).length))];
+    const others = shuffle(pool.filter(x => x !== A)).slice(0, 3).map(B => B.songs[Math.floor(Math.random() * Math.min(15, B.songs.length))]);
     const lab = x => `${x.title} – ${x.artist}`;
     out.push({ kind: 'guess', id: s.id, label: '🎧 Gissa låten', text: 'Vilken låt är det här?', correct: lab(s), options: shuffle([lab(s), ...others.map(lab)]), song: s, fact: '' });
   }
@@ -352,7 +352,7 @@ function lyricLines(txt) {
 async function makeLineOnline(n) {
   const seen = new Set(getSeen());
   const pool = await songPool(Math.min(14, n * 2 + 2));
-  const cands = pool.map(A => { const top = A.songs.slice(0, 6).filter(x => !seen.has('ly' + x.id)); return (top.length ? top : A.songs.slice(0, 6))[Math.floor(Math.random() * Math.min(6, top.length || A.songs.length))]; }).filter(Boolean);
+  const cands = pool.map(A => { const top = A.songs.slice(0, 12).filter(x => !seen.has('ly' + x.id)); return (top.length ? top : A.songs.slice(0, 12))[Math.floor(Math.random() * Math.min(12, top.length || A.songs.length))]; }).filter(Boolean);
   const lyr = await Promise.all(cands.map(lyricsFor));
   const out = [];
   cands.forEach((song, k) => {
@@ -392,16 +392,21 @@ async function fetchRockMix(n) {
   for (const l of lists) while (l.length && out.length < n) out.push(l.shift());   // fyll på från de som har kvar
   return shuffle(out);
 }
+// Rockfrågor från The Trivia API: taggen rock_music + musikkategorin filtrerad på rock (artistnamn/rockord)
+const ROCKY = /\b(rock|metal|punk|grunge|guitar|guitarist|drummer|bassist|riff|band)\b/i;
 async function fetchOnline(n) {
   const seen = new Set(getSeen());
   const out = [], got = new Set();
-  for (let attempt = 0; attempt < 3 && out.length < n; attempt++) {
-    const res = await fetch('https://the-trivia-api.com/v2/questions?limit=50&tags=rock_music', { headers: { 'Accept': 'application/json' } });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const items = await res.json();
-    (Array.isArray(items) ? items : (items.items || [])).forEach(it => {
+  const names = (window.ROCK_ARTISTS || []).map(norm).filter(x => x.length > 3);
+  const isRock = it => { const t = norm([typeof it.question === 'object' ? it.question.text : it.question, it.correctAnswer, ...(it.incorrectAnswers || [])].join(' ')); return ROCKY.test(t) || names.some(a => (' ' + t + ' ').includes(' ' + a + ' ')); };
+  const URLS = ['https://the-trivia-api.com/v2/questions?limit=50&tags=rock_music', 'https://the-trivia-api.com/v2/questions?limit=50&categories=music'];
+  for (let attempt = 0; attempt < 4 && out.length < n; attempt++) {
+    const url = URLS[attempt % URLS.length];
+    let items = [];
+    try { const res = await fetch(url, { headers: { 'Accept': 'application/json' } }); if (res.ok) items = await res.json(); } catch (e) {}
+    (Array.isArray(items) ? items : (items.items || [])).filter(it => url.includes('rock_music') || isRock(it)).forEach(it => {
       if (!it || got.has(it.id) || out.length >= n) return;
-      if (attempt < 2 && seen.has(it.id)) return;          // sista försöket: ta även redan visade
+      if (attempt < 3 && seen.has(it.id)) return;          // sista försöket: ta även redan visade
       const text = decodeHtml(typeof it.question === 'object' ? it.question.text : it.question);
       const correct = decodeHtml(it.correctAnswer), wrong = (it.incorrectAnswers || []).map(decodeHtml);
       if (!text || !correct || wrong.length < 1) return;

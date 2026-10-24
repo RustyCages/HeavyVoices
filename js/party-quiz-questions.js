@@ -18,4 +18,37 @@ window.ROCK_ARTISTS = [
   'Smashing Pumpkins', 'Stone Temple Pilots', 'Styx', 'Ted Nugent', 'Tesla', 'The Offspring', 'The Clash', 'Def Leppard',
   'Wolfmother', 'Rage Against The Machine', 'Queens Of The Stone Age', 'Thunder', 'Airbourne', 'Dio', 'Uriah Heep',
 ];
+// Fler artister (okt 2026) – fler låtar, klipp och genererade frågor innan något upprepas
+window.ROCK_ARTISTS = window.ROCK_ARTISTS.concat([
+  // klassisk rock / 60–70-tal
+  'The Beatles', 'The Kinks', 'The Animals', 'Cream', 'Jimi Hendrix', 'Jethro Tull', 'Genesis', 'Yes', 'Eagles',
+  'Fleetwood Mac', 'Bad Company', 'Grand Funk Railroad', 'The Allman Brothers Band', 'Golden Earring', 'Sweet', 'Slade',
+  'T. Rex', 'David Bowie', 'Kansas', 'REO Speedwagon', 'Blondie', 'Pat Benatar', 'Tom Petty', 'Bob Seger', 'Santana',
+  'Supertramp', 'Electric Light Orchestra', 'Nazareth', 'Mountain', 'Humble Pie', 'Montrose', 'Ten Years After',
+  // 80-tal / hårdrock / glam
+  'Quiet Riot', 'Dokken', 'Cinderella', 'Warrant', 'Winger', 'Great White', 'Night Ranger', 'Loverboy', 'Krokus',
+  'Accept', 'Helloween', 'Europe', 'Vixen', 'Lita Ford', 'Dee Snider', 'Bonfire', 'Gotthard', 'Treat', 'Pretty Maids',
+  'Y&T', 'Asia', 'Heart', 'Kix', 'L.A. Guns', 'Faster Pussycat', 'Firehouse', 'Steelheart', 'Danger Danger',
+  // metal
+  'Pantera', 'Anthrax', 'Testament', 'Sepultura', 'Machine Head', 'Slipknot', 'Korn', 'Trivium', 'Lamb of God',
+  'Five Finger Death Punch', 'Avantasia', 'Manowar', 'Blind Guardian', 'Dream Theater', 'Opeth', 'In Flames',
+  'Amon Amarth', 'Arch Enemy', 'Within Temptation', 'Epica', 'Children of Bodom', 'Gojira', 'Mastodon', 'Tool',
+  'Stratovarius', 'Dimmu Borgir', 'Bullet For My Valentine', 'Killswitch Engage', 'Trivium', 'Powerwolf', 'Lordi',
+  // 90-tal / alternativ / grunge
+  'Audioslave', 'Temple Of The Dog', 'Bush', 'Live', 'Collective Soul', 'Creed', 'Live', 'The Cranberries',
+  'Radiohead', 'Oasis', 'Blur', 'Placebo', 'Marilyn Manson', 'Nine Inch Nails', 'White Zombie', 'Faith No More',
+  'Jane\'s Addiction', 'Screaming Trees', 'Mudhoney', 'Hole', 'Weezer', 'Foo Fighters', 'Third Eye Blind', 'Incubus',
+  // 2000-tal och framåt
+  'Shinedown', 'Three Days Grace', 'Breaking Benjamin', 'Papa Roach', 'Godsmack', 'Staind', 'Seether', 'Daughtry',
+  'Halestorm', 'Alter Bridge', 'Slash', 'Velvet Revolver', 'Royal Blood', 'Greta Van Fleet', 'Rival Sons',
+  'The Struts', 'Måneskin', 'Black Stone Cherry', 'Bring Me The Horizon', 'Sleep Token', 'The White Stripes',
+  'The Black Keys', 'Arctic Monkeys', 'The Strokes', 'Kings of Leon', 'Jet', 'My Chemical Romance', 'Fall Out Boy',
+  'Paramore', 'Thirty Seconds To Mars', 'Biffy Clyro', 'Billy Talent', 'Sum 41', 'Blink-182', 'Rise Against',
+  // Sverige och Norden
+  'Ebba Grön', 'Imperiet', 'Magnus Uggla', 'Gyllene Tider', 'Roxette', 'Backyard Babies', 'Mustasch', 'Graveyard',
+  'Soilwork', 'Dark Funeral', 'Candlemass', 'Bathory', 'Entombed', 'Dissection', 'Clawfinger', 'Thåström',
+  'Hardcore Superstar', 'Crashdïet', 'H.E.A.T', 'Eclipse', 'Dynazty', 'Amaranthe', 'Avatar', 'Royal Republic',
+  'Kent', 'Takida', 'Mando Diao', 'Sahara Hotnights', 'The Sounds', 'Sator', 'Wilmer X', 'Electric Boys',
+  'Turbonegro', 'Mayhem', 'Hanoi Rocks', 'Children of Bodom', 'HIM', 'Stratovarius', 'Apocalyptica',
+]);
 window.ROCK_ARTISTS = [...new Set(window.ROCK_ARTISTS)];

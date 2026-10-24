@@ -32,7 +32,7 @@
   const cache = new Map();
   async function artistSongs(artist) {
     if (cache.has(artist)) return cache.get(artist);
-    const url = 'https://itunes.apple.com/search?' + new URLSearchParams({ term: artist, entity: 'song', attribute: 'artistTerm', limit: '50', country: 'se' });
+    const url = 'https://itunes.apple.com/search?' + new URLSearchParams({ term: artist, entity: 'song', attribute: 'artistTerm', limit: '100', country: 'se' });
     const data = await jsonp(url);
     const want = norm(artist), byKey = new Map(), minYear = new Map(), album = new Map();
     const COMP = /greatest|best of|hits|collection|essential|anthology|live|deluxe|edition|anniversary|box set|gold|platinum|ultimate|definitive|years|story|singles|soundtrack|remaster/i;
@@ -125,7 +125,7 @@
             let songs = [];
             try { songs = await artistSongs(artist); } catch (e) { failures++; continue; }
             // en låt per artist och varv – bland de mest populära
-            const cand = shuffle(songs.slice(0, 10).filter(x => !seen.has(x.id) && !seenTitle.has(norm(x.title))))[0];
+            const cand = shuffle(songs.slice(0, 20).filter(x => !seen.has(x.id) && !seenTitle.has(norm(x.title))))[0];
             if (!cand) continue;
             seen.add(cand.id); seenTitle.add(norm(cand.title));
             s = await prepare({ ...cand });
@@ -180,14 +180,14 @@
   const decadeLabel = d => d >= 2000 ? `${d}-talet` : `${String(d).slice(2)}-talet`;
   async function makeRockQuestions(n, seenIds) {
     const seen = new Set(seenIds || []);
-    const artists = shuffle(root.ROCK_ARTISTS || []).slice(0, Math.min(14, n + 6));
+    const artists = shuffle(root.ROCK_ARTISTS || []).slice(0, Math.min(22, n + 8));
     const res = await Promise.allSettled(artists.map(artistSongs));
-    const pool = res.map((r, i) => ({ artist: artists[i], songs: r.status === 'fulfilled' ? r.value.slice(0, 15) : [] })).filter(x => x.songs.length >= 4);
+    const pool = res.map((r, i) => ({ artist: artists[i], songs: r.status === 'fulfilled' ? r.value.slice(0, 30) : [] })).filter(x => x.songs.length >= 4);
     if (pool.length < 4) throw new Error('för få artister');
     const out = [], used = new Set();
-    const pickSong = A => shuffle(A.songs.slice(0, 10)).find(x => !used.has(x.id) && !seen.has('gen' + x.id));
+    const pickSong = A => shuffle(A.songs.slice(0, 20)).find(x => !used.has(x.id) && !seen.has('gen' + x.id));
     const otherArtists = A => shuffle(pool.filter(B => B !== A)).map(B => B.songs[0].artist);
-    const types = shuffle(['band', 'band', 'year', 'year', 'album', 'odd']);
+    const types = shuffle(['band', 'band', 'year', 'year', 'album', 'odd', 'first', 'albumBy']);
     let mbCalls = 0;
     for (let k = 0; out.length < n && k < n * 4; k++) {
       const A = pool[k % pool.length], s = pickSong(A);
@@ -219,6 +219,17 @@
         if (!intruder || mine.length < 2) continue;
         used.add(intruder.id);
         q = { text: `Vilken av låtarna är INTE av ${s.artist}?`, correct: intruder.title, options: [intruder.title, s.title, ...mine.map(x => x.title)], fact: `"${intruder.title}" är av ${intruder.artist}` };
+      } else if (type === 'first') {
+        // vilken av fyra låtar av samma artist släpptes först (olika år)
+        const four = shuffle(A.songs.filter(x => x.year)).reduce((acc, x) => { if (acc.length < 4 && !acc.some(y => y.year === x.year)) acc.push(x); return acc; }, []);
+        if (four.length < 4) continue;
+        const first = four.slice().sort((a, b) => a.year - b.year)[0];
+        q = { text: `Vilken av de här ${s.artist}-låtarna släpptes först?`, correct: first.title, options: four.map(x => x.title), fact: four.slice().sort((a, b) => a.year - b.year).map(x => `${x.title} (${x.year})`).join(' · ') };
+      } else if (type === 'albumBy') {
+        // vem gav ut albumet
+        if (!s.album || norm(s.album).includes(norm(s.artist)) || norm(s.album) === norm(s.title)) continue;
+        const opts = [s.artist, ...otherArtists(A).filter(a => norm(a) !== norm(s.artist)).slice(0, 3)];
+        q = { text: `Vem gav ut albumet "${s.album}"?`, correct: s.artist, options: opts };
       }
       if (!q || new Set(q.options.map(norm)).size < 4) continue;
       used.add(s.id);
@@ -231,11 +242,25 @@
   // ---------- Open Trivia DB: musikfrågor som handlar om rock ----------
   async function openTriviaRock(n, seenIds) {
     const seen = new Set(seenIds || []);
-    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 20000);
     try {
-      const res = await fetch('https://opentdb.com/api.php?amount=50&category=12&type=multiple&encode=url3986', { signal: ctl.signal });
+      // sessionsnyckel: Open Trivia DB ger då bara frågor vi inte fått förut (tills alla är använda)
+      let token = null;
+      try { const t = JSON.parse(localStorage.getItem('hv-otdb-token') || 'null'); if (t && Date.now() - t.at < 5 * 3600e3) token = t.token; } catch (e) {}
+      if (!token) {
+        try { const r = await fetch('https://opentdb.com/api_token.php?command=request', { signal: ctl.signal }); const j = await r.json(); if (j.token) { token = j.token; localStorage.setItem('hv-otdb-token', JSON.stringify({ token, at: Date.now() })); } } catch (e) {}
+      }
+      const ask = () => fetch('https://opentdb.com/api.php?amount=50&category=12&type=multiple&encode=url3986' + (token ? '&token=' + token : ''), { signal: ctl.signal });
+      const wait = ms => new Promise(r => setTimeout(r, ms));
+      let res = await ask();
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      const d = await res.json();
+      let d = await res.json();
+      if (d.response_code === 5) { await wait(5200); res = await ask(); d = await res.json(); }   // max 1 anrop per 5 s
+      if (token && (d.response_code === 4 || d.response_code === 3)) {
+        // alla frågor använda (4) eller nyckeln ogiltig (3) → nollställ och försök igen
+        try { if (d.response_code === 4) await fetch('https://opentdb.com/api_token.php?command=reset&token=' + token, { signal: ctl.signal }); else { localStorage.removeItem('hv-otdb-token'); token = null; } } catch (e) {}
+        await wait(5200); res = await ask(); d = await res.json();
+      }
       const dec = x => { try { return decodeURIComponent(x); } catch (e) { return x; } };
       const names = (root.ROCK_ARTISTS || []).map(norm).filter(x => x.length > 3);
       const ROCKY = /\b(rock|metal|punk|grunge|guitar|guitarist|drummer|bassist|riff|headbang|mosh)\b/i;

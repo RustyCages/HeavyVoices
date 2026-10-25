@@ -318,6 +318,12 @@ function renderMoteCard(ev, isPast) {
   (notesByEvent.get(ev.id) || []).forEach(n => {
     html += `<div class="event-body-row"><div class="event-body-label">Anteckningar från mötet, ${formatDate(n.created_at.slice(0, 10))}</div><div>${escapeHtml(n.body)}</div></div>`;
   });
+  if (isBooker) {
+    (notesByEvent.get(ev.id) || []).forEach(n => {
+      html += `<div style="margin:0 0 0.8rem;"><button type="button" class="rsvp-btn" data-notesend="${escapeHtml(n.id)}" data-event="${escapeHtml(ev.id)}">Skicka till inbjudna…</button></div>
+        <div data-send-note="${escapeHtml(n.id)}" hidden style="margin:0 0 0.8rem;"></div>`;
+    });
+  }
   if (canRecord && (mine || isBooker)) {
     html += `<div style="margin:0.4rem 0 0.8rem;">${recButtonHtml()}</div>`;
   }
@@ -389,6 +395,42 @@ async function callFn(name, payload) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || ('Fel ' + res.status));
   return data;
+}
+
+// ---------- anteckningar: bokaren skickar till de inbjudna ----------
+function toggleNoteSend(btn) {
+  const card = btn.closest('details');
+  const panel = card.querySelector(`[data-send-note="${CSS.escape(btn.dataset.notesend)}"]`);
+  if (!panel) return;
+  if (!panel.hidden) { panel.hidden = true; return; }
+  const list = inviteesByEvent.get(btn.dataset.event) || [];
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="book-list" style="margin:0.4rem 0;">${list.length
+      ? list.map(i => `<label class="book-person"><input type="checkbox" value="${escapeHtml(i.id)}"> ${escapeHtml(i.name)}</label>`).join('')
+      : '<p class="text-muted">Inga inbjudna till mötet.</p>'}</div>
+    <div class="book-tools">
+      <button type="button" class="btn-outline" data-notes-all>Välj alla</button>
+      <button type="button" class="btn-outline" data-notes-go>Skicka mejl</button>
+      <span data-notes-status style="font-size:0.9rem;color:var(--text-muted);"></span>
+    </div>`;
+  panel.querySelector('[data-notes-all]').onclick = () => panel.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = true; });
+  panel.querySelector('[data-notes-go]').onclick = () => sendNotesFromMember(btn.dataset.notesend, panel);
+}
+
+async function sendNotesFromMember(noteId, panel) {
+  const statusEl = panel.querySelector('[data-notes-status]');
+  const ids = [...panel.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value);
+  if (!ids.length) { statusEl.textContent = 'Välj minst en mottagare.'; return; }
+  if (!confirm(`Skicka anteckningen till ${ids.length} inbjudna? Varje person får ett eget mejl.`)) return;
+  statusEl.textContent = 'Skickar...';
+  try {
+    const r = await callFn('send-meeting-notes', { note_id: noteId, member_ids: ids });
+    statusEl.textContent = `Skickat till ${r.sent} medlem(mar)${r.failed ? `, ${r.failed} misslyckades` : ''}.`;
+    panel.querySelectorAll('input:checked').forEach(c => { c.checked = false; });
+  } catch (err) {
+    statusEl.textContent = err.message;
+  }
 }
 
 // ---------- skärminspelning (i webbläsaren, sparas som fil på datorn) ----------
@@ -518,6 +560,7 @@ document.getElementById('listMote').addEventListener('click', (e) => {
   if (!btn) return;
   if (btn.dataset.svar) respond(btn.dataset.token, btn.dataset.svar);
   if (btn.dataset.cancel) cancelMeeting(btn.dataset.cancel);
+  if (btn.dataset.notesend) toggleNoteSend(btn);
   if (btn.dataset.rec === 'start') startRec();
   if (btn.dataset.rec === 'stop') stopRec();
 });
@@ -566,8 +609,8 @@ async function loadEvents() {
   const [evRes, mineRes, bookerRes, notesRes] = await Promise.all([
     supabaseClient.from('events').select('*').order('event_date').order('event_time'),
     supabaseClient.from('meeting_invites').select('event_id, token, response').eq('member_id', me.id),
-    supabaseClient.from('meeting_invites').select('event_id, response, members(name)'),
-    supabaseClient.from('meeting_notes').select('event_id, body, created_at').order('created_at'),
+    supabaseClient.from('meeting_invites').select('event_id, member_id, response, members(name)'),
+    supabaseClient.from('meeting_notes').select('id, event_id, body, created_at').order('created_at'),
   ]);
 
   const { data: events, error } = evRes;
@@ -583,7 +626,7 @@ async function loadEvents() {
   inviteesByEvent = new Map();
   (bookerRes.data || []).forEach(r => {
     const arr = inviteesByEvent.get(r.event_id) || [];
-    arr.push({ name: r.members?.name || 'Okänd', response: r.response });
+    arr.push({ id: r.member_id, name: r.members?.name || 'Okänd', response: r.response });
     inviteesByEvent.set(r.event_id, arr);
   });
 
@@ -591,7 +634,7 @@ async function loadEvents() {
   notesByEvent = new Map();
   (notesRes.data || []).forEach(n => {
     const arr = notesByEvent.get(n.event_id) || [];
-    arr.push({ body: n.body, created_at: n.created_at });
+    arr.push({ id: n.id, body: n.body, created_at: n.created_at });
     notesByEvent.set(n.event_id, arr);
   });
 

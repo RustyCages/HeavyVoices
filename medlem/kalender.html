@@ -338,12 +338,14 @@ function renderMoteList(evs) {
 
 async function respond(token, svar) {
   setStatus('moteStatus', 'Sparar ditt svar...');
-  const fd = new FormData();
-  fd.append('token', token);
-  fd.append('svar', svar);
   try {
-    const res = await fetch(FN_URL('meeting-rsvp'), { method: 'POST', body: fd });
-    if (!res.ok) throw new Error('Svaret kunde inte sparas. Försök igen.');
+    const res = await fetch(FN_URL('meeting-rsvp'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ token, svar }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Svaret kunde inte sparas. Försök igen.');
     setStatus('moteStatus', `Ditt svar ${SVAR_LABEL[svar].toLowerCase()} är sparat.`);
     await loadEvents();
   } catch (err) {

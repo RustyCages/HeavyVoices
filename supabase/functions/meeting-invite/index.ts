@@ -121,7 +121,8 @@ function whenText(ev: any): string {
   return `${dag}${tid ? ` kl ${tid}` : ""}${slut ? `–${slut}` : ""}`;
 }
 
-const RSVP_BASE = (supabaseUrl: string) => `${supabaseUrl}/functions/v1/meeting-rsvp`;
+// Svarslänkarna går till svarssidan på heavyvoices.se, som anropar meeting-rsvp
+const RSVP_BASE = (_supabaseUrl: string) => "https://heavyvoices.se/mote-svar.html";
 
 function inviteHtml(ev: any, bokare: string, mottagare: any, rsvpBase: string): string {
   const knapp = (svar: string, label: string, bg: string, fg: string) =>

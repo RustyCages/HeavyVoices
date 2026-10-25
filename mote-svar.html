@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Svara på möte — Heavy Voices</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#121418; color:#f3f4f6; font-family: Arial, Helvetica, sans-serif; }
+  .wrap { max-width:520px; margin:0 auto; padding:40px 20px; }
+  h1 { font-size:22px; color:#E5A968; margin:0 0 22px; }
+  .title { font-size:18px; font-weight:bold; margin:0 0 6px; }
+  .when { color:#d1d5db; margin:0 0 6px; }
+  .now { color:#9ca3af; font-size:14px; margin:0 0 22px; }
+  .muted { color:#9ca3af; font-size:14px; }
+  .err { color:#f87171; }
+  button { margin:0 8px 10px 0; padding:12px 20px; border-radius:8px; border:0; font:inherit; font-size:15px; font-weight:bold; cursor:pointer; background:#2a2f3a; color:#f3f4f6; }
+  button.ja { background:#E5A968; color:#111317; }
+  button:disabled { opacity:.6; cursor:default; }
+  a { color:#E5A968; }
+  #msg { margin:18px 0 0; min-height:1.2em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Heavy Voices</h1>
+  <div id="app"><p class="muted">Laddar...</p></div>
+</div>
+<script>
+const FN = 'https://scfudeyozwedohujsoua.supabase.co/functions/v1/meeting-rsvp';
+const LABEL = { ja: 'Ja', kanske: 'Kanske', nej: 'Nej' };
+const params = new URLSearchParams(location.search);
+const token = params.get('token') || '';
+const forvald = params.get('svar') || '';
+const app = document.getElementById('app');
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function nar(ev) {
+  const dag = new Date(ev.event_date + 'T12:00:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Stockholm' });
+  const tid = (ev.event_time || '').slice(0, 5);
+  const slut = (ev.end_time || '').slice(0, 5);
+  return dag + (tid ? ' kl ' + tid : '') + (slut ? '–' + slut : '');
+}
+
+function fel(text) {
+  app.innerHTML = `<p class="err">${esc(text)}</p>`;
+}
+
+async function ladda() {
+  if (!/^[0-9a-f-]{36}$/i.test(token)) return fel('Länken är inte giltig. Använd knappen i mejlet igen.');
+  let d;
+  try {
+    const res = await fetch(FN + '?token=' + encodeURIComponent(token));
+    d = await res.json();
+    if (!res.ok) return fel(d.error || 'Något gick fel.');
+  } catch (err) {
+    return fel('Kunde inte nå servern. Försök igen om en stund.');
+  }
+  visa(d);
+}
+
+function visa(d) {
+  const nu = d.response ? `Ditt nuvarande svar: <strong>${LABEL[d.response]}</strong>.` : 'Du har inte svarat än.';
+  const val = ['ja', 'kanske', 'nej'].includes(forvald) ? [forvald] : ['ja', 'kanske', 'nej'];
+  const knappar = val.map(s =>
+    `<button type="button" class="${s === 'ja' ? 'ja' : ''}" data-svar="${s}">${val.length === 1 ? 'Bekräfta: ' : ''}${LABEL[s]}</button>`
+  ).join('');
+  const annat = val.length === 1
+    ? `<p><a href="?token=${encodeURIComponent(token)}">Välj ett annat svar</a></p>`
+    : '';
+  app.innerHTML = `
+    <p class="title">${esc(d.title)}</p>
+    <p class="when">${esc(nar(d))}</p>
+    <p class="now">${nu}</p>
+    <div id="knappar">${knappar}</div>${annat}
+    <p id="msg"></p>
+    <p><a href="${esc(d.meeting_url)}" target="_blank" rel="noopener">Gå till videomötet</a></p>`;
+  app.querySelectorAll('button[data-svar]').forEach(b =>
+    b.addEventListener('click', () => svara(b.dataset.svar, d)));
+}
+
+async function svara(svar, d) {
+  const knappar = document.querySelectorAll('#knappar button');
+  const msg = document.getElementById('msg');
+  knappar.forEach(b => b.disabled = true);
+  msg.className = '';
+  msg.textContent = 'Sparar ditt svar...';
+  try {
+    const res = await fetch(FN, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, svar }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Svaret kunde inte sparas. Försök igen.');
+    app.innerHTML = `
+      <p class="title">Tack${d.fornamn ? ', ' + esc(d.fornamn) : ''}!</p>
+      <p class="when">Du har svarat <strong>${LABEL[svar]}</strong> på ${esc(d.title)} (${esc(nar(d))}).</p>
+      <p class="muted">Du kan ändra svaret med knappen i mejlet.</p>
+      <p><a href="${esc(d.meeting_url)}" target="_blank" rel="noopener">Gå till videomötet</a></p>`;
+  } catch (err) {
+    msg.className = 'err';
+    msg.textContent = err.message;
+    knappar.forEach(b => b.disabled = false);
+  }
+}
+
+ladda();
+</script>
+</body>
+</html>

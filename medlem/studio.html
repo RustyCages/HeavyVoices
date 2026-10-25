@@ -1229,6 +1229,7 @@ async function startRecording() {
   }
   const pre = Number(document.getElementById('preRoll').value) || 0;
   const from = Math.max(0, position() - (playing ? 0 : pre));
+  if (window.innerWidth < 900) tl.fit();   // mobil: visa hela låten (Allt), inte en inzoomad vy
   let t;
   if (isEmpty(active) && active.mine && !active.id) {   // valt tomt spår: spela in i det
     t = active; t.clip = null; t.peaks = null; t.buffer = null; t.undo = []; t.loadingText = '● Spelar in…';

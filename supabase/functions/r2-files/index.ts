@@ -5,11 +5,12 @@
 //   songs.stem_*_path, bg_video_path        → area "stems"   → R2-nyckel "stems/<path>"
 //   warmup_videos.video_path / thumb_path   → area "warmup"  → R2-nyckel "warmup/<path>"
 //   filutforskaren                          → area "filer"   → R2-nyckel "filer/<path>"
+//   forum_attachments.path                  → area "forum"   → R2-nyckel "forum/<path>"
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "jsr:@supabase/server@^1";
 import { BUCKET, del, list, presign, put } from "./r2.ts";
 
-type Area = "stems" | "warmup" | "filer";
+type Area = "stems" | "warmup" | "filer" | "forum";
 type Action = "list" | "upload" | "download" | "sign" | "delete" | "mkdir";
 
 interface Payload {
@@ -23,10 +24,11 @@ interface Payload {
   filename?: string;     // namn vid nedladdning (annars sista delen av sökvägen)
 }
 
-const AREAS: Area[] = ["stems", "warmup", "filer"];
-// Speglar Storage-policyerna: stems = is_song_editor(), övriga = is_admin()
+const AREAS: Area[] = ["stems", "warmup", "filer", "forum"];
+// Speglar Storage-policyerna: stems = is_song_editor(), övriga = is_admin().
+// forum: alla godkända kan ladda upp (i sin egen mapp), åtkomst till filen kontrolleras mot forum_attachments.
 const canWrite = (area: Area, m: { role: string; stamledare: boolean }) =>
-  m.role === "admin" || (area === "stems" && m.stamledare === true);
+  area === "forum" || m.role === "admin" || (area === "stems" && m.stamledare === true);
 const WRITE_ACTIONS: Action[] = ["upload", "delete", "mkdir"];
 const PUT_TTL = 60 * 15;      // 15 min för uppladdning
 const GET_TTL = 60 * 60 * 6;  // 6 h, så att <audio>/<video> klarar långa övningspass med seek
@@ -68,6 +70,25 @@ const handler = withSupabase({ auth: "user" }, async (req, ctx) => {
     if (!AREAS.includes(area)) return json({ error: "Ogiltigt område" }, 400);
     if (WRITE_ACTIONS.includes(action) && !canWrite(area, caller)) {
       return json({ error: area === "stems" ? "Kräver admin eller stämledare" : "Kräver admin-behörighet" }, 403);
+    }
+
+    // Forum: bara uppladdning och nedladdning. Nedladdning släpps bara igenom för bilagor
+    // som den inloggade själv får se enligt RLS (forum_attachments använder användarens egen klient).
+    if (area === "forum") {
+      if (action !== "upload" && action !== "download") {
+        return json({ error: "Åtgärden stöds inte för forum" }, 400);
+      }
+      const key = toKey(area, body.key);
+      if (!key) return json({ error: "key krävs" }, 400);
+      const rel = key.slice(area.length + 1);
+      if (action === "upload" && !/^[0-9a-f-]{36}\/[^/]+$/i.test(rel)) {
+        return json({ error: "Ogiltig sökväg för forum" }, 400);
+      }
+      if (action === "download") {
+        const { data: bilaga } = await supabase
+          .from("forum_attachments").select("id").eq("path", rel).maybeSingle();
+        if (!bilaga) return json({ error: "Filen finns inte eller saknar åtkomst" }, 403);
+      }
     }
 
     switch (action) {

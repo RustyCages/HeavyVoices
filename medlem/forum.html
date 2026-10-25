@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forum — Heavy Voices</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .stamma-picker { display:flex; gap:0.5rem; flex-wrap:wrap; margin:0 0 1.2rem; }
+  .stamma-picker[hidden] { display:none; }
+  .stamma-picker button { background:rgba(255,255,255,0.06); color:#d1d5db; border:1px solid rgba(255,255,255,0.12); padding:0.5rem 1rem; }
+  .stamma-picker button.active { background:var(--accent); color:#111317; }
+
+  .forum-composer { display:grid; gap:0.6rem; margin-bottom:1.4rem; }
+  .forum-composer textarea { width:100%; min-height:5rem; box-sizing:border-box; }
+  .forum-composer .row { display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap; }
+  .forum-composer input[type=file] { color:var(--text-muted); font-size:0.9rem; max-width:100%; }
+  .forum-status { min-height:1.2em; margin:0 0 0.8rem; font-size:0.92rem; color:var(--text-muted); }
+  .forum-status.is-error { color:#f87171; }
+
+  .forum-post { padding:1rem 1.2rem; margin-bottom:1rem; }
+  .forum-meta { font-size:0.82rem; color:var(--text-muted); margin-bottom:0.4rem; display:flex; justify-content:space-between; gap:0.6rem; flex-wrap:wrap; }
+  .forum-body { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.5; }
+  .forum-files { display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.6rem; }
+  .forum-files button { font-size:0.85rem; padding:0.3rem 0.6rem; }
+  .forum-replies { margin:0.9rem 0 0 0.9rem; padding-left:0.9rem; border-left:2px solid var(--border); }
+  .forum-reply { margin-bottom:0.8rem; }
+  .forum-reply:last-child { margin-bottom:0; }
+  .forum-reply-box { margin-top:0.8rem; }
+  .forum-reply-box > summary { cursor:pointer; color:var(--accent); font-size:0.9rem; list-style:none; }
+  .forum-reply-box > summary::-webkit-details-marker { display:none; }
+  .forum-reply-box[open] > summary { margin-bottom:0.6rem; }
+  .forum-del { margin-top:0.6rem; font-size:0.82rem; padding:0.25rem 0.6rem; border-color:#f87171; color:#fca5a5; }
+</style>
+</head>
+<body>
+<header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+<div class="container">
+  <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
+  <h1>Stämforum</h1>
+  <p class="text-muted" style="margin:0 0 1rem;">Diskutera och dela filer inom din stämgrupp. Bara din stämgrupp ser inläggen, och stämledare och admin ser alla.</p>
+
+  <div class="stamma-picker" id="stammaPicker"></div>
+  <p class="forum-status" id="forumStatus" role="status"></p>
+
+  <div id="forumBody"><p class="text-muted">Laddar...</p></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+const STAMMOR = ['Sopran', 'Alt', 'Tenor', 'Bas'];
+const MAX_FILE_MB = 25;
+const MAX_FILES = 10;
+
+let me = null;
+let currentStamma = null;
+let posts = [];   // alla inlägg för vald stämgrupp
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function setStatus(text, isError) {
+  const el = document.getElementById('forumStatus');
+  el.textContent = text || '';
+  el.classList.toggle('is-error', !!isError);
+}
+
+function formatWhen(iso) {
+  return new Date(iso).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Stockholm' });
+}
+
+function fileSize(bytes) {
+  if (!bytes) return '';
+  return bytes > 1024 * 1024 ? (bytes / 1024 / 1024).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' kB';
+}
+
+// Stämgrupper man får välja: stämledare och admin alla, övriga bara sin egen
+function tillgangligaStammor() {
+  if (isSongEditor(me)) return STAMMOR;
+  return STAMMOR.includes(me.stamma) ? [me.stamma] : [];
+}
+
+function renderPicker() {
+  const picker = document.getElementById('stammaPicker');
+  const lista = tillgangligaStammor();
+  picker.innerHTML = lista.map(s =>
+    `<button type="button" class="${s === currentStamma ? 'active' : ''}" data-stamma="${s}">${s}</button>`).join('');
+  picker.hidden = lista.length <= 1;
+}
+
+// ---------- hämta och visa ----------
+async function loadPosts() {
+  const body = document.getElementById('forumBody');
+  if (!currentStamma) {
+    body.innerHTML = '<p class="text-muted">Ingen stämgrupp är vald på din profil. Be en admin sätta den under Medlemmar.</p>';
+    return;
+  }
+  const { data, error } = await supabaseClient.from('forum_posts')
+    .select('id, stamma, author_id, parent_id, body, created_at, author:members!forum_posts_author_id_fkey(name), forum_attachments(id, path, name, size)')
+    .eq('stamma', currentStamma)
+    .order('created_at', { ascending: true });
+  if (error) {
+    body.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  posts = data || [];
+  renderPosts();
+}
+
+function attachmentsHtml(p) {
+  const files = p.forum_attachments || [];
+  if (!files.length) return '';
+  return `<div class="forum-files">${files.map(f =>
+    `<button type="button" class="btn-outline" data-att-path="${escapeHtml(f.path)}" data-att-name="${escapeHtml(f.name)}">📎 ${escapeHtml(f.name)}${f.size ? ` <span class="text-muted">(${fileSize(f.size)})</span>` : ''}</button>`
+  ).join('')}</div>`;
+}
+
+function postHtml(p) {
+  const kanBorta = p.author_id === me.id || isSongEditor(me);
+  return `
+    <div class="forum-meta">
+      <span>${escapeHtml(p.author?.name || 'Borttagen medlem')}</span>
+      <span>${formatWhen(p.created_at)}</span>
+    </div>
+    <div class="forum-body">${escapeHtml(p.body)}</div>
+    ${attachmentsHtml(p)}
+    ${kanBorta ? `<button type="button" class="btn-outline forum-del" data-del="${p.id}">Ta bort</button>` : ''}`;
+}
+
+function renderPosts() {
+  const body = document.getElementById('forumBody');
+  const toppar = posts.filter(p => !p.parent_id).reverse();   // nyast först
+  const svar = {};
+  posts.filter(p => p.parent_id).forEach(p => { (svar[p.parent_id] = svar[p.parent_id] || []).push(p); });
+
+  const composer = `
+    <form class="forum-composer card" data-form="new" style="padding:1rem 1.2rem;">
+      <label style="font-weight:700;">Nytt inlägg i ${escapeHtml(currentStamma)}</label>
+      <textarea name="body" maxlength="5000" required placeholder="Skriv något till stämgruppen..."></textarea>
+      <div class="row">
+        <input type="file" name="files" multiple>
+        <button type="submit" class="btn">Publicera</button>
+      </div>
+    </form>`;
+
+  const inlagg = toppar.length
+    ? toppar.map(p => `
+        <article class="card forum-post">
+          ${postHtml(p)}
+          <div class="forum-replies">
+            ${(svar[p.id] || []).map(r => `<div class="forum-reply">${postHtml(r)}</div>`).join('')}
+          </div>
+          <details class="forum-reply-box">
+            <summary>Svara</summary>
+            <form class="forum-composer" data-form="reply" data-parent="${p.id}">
+              <textarea name="body" maxlength="5000" required placeholder="Ditt svar..."></textarea>
+              <div class="row">
+                <input type="file" name="files" multiple>
+                <button type="submit" class="btn-outline">Skicka svar</button>
+              </div>
+            </form>
+          </details>
+        </article>`).join('')
+    : '<p class="text-muted">Inga inlägg ännu. Var först att skriva något!</p>';
+
+  body.innerHTML = composer + inlagg;
+}
+
+// ---------- skriva ----------
+async function laddaUppBilagor(postId, files) {
+  const rader = [];
+  for (const file of files) {
+    const namn = file.name.replace(/[\\/:*?"<>|]+/g, '_').slice(0, 120);
+    const sokvag = `${postId}/${crypto.randomUUID().slice(0, 8)}-${namn}`;
+    const { error } = await supabaseClient.storage.from('heavy-voices-forum')
+      .upload(sokvag, file, { contentType: file.type || 'application/octet-stream' });
+    if (error) throw new Error(`Kunde inte ladda upp ${file.name}: ${error.message}`);
+    rader.push({ post_id: postId, path: sokvag, name: file.name, size: file.size, content_type: file.type || null });
+  }
+  if (rader.length) {
+    const { error } = await supabaseClient.from('forum_attachments').insert(rader);
+    if (error) throw new Error('Filerna laddades upp men kopplingen till inlägget misslyckades: ' + error.message);
+  }
+}
+
+async function skickaInlagg(form) {
+  const text = form.body.value.trim();
+  const files = [...form.files.files];
+  const parentId = form.dataset.parent || null;
+  if (!text) return setStatus('Skriv något först.', true);
+  if (files.length > MAX_FILES) return setStatus(`Max ${MAX_FILES} filer per inlägg.`, true);
+  const stora = files.find(f => f.size > MAX_FILE_MB * 1024 * 1024);
+  if (stora) return setStatus(`${stora.name} är större än ${MAX_FILE_MB} MB.`, true);
+
+  const btn = form.querySelector('button[type=submit]');
+  btn.disabled = true;
+  setStatus('Publicerar...');
+  try {
+    const postId = crypto.randomUUID();
+    const { error } = await supabaseClient.from('forum_posts').insert({
+      id: postId, stamma: currentStamma, author_id: me.id, parent_id: parentId, body: text,
+    });
+    if (error) throw new Error(error.message);
+    await laddaUppBilagor(postId, files);
+    setStatus('Inlägget är publicerat.');
+    await loadPosts();
+  } catch (err) {
+    setStatus(err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function oppnaBilaga(path, name) {
+  setStatus('Hämtar fil...');
+  const { data, error } = await supabaseClient.storage.from('heavy-voices-forum')
+    .createSignedUrl(path, 60, { download: name });
+  if (error || !data?.signedUrl) return setStatus('Kunde inte hämta filen: ' + (error?.message || 'okänt fel'), true);
+  setStatus('');
+  window.open(data.signedUrl, '_blank', 'noopener');
+}
+
+async function taBortInlagg(id) {
+  if (!confirm('Ta bort inlägget? Svar och bilagor tas bort med det.')) return;
+  const { error } = await supabaseClient.from('forum_posts').delete().eq('id', id);
+  if (error) return setStatus('Kunde inte ta bort: ' + error.message, true);
+  setStatus('Inlägget är borttaget.');
+  await loadPosts();
+}
+
+// ---------- händelser ----------
+document.getElementById('stammaPicker').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-stamma]');
+  if (!b) return;
+  currentStamma = b.dataset.stamma;
+  renderPicker();
+  loadPosts();
+});
+
+document.getElementById('forumBody').addEventListener('submit', (e) => {
+  if (!e.target.matches('form[data-form]')) return;
+  e.preventDefault();
+  skickaInlagg(e.target);
+});
+
+document.getElementById('forumBody').addEventListener('click', (e) => {
+  const att = e.target.closest('button[data-att-path]');
+  if (att) return oppnaBilaga(att.dataset.attPath, att.dataset.attName);
+  const del = e.target.closest('button[data-del]');
+  if (del) return taBortInlagg(del.dataset.del);
+});
+
+(async () => {
+  me = await requireAuth();
+  if (!me) return;
+  const lista = tillgangligaStammor();
+  currentStamma = lista.includes(me.stamma) ? me.stamma : (lista[0] || null);
+  renderPicker();
+  await loadPosts();
+})();
+</script>
+
+</body>
+</html>

@@ -13,7 +13,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 // (createSignedUrl(s), upload, remove, list, download). Sökvägarna i databasen är oförändrade.
 // Övriga buckets (noter, filer, recordings) går som förut mot Supabase.
 (function () {
-  const R2_AREAS = { 'heavy-voices-stems': 'stems', 'heavy-voices-warmup': 'warmup' };
+  const R2_AREAS = { 'heavy-voices-stems': 'stems', 'heavy-voices-warmup': 'warmup', 'heavy-voices-forum': 'forum' };
   const storage = supabaseClient.storage;
   const originalFrom = storage.from.bind(storage);
 

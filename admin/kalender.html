@@ -778,17 +778,31 @@ function noteItemHtml(n, showEvent) {
   const when = (showEvent && ev ? `${formatDate(ev.event_date)} — ${escapeAtt(ev.title)} · ` : '') + fmtNoteTime(n.created_at);
   const preview = n.body.replace(/\s+/g, ' ').slice(0, 90);
   return `<details class="mn-note" data-note="${n.id}">
-    <summary><span class="mn-when">${when}</span><span class="mn-preview">${escapeAtt(preview)}${n.body.length > 90 ? '…' : ''}</span></summary>
+    <summary><span class="mn-when">${n.visible_to_members ? '👥 ' : ''}${when}</span><span class="mn-preview">${escapeAtt(preview)}${n.body.length > 90 ? '…' : ''}</span></summary>
     <div class="mn-note-body">${escapeAtt(n.body)}</div>
     <div class="mn-note-actions">
       <button type="button" class="btn-outline mn-send" data-note="${n.id}">Skicka till…</button>
       <button type="button" class="btn-outline mn-exp-txt" data-note="${n.id}">Till .txt</button>
       <button type="button" class="btn-outline mn-exp-doc" data-note="${n.id}">Till Word</button>
+      <button type="button" class="btn-outline mn-vis-toggle" data-note="${n.id}" data-vis="${n.visible_to_members ? '1' : '0'}">${n.visible_to_members ? 'Dölj för medlemmar' : 'Visa för medlemmar'}</button>
       <button type="button" class="btn-danger mn-del" data-note="${n.id}">Ta bort</button>
     </div>
     <div class="mn-send-panel" data-send="${n.id}" hidden></div>
   </details>`;
 }
+
+// Växla om anteckningen syns för alla godkända medlemmar
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('.mn-vis-toggle');
+  if (!b) return;
+  const vis = b.dataset.vis !== '1';
+  b.disabled = true;
+  const { error } = await supabaseClient.from('meeting_notes').update({ visible_to_members: vis }).eq('id', b.dataset.note);
+  if (error) { alert('Kunde inte ändra synligheten: ' + error.message); b.disabled = false; return; }
+  await loadNotes();
+  renderAllNotes();
+  updateNoteCounts();
+});
 
 // ---------- Export ----------
 let mnFiltered = [];
@@ -935,6 +949,7 @@ function renderEventNotes(evId, panel) {
     <div class="mn-interim text-muted" style="font-style:italic; min-height:1.2em; font-size:0.9rem; margin-bottom:0.3rem;"></div>
     <textarea class="mn-area" placeholder="Anteckningar från mötet..."></textarea>
     <div class="actions" style="margin-top:0.6rem; display:flex; gap:0.6rem;">
+      <label style="display:flex; align-items:center; gap:0.4rem;"><input type="checkbox" class="mn-vis"> Synlig för alla medlemmar</label>
       <button type="button" class="mn-save">Spara anteckning</button>
       <button type="button" class="btn-outline mn-clear">Rensa</button>
       <button type="button" class="btn-outline mn-close" style="margin-left:auto;">✕ Stäng</button>
@@ -964,7 +979,8 @@ function renderEventNotes(evId, panel) {
     const err = panel.querySelector('.mn-err'); err.textContent = '';
     const body = area.value.trim();
     if (!body) { err.textContent = 'Anteckningen är tom.'; return; }
-    const { error } = await supabaseClient.from('meeting_notes').insert({ event_id: evId, body, created_by: adminId });
+    const visible_to_members = panel.querySelector('.mn-vis').checked;
+    const { error } = await supabaseClient.from('meeting_notes').insert({ event_id: evId, body, created_by: adminId, visible_to_members });
     if (error) { err.textContent = error.message; return; }
     await loadNotes();
     renderAllNotes();

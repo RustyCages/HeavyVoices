@@ -295,6 +295,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: FROM,
         to: [m.email],
+        reply_to: me.email || undefined,
         subject: `Möte: ${title}, ${whenText(ev)}`,
         html: inviteHtml(ev, me.name || "Heavy Voices", { fornamn, token: tokenByMember.get(m.id) }, rsvpBase),
         text: `Hej ${fornamn}! ${me.name} har bokat ett möte: ${title}, ${whenText(ev)}.\n\nGå med i videomötet: ${meetingUrl}\n\nSvara: ${rsvpBase}?token=${tokenByMember.get(m.id)}`,

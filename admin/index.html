@@ -145,7 +145,7 @@
       back.className = 'back-btn';
       back.innerHTML = '&larr; Tillbaka';
       document.querySelector('.container').prepend(back);
-      const ok = ['/admin/latar.html', '/medlem/rostovning.html', '/medlem/repertoar.html', '/medlem/studio.html', '/admin/info.html'];
+      const ok = ['/admin/latar.html', '/medlem/rostovning.html', '/medlem/repertoar.html', '/medlem/studio.html', '/admin/info.html', '/admin/kalender.html'];
       document.querySelectorAll('.nav-list > li').forEach(li => {
         const href = (li.querySelector('a') || {}).getAttribute && li.querySelector('a').getAttribute('href').split('?')[0];
         if (!ok.includes(href)) li.remove();

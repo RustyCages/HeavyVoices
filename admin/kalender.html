@@ -1013,7 +1013,7 @@ document.getElementById('mnExportTxt').addEventListener('click', () => { if (mnF
 document.getElementById('mnExportDoc').addEventListener('click', () => { if (mnFiltered.length) exportNotesFile(mnFiltered, `Motesanteckningar-${todayFileStamp()}`, 'doc'); });
 
 (async () => {
-  const member = await requireAuth('admin');
+  const member = await requireAuth('stamledare');
   if (member) { adminId = member.id; await loadEvents(); if (await loadNotes()) { renderAllNotes(); updateNoteCounts(); }
   else { document.querySelectorAll('.mn-open').forEach(b => b.hidden = true); } }
 })();

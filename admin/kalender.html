@@ -38,6 +38,10 @@
   .mn-note-body { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.5; margin-top:0.5rem; }
   .mn-note-actions { display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.6rem; }
   .mn-note-actions button { padding:0.25rem 0.6rem; font-size:0.8rem; }
+  .mn-send-panel { margin-top:0.6rem; }
+  .mn-send-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:0.3rem 1rem; max-height:260px; overflow:auto; padding:0.5rem 0; }
+  .mn-send-list label { display:flex; align-items:center; gap:0.4rem; font-size:0.9rem; }
+  .mn-send-list input { width:auto; margin:0; }
   .mn-section { margin-top:2.5rem; }
   .mn-section input[type=search] { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.55rem 0.8rem; margin-bottom:0.8rem; }
   .event-date { font-family: 'Roboto Condensed', sans-serif; font-size: 1.15rem; min-width: 95px; }
@@ -777,10 +781,12 @@ function noteItemHtml(n, showEvent) {
     <summary><span class="mn-when">${when}</span><span class="mn-preview">${escapeAtt(preview)}${n.body.length > 90 ? '…' : ''}</span></summary>
     <div class="mn-note-body">${escapeAtt(n.body)}</div>
     <div class="mn-note-actions">
+      <button type="button" class="btn-outline mn-send" data-note="${n.id}">Skicka till…</button>
       <button type="button" class="btn-outline mn-exp-txt" data-note="${n.id}">Till .txt</button>
       <button type="button" class="btn-outline mn-exp-doc" data-note="${n.id}">Till Word</button>
       <button type="button" class="btn-danger mn-del" data-note="${n.id}">Ta bort</button>
     </div>
+    <div class="mn-send-panel" data-send="${n.id}" hidden></div>
   </details>`;
 }
 
@@ -834,7 +840,78 @@ function renderAllNotes() {
   bindNoteDeletes(document.getElementById('mnAll'));
 }
 
+// ---------- Skicka anteckning som mejl till valda medlemmar ----------
+let mailMembers = null;
+async function getMailMembers() {
+  if (!mailMembers) {
+    const { data, error } = await supabaseClient.from('members').select('id, name, email').eq('status', 'approved').order('name');
+    if (error) throw error;
+    mailMembers = data || [];
+  }
+  return mailMembers;
+}
+
+function bindNoteSend(root) {
+  root.querySelectorAll('.mn-send').forEach(b => b.onclick = async (e) => {
+    e.preventDefault();
+    const noteId = b.dataset.note;
+    const panel = root.querySelector(`.mn-send-panel[data-send="${CSS.escape(String(noteId))}"]`);
+    if (!panel) return;
+    if (!panel.hidden) { panel.hidden = true; return; }
+    panel.hidden = false;
+    panel.innerHTML = '<p class="text-muted">Laddar medlemmar...</p>';
+    try {
+      const members = await getMailMembers();
+      panel.innerHTML = `
+        <div class="mn-send-list">${members.filter(m => m.email).map(m =>
+          `<label><input type="checkbox" value="${escapeAtt(m.id)}"> ${escapeAtt(m.name || m.email)}</label>`).join('')}</div>
+        <div class="mn-note-actions">
+          <button type="button" class="btn-outline mn-send-all">Välj alla</button>
+          <button type="button" class="btn-outline mn-send-go">Skicka mejl</button>
+          <span class="mn-send-status text-muted"></span>
+        </div>`;
+    } catch (err) {
+      panel.innerHTML = `<p class="error">${escapeAtt(err.message)}</p>`;
+      return;
+    }
+    panel.querySelector('.mn-send-all').onclick = () => panel.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = true; });
+    panel.querySelector('.mn-send-go').onclick = () => sendNoteMail(noteId, panel);
+  });
+}
+
+async function sendNoteMail(noteId, panel) {
+  const statusEl = panel.querySelector('.mn-send-status');
+  const note = [...notesByEvent.values()].flat().find(n => String(n.id) === String(noteId));
+  if (!note) { statusEl.textContent = 'Anteckningen finns inte längre.'; return; }
+  const ids = [...panel.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value);
+  if (!ids.length) { statusEl.textContent = 'Välj minst en mottagare.'; return; }
+  if (!confirm(`Skicka anteckningen till ${ids.length} medlem(mar)? Mejlet går till varje mottagare med egen adress.`)) return;
+
+  const ev = allEvents.get(String(note.event_id));
+  const subject = ev ? `Anteckningar från mötet: ${ev.title} (${formatDate(ev.event_date)})` : 'Anteckning från Heavy Voices';
+  statusEl.textContent = 'Skickar...';
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-member-email`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ subject, message: note.body, member_ids: ids }),
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) { statusEl.textContent = 'Kunde inte skicka: ' + (result.error || `fel ${res.status}`); return; }
+    statusEl.textContent = `Skickat till ${ids.length} medlem(mar).`;
+    panel.querySelectorAll('input[type=checkbox]:checked').forEach(c => { c.checked = false; });
+  } catch (err) {
+    statusEl.textContent = 'Kunde inte skicka: ' + err.message;
+  }
+}
+
 function bindNoteDeletes(root) {
+  bindNoteSend(root);
   const findNote = id => [...notesByEvent.values()].flat().find(n => String(n.id) === String(id));
   root.querySelectorAll('.mn-exp-txt').forEach(b => b.onclick = (e) => { e.preventDefault(); const n = findNote(b.dataset.note); if (n) exportNotesFile([n], `Mote-${todayFileStamp()}-${n.id.slice(0, 8)}`, 'txt'); });
   root.querySelectorAll('.mn-exp-doc').forEach(b => b.onclick = (e) => { e.preventDefault(); const n = findNote(b.dataset.note); if (n) exportNotesFile([n], `Mote-${todayFileStamp()}-${n.id.slice(0, 8)}`, 'doc'); });

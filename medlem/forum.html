@@ -7,10 +7,6 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
 <style>
-  .stamma-picker { display:flex; gap:0.5rem; flex-wrap:wrap; margin:0 0 1.2rem; }
-  .stamma-picker[hidden] { display:none; }
-  .stamma-picker button { background:rgba(255,255,255,0.06); color:#d1d5db; border:1px solid rgba(255,255,255,0.12); padding:0.5rem 1rem; }
-  .stamma-picker button.active { background:var(--accent); color:#111317; }
 
   .forum-composer { display:grid; gap:0.6rem; margin-bottom:1.4rem; }
   .forum-composer textarea { width:100%; min-height:5rem; box-sizing:border-box; }
@@ -37,9 +33,8 @@
 <div class="container">
   <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
   <h1>Stämforum</h1>
-  <p class="text-muted" style="margin:0 0 1rem;">Diskutera och dela filer inom din stämgrupp. Bara din stämgrupp ser inläggen, och stämledare och admin ser alla.</p>
+  <p class="text-muted" style="margin:0 0 1rem;">Diskutera och dela filer med hela kören. Varje inlägg visar vilken stämma som skrev det.</p>
 
-  <div class="stamma-picker" id="stammaPicker"></div>
   <p class="forum-status" id="forumStatus" role="status"></p>
 
   <div id="forumBody"><p class="text-muted">Laddar...</p></div>
@@ -54,8 +49,8 @@ const MAX_FILE_MB = 25;
 const MAX_FILES = 10;
 
 let me = null;
-let currentStamma = null;
-let posts = [];   // alla inlägg för vald stämgrupp
+let posts = [];   // alla inlägg, för hela kören
+const kanSkriva = () => STAMMOR.includes(me.stamma);   // man skriver med sin egen stämma
 
 function escapeHtml(str) {
   if (str == null) return '';
@@ -77,30 +72,11 @@ function fileSize(bytes) {
   return bytes > 1024 * 1024 ? (bytes / 1024 / 1024).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' kB';
 }
 
-// Stämgrupper man får välja: stämledare och admin alla, övriga bara sin egen
-function tillgangligaStammor() {
-  if (isSongEditor(me)) return STAMMOR;
-  return STAMMOR.includes(me.stamma) ? [me.stamma] : [];
-}
-
-function renderPicker() {
-  const picker = document.getElementById('stammaPicker');
-  const lista = tillgangligaStammor();
-  picker.innerHTML = lista.map(s =>
-    `<button type="button" class="${s === currentStamma ? 'active' : ''}" data-stamma="${s}">${s}</button>`).join('');
-  picker.hidden = lista.length <= 1;
-}
-
 // ---------- hämta och visa ----------
 async function loadPosts() {
   const body = document.getElementById('forumBody');
-  if (!currentStamma) {
-    body.innerHTML = '<p class="text-muted">Ingen stämgrupp är vald på din profil. Be en admin sätta den under Medlemmar.</p>';
-    return;
-  }
   const { data, error } = await supabaseClient.from('forum_posts')
     .select('id, stamma, author_id, parent_id, title, body, created_at, author:members!forum_posts_author_id_fkey(name), forum_attachments(id, path, name, size)')
-    .eq('stamma', currentStamma)
     .order('created_at', { ascending: true });
   if (error) {
     body.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
@@ -122,7 +98,7 @@ function postHtml(p) {
   const kanBorta = p.author_id === me.id || isSongEditor(me);
   return `
     <div class="forum-meta">
-      <span>${escapeHtml(p.author?.name || 'Borttagen medlem')}</span>
+      <span>${escapeHtml(p.author?.name || 'Borttagen medlem')} · ${escapeHtml(p.stamma)}</span>
       <span>${formatWhen(p.created_at)}</span>
     </div>
     <div class="forum-body">${escapeHtml(p.body)}</div>
@@ -136,9 +112,9 @@ function renderPosts() {
   const svar = {};
   posts.filter(p => p.parent_id).forEach(p => { (svar[p.parent_id] = svar[p.parent_id] || []).push(p); });
 
-  const composer = `
+  const composer = !kanSkriva() ? '<p class="text-muted">Du har ingen stämma på din profil. Be en admin sätta den under Medlemmar för att kunna skriva.</p>' : `
     <form class="forum-composer card" data-form="new" style="padding:1rem 1.2rem;">
-      <label style="font-weight:700;">Nytt ämne i ${escapeHtml(currentStamma)}</label>
+      <label style="font-weight:700;">Nytt ämne (du skriver som ${escapeHtml(me.stamma)})</label>
       <input type="text" name="title" maxlength="150" required placeholder="Rubrik – vad handlar det om?">
       <textarea name="body" maxlength="5000" required placeholder="Skriv något till stämgruppen..."></textarea>
       <div class="row">
@@ -191,6 +167,7 @@ async function skickaInlagg(form) {
   const parentId = form.dataset.parent || null;
   const title = parentId ? null : (form.querySelector('[name=title]')?.value || '').trim();
   if (!parentId && !title) return setStatus('Skriv en rubrik först.', true);
+  if (!kanSkriva()) return setStatus('Du har ingen stämma på din profil.', true);
   if (!text) return setStatus('Skriv något först.', true);
   if (files.length > MAX_FILES) return setStatus(`Max ${MAX_FILES} filer per inlägg.`, true);
   const stora = files.find(f => f.size > MAX_FILE_MB * 1024 * 1024);
@@ -202,7 +179,7 @@ async function skickaInlagg(form) {
   try {
     const postId = crypto.randomUUID();
     const { error } = await supabaseClient.from('forum_posts').insert({
-      id: postId, stamma: currentStamma, author_id: me.id, parent_id: parentId, title, body: text,
+      id: postId, stamma: me.stamma, author_id: me.id, parent_id: parentId, title, body: text,
     });
     if (error) throw new Error(error.message);
     await laddaUppBilagor(postId, files);
@@ -233,14 +210,6 @@ async function taBortInlagg(id) {
 }
 
 // ---------- händelser ----------
-document.getElementById('stammaPicker').addEventListener('click', (e) => {
-  const b = e.target.closest('button[data-stamma]');
-  if (!b) return;
-  currentStamma = b.dataset.stamma;
-  renderPicker();
-  loadPosts();
-});
-
 document.getElementById('forumBody').addEventListener('submit', (e) => {
   if (!e.target.matches('form[data-form]')) return;
   e.preventDefault();
@@ -257,9 +226,6 @@ document.getElementById('forumBody').addEventListener('click', (e) => {
 (async () => {
   me = await requireAuth();
   if (!me) return;
-  const lista = tillgangligaStammor();
-  currentStamma = lista.includes(me.stamma) ? me.stamma : (lista[0] || null);
-  renderPicker();
   await loadPosts();
 })();
 </script>

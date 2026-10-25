@@ -8,8 +8,9 @@
 <link rel="stylesheet" href="/css/style.css">
 <style>
 
-  .forum-composer { display:grid; gap:0.6rem; margin-bottom:1.4rem; }
-  .forum-composer textarea { width:100%; min-height:5rem; box-sizing:border-box; }
+  .forum-composer { display:grid; grid-template-columns:minmax(0,1fr); gap:0.6rem; margin-bottom:1.4rem; }
+  .forum-composer input[type=text], .forum-composer textarea { width:100%; min-width:0; box-sizing:border-box; }
+  .forum-composer textarea { min-height:5rem; resize:vertical; }
   .forum-composer .row { display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap; }
   .forum-composer input[type=file] { color:var(--text-muted); font-size:0.9rem; max-width:100%; }
   .forum-status { min-height:1.2em; margin:0 0 0.8rem; font-size:0.92rem; color:var(--text-muted); }

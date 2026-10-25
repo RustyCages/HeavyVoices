@@ -26,10 +26,32 @@
   .event-type-rep { color:#60a5fa; }
   .event-type-konsert { color:var(--accent); }
   .event-type-ovrigt { color:var(--text-muted); }
+  .event-type-mote { color:#34d399; }
 
   .event-body-row { padding:0.3rem 0; }
   .event-body-row > div:last-child { white-space:pre-wrap; } /* behåll radbrytningar i info-texten */
   .event-body-label { font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.15rem; }
+
+  /* Mötesbokare */
+  .book-card { margin-bottom:1.2rem; }
+  .book-card > summary { cursor:pointer; font-weight:700; }
+  .book-form { margin-top:1rem; display:grid; gap:0.9rem; }
+  .book-form label { display:grid; gap:0.3rem; font-size:0.9rem; color:var(--text-muted); }
+  .book-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:0.7rem; }
+  .book-invitees { border:1px solid var(--border); border-radius:0.5rem; padding:0.6rem 0.8rem; margin:0; min-width:0; }
+  .book-invitees legend { color:var(--text-muted); font-size:0.9rem; padding:0 0.3rem; }
+  .book-tools { display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.4rem; }
+  .book-tools button { padding:0.3rem 0.7rem; font-size:0.85rem; }
+  .book-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:0.35rem 1rem; }
+  .book-person { display:flex; align-items:center; gap:0.5rem; color:var(--text); font-size:0.95rem; }
+  .book-person input { width:auto; margin:0; }
+  .form-status { margin:0 0 0.6rem; font-size:0.9rem; min-height:1.2em; color:var(--text-muted); }
+  .form-status.is-error { color:#f87171; }
+  .rsvp-row { display:flex; gap:0.5rem; flex-wrap:wrap; margin:0.3rem 0 0.8rem; }
+  .rsvp-btn { padding:0.45rem 0.9rem; border-radius:0.5rem; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:var(--text); cursor:pointer; font:inherit; }
+  .rsvp-btn[aria-pressed="true"] { background:var(--accent); color:#111317; border-color:var(--accent); font-weight:700; }
+  .invitee-list { list-style:none; padding:0; margin:0.3rem 0 0.8rem; font-size:0.92rem; }
+  .invitee-list li { display:flex; justify-content:space-between; gap:1rem; padding:0.25rem 0; border-top:1px solid var(--border); }
 </style>
 </head>
 <body>
@@ -37,7 +59,40 @@
 <div class="container">
   <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
   <h1>Kalender</h1>
-  <p style="margin:0 0 1rem;"><a href="https://meet.jit.si/HeavyVoices-Mote-k7r2q9" target="_blank" rel="noopener" class="btn btn-outline" title="Öppnar körens videomöte i Jitsi Meet (gratis, inget konto behövs för att delta)">📹 Videomöte</a></p>
+  <p style="margin:0 0 1rem;"><a href="https://meet.jit.si/HeavyVoices-Mote-k7r2q9" target="_blank" rel="noopener" class="btn btn-outline" title="Öppnar körens videomöte i Jitsi Meet (gratis, inget konto behövs för att delta)">📹 Körens fasta videorum</a></p>
+
+  <details class="card book-card" id="bookCard">
+    <summary>➕ Boka ett möte</summary>
+    <form class="book-form" id="bookForm">
+      <label>Titel
+        <input type="text" id="bTitle" value="Möte" maxlength="120" required>
+      </label>
+      <div class="book-row">
+        <label>Datum
+          <input type="date" id="bDate" required>
+        </label>
+        <label>Starttid
+          <input type="time" id="bTime" required>
+        </label>
+        <label>Sluttid (valfritt)
+          <input type="time" id="bEnd">
+        </label>
+      </div>
+      <label>Anteckningar (valfritt)
+        <textarea id="bNotes" rows="3" maxlength="1000" placeholder="T.ex. vad ni ska gå igenom"></textarea>
+      </label>
+      <fieldset class="book-invitees">
+        <legend>Bjud in</legend>
+        <div class="book-tools">
+          <button type="button" class="btn-outline" id="bAll">Välj alla</button>
+          <button type="button" class="btn-outline" id="bNone">Rensa</button>
+        </div>
+        <div class="book-list" id="bList"><p class="text-muted">Laddar medlemmar...</p></div>
+      </fieldset>
+      <p class="form-status" id="bStatus" role="status"></p>
+      <button type="submit" class="btn" id="bSubmit">Boka och skicka inbjudningar</button>
+    </form>
+  </details>
 
   <style>
     .month-view { margin-bottom: 1.2rem; }
@@ -57,6 +112,7 @@
     .m-dot.rep { background: var(--accent); }
     .m-dot.konsert { background: #a78bfa; }
     .m-dot.ovrigt { background: #60a5fa; }
+    .m-dot.mote { background: #34d399; }
     .m-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-top: 0.6rem; font-size: 0.8rem; color: var(--text-muted); }
     .m-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
     .m-day { margin-top: 0.8rem; }
@@ -70,13 +126,14 @@
       <button type="button" class="btn-outline" id="mNext" aria-label="Nästa månad">›</button>
     </div>
     <div class="m-grid" id="mGrid"></div>
-    <div class="m-legend"><span><i class="m-dot rep"></i>Repetition</span><span><i class="m-dot konsert"></i>Konsert</span><span><i class="m-dot ovrigt"></i>Övrigt</span></div>
+    <div class="m-legend"><span><i class="m-dot rep"></i>Repetition</span><span><i class="m-dot konsert"></i>Konsert</span><span><i class="m-dot mote"></i>Möte</span><span><i class="m-dot ovrigt"></i>Övrigt</span></div>
     <div class="m-day" id="mDay"></div>
   </details>
 
   <div class="tabs">
     <button class="tab-btn active" id="tabRepBtn">Reptider</button>
     <button class="tab-btn" id="tabKonsertBtn">Konserter</button>
+    <button class="tab-btn" id="tabMoteBtn">Möten</button>
     <button class="tab-btn" id="tabOvrigtBtn">Övrigt</button>
   </div>
 
@@ -85,6 +142,10 @@
   </div>
   <div class="tab-panel" id="tabKonsert">
     <div id="listKonsert"><p class="text-muted">Laddar...</p></div>
+  </div>
+  <div class="tab-panel" id="tabMote">
+    <p class="form-status" id="moteStatus" role="status"></p>
+    <div id="listMote"><p class="text-muted">Laddar...</p></div>
   </div>
   <div class="tab-panel" id="tabOvrigt">
     <div id="listOvrigt"><p class="text-muted">Laddar...</p></div>
@@ -101,6 +162,13 @@ const emptyLabels = {
   konsert: 'Inga konserter inlagda än.',
   ovrigt: 'Inget övrigt inlagt än.'
 };
+const SVAR_LABEL = { ja: 'Ja', nej: 'Nej', kanske: 'Kanske' };
+const FN_URL = name => `${SUPABASE_URL}/functions/v1/${name}`;
+
+let me = null;                    // inloggad medlem
+let membersById = new Map();      // id -> namn (godkända medlemmar)
+let myInvites = new Map();        // event_id -> { token, response } (mina inbjudningar)
+let inviteesByEvent = new Map();  // event_id -> [{ name, response }] (för bokaren)
 
 function escapeHtml(str) {
   if (str == null) return '';
@@ -112,20 +180,30 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function todayStockholm() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' });
+}
+
+function setStatus(id, text, isError) {
+  const el = document.getElementById(id);
+  el.textContent = text || '';
+  el.classList.toggle('is-error', !!isError);
+}
+
 // =========================================================
 // Tabs
 // =========================================================
-document.getElementById('tabRepBtn').addEventListener('click', () => switchTab('rep'));
-document.getElementById('tabKonsertBtn').addEventListener('click', () => switchTab('konsert'));
-document.getElementById('tabOvrigtBtn').addEventListener('click', () => switchTab('ovrigt'));
+const TAB_BTN = { rep: 'tabRepBtn', konsert: 'tabKonsertBtn', mote: 'tabMoteBtn', ovrigt: 'tabOvrigtBtn' };
+const TAB_PANEL = { rep: 'tabRep', konsert: 'tabKonsert', mote: 'tabMote', ovrigt: 'tabOvrigt' };
+Object.keys(TAB_BTN).forEach(name => {
+  document.getElementById(TAB_BTN[name]).addEventListener('click', () => switchTab(name));
+});
 
 function switchTab(name) {
-  document.getElementById('tabRepBtn').classList.toggle('active', name === 'rep');
-  document.getElementById('tabKonsertBtn').classList.toggle('active', name === 'konsert');
-  document.getElementById('tabOvrigtBtn').classList.toggle('active', name === 'ovrigt');
-  document.getElementById('tabRep').classList.toggle('active', name === 'rep');
-  document.getElementById('tabKonsert').classList.toggle('active', name === 'konsert');
-  document.getElementById('tabOvrigt').classList.toggle('active', name === 'ovrigt');
+  Object.keys(TAB_BTN).forEach(n => {
+    document.getElementById(TAB_BTN[n]).classList.toggle('active', n === name);
+    document.getElementById(TAB_PANEL[n]).classList.toggle('active', n === name);
+  });
 }
 
 // =========================================================
@@ -135,8 +213,8 @@ function timeRange(ev) {
   if (!ev.event_time) return '';
   return ' ' + ev.event_time.slice(0,5) + (ev.end_time ? '–' + ev.end_time.slice(0,5) : '');
 }
-  
-  function renderEventCard(ev, isPast) {
+
+function renderEventCard(ev, isPast) {
   const details = document.createElement('details');
   details.className = 'event-card card modern-card' + (isPast ? ' past' : '');
 
@@ -187,12 +265,200 @@ function renderGroup(containerEl, events, type) {
   });
 }
 
+// ---------- möten ----------
+function renderMoteCard(ev, isPast) {
+  const isBooker = ev.created_by === me.id;
+  const canCancel = isBooker || me.role === 'admin';
+  const mine = myInvites.get(ev.id);
+  const bookerName = membersById.get(ev.created_by) || 'Okänd';
+
+  const details = document.createElement('details');
+  details.className = 'event-card card modern-card' + (isPast ? ' past' : '');
+  details.innerHTML = `
+    <summary>
+      <div class="row-between">
+        <div class="event-summary-main">
+          <span class="event-date">${formatDate(ev.event_date)}${timeRange(ev)}</span>
+          <span class="event-title event-type-mote">${escapeHtml(ev.title)}</span>
+        </div>
+        <span class="text-muted">Visa ▾</span>
+      </div>
+      <div class="text-muted" style="font-size:0.85rem;margin-top:0.2rem;">Bokat av ${escapeHtml(bookerName)}</div>
+    </summary>`;
+
+  let html = '';
+  if (mine) {
+    html += `<div class="event-body-label">Ditt svar</div><div class="rsvp-row">`
+      + ['ja', 'kanske', 'nej'].map(s =>
+          `<button type="button" class="rsvp-btn" data-svar="${s}" data-token="${escapeHtml(mine.token)}" aria-pressed="${mine.response === s}">${SVAR_LABEL[s]}</button>`
+        ).join('')
+      + `</div>`;
+  } else if (!isBooker) {
+    html += `<p class="text-muted">Du är inte inbjuden till det här mötet.</p>`;
+  }
+
+  if ((mine || isBooker) && ev.meeting_url) {
+    html += `<div class="event-body-row"><div class="event-body-label">Videomöte</div>
+      <div><a href="${escapeHtml(ev.meeting_url)}" target="_blank" rel="noopener" style="color:var(--accent);">Gå med i videomötet</a></div></div>`;
+  }
+  if (ev.notes) {
+    html += `<div class="event-body-row"><div class="event-body-label">Anteckningar</div><div>${escapeHtml(ev.notes)}</div></div>`;
+  }
+  if (isBooker) {
+    const list = inviteesByEvent.get(ev.id) || [];
+    const c = { ja: 0, kanske: 0, nej: 0, ingen: 0 };
+    list.forEach(i => { c[i.response || 'ingen']++; });
+    html += `<div class="event-body-label" style="margin-top:0.6rem;">Inbjudna (${list.length}) · Ja ${c.ja} · Kanske ${c.kanske} · Nej ${c.nej} · Inget svar ${c.ingen}</div>`;
+    html += `<ul class="invitee-list">` + list.map(i =>
+      `<li><span>${escapeHtml(i.name)}</span><span class="text-muted">${i.response ? SVAR_LABEL[i.response] : 'Inget svar'}</span></li>`
+    ).join('') + `</ul>`;
+  }
+  if (canCancel) {
+    html += `<button type="button" class="btn-outline" data-cancel="${escapeHtml(ev.id)}" style="border-color:#f87171;color:#fca5a5;">Avboka mötet</button>`;
+  }
+
+  const body = document.createElement('div');
+  body.innerHTML = html || '<p class="text-muted">Inga fler detaljer.</p>';
+  details.appendChild(body);
+  return details;
+}
+
+function renderMoteList(evs) {
+  const el = document.getElementById('listMote');
+  if (!evs.length) {
+    el.innerHTML = '<p class="text-muted">Inga möten bokade än. Boka ett med formuläret ovan.</p>';
+    return;
+  }
+  const todayStr = todayStockholm();
+  const upcoming = evs.filter(e => e.event_date >= todayStr);
+  const past = evs.filter(e => e.event_date < todayStr).reverse();
+  el.innerHTML = '';
+  upcoming.concat(past).forEach(ev => el.appendChild(renderMoteCard(ev, ev.event_date < todayStr)));
+}
+
+async function respond(token, svar) {
+  setStatus('moteStatus', 'Sparar ditt svar...');
+  const fd = new FormData();
+  fd.append('token', token);
+  fd.append('svar', svar);
+  try {
+    const res = await fetch(FN_URL('meeting-rsvp'), { method: 'POST', body: fd });
+    if (!res.ok) throw new Error('Svaret kunde inte sparas. Försök igen.');
+    setStatus('moteStatus', `Ditt svar ${SVAR_LABEL[svar].toLowerCase()} är sparat.`);
+    await loadEvents();
+  } catch (err) {
+    setStatus('moteStatus', err.message, true);
+  }
+}
+
+async function cancelMeeting(eventId) {
+  if (!confirm('Avboka mötet? Alla inbjudna får ett avbokningsmejl.')) return;
+  setStatus('moteStatus', 'Avbokar mötet...');
+  try {
+    const r = await callFn('meeting-invite', { action: 'cancel', event_id: eventId });
+    setStatus('moteStatus', `Mötet är avbokat. ${r.sent ?? 0} avbokningsmejl skickade.`);
+    await loadEvents();
+  } catch (err) {
+    setStatus('moteStatus', err.message, true);
+  }
+}
+
+// Anropar en Edge Function som kräver inloggning
+async function callFn(name, payload) {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) throw new Error('Du behöver logga in igen.');
+  const res = await fetch(FN_URL(name), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + session.access_token,
+      apikey: SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ('Fel ' + res.status));
+  return data;
+}
+
+// ---------- bokningsformulär ----------
+async function loadMembers() {
+  const box = document.getElementById('bList');
+  const { data, error } = await supabaseClient
+    .from('members').select('id, name').eq('status', 'approved').order('name');
+  if (error) {
+    box.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  membersById = new Map((data || []).map(m => [m.id, m.name]));
+  const andra = (data || []).filter(m => m.id !== me.id);
+  box.innerHTML = andra.length
+    ? andra.map(m => `<label class="book-person"><input type="checkbox" value="${escapeHtml(m.id)}"> ${escapeHtml(m.name || 'Namnlös')}</label>`).join('')
+    : '<p class="text-muted">Inga andra godkända medlemmar.</p>';
+}
+
+document.getElementById('bAll').addEventListener('click', () =>
+  document.querySelectorAll('#bList input[type=checkbox]').forEach(c => { c.checked = true; }));
+document.getElementById('bNone').addEventListener('click', () =>
+  document.querySelectorAll('#bList input[type=checkbox]').forEach(c => { c.checked = false; }));
+
+document.getElementById('bookForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const bTitle = document.getElementById('bTitle');
+  const bDate = document.getElementById('bDate');
+  const bTime = document.getElementById('bTime');
+  const bEnd = document.getElementById('bEnd');
+  const bNotes = document.getElementById('bNotes');
+  const bSubmit = document.getElementById('bSubmit');
+
+  const title = bTitle.value.trim() || 'Möte';
+  const date = bDate.value;
+  const time = bTime.value;
+  const end = bEnd.value;
+  const ids = [...document.querySelectorAll('#bList input[type=checkbox]:checked')].map(c => c.value);
+
+  if (!date || !time) return setStatus('bStatus', 'Välj datum och starttid.', true);
+  if (end && end <= time) return setStatus('bStatus', 'Sluttiden måste vara efter starttiden.', true);
+  if (!ids.length) return setStatus('bStatus', 'Bjud in minst en medlem.', true);
+
+  bSubmit.disabled = true;
+  setStatus('bStatus', 'Bokar och skickar inbjudningar...');
+  try {
+    const r = await callFn('meeting-invite', {
+      action: 'create',
+      title,
+      date,
+      time,
+      end_time: end || undefined,
+      notes: bNotes.value.trim() || undefined,
+      member_ids: ids,
+    });
+    const fel = r.failed?.length ? ` Mejl misslyckades för ${r.failed.length} st.` : '';
+    setStatus('bStatus', `Mötet är bokat och ${r.sent} inbjudningar är skickade.${fel}`);
+    e.target.reset();
+    bTitle.value = 'Möte';
+    document.querySelectorAll('#bList input:checked').forEach(c => { c.checked = false; });
+    await loadEvents();
+  } catch (err) {
+    setStatus('bStatus', err.message || 'Något gick fel.', true);
+  } finally {
+    bSubmit.disabled = false;
+  }
+});
+
+document.getElementById('listMote').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  if (btn.dataset.svar) respond(btn.dataset.token, btn.dataset.svar);
+  if (btn.dataset.cancel) cancelMeeting(btn.dataset.cancel);
+});
+
 // ---------- månadsvy (alla medlemmar, inkl. stämledare) ----------
 let monthEvents = [];
 let mYear = null, mMonth = null, mSelected = null;
 function renderMonth() {
   if (mYear === null) { const t = new Date(); mYear = t.getFullYear(); mMonth = t.getMonth(); }
-  const todayYmd = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' });
+  const todayYmd = todayStockholm();
   const pad = n => String(n).padStart(2, '0');
   const first = new Date(mYear, mMonth, 1);
   const startDow = (first.getDay() + 6) % 7;                 // måndag = 0
@@ -228,17 +494,30 @@ function renderMonth() {
 }
 
 async function loadEvents() {
-  const { data: events, error } = await supabaseClient
-    .from('events').select('*').order('event_date').order('event_time');
+  const [evRes, mineRes, bookerRes] = await Promise.all([
+    supabaseClient.from('events').select('*').order('event_date').order('event_time'),
+    supabaseClient.from('meeting_invites').select('event_id, token, response').eq('member_id', me.id),
+    supabaseClient.from('meeting_invites').select('event_id, response, members(name)'),
+  ]);
 
+  const { data: events, error } = evRes;
   if (error) {
-    ['listRep', 'listKonsert', 'listOvrigt'].forEach(id => {
+    ['listRep', 'listKonsert', 'listOvrigt', 'listMote'].forEach(id => {
       document.getElementById(id).innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
     });
     return;
   }
 
-  const byType = { rep: [], konsert: [], ovrigt: [] };
+  // Inbjudningar: tolereras om tabellen saknas (migrationen inte körd än), så att resten av kalendern fungerar
+  myInvites = new Map((mineRes.data || []).map(r => [r.event_id, { token: r.token, response: r.response }]));
+  inviteesByEvent = new Map();
+  (bookerRes.data || []).forEach(r => {
+    const arr = inviteesByEvent.get(r.event_id) || [];
+    arr.push({ name: r.members?.name || 'Okänd', response: r.response });
+    inviteesByEvent.set(r.event_id, arr);
+  });
+
+  const byType = { rep: [], konsert: [], mote: [], ovrigt: [] };
   (events || []).forEach(ev => {
     (byType[ev.event_type] || byType.ovrigt).push(ev);
   });
@@ -246,13 +525,17 @@ async function loadEvents() {
   renderGroup(document.getElementById('listRep'), byType.rep, 'rep');
   renderGroup(document.getElementById('listKonsert'), byType.konsert, 'konsert');
   renderGroup(document.getElementById('listOvrigt'), byType.ovrigt, 'ovrigt');
+  renderMoteList(byType.mote);
   monthEvents = events || [];
   renderMonth();
 }
 
 (async () => {
-  const member = await requireAuth();
-  if (member) loadEvents();
+  me = await requireAuth();
+  if (!me) return;
+  document.getElementById('bDate').min = todayStockholm();
+  await loadMembers();
+  await loadEvents();
 })();
 </script>
 

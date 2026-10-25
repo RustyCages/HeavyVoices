@@ -5,6 +5,11 @@
 alter table public.events add column if not exists created_by uuid references public.members(id) on delete set null;
 alter table public.events add column if not exists meeting_url text;
 
+-- 1b. Tillåt event_type 'mote' (villkoret från början tillät bara rep, konsert, ovrigt)
+alter table public.events drop constraint if exists events_event_type_check;
+alter table public.events add constraint events_event_type_check
+  check (event_type in ('rep', 'konsert', 'ovrigt', 'mote'));
+
 -- 2. Inbjudningar: en rad per inbjuden medlem, med en hemlig token som används i svarslänken i mejlet
 create table if not exists public.meeting_invites (
   id          uuid primary key default gen_random_uuid(),

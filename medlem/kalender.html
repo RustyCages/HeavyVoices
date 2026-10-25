@@ -170,6 +170,7 @@ let me = null;                    // inloggad medlem
 let membersById = new Map();      // id -> namn (godkända medlemmar)
 let myInvites = new Map();        // event_id -> { token, response } (mina inbjudningar)
 let inviteesByEvent = new Map();  // event_id -> [{ name, response }] (för bokaren)
+let notesByEvent = new Map();     // event_id -> [{ body, created_at }] (mötesanteckningar, bara för inbjudna)
 
 function escapeHtml(str) {
   if (str == null) return '';
@@ -314,6 +315,9 @@ function renderMoteCard(ev, isPast) {
       `<li><span>${escapeHtml(i.name)}</span><span class="text-muted">${i.response ? SVAR_LABEL[i.response] : 'Inget svar'}</span></li>`
     ).join('') + `</ul>`;
   }
+  (notesByEvent.get(ev.id) || []).forEach(n => {
+    html += `<div class="event-body-row"><div class="event-body-label">Anteckningar från mötet, ${formatDate(n.created_at.slice(0, 10))}</div><div>${escapeHtml(n.body)}</div></div>`;
+  });
   if (canRecord && (mine || isBooker)) {
     html += `<div style="margin:0.4rem 0 0.8rem;">${recButtonHtml()}</div>`;
   }
@@ -559,10 +563,11 @@ function renderMonth() {
 }
 
 async function loadEvents() {
-  const [evRes, mineRes, bookerRes] = await Promise.all([
+  const [evRes, mineRes, bookerRes, notesRes] = await Promise.all([
     supabaseClient.from('events').select('*').order('event_date').order('event_time'),
     supabaseClient.from('meeting_invites').select('event_id, token, response').eq('member_id', me.id),
     supabaseClient.from('meeting_invites').select('event_id, response, members(name)'),
+    supabaseClient.from('meeting_notes').select('event_id, body, created_at').order('created_at'),
   ]);
 
   const { data: events, error } = evRes;
@@ -580,6 +585,14 @@ async function loadEvents() {
     const arr = inviteesByEvent.get(r.event_id) || [];
     arr.push({ name: r.members?.name || 'Okänd', response: r.response });
     inviteesByEvent.set(r.event_id, arr);
+  });
+
+  // Anteckningar: RLS släpper bara igenom möten man är inbjuden till. Tolereras om tabellen saknas.
+  notesByEvent = new Map();
+  (notesRes.data || []).forEach(n => {
+    const arr = notesByEvent.get(n.event_id) || [];
+    arr.push({ body: n.body, created_at: n.created_at });
+    notesByEvent.set(n.event_id, arr);
   });
 
   const byType = { rep: [], konsert: [], mote: [], ovrigt: [] };

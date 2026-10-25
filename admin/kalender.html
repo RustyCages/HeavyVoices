@@ -784,7 +784,7 @@ function noteItemHtml(n, showEvent) {
       <button type="button" class="btn-outline mn-send" data-note="${n.id}">Skicka till…</button>
       <button type="button" class="btn-outline mn-exp-txt" data-note="${n.id}">Till .txt</button>
       <button type="button" class="btn-outline mn-exp-doc" data-note="${n.id}">Till Word</button>
-      ${isFullAdmin ? `<button type="button" class="btn-danger mn-del" data-note="${n.id}">Ta bort</button>` : ''}
+      <button type="button" class="btn-danger mn-del" data-note="${n.id}">Ta bort</button>
     </div>
     <div class="mn-send-panel" data-send="${n.id}" hidden></div>
   </details>`;
@@ -1142,8 +1142,7 @@ document.addEventListener('click', async (e) => {
 
 (async () => {
   const member = await requireAuth('stamledare');
-  if (member) { adminId = member.id; isFullAdmin = member.role === 'admin'; await loadEvents(); if (await loadNotes()) { renderAllNotes(); updateNoteCounts(); }
-  if (!isFullAdmin) document.querySelectorAll('.mn-open').forEach(b => b.hidden = true); }
+  if (member) { adminId = member.id; isFullAdmin = member.role === 'admin'; await loadEvents(); if (await loadNotes()) { renderAllNotes(); updateNoteCounts(); } }
 })();
 </script>
 

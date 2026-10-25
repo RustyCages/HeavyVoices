@@ -63,6 +63,13 @@
           <p>Repetitioner &amp; framträdanden</p>
         </span>
       </a></li>
+      <li><a href="/medlem/forum.html" class="nav-item">
+        <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>
+        <span class="nav-item-text">
+          <h3>Forum</h3>
+          <p>Stämgruppens inlägg &amp; filer</p>
+        </span>
+      </a></li>
       <li><a href="/admin/medlemmar.html" class="nav-item">
         <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
         <span class="nav-item-text">
@@ -145,7 +152,7 @@
       back.className = 'back-btn';
       back.innerHTML = '&larr; Tillbaka';
       document.querySelector('.container').prepend(back);
-      const ok = ['/admin/latar.html', '/medlem/rostovning.html', '/medlem/repertoar.html', '/medlem/studio.html', '/admin/info.html', '/admin/kalender.html'];
+      const ok = ['/admin/latar.html', '/medlem/rostovning.html', '/medlem/repertoar.html', '/medlem/studio.html', '/admin/info.html', '/admin/kalender.html', '/medlem/forum.html'];
       document.querySelectorAll('.nav-list > li').forEach(li => {
         const href = (li.querySelector('a') || {}).getAttribute && li.querySelector('a').getAttribute('href').split('?')[0];
         if (!ok.includes(href)) li.remove();

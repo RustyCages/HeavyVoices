@@ -52,6 +52,7 @@
   .event-type-rep { color: #60a5fa; }
   .event-type-konsert { color: var(--accent); }
   .event-type-ovrigt { color: var(--text-muted); }
+  .event-type-mote { color: #34d399; }
   .event-meta { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
   .form-row > label { display: block; min-width: 0; }
@@ -166,6 +167,7 @@
     .m-dot.rep { background: var(--accent); }
     .m-dot.konsert { background: #a78bfa; }
     .m-dot.ovrigt { background: #60a5fa; }
+    .m-dot.mote { background: #34d399; }
     .m-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-top: 0.6rem; font-size: 0.8rem; color: var(--text-muted); }
     .m-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
     .m-day { margin-top: 0.8rem; }
@@ -179,17 +181,19 @@
       <button type="button" class="btn-outline" id="mNext" aria-label="Nästa månad">›</button>
     </div>
     <div class="m-grid" id="mGrid"></div>
-    <div class="m-legend"><span><i class="m-dot rep"></i>Repetition</span><span><i class="m-dot konsert"></i>Konsert</span><span><i class="m-dot ovrigt"></i>Övrigt</span></div>
+    <div class="m-legend"><span><i class="m-dot rep"></i>Repetition</span><span><i class="m-dot konsert"></i>Konsert</span><span><i class="m-dot mote"></i>Möte</span><span><i class="m-dot ovrigt"></i>Övrigt</span></div>
     <div class="m-day" id="mDay"></div>
   </details>
 
   <div class="tabs" role="tablist">
     <button type="button" class="tab-btn active" data-tab="rep">Reptider<span class="count"></span></button>
     <button type="button" class="tab-btn" data-tab="konsert">Konserter<span class="count"></span></button>
+    <button type="button" class="tab-btn" data-tab="mote">Möten<span class="count"></span></button>
     <button type="button" class="tab-btn" data-tab="ovrigt">Övrigt<span class="count"></span></button>
   </div>
   <div class="tab-panel active" data-panel="rep"><p class="text-muted">Laddar...</p></div>
   <div class="tab-panel" data-panel="konsert"><p class="text-muted">Laddar...</p></div>
+  <div class="tab-panel" data-panel="mote"><p class="text-muted">Laddar...</p></div>
   <div class="tab-panel" data-panel="ovrigt"><p class="text-muted">Laddar...</p></div>
 </div>
 
@@ -208,7 +212,7 @@
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script>
-const typeLabels = { rep: 'Repetition', konsert: 'Konsert', ovrigt: 'Övrigt' };
+const typeLabels = { rep: 'Repetition', konsert: 'Konsert', mote: 'Möte', ovrigt: 'Övrigt' };
 
 const MAX_OCCURRENCES = 200;
 
@@ -319,7 +323,18 @@ function renderAttPanel(evId, panel) {
 
 function escapeAtt(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 
-const EMPTY_LABELS = { rep: 'Inga kommande repetitioner.', konsert: 'Inga kommande konserter.', ovrigt: 'Inget kommande inlagt.' };
+const EMPTY_LABELS = { rep: 'Inga kommande repetitioner.', konsert: 'Inga kommande konserter.', mote: 'Inga kommande möten.', ovrigt: 'Inget kommande inlagt.' };
+const moteInvites = new Map(); // event_id -> [{ name, response }]
+let isFullAdmin = false;       // stämledare ser möten men får bara avboka som admin
+
+function moteInfoHtml(ev) {
+  const list = moteInvites.get(String(ev.id)) || [];
+  const c = { ja: 0, kanske: 0, nej: 0, ingen: 0 };
+  list.forEach(i => { c[i.response || 'ingen']++; });
+  const bokare = ev.booker?.name || 'okänd';
+  const link = ev.meeting_url ? ` · <a href="${escapeAtt(ev.meeting_url)}" target="_blank" rel="noopener">Videomöte</a>` : '';
+  return `<div class="event-meta">Bokat av ${escapeAtt(bokare)} · ${list.length} inbjudna · Ja ${c.ja} · Kanske ${c.kanske} · Nej ${c.nej} · Inget svar ${c.ingen}${link}</div>`;
+}
 const openPastGroups = new Set();
 let activeTab = 'rep';
 
@@ -331,12 +346,15 @@ function eventHtml(ev) {
         <strong class="event-type-${ev.event_type}">${typeLabels[ev.event_type] || 'Övrigt'}</strong> — ${escapeAtt(ev.title)}${ev.series_id ? '<span class="series-badge">↻ serie</span>' : ''}
         ${ev.location ? `<div class="event-meta">${escapeAtt(ev.location)}</div>` : ''}
         ${ev.notes ? `<div class="event-meta event-notes">${escapeAtt(ev.notes)}</div>` : ''}
+        ${ev.event_type === 'mote' ? moteInfoHtml(ev) : ''}
       </div>
       <div class="event-actions">
         ${ev.event_date <= todayStr ? `<button type="button" class="att-btn" data-id="${ev.id}" aria-expanded="false">Närvaro (${attCount(ev.id)}) ▾</button>` : ''}
         <button type="button" class="mn-btn mn-open" data-id="${ev.id}" aria-expanded="false">🎙 Anteckningar</button>
-        <button type="button" class="edit-btn" data-id="${ev.id}">Redigera</button>
-        <button type="button" class="btn-danger deleteEventBtn" data-id="${ev.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort</button>
+        ${ev.event_type === 'mote'
+          ? (isFullAdmin ? `<button type="button" class="btn-danger mote-cancel" data-id="${ev.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Avboka</button>` : '')
+          : `<button type="button" class="edit-btn" data-id="${ev.id}">Redigera</button>
+        <button type="button" class="btn-danger deleteEventBtn" data-id="${ev.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort</button>`}
         ${ev.series_id ? `<button type="button" class="btn-danger deleteEventBtn" data-series="${ev.series_id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort serie</button>` : ''}
       </div>
       <div class="att-panel" data-panel-att="${ev.id}" hidden></div>
@@ -391,8 +409,9 @@ function renderMonth() {
 }
 
 async function loadEvents() {
-  const [{ data: events, error }] = await Promise.all([
-    supabaseClient.from('events').select('*').order('event_date').order('event_time'),
+  const [{ data: events, error }, { data: invites }] = await Promise.all([
+    supabaseClient.from('events').select('*, booker:members!events_created_by_fkey(name)').order('event_date').order('event_time'),
+    supabaseClient.from('meeting_invites').select('event_id, response, members(name)'),
     loadAttendanceData(),
   ]);
 
@@ -401,7 +420,13 @@ async function loadEvents() {
     return;
   }
 
-  const byType = { rep: [], konsert: [], ovrigt: [] };
+  moteInvites.clear();
+  (invites || []).forEach(r => {
+    const arr = moteInvites.get(r.event_id) || [];
+    arr.push({ name: r.members?.name, response: r.response });
+    moteInvites.set(r.event_id, arr);
+  });
+  const byType = { rep: [], konsert: [], mote: [], ovrigt: [] };
   allEvents = new Map((events || []).map(ev => [String(ev.id), ev]));
   (events || []).forEach(ev => (byType[ev.event_type] || byType.ovrigt).push(ev));
 
@@ -1012,9 +1037,37 @@ document.getElementById('mnSearch').addEventListener('input', renderAllNotes);
 document.getElementById('mnExportTxt').addEventListener('click', () => { if (mnFiltered.length) exportNotesFile(mnFiltered, `Motesanteckningar-${todayFileStamp()}`, 'txt'); });
 document.getElementById('mnExportDoc').addEventListener('click', () => { if (mnFiltered.length) exportNotesFile(mnFiltered, `Motesanteckningar-${todayFileStamp()}`, 'doc'); });
 
+async function callFnAdmin(name, payload) {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) throw new Error('Du behöver logga in igen.');
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + session.access_token, apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ('Fel ' + res.status));
+  return data;
+}
+
+// Avboka möte: skickar avbokningsmejl till de inbjudna (samma som bokaren gör)
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.mote-cancel');
+  if (!btn) return;
+  if (!confirm('Avboka mötet? Alla inbjudna får ett avbokningsmejl.')) return;
+  btn.disabled = true;
+  try {
+    await callFnAdmin('meeting-invite', { action: 'cancel', event_id: btn.dataset.id });
+    await loadEvents();
+  } catch (err) {
+    alert(err.message);
+    btn.disabled = false;
+  }
+});
+
 (async () => {
   const member = await requireAuth('stamledare');
-  if (member) { adminId = member.id; await loadEvents(); if (await loadNotes()) { renderAllNotes(); updateNoteCounts(); }
+  if (member) { adminId = member.id; isFullAdmin = member.role === 'admin'; await loadEvents(); if (await loadNotes()) { renderAllNotes(); updateNoteCounts(); }
   else { document.querySelectorAll('.mn-open').forEach(b => b.hidden = true); } }
 })();
 </script>

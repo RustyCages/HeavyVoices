@@ -258,7 +258,7 @@
   .k-frame.has-bg-video .k-line { text-shadow:0 2px 10px rgba(0,0,0,0.85); }
   .k-frame.has-bg-video .k-line.k-active { text-shadow:0 2px 10px rgba(0,0,0,0.85), 0 0 18px rgba(229,169,104,0.35); }
   #karaoke {
-    position:relative; z-index:2; height:6.4rem; overflow:hidden; text-align:center;
+    position:relative; z-index:2; height:var(--k-h, 6.4rem); overflow:hidden; text-align:center;
     -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 28%, #000 72%, transparent 100%);
             mask-image:linear-gradient(to bottom, transparent 0, #000 28%, #000 72%, transparent 100%);
   }
@@ -296,7 +296,7 @@
   #karaoke.no-anim .k-reel, #karaoke.no-anim .k-line { transition:none; }
   /* Rullande noter (Block / Noter) i stället för textraderna */
   .k-roll { position:absolute; inset:0; display:none; }
-  #karaoke.roll-mode { height:10rem; }
+  #karaoke.roll-mode { height:var(--k-h, 10rem); }
   #karaoke.roll-mode, #playerBar.expanded #karaoke.roll-mode {
     -webkit-mask-image:linear-gradient(to right, transparent 0, #000 3%, #000 95%, transparent 100%);
             mask-image:linear-gradient(to right, transparent 0, #000 3%, #000 95%, transparent 100%);
@@ -305,6 +305,11 @@
   #karaoke.roll-mode .k-roll { display:block; }
   .k-modes { position:absolute; right:0.45rem; bottom:0.35rem; z-index:3; display:flex; gap:2px; padding:2px; border-radius:999px; background:rgba(10,12,16,0.6); border:1px solid var(--border); }
   .k-modes[hidden] { display:none; }
+  /* Handtag för karaokerutans höjd: dra ↕ upp eller ner, dubbelklicka för standardhöjd */
+  .k-resize { position:relative; z-index:3; height:1rem; display:flex; align-items:center; justify-content:center; cursor:ns-resize; touch-action:none; user-select:none; -webkit-user-select:none; }
+  .k-resize::before { content:''; width:2.5rem; height:3px; border-radius:2px; background:var(--border); }
+  .k-resize:hover::before, .k-resize.dragging::before { background:var(--accent); }
+  #playerBar.expanded .k-resize { display:none; }
   .k-modes button { font-size:0.72rem; padding:0.12rem 0.55rem; border-radius:999px; background:transparent; color:var(--text-muted); border:0; box-shadow:none; transform:none; min-height:0; }
   .k-modes button:hover { color:var(--text); box-shadow:none; transform:none; }
   .k-modes button.on { background:var(--accent); color:#111317; }
@@ -386,7 +391,8 @@
       <button type="button" data-km="text" title="Synkad text rad för rad">Text</button>
       <button type="button" data-km="blocks" title="Notblock som rullar in, orden ovanför">Block</button>
       <button type="button" data-km="staff" title="Notrader som rullar in – riktig notskrift när notsättarens notblad finns">Noter</button>
-    </div></div>
+    </div>
+    <div class="k-resize" id="kResize" title="Dra upp eller ner för att ändra höjden. Dubbelklicka för standardhöjd." aria-label="Dra upp eller ner för att ändra höjden på texten" role="separator"></div></div>
   <div class="k-split hidden" id="karaokeSplit"></div>
   <div id="playerTitle">–</div>
   <div id="playerScrubberRow">
@@ -2509,6 +2515,43 @@ document.getElementById('splitBtn').addEventListener('click', () => {
   requestAnimationFrame(() => renderSplit(true));
 });
 window.addEventListener('resize', () => renderSplit(true));
+
+// ---------- Karaokerutans höjd: dra handtaget ↕ upp eller ner ----------
+(() => {
+  const karaoke = document.getElementById('karaoke');
+  const handle = document.getElementById('kResize');
+  if (!karaoke || !handle) return;
+  const DEFAULT_H = 6.4 * 16, MIN_H = 3.5 * 16, MAX_H = 24 * 16;   // px
+  const clampH = v => Math.min(MAX_H, Math.max(MIN_H, v));
+  const applyH = px => karaoke.style.setProperty('--k-h', px + 'px');
+  try {
+    const saved = parseFloat(localStorage.getItem('hv-karaoke-h'));
+    if (isFinite(saved)) applyH(clampH(saved));
+  } catch (e) {}
+  let drag = null;
+  handle.addEventListener('pointerdown', (e) => {
+    drag = { y: e.clientY, h: karaoke.getBoundingClientRect().height };
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add('dragging');
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (drag) applyH(clampH(drag.h + (e.clientY - drag.y)));
+  });
+  const endDrag = () => {
+    if (!drag) return;
+    drag = null;
+    handle.classList.remove('dragging');
+    const h = parseFloat(karaoke.style.getPropertyValue('--k-h'));
+    try { if (isFinite(h)) localStorage.setItem('hv-karaoke-h', String(h)); } catch (e) {}
+  };
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+  handle.addEventListener('dblclick', () => {
+    karaoke.style.removeProperty('--k-h');
+    try { localStorage.removeItem('hv-karaoke-h'); } catch (e) {}
+  });
+})();
 function updateExpandAvailability() {
   const canExpand = karaokeVisible();
   document.getElementById('expandBtn').classList.toggle('hidden', !canExpand);

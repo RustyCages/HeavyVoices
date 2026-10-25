@@ -50,7 +50,6 @@ const MAX_FILES = 10;
 
 let me = null;
 let posts = [];   // alla inlägg, för hela kören
-const kanSkriva = () => STAMMOR.includes(me.stamma);   // man skriver med sin egen stämma
 
 function escapeHtml(str) {
   if (str == null) return '';
@@ -98,7 +97,7 @@ function postHtml(p) {
   const kanBorta = p.author_id === me.id || isSongEditor(me);
   return `
     <div class="forum-meta">
-      <span>${escapeHtml(p.author?.name || 'Borttagen medlem')} · ${escapeHtml(p.stamma)}</span>
+      <span>${escapeHtml(p.author?.name || 'Borttagen medlem')}${p.stamma ? ' · ' + escapeHtml(p.stamma) : ''}</span>
       <span>${formatWhen(p.created_at)}</span>
     </div>
     <div class="forum-body">${escapeHtml(p.body)}</div>
@@ -112,9 +111,9 @@ function renderPosts() {
   const svar = {};
   posts.filter(p => p.parent_id).forEach(p => { (svar[p.parent_id] = svar[p.parent_id] || []).push(p); });
 
-  const composer = !kanSkriva() ? '<p class="text-muted">Du har ingen stämma på din profil. Be en admin sätta den under Medlemmar för att kunna skriva.</p>' : `
+  const composer = `
     <form class="forum-composer card" data-form="new" style="padding:1rem 1.2rem;">
-      <label style="font-weight:700;">Nytt ämne (du skriver som ${escapeHtml(me.stamma)})</label>
+      <label style="font-weight:700;">Nytt ämne</label>
       <input type="text" name="title" maxlength="150" required placeholder="Rubrik – vad handlar det om?">
       <textarea name="body" maxlength="5000" required placeholder="Skriv något till stämgruppen..."></textarea>
       <div class="row">
@@ -167,7 +166,6 @@ async function skickaInlagg(form) {
   const parentId = form.dataset.parent || null;
   const title = parentId ? null : (form.querySelector('[name=title]')?.value || '').trim();
   if (!parentId && !title) return setStatus('Skriv en rubrik först.', true);
-  if (!kanSkriva()) return setStatus('Du har ingen stämma på din profil.', true);
   if (!text) return setStatus('Skriv något först.', true);
   if (files.length > MAX_FILES) return setStatus(`Max ${MAX_FILES} filer per inlägg.`, true);
   const stora = files.find(f => f.size > MAX_FILE_MB * 1024 * 1024);
@@ -179,7 +177,7 @@ async function skickaInlagg(form) {
   try {
     const postId = crypto.randomUUID();
     const { error } = await supabaseClient.from('forum_posts').insert({
-      id: postId, stamma: me.stamma, author_id: me.id, parent_id: parentId, title, body: text,
+      id: postId, stamma: STAMMOR.includes(me.stamma) ? me.stamma : null, author_id: me.id, parent_id: parentId, title, body: text,
     });
     if (error) throw new Error(error.message);
     await laddaUppBilagor(postId, files);

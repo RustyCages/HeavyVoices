@@ -26,6 +26,10 @@
   .forum-reply:last-child { margin-bottom:0; }
   .forum-reply-box { margin-top:0.8rem; }
   .forum-title { margin:0 0 0.5rem; font-size:1.25rem; overflow-wrap:anywhere; }
+  .forum-post > summary { cursor:pointer; list-style:none; }
+  .forum-post > summary::-webkit-details-marker { display:none; }
+  .forum-post > summary .forum-title::after { content:' ▾'; color:var(--text-muted); font-size:0.9em; }
+  .forum-post[open] > summary .forum-title::after { content:' ▴'; }
   .forum-del { margin-top:0.6rem; font-size:0.82rem; padding:0.25rem 0.6rem; border-color:#f87171; color:#fca5a5; }
 </style>
 </head>
@@ -51,6 +55,7 @@ const MAX_FILES = 10;
 
 let me = null;
 let posts = [];   // alla inlägg, för hela kören
+const stangda = new Set();   // trådar som användaren har fällt ihop (behålls vid omladdning)
 
 function escapeHtml(str) {
   if (str == null) return '';
@@ -125,8 +130,8 @@ function renderPosts() {
 
   const inlagg = toppar.length
     ? toppar.map(p => `
-        <article class="card forum-post">
-          <h2 class="forum-title">${escapeHtml(p.title || '')}</h2>
+        <details class="card forum-post" data-thread="${p.id}" ${stangda.has(p.id) ? '' : 'open'}>
+          <summary><h2 class="forum-title">${escapeHtml(p.title || '')}</h2></summary>
           ${postHtml(p)}
           <div class="forum-replies">
             ${(svar[p.id] || []).map(r => `<div class="forum-reply">${postHtml(r)}</div>`).join('')}
@@ -138,7 +143,7 @@ function renderPosts() {
               <button type="submit" class="btn-outline">Skicka svar</button>
             </div>
           </form>
-        </article>`).join('')
+        </details>`).join('')
     : '<p class="text-muted">Inga inlägg ännu. Var först att skriva något!</p>';
 
   body.innerHTML = composer + inlagg;
@@ -209,6 +214,12 @@ async function taBortInlagg(id) {
 }
 
 // ---------- händelser ----------
+document.getElementById('forumBody').addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!d.matches || !d.matches('details[data-thread]')) return;
+  if (d.open) stangda.delete(d.dataset.thread); else stangda.add(d.dataset.thread);
+}, true);
+
 document.getElementById('forumBody').addEventListener('submit', (e) => {
   if (!e.target.matches('form[data-form]')) return;
   e.preventDefault();

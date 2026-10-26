@@ -345,15 +345,12 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
     <h1>Röstövning</h1>
     <div class="title-actions">
       <a href="/medlem/uppvarmning.html" class="btn btn-outline" title="Videor för andning, uppvärmning och skalövningar">🔥 Uppvärmning</a>
-      <button class="btn-outline" id="tunerBtn" aria-expanded="false" aria-controls="tunerPanel" title="Se vilken ton du sjunger – och om den ligger rätt">🎵 Tonmätare</button>
+      <a href="/medlem/tonmatare.html" class="btn btn-outline" title="Se vilken ton du sjunger – och om den ligger rätt">🎵 Tonmätare</a>
       <button class="btn-outline" id="guideBtn" aria-expanded="false" aria-controls="guide">❔ Så funkar det</button>
     </div>
   </div>
   <p class="hint">Sjung din stämma mot notbanan och se direkt om du träffar tonen.<span class="admin-only"> Som admin räknar du också fram noterna (tonkurvorna) ur stämfilerna här.</span></p>
 
-  <div class="card static" id="tunerPanel" hidden style="padding:0; overflow:hidden;">
-    <iframe id="tunerFrame" title="Tonmätare" allow="microphone" style="display:block; width:100%; height:640px; border:0;"></iframe>
-  </div>
 
   <div class="card static guide" id="guide" hidden>
     <h2>Så funkar röstövningen</h2>
@@ -2998,15 +2995,6 @@ document.querySelectorAll('.prog-tabs button').forEach(b => b.addEventListener('
   document.getElementById('tolMore').addEventListener('click', () => setTol(Number(tol.value) + 10));
 })();
 (() => {
-  // Tonmätare (inbäddad) – laddas först när den öppnas
-  const tb = document.getElementById('tunerBtn'), tp = document.getElementById('tunerPanel'), tf = document.getElementById('tunerFrame');
-  tb.addEventListener('click', () => {
-    const open = tp.hidden;
-    if (open && !tf.getAttribute('src')) tf.setAttribute('src', '/medlem/tonmatare.html?embed=1');
-    tp.hidden = !open;
-    tb.setAttribute('aria-expanded', String(open));
-    tb.textContent = open ? '✕ Stäng tonmätaren' : '🎵 Tonmätare';
-  });
   const g = document.getElementById('guide'), b = document.getElementById('guideBtn');
   const set = (open) => { g.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? '✕ Stäng guiden' : '❔ Så funkar det'; };
   let seen = null; try { seen = localStorage.getItem('hv-tonkurva-guide'); } catch (e) {}

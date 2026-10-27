@@ -133,7 +133,6 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .xfer-check small { color: var(--text-muted); font-size: 0.75rem; }
   .xfer-note { font-size: 0.75rem; color: var(--text-muted); line-height: 1.45; }
   .nb-preview { background: #fff; color: #000; border-radius: 0.5rem; max-height: 70vh; overflow: auto; padding: 0.5rem; }
-  .nb-preview:empty { display: none; }
   .nb-check { display: flex; align-items: center; gap: 0.35rem; }
   .nb-check input { width: auto; margin: 0; accent-color: var(--accent); }
   .xfer-name { display: grid; gap: 0.25rem; font-size: 0.8rem; color: var(--text-muted); margin: 0; }
@@ -3804,7 +3803,11 @@ document.getElementById('nbMake')?.addEventListener('click', async () => {
   box.innerHTML = '';
   try {
     await nbLoadOsmd();
-    const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(box, { backend: 'svg', autoResize: false, drawPartNames: true, drawCredits: true });
+    // egen yta med fast bredd – notvisaren mäter bredden när den skapas
+    const sheet = document.createElement('div');
+    sheet.style.width = Math.max(600, box.clientWidth - 16) + 'px';
+    box.appendChild(sheet);
+    const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(sheet, { backend: 'svg', autoResize: false, drawPartNames: true, drawCredits: true });
     await osmd.load(r.xml);
     osmd.render();
     nbStatus(`${r.key.name} · ${r.bars} takter · ` + r.parts.map(p => `${p.name} ${p.notes} noter`).join(', '));

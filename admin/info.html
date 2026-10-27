@@ -18,6 +18,7 @@
   .breadcrumbs a:hover { text-decoration:underline; }
   .breadcrumbs .sep { color:var(--text-muted); }
   .breadcrumbs .current { color:var(--text); }
+  .breadcrumbs .crumb-back { font-family:inherit; font-size:0.85rem; padding:0.3rem 0.7rem; margin-right:0.4rem; }
 
   .file-row {
     display:flex; align-items:center; gap:0.9rem; padding:0.75rem 0.5rem;
@@ -249,14 +250,28 @@ const trashIconSvg = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none
 function renderBreadcrumbs() {
   const el = document.getElementById('breadcrumbs');
   el.innerHTML = '';
+  if (!currentPath.length) return;   // översta nivån: ingen sökväg att visa
+
+  // inne i en mapp: tillbaka-knapp och länk till översta nivån
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.className = 'btn-outline crumb-back';
+  back.textContent = '← Tillbaka';
+  back.title = 'Till mappen ovanför';
+  back.addEventListener('click', () => { currentPath = currentPath.slice(0, -1); loadCurrent(); });
+  el.appendChild(back);
+  const home = document.createElement('a');
+  home.textContent = 'Alla filer';
+  home.addEventListener('click', () => { currentPath = []; loadCurrent(); });
+  makeDropTarget(home, '');
+  el.appendChild(home);
 
   currentPath.forEach((seg, idx) => {
-    if (idx > 0) {
-      const sep = document.createElement('span');
-      sep.className = 'sep';
-      sep.textContent = ' / ';
-      el.appendChild(sep);
-    }
+    // avgränsare före varje mapp (även efter "Alla filer")
+    const sep = document.createElement('span');
+    sep.className = 'sep';
+    sep.textContent = ' / ';
+    el.appendChild(sep);
 
     if (idx === currentPath.length - 1) {
       const cur = document.createElement('span');

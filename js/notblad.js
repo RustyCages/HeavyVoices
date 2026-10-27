@@ -82,7 +82,11 @@
   function trackGrid(onsets, o, barU) {
     const e8 = 30 / o.bpm, barSec = barU * 15 / o.bpm;
     const ts = onsets.slice().sort((a, b) => a - b);
-    if (ts.length < 6 || o.follow === false) return { dev: () => 0, barDev: () => 0 };
+    // fast rutnät (avstängt eller för få noter att följa)
+    if (ts.length < 6 || o.follow === false) return {
+      barDev: () => 0,
+      locate: t => { const v = (t - o.beatOffset) / barSec, k = Math.floor(v); return { k, u: v - k }; },
+    };
     const k0 = Math.floor((ts[0] - o.beatOffset) / barSec) - 1, k1 = Math.ceil((ts[ts.length - 1] - o.beatOffset) / barSec) + 1;
     const devs = new Map();
     let dev = 0;
@@ -181,6 +185,15 @@
         first.melisma = inBox.filter(r => r !== first).length > 0;
       });
     }
+    // delade ord ("lju..." | "set", "wa-" | "ter") blir stavelser med bindestreck i notskriften
+    let cont = false;
+    notes.forEach(r => {
+      if (!r.w) return;
+      const more = /(\.\.\.|…|-)$/.test(r.w);
+      r.w = r.w.replace(/(\.\.\.|…|-)+$/, '').trim() || r.w;
+      r.syl = cont ? (more ? 'middle' : 'end') : (more ? 'begin' : 'single');
+      cont = more;
+    });
     let err = 0; notes.forEach(r => { err += Math.abs(r.a - r.xa) * unit; });   // ungefärligt (ms)
     return { notes, dropped, meanErrMs: notes.length ? Math.round(err / notes.length * 1000) : 0 };
   }
@@ -254,7 +267,7 @@
       let cur = firstBar * barU;
       p.q.notes.forEach(x => {
         if (x.a > cur) segs.push({ a: cur, b: x.a, rest: true });
-        segs.push({ a: x.a, b: x.b, n: x.n, w: x.w, melisma: x.melisma });
+        segs.push({ a: x.a, b: x.b, n: x.n, w: x.w, syl: x.syl, melisma: x.melisma });
         cur = x.b;
       });
       if (cur < (lastBar + 1) * barU) segs.push({ a: cur, b: (lastBar + 1) * barU, rest: true });
@@ -279,7 +292,7 @@
             const lastOfNote = !s.rest && pos + b0 + len === s.b;
             pieces.push({ pos, len, rest: s.rest, n: s.n,
               tieStop: !s.rest && !firstOfNote, tieStart: !s.rest && !lastOfNote,
-              w: firstOfNote ? s.w : '', melisma: firstOfNote && (s.melisma || false) });
+              w: firstOfNote ? s.w : '', syl: s.syl, melisma: firstOfNote && (s.melisma || false) });
             pos += len;
           });
         });
@@ -350,7 +363,7 @@
     if (pc.beam1) s += `<beam number="1">${pc.beam1}</beam>`;
     if (pc.beam2) s += `<beam number="2">${pc.beam2}</beam>`;
     if (pc.tieStart || pc.tieStop) s += '<notations>' + (pc.tieStop ? '<tied type="stop"/>' : '') + (pc.tieStart ? '<tied type="start"/>' : '') + '</notations>';
-    if (pc.w) s += `<lyric number="1"><syllabic>single</syllabic><text>${esc(pc.w)}</text>${pc.melisma ? '<extend/>' : ''}</lyric>`;
+    if (pc.w) s += `<lyric number="1"><syllabic>${pc.syl || 'single'}</syllabic><text>${esc(pc.w)}</text>${pc.melisma && (!pc.syl || pc.syl === 'single' || pc.syl === 'end') ? '<extend/>' : ''}</lyric>`;
     s += '</note>\n';
     return s;
   }

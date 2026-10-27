@@ -132,6 +132,10 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .xfer-check input { width: auto; margin: 0.2rem 0 0; accent-color: var(--accent); }
   .xfer-check small { color: var(--text-muted); font-size: 0.75rem; }
   .xfer-note { font-size: 0.75rem; color: var(--text-muted); line-height: 1.45; }
+  .nb-preview { background: #fff; color: #000; border-radius: 0.5rem; max-height: 70vh; overflow: auto; padding: 0.5rem; }
+  .nb-preview:empty { display: none; }
+  .nb-check { display: flex; align-items: center; gap: 0.35rem; }
+  .nb-check input { width: auto; margin: 0; accent-color: var(--accent); }
   .xfer-name { display: grid; gap: 0.25rem; font-size: 0.8rem; color: var(--text-muted); margin: 0; }
   .xfer-name input { margin: 0; padding: 0.35rem 0.5rem; }
   .xfer-midi { display: grid; gap: 0.35rem; padding: 0.5rem 0.6rem; border: 1px dashed var(--border); border-radius: 0.5rem; font-size: 0.82rem; }
@@ -548,6 +552,27 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
         </div>
         <div class="edit-tools"><button type="button" class="btn-outline" id="xClose">Stäng</button><span class="edit-status" id="xStatus"></span></div>
       </div>
+      <button type="button" class="btn-outline toggle-btn" id="nbBtn" aria-expanded="false" aria-controls="nbPanel" title="Gör notskrift av noterna – en stämma eller hela kören – att visa i spelaren, öppna i MuseScore eller skriva ut">🎼 Skapa notblad</button>
+      <div class="copy-panel" id="nbPanel" hidden>
+        <b>Skapa notblad – <span id="nbSong"></span></b>
+        <p class="xfer-note">Noterna läggs i låtens takter (från 🥁 Tempo &amp; klick) och avrundas till läsbara notvärden. Tonart och klav väljs automatiskt och sångtexten läggs under noterna. Det blir ett <b>övningsnotblad</b> – bra noter ger bra notblad, så rätta noterna först. Finputsa i MuseScore vid behov.</p>
+        <div class="chips" id="nbStems"></div>
+        <small class="xfer-note">En stämma = eget notblad. Flera = körpartitur (en notrad per stämma).</small>
+        <div class="xfer-row">
+          <label>Rytm <select id="nbGrid"><option value="4">Sextondelar (detaljerat)</option><option value="2">Åttondelar (enklare)</option></select></label>
+          <label>Tonart <select id="nbKey"></select></label>
+          <label class="nb-check" title="Taktstrecken följer sångarnas insatser när inspelningen glider lite i tempo"><input type="checkbox" id="nbFollow" checked> Följ inspelningens tempo</label>
+        </div>
+        <div class="edit-tools"><button type="button" id="nbMake">🎼 Skapa notblad</button><button type="button" class="btn-outline" id="nbClose">Stäng</button><span class="edit-status" id="nbStatus"></span></div>
+        <div id="nbResult" hidden>
+          <div class="edit-tools">
+            <button type="button" id="nbPlayer" title="Notbladet visas i spelaren (Repertoar) när man väljer Noter – för stämmorna som är med">▶ Visa i spelaren</button>
+            <button type="button" class="btn-outline" id="nbDownload" title="MusicXML öppnas i MuseScore, Sibelius, Finale, Dorico m.fl.">⬇ MusicXML (MuseScore)</button>
+            <button type="button" class="btn-outline" id="nbPrint" title="Öppnar notbladet i A4 – välj Spara som PDF i utskriftsrutan">🖨 Skriv ut / PDF</button>
+          </div>
+          <div class="nb-preview" id="nbPreview"></div>
+        </div>
+      </div>
       <div class="copy-panel" id="copyPanel" hidden>
         <b>Kopiera noterna från <span id="copySrc"></span> till:</b>
         <div class="chips" id="copyTargets"></div>
@@ -752,6 +777,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
 <script src="/js/pitch-analyze.js"></script>
 <script src="/js/voice-tools.js"></script>
 <script src="/js/note-io.js"></script>
+<script src="/js/notblad.js"></script>
 <script src="/js/bg-video.js"></script>
 <script src="/js/bg-video-admin.js"></script>
 <script src="/js/party.js"></script>
@@ -1897,13 +1923,15 @@ function analysisPitchAt(t) {
 async function saveNotes(removeEdits) {
   const st = current;
   const data = { ...(st.raw || {}) };
-  if (removeEdits) { delete data.edited_notes; delete data.edited_at; }
+  let staleScore = false;
+  if (removeEdits) { delete data.edited_notes; delete data.edited_at; if (data.score && data.score.generated) { delete data.score; staleScore = true; } }
   else {
     const lyr = current.pitch.lyr;
     data.edited_notes = eNotes().map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w && !lyr ? { w: n.w } : {}), ...nExtra(n) }));
     if (lyr) data.lyrics = lyr.filter(b => b.w && b.w.trim()).map(b => ({ t: Math.round(b.t * 100) / 100, d: Math.round(b.d * 100) / 100, w: b.w.trim() }));
     data.edited_at = new Date().toISOString();
     if (st._pendingScore !== undefined) { if (st._pendingScore) data.score = st._pendingScore; else delete data.score; }
+    else if (data.score && data.score.generated) { delete data.score; staleScore = true; }   // skapat från de gamla noterna
   }
   editStatus('Sparar…');
   const { error } = await supabaseClient.from('song_pitch').upsert({
@@ -1913,7 +1941,8 @@ async function saveNotes(removeEdits) {
   st.raw = data; st.pitchBase = prepPitch(data); dirty = false; delete st._pendingScore;
   if (removeEdits) { applyMerge(st); setEditMode(false); showStem(st); }
   else { st.pitch = { ...st.pitchBase, notes: st.pitchBase.notes.map(n => ({ ...n })), lyr: st.pitchBase.lyr ? st.pitchBase.lyr.map(b => ({ ...b })) : null }; selBox = -1; editStatus(); }
-  toast(removeEdits ? 'Redigeringen borttagen – medlemmar ser notanalysen igen' : 'Noterna sparade – medlemmarna ser dem nu');
+  toast((removeEdits ? 'Redigeringen borttagen – medlemmar ser notanalysen igen' : 'Noterna sparade – medlemmarna ser dem nu') +
+    (staleScore ? '. Notbladet i spelaren togs bort eftersom noterna ändrats – skapa det igen under 🎼 Skapa notblad.' : ''), staleScore ? 6500 : 2800);
   renderRows();
   return true;
 }
@@ -3388,7 +3417,7 @@ document.getElementById('editToggle')?.addEventListener('click', () => setEditMo
 document.getElementById('textEditToggle')?.addEventListener('click', () => setEditMode(!(editMode && textMode), true));
 // Admin-knapparna fälls ut som paneler – bara en öppen åt gången
 (() => {
-  const ACC = [['editToggle', 'editTools'], ['textEditToggle', 'textTools'], ['copyAnalysisBtn', 'copyPanel'], ['tempoBtn', 'tempoPanel'], ['vidBtn', 'vidPanel'], ['xferBtn', 'xferPanel']]
+  const ACC = [['editToggle', 'editTools'], ['textEditToggle', 'textTools'], ['copyAnalysisBtn', 'copyPanel'], ['tempoBtn', 'tempoPanel'], ['vidBtn', 'vidPanel'], ['xferBtn', 'xferPanel'], ['nbBtn', 'nbPanel']]
     .map(([b, p]) => [document.getElementById(b), document.getElementById(p)]).filter(([b, p]) => b && p);
   // knappens markering följer alltid panelen (även när panelen stängs på annat sätt)
   ACC.forEach(([b, p]) => new MutationObserver(() => b.setAttribute('aria-expanded', String(!p.hidden))).observe(p, { attributes: true, attributeFilter: ['hidden'] }));
@@ -3616,7 +3645,7 @@ const stemOffOf = st => (Number((song.stem_offsets || {})[st.key]) || 0) / 1000;
 // andra stämmors noter (samma notblad) omräknade till notbladets tid – övningsfiler har ofta de andra stämmorna
 // i bakgrunden, så synken får räkna dem som rätt ljud
 function othersInScoreTime(st, measures) {
-  return stems.filter(o => o !== st && o.raw && o.raw.score && Array.isArray(o.raw.edited_notes) && NoteIO.sameMeasures(o.raw.score.measures, measures))
+  return stems.filter(o => o !== st && o.raw && o.raw.score && !o.raw.score.generated && Array.isArray(o.raw.edited_notes) && NoteIO.sameMeasures(o.raw.score.measures, measures))
     .map(o => {
       const tb = o.raw.score.measures;
       const inv = t => {
@@ -3632,7 +3661,7 @@ function othersInScoreTime(st, measures) {
 }
 // andra stämmor med samma notblad (samma takter): deras takttider omräknade till stämman st:s tid
 function otherScoreTables(st, measures) {
-  return stems.filter(o => o !== st && o.raw && o.raw.score && NoteIO.sameMeasures(o.raw.score.measures, measures))
+  return stems.filter(o => o !== st && o.raw && o.raw.score && !o.raw.score.generated && NoteIO.sameMeasures(o.raw.score.measures, measures))
     .map(o => ({ st: o, table: o.raw.score.measures.map(m => ({ ...m, a: m.a + stemOffOf(o) - stemOffOf(st), b: m.b + stemOffOf(o) - stemOffOf(st) })) }));
 }
 // finsynk (följ tempoändringar) – svar: { notes, txt }
@@ -3698,6 +3727,145 @@ document.getElementById('xferBtn')?.addEventListener('click', () => {
   openXfer();
 });
 document.getElementById('xClose')?.addEventListener('click', () => { document.getElementById('xferPanel').hidden = true; document.getElementById('xferBtn').setAttribute('aria-expanded', 'false'); });
+
+// ---------- admin: skapa notblad (MusicXML) från noterna ----------
+// js/notblad.js gör notskriften; här väljs stämmor, förhandsvisas, sparas för spelaren, laddas ner och skrivs ut.
+const NB_OSMD_URL = 'https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@2.1.3/build/opensheetmusicdisplay.min.js';
+let nbOsmdLoading = null, nbLast = null;
+function nbLoadOsmd() {
+  if (window.opensheetmusicdisplay) return Promise.resolve();
+  if (!nbOsmdLoading) nbOsmdLoading = new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = NB_OSMD_URL; sc.onload = () => res(); sc.onerror = () => { nbOsmdLoading = null; rej(new Error('Kunde inte ladda notvisaren')); };
+    document.head.appendChild(sc);
+  });
+  return nbOsmdLoading;
+}
+const nbStatus = (m) => { document.getElementById('nbStatus').textContent = m || ''; };
+const NB_NOT_VOICE = /full|mix|backtrack|komp|instrument|karaoke|playback|click|klick/i;
+const nbVoiceStems = () => stems.filter(st => st.key !== 'stem_backtrack_path' && !NB_NOT_VOICE.test(st.label || '') && st.pitch && (st.pitch.notes || []).length);
+const nbNotesOf = st => (st === current ? eNotes() : st.pitch.notes) || [];
+function nbFileBase(parts) {
+  const t = `${song.title}` + (parts.length === 1 ? ` - ${parts[0].label}` : ' - korpartitur');
+  return t.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim() || 'notblad';
+}
+function openNotblad() {
+  document.getElementById('nbSong').textContent = song.title;
+  const list = nbVoiceStems();
+  document.getElementById('nbStems').innerHTML = list.length ? list.map(st => {
+    const sc = st.raw && st.raw.score;
+    const tag = sc ? (sc.generated ? ' <small>(har skapat notblad)</small>' : ' <small>(har notsättarens notblad)</small>') : '';
+    return `<label><input type="checkbox" value="${esc(st.key)}" checked> ${esc(st.label)}${st.pitch.edited ? '' : ' <small>(notanalys)</small>'}${tag}</label>`;
+  }).join('') : '<small>Inga stämmor med noter än – analysera stämmorna först.</small>';
+  const ks = document.getElementById('nbKey');
+  if (!ks.options.length) {
+    const MAJ = ['Gess', 'Dess', 'Ass', 'Ess', 'B', 'F', 'C', 'G', 'D', 'A', 'E', 'H', 'Fiss'];
+    const MIN = ['ess', 'b', 'f', 'c', 'g', 'd', 'a', 'e', 'h', 'fiss', 'ciss', 'giss', 'diss'];
+    ks.innerHTML = '<option value="auto">Automatisk</option>' + MAJ.map((m, i) => {
+      const f = i - 6, acc = f === 0 ? 'inga förtecken' : f > 0 ? `${f}♯` : `${-f}♭`;
+      return `<option value="${f}">${m}-dur / ${MIN[i]}-moll (${acc})</option>`;
+    }).join('');
+  }
+  nbStatus(songBpm() ? '' : '⚠ Låten har inget tempo – sätt det i 🥁 Tempo & klick först, annars hamnar inte takterna rätt.');
+  document.getElementById('nbPanel').hidden = false;
+}
+document.getElementById('nbBtn')?.addEventListener('click', () => {
+  const pnl = document.getElementById('nbPanel');
+  if (!pnl.hidden) { pnl.hidden = true; return; }
+  openNotblad();
+});
+document.getElementById('nbClose')?.addEventListener('click', () => { document.getElementById('nbPanel').hidden = true; });
+
+document.getElementById('nbMake')?.addEventListener('click', async () => {
+  const keys = [...document.querySelectorAll('#nbStems input:checked')].map(c => c.value);
+  const parts = nbVoiceStems().filter(st => keys.includes(st.key));
+  if (!parts.length) { nbStatus('Bocka i minst en stämma'); return; }
+  if (!songBpm()) { nbStatus('Sätt låtens tempo i 🥁 Tempo & klick först'); return; }
+  const kv = document.getElementById('nbKey').value;
+  let r;
+  try {
+    r = Notblad.build({
+      title: song.title + (parts.length === 1 ? ` – ${parts[0].label}` : ''),
+      bpm: songBpm(), beatOffset: Number(song.beat_offset) || 0, beatsPerBar: Number(song.beats_per_bar) || 4,
+      grid: Number(document.getElementById('nbGrid').value) || 4,
+      follow: document.getElementById('nbFollow').checked,
+      key: kv === 'auto' ? null : { fifths: Number(kv), minor: false },
+      parts: parts.map(st => ({
+        name: st.label, offset: (Number((song.stem_offsets || {})[st.key]) || 0) / 1000,
+        notes: nbNotesOf(st).map(n => ({ t: n.t, d: n.d, n: n.n, ...(n.w ? { w: n.w } : {}) })),
+        lyr: st.pitch.lyr || null,
+      })),
+    });
+  } catch (e) { nbStatus(e.message || String(e)); return; }
+  nbLast = { r, stems: parts, dirtyAt: dirty && parts.includes(current) };
+  document.getElementById('nbResult').hidden = false;
+  nbStatus(`${r.key.name} · ${r.bars} takter · ` + r.parts.map(p => `${p.name} ${p.notes} noter`).join(', ') + ' – renderar…');
+  const box = document.getElementById('nbPreview');
+  box.innerHTML = '';
+  try {
+    await nbLoadOsmd();
+    const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(box, { backend: 'svg', autoResize: false, drawPartNames: true, drawCredits: true });
+    await osmd.load(r.xml);
+    osmd.render();
+    nbStatus(`${r.key.name} · ${r.bars} takter · ` + r.parts.map(p => `${p.name} ${p.notes} noter`).join(', '));
+  } catch (e) { nbStatus('Notbladet skapades men kunde inte visas: ' + (e.message || e)); }
+});
+
+document.getElementById('nbDownload')?.addEventListener('click', async () => {
+  if (!nbLast) return;
+  const res = await NoteIO.saveFile(nbLast.r.xml, nbFileBase(nbLast.stems) + '.musicxml', 'application/vnd.recordare.musicxml+xml');
+  if (res !== 'cancelled') toast('Notbladet sparat – öppna det i MuseScore (Arkiv → Öppna)');
+});
+
+document.getElementById('nbPrint')?.addEventListener('click', async () => {
+  if (!nbLast) return;
+  const w = window.open('', '_blank');
+  if (!w) { toast('Tillåt popup-fönster för att skriva ut'); return; }
+  w.document.write(`<!doctype html><html lang="sv"><head><meta charset="utf-8"><title>${esc(song.title)}</title><style>
+    @page { size: A4; margin: 10mm; } body { margin: 0; font-family: sans-serif; background: #fff; }
+    .pg { page-break-after: always; } .pg:last-child { page-break-after: auto; } svg { width: 100%; height: auto; display: block; }
+    p { color: #555; font-size: 14px; padding: 1rem; }</style></head><body><p>Förbereder notbladet…</p></body></html>`);
+  w.document.close();
+  try {
+    await nbLoadOsmd();
+    const div = document.createElement('div');
+    div.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;';
+    document.body.appendChild(div);
+    const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(div, { backend: 'svg', autoResize: false, pageFormat: 'A4_P', pageBackgroundColor: '#FFFFFF', drawPartNames: true });
+    await osmd.load(nbLast.r.xml);
+    osmd.render();
+    const pages = [...div.querySelectorAll('svg')].map(svg => `<div class="pg">${svg.outerHTML}</div>`).join('');
+    div.remove();
+    w.document.body.innerHTML = pages;
+    setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 300);
+  } catch (e) { w.document.body.innerHTML = '<p>Kunde inte skapa utskriften: ' + esc(e.message || String(e)) + '</p>'; }
+});
+
+document.getElementById('nbPlayer')?.addEventListener('click', async () => {
+  if (!nbLast) return;
+  if (dirty && nbLast.stems.includes(current)) { nbStatus('Spara noterna först (💾 Spara noter) och skapa notbladet igen – annars visar spelaren andra noter än notbladet'); return; }
+  const { r } = nbLast;
+  let use = nbLast.stems.map((st, k) => ({ st, k })).filter(x => x.st.raw);
+  const notator = use.filter(x => x.st.raw.score && !x.st.raw.score.generated);
+  if (notator.length && !confirm(`${notator.map(x => x.st.label).join(', ')} har redan notsättarens notblad i spelaren.\n\nOK = ersätt med det skapade notbladet\nAvbryt = behåll notsättarens för ${notator.length === 1 ? 'den' : 'dem'}`))
+    use = use.filter(x => !notator.includes(x));
+  if (!use.length) { nbStatus('Inget ändrades'); return; }
+  nbStatus('Sparar…');
+  const slug = nbLast.stems.length === 1 ? nbLast.stems[0].key.replace(/[^\w-]+/g, '_') : 'kor';
+  const path = `${song.id}/notblad__${slug}.musicxml`;
+  const up = await supabaseClient.storage.from('heavy-voices-noter').upload(path, new Blob([r.xml], { type: 'application/xml' }), { upsert: true, contentType: 'application/xml' });
+  if (up.error) { nbStatus('Kunde inte spara notbladet: ' + up.error.message); return; }
+  const now = new Date().toISOString();
+  for (const { st, k } of use) {
+    const data = { ...st.raw, score: { path, part: k, generated: true, at: now, measures: r.partMeasures(k) } };
+    const { error } = await supabaseClient.from('song_pitch').upsert({ song_id: song.id, stem_key: st.key, stem_path: st.pitchPath || st.path, data, updated_at: st.pitchAt || now });
+    if (error) { nbStatus(`Kunde inte spara för ${st.label}: ${error.message}`); return; }
+    st.raw = data;
+  }
+  nbStatus(`Klart – ${use.map(x => x.st.label).join(', ')} visar notbladet i spelaren (Repertoar → 🎤 → Noter)`);
+  toast('Notbladet visas nu i spelaren under Noter', 4000);
+  renderRows();
+});
 document.getElementById('xSaveDevice')?.addEventListener('click', async () => {
   const notes = eNotes();
   if (!notes.length) { xStatus('Det finns inga noter att exportera'); return; }
@@ -3945,7 +4113,8 @@ document.getElementById('xSyncNow')?.addEventListener('click', () => {
     if (i >= 0) list[i].syl = list[i].syl ? list[i].syl + ' ' + b.w : b.w;
   });
   // notbladet (om det finns) synkas om på samma sätt
-  const ex = current._pendingScore !== undefined ? current._pendingScore : (current.raw && current.raw.score);
+  let ex = current._pendingScore !== undefined ? current._pendingScore : (current.raw && current.raw.score);
+  if (ex && ex.generated) ex = null;   // eget skapat notblad är ingen förlaga att synka mot
   const opts = ex ? { score: { path: ex.path, measures: ex.measures.map(m => ({ i: m.i, len: m.len, s0: m.a, s1: m.b })) }, part: ex.part } : {};
   syncAndImport(list, 'notbanan', opts).finally(() => { document.getElementById('xAutoSync').checked = was; sh.value = keep[0]; trn.value = keep[1]; });
 });
@@ -3962,7 +4131,7 @@ async function loadScoreTracks(path) {
   return scoreXmlCache.get(path);
 }
 document.getElementById('xScoreAlign')?.addEventListener('click', async () => {
-  const withScore = stems.filter(st => st.raw && st.raw.score && st.raw.score.path && st.raw.score.measures && st.raw.midi && st.raw.midi.some(v => v > 0));
+  const withScore = stems.filter(st => st.raw && st.raw.score && !st.raw.score.generated && st.raw.score.path && st.raw.score.measures && st.raw.midi && st.raw.midi.some(v => v > 0));
   const groups = [];
   withScore.forEach(st => { const g = groups.find(g => NoteIO.sameMeasures(g[0].raw.score.measures, st.raw.score.measures)); if (g) g.push(st); else groups.push([st]); });
   const grp = groups.sort((a, b) => b.length - a.length)[0];

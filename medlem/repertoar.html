@@ -305,6 +305,17 @@
   #karaoke.roll-mode .k-roll { display:block; }
   .k-modes { position:absolute; right:0.45rem; bottom:0.35rem; z-index:3; display:flex; gap:2px; padding:2px; border-radius:999px; background:rgba(10,12,16,0.6); border:1px solid var(--border); }
   .k-modes[hidden] { display:none; }
+  /* Följ tonen: orden i raden som sjungs flyttas upp/ner efter tonen (noterna från Röstövningen) */
+  .k-follow-btn { position:absolute; left:0.45rem; bottom:0.35rem; z-index:3; font-size:0.72rem; padding:0.12rem 0.6rem; border-radius:999px; background:rgba(10,12,16,0.6); color:var(--text-muted); border:1px solid var(--border); box-shadow:none; transform:none; min-height:0; }
+  .k-follow-btn:hover { color:var(--text); box-shadow:none; transform:none; }
+  .k-follow-btn[aria-pressed="true"] { color:var(--accent); border-color:var(--accent); }
+  .k-follow-btn[hidden] { display:none; }
+  #playerBar.expanded .k-follow-btn { font-size:0.85rem; padding:0.25rem 0.8rem; }
+  .k-line.k-follow { padding-top:0.7em; padding-bottom:0.7em; line-height:1.1; }
+  .k-line.k-follow .kw { display:inline-block; transform:translateY(var(--y, 0)); transition:transform 0.35s cubic-bezier(.3,1.4,.5,1), color 0.15s, opacity 0.15s; color:var(--text); opacity:0.6; }
+  .k-line.k-follow .kw.sung { color:var(--accent); opacity:0.7; }
+  .k-line.k-follow .kw.on { color:var(--accent); opacity:1; text-shadow:0 0 14px rgba(229,169,104,0.5); }
+  @media (prefers-reduced-motion: reduce) { .k-line.k-follow .kw { transition:color 0.15s, opacity 0.15s; } }
   /* Handtag för karaokerutans höjd: dra ↕ upp eller ner, dubbelklicka för standardhöjd */
   .k-resize { position:relative; z-index:3; height:1rem; display:flex; align-items:center; justify-content:center; cursor:ns-resize; touch-action:none; user-select:none; -webkit-user-select:none; }
   .k-resize::before { content:''; width:2.5rem; height:3px; border-radius:2px; background:var(--border); }
@@ -387,6 +398,7 @@
 <div id="playerBar" class="hidden">
   <button type="button" id="expandBtn" class="hidden" title="Förstora texten">&#x26F6;</button>
   <div class="k-frame"><div id="karaoke" class="hidden"><div class="k-reel"></div><div class="k-roll" id="kRoll"></div></div>
+    <button type="button" class="k-follow-btn" id="kFollowBtn" hidden aria-pressed="true" title="Orden åker upp och ner efter tonen de sjungs på (noterna från Röstövningen)">≈ Följ tonen</button>
     <div class="k-modes" id="kModes" hidden role="group" aria-label="Visa som">
       <button type="button" data-km="text" title="Synkad text rad för rad">Text</button>
       <button type="button" data-km="blocks" title="Notblock som rullar in, orden ovanför">Block</button>
@@ -1973,6 +1985,7 @@ const pitchHtml = (t, me = myVoiceLetter()) => escapeHtml(t)
 
 function buildKaraokeReel() {
   const reel = document.querySelector('#karaoke .k-reel');
+  kf.el = null; kfReset();   // raderna byggs om – den gamla raden finns inte kvar
   // Första elementet är en tom "intro"-rad så att första textraden väntar under mitten innan den börjar
   const me = myVoiceLetter();
   reel.innerHTML = '<div class="k-line k-intro"></div>' + karaokeLines.map(l =>
@@ -2027,6 +2040,84 @@ function kPlace(reel, lines, idx, cue, st) {
 function kCountdown(reel, lines, idx, t, st) { kPlace(reel, lines, idx, kCue([{ lines, idx }], t), st); }
 const kcMain = {};
 
+// ---------- Följ tonen (som i Röstövningen) ----------
+// Raden som sjungs delas i ord som flyttas upp/ner efter tonen de sjungs på – tonerna kommer från
+// Röstövningens noter för stämman som visas (rollStems). Valet delas med Röstövningen (samma nyckel).
+let kFollow = (() => { try { return localStorage.getItem('hv-k-follow') !== '0'; } catch (e) { return true; } })();
+const kf = { line: -2, el: null, html: '', words: null, wi: -2, off: 0 };
+function kfReset() {
+  if (kf.el) { kf.el.innerHTML = kf.html; kf.el.classList.remove('k-follow'); }
+  kf.line = -2; kf.el = null; kf.html = ''; kf.words = null; kf.wi = -2;
+}
+function kfActive() { return kFollow && rollAvailable() && !splitActive() && kEffMode() === 'text'; }
+function kfWords(idx) {
+  const l = karaokeLines[idx];
+  if (!isSung(l) || !kfActive()) return null;
+  const key = rollStemKey(playerSong), st = key && rollStems.get(key);
+  if (!st || !st.notes.length) return null;
+  const off = stemOff(playerSong, key), ns = st.notes;
+  const a = l.time - off, b = (idx + 1 < karaokeLines.length ? karaokeLines[idx + 1].time : l.time + 8) - off;
+  const bx = rollLyrics(st, off).filter(x => x.w && x.t >= a - 0.15 && x.t < b - 0.05);
+  if (!bx.length) return null;
+  // tonen = noten som överlappar ordet mest (annars närmaste inom 0,6 s)
+  const pitchOf = x => {
+    let best = null, bo = 0, near = null, nd = 0.6;
+    for (const n of ns) {
+      const o = Math.min(n.t + n.d, x.t + x.d) - Math.max(n.t, x.t);
+      if (o > bo) { bo = o; best = n; }
+      const d = Math.max(n.t - (x.t + x.d), x.t - (n.t + n.d), 0);
+      if (d < nd) { nd = d; near = n; }
+    }
+    return (best || near) ? (best || near).n : null;
+  };
+  const ws = bx.map(x => ({ t: x.t + off, w: x.w, n: pitchOf(x) }));   // t på låtens tidslinje
+  const ps = ws.map(w => w.n).filter(n => n != null);
+  if (!ps.length) return null;
+  const lo = Math.min(...ps), hi = Math.max(...ps), mid = (lo + hi) / 2, span = Math.max(hi - lo, 5);
+  let last = mid;
+  ws.forEach(w => { if (w.n == null) w.n = last; last = w.n; w.y = (mid - w.n) / span * 1.3; });   // ±0,65 em
+  return ws;
+}
+// anropas varje bildruta från renderKaraoke: bygger om aktiv rad vid radbyte, tänder ordet som sjungs
+function kfUpdate(reel, idx, t) {
+  if (idx !== kf.line) {
+    kfReset();
+    kf.line = idx;
+    const ws = idx >= 0 ? kfWords(idx) : null, el = reel.children[idx + 1];
+    if (ws && el) {
+      kf.el = el; kf.html = el.innerHTML; kf.words = ws;
+      el.textContent = '';
+      ws.forEach((w, j) => {
+        if (j) el.append(' ');
+        const sp = document.createElement('span');
+        sp.className = 'kw'; sp.textContent = w.w; sp.style.setProperty('--y', w.y.toFixed(2) + 'em');
+        el.append(sp);
+      });
+      el.classList.add('k-follow');
+    }
+  }
+  if (kf.words && kf.el) {
+    let j = -1;
+    for (let k = 0; k < kf.words.length; k++) { if (kf.words[k].t <= t + 0.03) j = k; else break; }
+    if (j !== kf.wi) {
+      kf.wi = j;
+      [...kf.el.querySelectorAll('.kw')].forEach((sp, k) => { sp.classList.toggle('on', k === j); sp.classList.toggle('sung', k < j); });
+    }
+  }
+}
+function updateFollowBtn() {
+  const b = document.getElementById('kFollowBtn');
+  b.hidden = !(rollAvailable() && !splitActive() && kEffMode() === 'text' && karaokeLines.some(l => l.text));
+  b.setAttribute('aria-pressed', String(kFollow));
+}
+document.getElementById('kFollowBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  kFollow = !kFollow;
+  try { localStorage.setItem('hv-k-follow', kFollow ? '1' : '0'); } catch (err) {}
+  updateFollowBtn();
+  kfReset(); renderKaraoke(true);
+});
+
 function renderKaraoke(force) {
   if (!karaokeOn || !karaokeLines.length) return;
   const box = document.getElementById('karaoke');
@@ -2037,6 +2128,8 @@ function renderKaraoke(force) {
     if (karaokeLines[i].time <= t) idx = i; else break;
   }
   kCountdown(box.querySelector('.k-reel'), karaokeLines, idx, t, kcMain);
+  if (force) kfReset();
+  kfUpdate(box.querySelector('.k-reel'), idx, t);
   if (idx === karaokeIdx && !force) return;
 
   // Stora hopp (ny låt, scrubbing, visa igen) = flytta direkt utan animation
@@ -2389,6 +2482,7 @@ async function applyRoll() {
   modes.querySelector('[data-km="text"]').hidden = !karaokeLines.some(l => l.text);
   modes.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.km === m));
   box.classList.toggle('roll-mode', m !== 'text');
+  updateFollowBtn(); kfReset();
   if (m === 'text' || !rollKey) return;
   if (!roll) roll = NoteRoll.create(document.getElementById('kRoll'));
   const song = playerSong, st = rollStems.get(rollKey), off = stemOff(song, rollKey);

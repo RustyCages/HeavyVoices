@@ -61,7 +61,42 @@ async function requireAuth(requiredRole = null) {
   }
 
   showRoleStrip(member);
+  showTabbar(member);
   return member;
+}
+
+// Stramt utseende (test): flikrad längst ner på mobil på de enklare medlemssidorna.
+// Inte på Repertoar (spelaren ligger där), Röstövning, Studio, party eller inbäddade vyer.
+function showTabbar(member) {
+  try {
+    if (document.documentElement.getAttribute('data-ui') !== 'stram') return;
+    if (window.top !== window || /[?&]embed\b/.test(location.search)) return;
+    const p = location.pathname;
+    if (!/^\/medlem\/(index\.html)?$|^\/medlem\/(kalender|forum|info|uppvarmning|tonmatare)\.html$|^\/konto\.html$/.test(p)) return;
+    if (document.querySelector('.ui-tabbar')) return;
+    const home = member && member.role === 'admin' ? '/admin/' : '/medlem/';
+    const ic = {
+      home: '<path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/>',
+      ova: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+      cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+      more: '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>'
+    };
+    const tabs = [
+      ['Hem', home, ic.home, /^\/medlem\/(index\.html)?$/.test(p) && !location.hash],
+      ['Öva', '/medlem/repertoar.html?tab=repertoar', ic.ova, /uppvarmning|tonmatare/.test(p)],
+      ['Kalender', '/medlem/kalender.html', ic.cal, /kalender/.test(p)],
+      ['Mer', '/medlem/#mer', ic.more, /forum|info|konto/.test(p)]
+    ];
+    const add = () => {
+      const nav = document.createElement('nav');
+      nav.className = 'ui-tabbar';
+      nav.setAttribute('aria-label', 'Huvudnavigering');
+      nav.innerHTML = tabs.map(t => '<a href="' + t[1] + '"' + (t[3] ? ' aria-current="page"' : '') + '><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + t[2] + '</svg><span>' + t[0] + '</span></a>').join('');
+      document.body.appendChild(nav);
+      document.documentElement.classList.add('has-tabbar');
+    };
+    if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
+  } catch (_) {}
 }
 
 // Guldrand överst på alla sidor för admin och stämledare: "⚙ Adminläge · Namn".

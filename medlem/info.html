@@ -65,7 +65,7 @@
     <div class="card"><ul class="nav-list" id="upcomingList"></ul></div>
   </div>
 
-  <h2 style="margin-top:2rem;">Filer och Dokument</h2>
+  <h2 style="margin-top:2rem;">Filer och dokument</h2>
   <div class="breadcrumbs" id="breadcrumbs"></div>
   <div class="card">
     <div id="fileList"><p class="text-muted">Laddar...</p></div>
@@ -81,7 +81,7 @@
     <h3>Fråga om kören</h3>
     <p class="text-muted">Sök i guiderna och körinfon. Svaren är hämtade direkt ur dokumenten.</p>
     <form id="faqForm" class="faq-form" role="search">
-      <input id="faqInput" type="search" maxlength="200" placeholder="T.ex. hur kalibrerar jag" aria-label="Sök i kårens dokument" autocomplete="off">
+      <input id="faqInput" type="search" maxlength="200" placeholder="T.ex. hur kalibrerar jag" aria-label="Sök i körens dokument" autocomplete="off">
       <button type="submit" class="btn-gold">Sök</button>
     </form>
     <div id="faqResults" class="faq-results" aria-live="polite"></div>
@@ -95,6 +95,12 @@
     .faq-hit p { margin: 0.25rem 0; white-space: pre-line; }
     .faq-hit small { display: block; }
     .faq-fallback { font-size: 0.9rem; margin-top: 0.9rem; }
+    /* Stramt utseende (test): frågerutan först */
+    html[data-ui="stram"] .container { display: flex; flex-direction: column; }
+    html[data-ui="stram"] .container > .back-btn { order: -3; align-self: flex-start; }
+    html[data-ui="stram"] .container > h1 { order: -2; }
+    html[data-ui="stram"] .container > .faq-card { order: -1; margin-top: 0.5rem !important; border-color: rgba(229,169,104,0.35); }
+    html[data-ui="stram"] .faq-hit { border-left-color: rgba(255,255,255,0.2); }
   </style>
 </div>
 

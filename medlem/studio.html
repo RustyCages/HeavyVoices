@@ -190,6 +190,14 @@
   .guide-box { margin-top: 1rem; font-size: 0.84rem; color: var(--text-muted); line-height: 1.55; }
   .guide-box b { color: var(--text); }
   @media (max-width: 640px) { .t-ctrl { margin-left: 0; width: 100%; } .t-ctrl input[type=range] { flex: 1; } }
+
+  /* ---------- Stramt utseende (test) ---------- */
+  html.studio-simple:not(.studio-more) #markBtn, html.studio-simple:not(.studio-more) #newTrackBtn,
+  html.studio-simple:not(.studio-more) #importBtn, html.studio-simple:not(.studio-more) .zoom-bar,
+  html.studio-simple:not(.studio-more) #secSnap, html.studio-simple:not(.studio-more) .ai-home { display: none !important; }
+  :where(html[data-ui="stram"]) .warn-box { background: rgba(255,255,255,0.03); border-color: var(--border); }
+  :where(html[data-ui="stram"]) .t-ctrl .soloBtn.on { background: #2a2f3a; color: var(--text); border-color: rgba(255,255,255,0.28); }
+  :where(html[data-ui="stram"]) .rec-btn { box-shadow: none; }
 </style>
 </head>
 <body>
@@ -382,6 +390,25 @@ let audioCtx = null, sources = [], playing = false, startCtxTime = 0, startPos =
 let mic = null;    // { stream, src, proc, analyser }
 let rec = null;    // pågående inspelning { chunks, startCtx, songStart, track }
 let lines = [];
+
+// ---------- Stramt utseende (test): enklare Studio för medlemmar ----------
+// Döljer verktyg som de flesta inte behöver (markör, tomt spår, ladda in fil, zoomlist, ögonblicksbilder)
+// bakom knappen "Fler verktyg". Inspelning, flytta, kalibrering och spara finns kvar.
+function setupSimpleStudio() {
+  const root = document.documentElement;
+  root.classList.add('studio-simple');
+  const row = document.getElementById('markBtn') && document.getElementById('markBtn').parentElement;
+  if (!row || document.getElementById('moreToolsBtn')) return;
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'btn-outline'; b.id = 'moreToolsBtn'; b.setAttribute('aria-expanded', 'false');
+  b.textContent = 'Fler verktyg';
+  b.addEventListener('click', () => {
+    const on = root.classList.toggle('studio-more');
+    b.setAttribute('aria-expanded', String(on));
+    b.textContent = on ? 'Färre verktyg' : 'Fler verktyg';
+  });
+  row.insertBefore(b, document.getElementById('markBtn'));
+}
 
 // ---------- hjälpare ----------
 const fmt = WaveTimeline.fmt;
@@ -2197,6 +2224,7 @@ snapEl('snapFile').addEventListener('change', e => { const f = e.target.files[0]
   const member = await requireAuth();
   if (!member) return;
   me = member; isAdmin = isSongEditor(member);
+  if (!isAdmin && document.documentElement.getAttribute('data-ui') === 'stram') setupSimpleStudio();
   if (isAdmin && (new URLSearchParams(location.search).get('from') === 'admin' || /\/admin\/[^/?#]+\.html/.test(document.referrer))) document.getElementById('backLink').href = '/admin/';
   try { const v = localStorage.getItem('hv-rec-latency'); if (v != null) document.getElementById('latency').value = v; } catch (e) {}
   const { data, error } = await supabaseClient.from('songs').select('*').order('title');

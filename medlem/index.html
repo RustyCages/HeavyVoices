@@ -125,7 +125,7 @@
     <div id="checkinList"></div>
   </div>
 
-  <div class="card" style="margin-top: 1.5rem;">
+  <div class="card ui-klassisk-only" style="margin-top: 1.5rem;">
     <ul class="nav-list">
       <li><a href="/medlem/repertoar.html?tab=repertoar" class="nav-item">
         <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></span>
@@ -192,6 +192,39 @@
       </a></li>
     </ul>
   </div>
+
+  <!-- Stramt utseende (test): grupperad meny. Visas bara med data-ui="stram". -->
+  <div class="ui-stram-only hv-home">
+    <a href="#" class="hv-continue" id="hvContinue" hidden>
+      <span class="hv-continue-t"><small>Fortsätt öva</small><b id="hvContinueSong"></b></span>
+      <span class="hv-continue-btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>Öva</span>
+    </a>
+    <section class="hv-sec">
+    <h2 class="hv-group">Öva</h2>
+    <ul class="hv-list card">
+      <li><a href="/medlem/repertoar.html?tab=repertoar" class="hv-row"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span class="hv-row-t"><b>Repertoar</b><small>Lyssna, text och spellistor</small></span><span class="hv-chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></a></li>
+      <li><a href="/medlem/rostovning.html" class="hv-row"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></svg><span class="hv-row-t"><b>Röstövning</b><small>Sjung din stämma, se om du träffar</small></span><span class="hv-chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></a></li>
+      <li><a href="/medlem/uppvarmning.html" class="hv-row"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.1.4 1.3 1.4 2.6 2.5 2.6z"/></svg><span class="hv-row-t"><b>Uppvärmning</b><small>Andning, röst och skalor</small></span><span class="hv-chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></a></li>
+    </ul>
+    </section>
+    <section class="hv-sec">
+    <h2 class="hv-group">Kören</h2>
+    <div class="hv-tiles">
+      <a href="/medlem/kalender.html" class="hv-tile"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span>Kalender</span></a>
+      <a href="/medlem/forum.html" class="hv-tile"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Forum</span></a>
+      <a href="/medlem/info.html" class="hv-tile"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span>Information</span></a>
+    </div>
+    </section>
+    <section class="hv-sec hv-sec-mer">
+    <h2 class="hv-group" id="mer">Mer</h2>
+    <ul class="hv-list card">
+      <li><a href="/medlem/studio.html" class="hv-row"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg><span class="hv-row-t"><b>Studio</b><small>Spela in egna stämmor och idéer</small></span><span class="hv-chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></a></li>
+      <li><a href="/medlem/tonmatare.html" class="hv-row"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="hv-row-t"><b>Tonmätare</b><small>Se vilken ton du sjunger</small></span><span class="hv-chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></a></li>
+      <li><a href="/guide.html?guide=medlem" class="hv-row"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg><span class="hv-row-t"><b>Guide</b><small>Så funkar medlemssidan</small></span><span class="hv-chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></a></li>
+      <li><a href="/konto.html" class="hv-row"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="hv-row-t"><b>Mitt konto</b><small>Lösenord och utseende</small></span><span class="hv-chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></a></li>
+    </ul>
+    </section>
+  </div>
   <div id="installTop" data-install-app="Lägg till som app"></div>
 
   <div class="page-footer">
@@ -211,6 +244,12 @@
   const member = await requireAuth();
   if (member) {
     document.getElementById('welcome').textContent = `Välkommen ${member.name}`;
+    if (document.documentElement.getAttribute('data-ui') === 'stram') {
+      const first = String(member.name || '').trim().split(/\s+/)[0];
+      document.querySelector('.title-row h1').textContent = first ? `Hej ${first}` : 'Hej';
+      document.getElementById('welcome').textContent = new Date().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Stockholm' }).replace(/^./, c => c.toUpperCase());
+      showContinue();
+    }
     document.getElementById('roleBadge').textContent = (member.role !== 'admin' && member.stamledare) ? 'stämledare' : member.role;
     loadCheckin(member);
     showParty(member);
@@ -231,6 +270,17 @@
     }
   }
 })();
+
+// ---------- Fortsätt öva (stramt utseende): senaste låten från Röstövning eller Repertoar ----------
+function showContinue() {
+  let last = null;
+  try { last = JSON.parse(localStorage.getItem('hv-last-practice') || 'null'); } catch (e) {}
+  if (!last || !last.url || !last.title || !/^\/medlem\//.test(last.url)) return;
+  const a = document.getElementById('hvContinue');
+  a.href = last.url;
+  document.getElementById('hvContinueSong').textContent = last.title + (last.voice ? ' · ' + last.voice : '');
+  a.hidden = false;
+}
 
 // ---------- Info-ruta efter inloggning (en gång per inloggning) ----------
 function showUpdateNotice() {

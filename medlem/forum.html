@@ -32,13 +32,19 @@
   .forum-post > summary .forum-title::after { content:' ▾'; color:var(--text-muted); font-size:0.9em; }
   .forum-post[open] > summary .forum-title::after { content:' ▴'; }
   .forum-del { margin-top:0.6rem; font-size:0.82rem; padding:0.25rem 0.6rem; border-color:#f87171; color:#fca5a5; }
+
+  /* Stramt utseende (test): "Nytt inlägg"-knapp i stället för formuläret överst */
+  .forum-title { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .forum-title h1 { margin: 0.67em 0; }
+  html[data-ui="stram"] #newPostBtn { display: inline-flex !important; }
+  html[data-ui="stram"]:not(.forum-compose) form[data-form="new"] { display: none; }
 </style>
 </head>
 <body>
 <header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
 <div class="container">
   <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
-  <h1>Stämforum</h1>
+  <div class="forum-title"><h1>Forum</h1><button type="button" class="btn-gold ui-stram-only" id="newPostBtn" aria-expanded="false">Nytt inlägg</button></div>
   <p class="text-muted" style="margin:0 0 1rem;">Diskutera och dela filer med hela kören. Varje inlägg visar vilken stämma som skrev det.</p>
 
   <p class="forum-status" id="forumStatus" role="status"></p>
@@ -207,7 +213,8 @@ async function oppnaBilaga(path, name) {
 }
 
 async function taBortInlagg(id) {
-  if (!confirm('Ta bort inlägget? Svar och bilagor tas bort med det.')) return;
+  const nSvar = posts.filter(p => String(p.parent_id) === String(id)).length;
+  if (!confirm(nSvar ? `Ta bort inlägget? Det har ${nSvar} svar, som också tas bort tillsammans med alla bilagor. Det går inte att ångra.` : 'Ta bort inlägget? Bilagorna tas också bort. Det går inte att ångra.')) return;
   const { error } = await supabaseClient.from('forum_posts').delete().eq('id', id);
   if (error) return setStatus('Kunde inte ta bort: ' + error.message, true);
   setStatus('Inlägget är borttaget.');
@@ -241,5 +248,17 @@ document.getElementById('forumBody').addEventListener('click', (e) => {
 })();
 </script>
 
+
+<script>
+(function () {
+  const b = document.getElementById('newPostBtn'); if (!b) return;
+  b.addEventListener('click', () => {
+    const on = document.documentElement.classList.toggle('forum-compose');
+    b.setAttribute('aria-expanded', String(on));
+    b.textContent = on ? 'Stäng' : 'Nytt inlägg';
+    if (on) { const f = document.querySelector('form[data-form="new"] input[name="title"]'); if (f) f.focus(); }
+  });
+})();
+</script>
 </body>
 </html>

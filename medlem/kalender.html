@@ -53,6 +53,14 @@
   .rsvp-btn[aria-pressed="true"] { background:var(--accent); color:#111317; border-color:var(--accent); font-weight:700; }
   .invitee-list { list-style:none; padding:0; margin:0.3rem 0 0.8rem; font-size:0.92rem; }
   .invitee-list li { display:flex; justify-content:space-between; gap:1rem; padding:0.25rem 0; border-top:1px solid var(--border); }
+
+  /* Stramt utseende (test) */
+  .next-card { margin-bottom: 1rem; border-color: rgba(229,169,104,0.35) !important; }
+  .next-k { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  .next-t { font-size: 1.2rem; font-weight: 600; margin-top: 0.25rem; }
+  .next-d { color: var(--text); font-variant-numeric: tabular-nums; margin-top: 0.15rem; }
+  .next-loc { display: block; color: var(--text-muted); }
+  .next-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; }
 </style>
 </head>
 <body>
@@ -119,6 +127,7 @@
     .m-day { margin-top: 0.8rem; }
     .m-ev { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-top: 1px solid var(--border); font-size: 0.92rem; }
   </style>
+  <section class="card next-card ui-stram-only" id="nextCard" hidden></section>
   <details class="card month-view" id="monthView">
     <summary>📅 Månadsvy</summary>
     <div class="month-nav">
@@ -650,6 +659,52 @@ async function loadEvents() {
   renderMoteList(byType.mote);
   monthEvents = events || [];
   renderMonth();
+  if (document.documentElement.getAttribute('data-ui') === 'stram') renderNext(events || []);
+}
+
+// ---------- Stramt utseende (test): nästa händelse överst, Boka möte under fliken Möten ----------
+const NEXT_TYPE = { rep: 'Repetition', konsert: 'Konsert', mote: 'Möte', ovrigt: 'Övrigt' };
+function renderNext(events) {
+  const el = document.getElementById('nextCard');
+  const today = todayStockholm();
+  const ev = events.find(e => e.event_date >= today);
+  if (!ev) { el.hidden = true; return; }
+  const loc = ev.location ? `<span class="next-loc">${escapeHtml(ev.location)}</span>` : '';
+  el.innerHTML = `
+    <div class="next-k">Nästa · ${NEXT_TYPE[ev.event_type] || 'Händelse'}</div>
+    <div class="next-t">${escapeHtml(ev.title)}</div>
+    <div class="next-d">${formatDate(ev.event_date)}${timeRange(ev)}</div>${loc}
+    <div class="next-actions">
+      ${ev.location ? `<a class="btn btn-outline" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.location)}">Vägbeskrivning</a>` : ''}
+      <button type="button" class="btn-outline" id="nextIcs">Lägg till i min kalender</button>
+    </div>`;
+  el.hidden = false;
+  document.getElementById('nextIcs').addEventListener('click', () => downloadIcs(ev));
+}
+function downloadIcs(ev) {
+  const d = ev.event_date.replace(/-/g, '');
+  const t = (x) => x ? x.slice(0, 5).replace(':', '') + '00' : '';
+  const start = ev.event_time ? `DTSTART;TZID=Europe/Stockholm:${d}T${t(ev.event_time)}` : `DTSTART;VALUE=DATE:${d}`;
+  let end = '';
+  if (ev.event_time) {
+    let et = ev.end_time;
+    if (!et) { const [h, m] = ev.event_time.split(':').map(Number); et = String(Math.min(h + 2, 23)).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }
+    end = `DTEND;TZID=Europe/Stockholm:${d}T${t(et)}`;
+  }
+  const esc = (x) => String(x || '').replace(/[\\,;]/g, m => '\\' + m).replace(/\n/g, '\\n');
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Heavy Voices//Kalender//SV', 'BEGIN:VEVENT',
+    `UID:hv-${ev.id}@heavyvoices.se`, 'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z',
+    start, end, `SUMMARY:${esc(ev.title)}`, ev.location ? `LOCATION:${esc(ev.location)}` : '', ev.notes ? `DESCRIPTION:${esc(ev.notes)}` : '',
+    'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+  a.download = (ev.title || 'handelse').replace(/[^\wåäöÅÄÖ -]/g, '') + '.ics';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+if (document.documentElement.getAttribute('data-ui') === 'stram') {
+  const bc = document.getElementById('bookCard'), mp = document.getElementById('tabMote');
+  if (bc && mp) mp.prepend(bc);
 }
 
 (async () => {

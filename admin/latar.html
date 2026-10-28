@@ -72,6 +72,19 @@
   select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.6rem; }
   audio.stem-preview { width: 100%; margin-top: 0.4rem; display: none; }
   .customLabelInput { display: none; min-width: 160px; }
+
+  /* ---------- Stramt utseende (test): checklista per låt ---------- */
+  .song-check { margin: 0.6rem 0 0.2rem; }
+  html[data-ui="stram"] .song-check { display: flex !important; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem; }
+  .chk-row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .chk { display: inline-flex; align-items: center; gap: 0.35rem; min-height: 2rem; padding: 0 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600;
+    color: var(--text); border: 1px dashed rgba(255,255,255,0.25); text-decoration: none; }
+  .chk.ok { color: #86efac; border: 1px solid rgba(74,222,128,0.3); background: rgba(74,222,128,0.08); }
+  a.chk:hover { border-color: rgba(255,255,255,0.45); color: var(--text); }
+  a.chk.ok:hover { color: #86efac; }
+  .chk-next { min-height: 2.25rem; }
+  .chk-hint { font-size: 0.85rem; color: var(--text-muted); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -734,6 +747,31 @@ function wireStemsArea(s) {
   }
 }
 
+// ---------- Stramt utseende (test): checklista per låt med nästa steg ----------
+function songChecklist(s, pitchIds) {
+  if (document.documentElement.getAttribute('data-ui') !== 'stram') return '';
+  const hasStems = Object.keys(s).some(k => /^stem_.+_path$/.test(k) && s[k]) || (Array.isArray(s.extra_stems) && s.extra_stems.length > 0);
+  const rost = `/medlem/rostovning.html?song=${encodeURIComponent(s.id)}&from=admin`;
+  const synk = `/admin/text-synk.html?id=${encodeURIComponent(s.id)}`;
+  const items = [
+    ['Stämfiler', hasStems, null, 'Ladda upp stämfiler'],
+    ['Text', !!s.lyrics_plain, synk, 'Lägg in sångtexten'],
+    ['Synk', !!s.lyrics_lrc, synk, 'Synka texten'],
+    ['Noter', pitchIds.has(String(s.id)), rost, 'Analysera stämmorna'],
+    ['Tempo', Number(s.bpm) > 0, rost, 'Ställ in tempo']
+  ];
+  const next = items.find(i => !i[1]);
+  const chips = items.map(([t, ok, href]) => {
+    const inner = `<span aria-hidden="true">${ok ? '✓' : '○'}</span>${t}<span class="sr-only">${ok ? ' klart' : ' saknas'}</span>`;
+    return href ? `<a class="chk ${ok ? 'ok' : ''}" href="${href}">${inner}</a>` : `<span class="chk ${ok ? 'ok' : ''}">${inner}</span>`;
+  }).join('');
+  let action = '';
+  if (next && next[2]) action = `<a class="btn chk-next" href="${next[2]}">Nästa: ${next[3]}</a>`;
+  else if (next) action = `<span class="chk-hint">Nästa: ${next[3]} under Redigera text och filer</span>`;
+  else if (s.published === false) action = `<span class="chk-hint">Allt klart – gör låten synlig med knappen ovan</span>`;
+  return `<div class="song-check ui-stram-only"><div class="chk-row">${chips}</div>${action}</div>`;
+}
+
 async function loadSongs() {
   const { data, error } = await supabaseClient
     .from('songs')
@@ -748,6 +786,12 @@ async function loadSongs() {
   }
 
   songs = data || [];
+  // Stramt utseende (test): vilka låtar har notanalys, för checklistan per låt
+  let pitchIds = new Set();
+  if (document.documentElement.getAttribute('data-ui') === 'stram') {
+    const { data: pr } = await supabaseClient.from('song_pitch').select('song_id');
+    pitchIds = new Set((pr || []).map(r => String(r.song_id)));
+  }
 
   if (!songs.length) {
     listEl.innerHTML = `<p class="text-muted">Inga låtar än.</p>`;
@@ -764,6 +808,7 @@ async function loadSongs() {
           ${s.published === false ? '&#128065;&#8205;&#128488; Dold' : '&#128065; Synlig'}
         </button>
       </div>
+      ${songChecklist(s, pitchIds)}
 
       <details>
         <summary>Redigera text och filer</summary>

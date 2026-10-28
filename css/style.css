@@ -525,3 +525,83 @@ font-family: 'DM Sans', system-ui, sans-serif; font-weight: 600; letter-spacing:
 
 /* Siffror som inte hoppar */
 :where(html[data-ui="stram"]) time, :where(html[data-ui="stram"]) .tabular { font-variant-numeric: tabular-nums; }
+
+/* --- Delar som bara visas i ett av lägena --- */
+.ui-stram-only { display: none !important; }
+html[data-ui="stram"] .ui-stram-only { display: block !important; }
+html[data-ui="stram"] .ui-klassisk-only { display: none !important; }
+html[data-ui="stram"] .ui-stram-only[hidden] { display: none !important; }
+
+/* --- Stram startsida: grupperad meny --- */
+.hv-home { margin-top: 1.25rem; }
+.hv-group { margin: 1.25rem 0 0.5rem 0.25rem; font: 600 0.8rem 'DM Sans', system-ui, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.hv-list.card { list-style: none; margin: 0; padding: 0 1rem; }
+.hv-list li + li { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.hv-row { display: flex; align-items: center; gap: 0.9rem; min-height: 3.5rem; color: var(--text); text-decoration: none; }
+.hv-row:hover { color: var(--text); }
+.hv-row > svg { flex: none; color: #c7ccd4; }
+.hv-row-t { flex: 1; min-width: 0; }
+.hv-row-t b { display: block; font-weight: 600; font-size: 1rem; }
+.hv-row-t small { display: block; color: var(--text-muted); font-size: 0.85rem; }
+.hv-chev { color: #5c626d; display: flex; }
+.hv-row:hover .hv-chev { color: var(--text-muted); }
+.hv-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+.hv-tile { min-height: 4.75rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem;
+  background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+.hv-tile svg { color: #c7ccd4; }
+.hv-tile:hover { color: var(--text); border-color: var(--border-hover); }
+.hv-continue { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem; background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: var(--radius-md); color: var(--text); text-decoration: none; }
+.hv-continue[hidden] { display: none !important; }
+.hv-continue:hover { color: var(--text); border-color: var(--border-hover); }
+.hv-continue-t { flex: 1; min-width: 0; }
+.hv-continue-t small { display: block; color: var(--text-muted); font-size: 0.85rem; }
+.hv-continue-t b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hv-continue-btn { display: inline-flex; align-items: center; gap: 0.4rem; height: 2.25rem; padding: 0 0.85rem; border-radius: var(--radius-sm);
+  background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 0.9rem; }
+@media (min-width: 1000px) {
+  html[data-ui="stram"] .hv-home { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1.5rem; align-items: start; }
+  .hv-home .hv-continue { grid-column: 1 / -1; }
+  .hv-home .hv-sec-mer { grid-column: 1 / -1; }
+}
+/* Stram startsida: mindre logga, ingen extra luft */
+:where(html[data-ui="stram"]) .site-header--logo .site-logo-img { height: 64px; }
+
+/* --- Stram: flikrad längst ner på mobil (läggs in av js/auth.js) --- */
+.ui-tabbar { display: none; }
+@media (max-width: 700px) {
+  html[data-ui="stram"] .ui-tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 950; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    height: calc(64px + env(safe-area-inset-bottom, 0px)); padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: border-box;
+    background: #171a21; border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  html[data-ui="stram"] .ui-tabbar a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    color: #8b919c; text-decoration: none; font-size: 0.8rem; font-weight: 600; border-top: 2px solid transparent; }
+  html[data-ui="stram"] .ui-tabbar a[aria-current="page"] { color: var(--text); border-top-color: var(--accent); }
+  html[data-ui="stram"].has-tabbar body { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* --- Segmentväljare (t.ex. Öva / Förbered låten) --- */
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; background: #171a21; border: 1px solid var(--border); gap: 2px; }
+.seg button { min-height: 2.1rem; padding: 0 0.9rem; border: none; border-radius: 7px; background: transparent; color: var(--text-muted); font-weight: 600; font-size: 0.9rem; }
+.seg button:hover { background: rgba(255, 255, 255, 0.04); color: var(--text); box-shadow: none; transform: none; }
+.seg button[aria-pressed="true"] { background: #2a2f3a; color: var(--text); }
+
+/* --- Stram: valda lägen och flikar är neutrala (guld bara för huvudknappar) ---
+   Medvetet högre specificitet än sidornas egna "vald"-regler. */
+html[data-ui="stram"] button[aria-pressed="true"]:not(.mic-btn):not([data-keep-accent]),
+html[data-ui="stram"] .tab-btn.active {
+  background: #2a2f3a; color: var(--text); border-color: rgba(255, 255, 255, 0.28); box-shadow: none;
+}
+html[data-ui="stram"] .tab-btn { box-shadow: none; }
+/* Små versala Roboto-etiketter blir lugnare DM Sans */
+html[data-ui="stram"] .field-k, html[data-ui="stram"] .zoom-bar .zl, html[data-ui="stram"] .admin-sync .k,
+html[data-ui="stram"] .tep-sec .sec-t, html[data-ui="stram"] .ov-h, html[data-ui="stram"] h2.grp {
+  font-family: 'DM Sans', system-ui, sans-serif; font-weight: 600; letter-spacing: 0.05em;
+}
+html[data-ui="stram"] .admin-sync .k { color: var(--text-muted); }
+/* Toast-rutor (finns på flera sidor som inline-stil): neutral yta */
+html[data-ui="stram"] #toast { background: #1f232c !important; color: var(--text) !important; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: none !important; }
+/* Dialoger och modaler */
+:where(html[data-ui="stram"]) .modal, :where(html[data-ui="stram"]) .choice-box, :where(html[data-ui="stram"]) .notice-box { background: #1f232c; box-shadow: none; border-color: rgba(255, 255, 255, 0.12); }
+html[data-ui="stram"] .event-item.editing, html[data-ui="stram"] #eventFormCard.editing { box-shadow: none; }

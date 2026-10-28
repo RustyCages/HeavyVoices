@@ -339,6 +339,27 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
   .party-result .rank { font-family: 'Roboto Condensed', sans-serif; font-size: clamp(1.6rem, 5vw, 2.6rem); text-transform: uppercase; color: #fff; }
   .party-result p { color: var(--text-muted); margin: 0; }
   .party-result .btns { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; margin-top: 0.8rem; }
+
+  /* ---------- Stramt utseende (test) ---------- */
+  html.rost-ova .edit-bar, html.rost-ova .desktop-note, html.rost-ova #stemArea .bulk, html.rost-ova .analyzeBtn,
+  html.rost-ova .stem-status, html.rost-ova .hint .admin-only, html.rost-ova .stems-more { display: none !important; }
+  :where(html[data-ui="stram"]) .card.static:hover { box-shadow: none; }
+  :where(html[data-ui="stram"]) .toggle-btn[aria-expanded="true"] { background: #2a2f3a; color: var(--text); border-color: var(--accent); }
+  :where(html[data-ui="stram"]) .voice-pick button[aria-pressed="true"],
+  :where(html[data-ui="stram"]) .prog-tabs button[aria-pressed="true"] { background: #2a2f3a; color: var(--text); border-color: rgba(255,255,255,0.28); }
+  :where(html[data-ui="stram"]) .chips label:has(input:checked),
+  :where(html[data-ui="stram"]) .ghost-row .chips label.me { border-color: rgba(255,255,255,0.28); background: rgba(255,255,255,0.06); }
+  :where(html[data-ui="stram"]) .set legend, :where(html[data-ui="stram"]) .g-set h4, :where(html[data-ui="stram"]) .edit-help h4 { color: var(--text-muted); font-family: 'DM Sans', system-ui, sans-serif; font-weight: 600; }
+  :where(html[data-ui="stram"]) .pitch-row.active .stem-label { color: var(--text); }
+  :where(html[data-ui="stram"]) .g-rec { background: rgba(255,255,255,0.03); border-color: var(--border); border-left: 1px solid var(--border); }
+  :where(html[data-ui="stram"]) .g-rec > b, :where(html[data-ui="stram"]) .g-strong, :where(html[data-ui="stram"]) #helpPop b { color: var(--text); }
+  :where(html[data-ui="stram"]) .guide li::before { background: #2a2f3a; color: var(--text); }
+  :where(html[data-ui="stram"]) #helpPop { border-color: rgba(255,255,255,0.16); box-shadow: none; background: #1f232c; }
+  :where(html[data-ui="stram"]) .mic-btn { box-shadow: none; border-radius: 10px; }
+  :where(html[data-ui="stram"]) .mic-btn.on { box-shadow: none; }
+  :where(html[data-ui="stram"]) .help:hover, :where(html[data-ui="stram"]) .help[aria-expanded="true"] { color: var(--text); border-color: rgba(255,255,255,0.3); }
+  :where(html[data-ui="stram"]) .k-now.k-follow .kw.on { text-shadow: none; }
+  :where(html[data-ui="stram"]) .title-actions { align-items: center; }
 </style>
 </head>
 <body>
@@ -1049,6 +1070,33 @@ async function analyzeAll() {
   toast(`Klart: ${ok} av ${list.length} stämmor analyserade`);
 }
 
+// ---------- Stramt utseende: läge "Öva" / "Förbered låten" för admin och stämledare ----------
+// Öva döljer analys- och redigeringsverktygen, så sidan ser ut som för en medlem.
+function setupModeSwitch() {
+  const wrap = document.querySelector('.title-actions');
+  if (!wrap || document.getElementById('rostMode')) return;
+  const g = document.createElement('div');
+  g.className = 'seg'; g.id = 'rostMode'; g.setAttribute('role', 'group'); g.setAttribute('aria-label', 'Läge');
+  g.innerHTML = '<button type="button" data-m="ova">Öva</button><button type="button" data-m="forbered">Förbered låten</button>';
+  wrap.prepend(g);
+  let m = 'forbered';
+  try { m = localStorage.getItem('hv-rost-mode') === 'ova' ? 'ova' : 'forbered'; } catch (e) {}
+  const apply = (mode) => {
+    document.documentElement.classList.toggle('rost-ova', mode === 'ova');
+    g.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === mode)));
+    try { localStorage.setItem('hv-rost-mode', mode); } catch (e) {}
+  };
+  g.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    if (b.dataset.m === 'ova' && editMode) {
+      if (dirty && !confirm('Du har osparade ändringar i noterna. Släppa dem?')) return;
+      dirty = false; setEditMode(false);
+    }
+    apply(b.dataset.m);
+  });
+  apply(m);
+}
+
 // ---------- visning ----------
 function showStem(st) {
   { const xp = document.getElementById('xferPanel'); if (xp) { xp.hidden = true; document.getElementById('xferBtn').setAttribute('aria-expanded', 'false'); } }
@@ -1069,6 +1117,7 @@ function showStem(st) {
   document.querySelectorAll('.pitch-row').forEach(r => r.classList.toggle('active', !!st.rowEl && r === st.rowEl));
   const p = st.pitch, s = p.stats || {};
   document.getElementById('viewerTitle').textContent = `${song.title} – ${st.label}`;
+  try { if (!PARTY) localStorage.setItem('hv-last-practice', JSON.stringify({ title: song.title, voice: st.label, url: '/medlem/rostovning.html?song=' + song.id })); } catch (e) {}
   document.getElementById('stats').innerHTML =
     (p.edited ? '<span class="edited-tag">✓ Förberedda noter</span> ' : '') +
     `<b>${s.noteCount}</b> noter · omfång <b>${s.low != null ? nm(s.low) + '–' + nm(s.high) : '–'}</b>` +
@@ -4410,6 +4459,7 @@ document.getElementById('partyResult').addEventListener('click', e => { if (e.ta
     if (new URLSearchParams(location.search).get('from') === 'admin') b.href = '/admin/';
     else if (ref) b.href = ref;
   }
+  if (isAdmin && !PARTY && document.documentElement.getAttribute('data-ui') === 'stram') setupModeSwitch();
   const { data: me } = await supabaseClient.from('members').select('stamma').eq('id', member.id).single();
   const st = String((me && me.stamma) || '').toLowerCase();
   myVoice = ['sopran', 'alt', 'tenor', 'bas'].find(k => st.startsWith(k)) || '';

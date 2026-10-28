@@ -589,11 +589,13 @@ html[data-ui="stram"] .ui-stram-only[hidden] { display: none !important; }
 
 /* --- Stram: valda lägen och flikar är neutrala (guld bara för huvudknappar) ---
    Medvetet högre specificitet än sidornas egna "vald"-regler. */
-html[data-ui="stram"] button[aria-pressed="true"]:not(.mic-btn):not([data-keep-accent]),
+html[data-ui="stram"] button[aria-pressed="true"]:not(.mic-btn):not(.muteBtn):not([data-keep-accent]),
 html[data-ui="stram"] .tab-btn.active {
   background: #2a2f3a; color: var(--text); border-color: rgba(255, 255, 255, 0.28); box-shadow: none;
 }
 html[data-ui="stram"] .tab-btn { box-shadow: none; }
+/* Tystade spår ska synas tydligt även i stramt läge */
+html[data-ui="stram"] .muteBtn.muted, html[data-ui="stram"] .muteBtn.on { background: #b42318; color: #fff; border-color: #b42318; }
 /* Små versala Roboto-etiketter blir lugnare DM Sans */
 html[data-ui="stram"] .field-k, html[data-ui="stram"] .zoom-bar .zl, html[data-ui="stram"] .admin-sync .k,
 html[data-ui="stram"] .tep-sec .sec-t, html[data-ui="stram"] .ov-h, html[data-ui="stram"] h2.grp {

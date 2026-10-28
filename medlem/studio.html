@@ -198,6 +198,23 @@
   :where(html[data-ui="stram"]) .warn-box { background: rgba(255,255,255,0.03); border-color: var(--border); }
   :where(html[data-ui="stram"]) .t-ctrl .soloBtn.on { background: #2a2f3a; color: var(--text); border-color: rgba(255,255,255,0.28); }
   :where(html[data-ui="stram"]) .rec-btn { box-shadow: none; }
+
+  /* ---------- Spara / dela-rutan ---------- */
+  .share-back { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .share-box { width: 100%; max-width: 420px; background: var(--bg, #121418); border: 1px solid var(--border-hover, rgba(229,169,104,0.35)); border-radius: 1rem; padding: 1.3rem 1.3rem 1.1rem; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
+  .share-box h3 { margin: 0 0 0.9rem; font-size: 1.25rem; }
+  .share-k { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin: 0 0 0.35rem; padding: 0; }
+  .share-opts { border: 0; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.45rem; }
+  .share-opt { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem 0.85rem; border: 1px solid var(--border); border-radius: 0.6rem; cursor: pointer; }
+  .share-opt:has(input:checked) { border-color: var(--accent); background: rgba(229,169,104,0.08); }
+  .share-opt input { width: auto; margin: 0.2rem 0 0; accent-color: var(--accent); }
+  .share-opt b { display: block; font-weight: 600; }
+  .share-opt small { display: block; color: var(--text-muted); font-size: 0.85rem; line-height: 1.35; }
+  .share-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+  .share-actions button { min-height: 2.6rem; padding: 0 1.1rem; }
+  .vis-now { font-size: 0.85rem; color: var(--text-muted); }
+  .shareBtn { white-space: nowrap; }
+  :where(html[data-ui="stram"]) .share-box { background: #1f232c; border-color: rgba(255,255,255,0.12); box-shadow: none; border-radius: 14px; }
 </style>
 </head>
 <body>
@@ -224,10 +241,10 @@
       <li><div><b>Lyssna</b><p>Din tagning dyker upp som ett rött spår. Tryck ▶ och lyssna tillsammans med låten. Inte nöjd? Spela in en gång till – varje försök blir ett eget spår, och du tar bort de du inte vill ha med papperskorgen 🗑 längst till höger på spårets rad. Vill du ha ett tomt spår att spela in eller klistra in i? Tryck <b>➕ Nytt tomt spår</b>, välj det och tryck <b>⏺ Spela in</b>.</p></div></li>
       <li><div><b>Putsa (om du vill)</b><p>Låtens stämmor är 🔒 <b>låsta</b> och kan inte ändras. Vill du utgå från en stämma, tryck <b>⧉ Kopia</b> på dess rad – kopian blir ditt eget spår som du kan klippa och spara. Ligger inspelningen lite fel i tid? Slå på <b>↔ Flytta</b> och dra det röda spåret i sidled – klicka på Flytta igen när du är klar, så kan inget hamna ur synk av misstag. För finjustering: klicka på spåret och tryck <b>←</b> / <b>→</b> (Shift = större steg), eller använd knapparna och reglaget på raden <b>Synk</b>. Med <b>Taktrutnät</b> på syns låtens takter som streck i spåren. Har spåret fel tempo? Tryck <b>📏 Mät BPM</b> och sedan <b>⇔ Sträck till måltempot</b> – tonhöjden ändras inte. Under <b>Effekter</b> slår du på <b>🌫 Reverb</b> (efterklang), väljer ett rum och finjusterar med reglagen medan du lyssnar. Reverben hörs direkt men läggs i filen först när du trycker <b>🔥 Lägg på i spåret</b> (eller när du sparar och svarar ja). Utan valt verktyg drar du i spåren för att bläddra i låten (eller Shift + mushjulet). Vill du ta bort ett harkel? Välj <b>▭ Markera</b>, dra över biten och tryck <b>🔇 Tysta markerat</b> (eller Delete) – resten av spåret ligger kvar i synk. <b>✂ Ta bort och dra ihop</b> (Shift+Delete) klipper bort biten så att allt efter flyttas tidigare, och <b>⌗ Beskär</b> behåller bara det markerade på samma plats. Vill du använda en bra bit igen – t.ex. en refräng – markera den, tryck <b>⎘ Kopiera markerat</b>, klicka i spåret du vill lägga den i, ställ spelhuvudet och tryck <b>📋 Klistra in</b> (<b>Ersätt</b> skriver över, <b>Infoga</b> skjuter resten framåt, <b>Lägg ovanpå</b> mixar ihop). <b>📶 Normalisera</b> gör en svag inspelning starkare, och under <b>Volym</b> höjer eller sänker du hela spåret eller bara det markerade (t.ex. +3 dB). <b>↶ Ångra</b> tar tillbaka.</p></div></li>
       <li><div><b>Röstverktyg (på dator)</b><p><b>🎵 Tonhöjd</b>: markera en fras och gör ett nytt spår med ny tonhöjd – välj <b>halvtoner</b> (allt flyttas lika mycket) eller <b>steg i tonarten</b> (t.ex. <i>ters över</i>, så som en stämma sjungs). Tempot ändras inte. Bäst upp till ungefär 4–5 halvtoner, längre än så låter det lätt konstlat. <b>🎹 Syntröst</b>: en datorröst som sjunger ”ooh”, ”aah” eller ”mmm” på en stämmas noter från Röstövning – samma toner eller som en stämma över/under. Bra för att höra hur en harmoni låter innan någon sjungit in den. <b>🧽 Rengör</b>: behåller tonen som sjungs och dämpar andra stämmor och brus – välj <i>Bara brus</i> om du bara vill ta bort sus från din inspelning. <b>🤖 AI-separera</b>: delar upp ett spår – t.ex. en inspelning av hela låten – i sång och komp (eller sång, trummor, bas, övrigt). Det körs på din egen dator och är gratis; första gången laddas en AI-modell ner, sedan går det fortare. Snabbast i Chrome eller Edge på en dator med grafikkort. Sången blir alla stämmor ihop – kör sedan <b>Rengör</b> på sångspåret för att lyfta fram en stämma.</p></div></li>
-      <li><div><b>Spara</b><p>Skriv ett namn, till exempel ”Ters över refrängen”, välj vem som får höra den och tryck <b>💾 Spara inspelning</b>. Den hamnar under <b>Mina inspelningar</b> längst ner på sidan.</p></div></li>
+      <li><div><b>Spara och dela</b><p>Tryck <b>Spara inspelning</b> (eller <b>Dela</b> på spårets rad). Skriv ett namn, till exempel ”Ters över refrängen”, och välj vem som får höra den: <b>Bara jag</b>, <b>Körledningen</b> eller <b>Hela kören</b>. Den hamnar under <b>Mina inspelningar</b> längst ner på sidan.</p></div></li>
     </ol>
     <h3>Vem hör min inspelning?</h3>
-    <p class="g-p">🔒 <b>Privat</b> – bara du. 👥 <b>Körledningen</b> – du och körledningen, bra när du vill visa en idé. 🌍 <b>Alla</b> – hela kören kan lyssna på den i Studio. Du kan ändra valet när du vill och spara igen.</p>
+    <p class="g-p"><b>Bara jag</b> – ingen annan. <b>Körledningen</b> – admin och stämledare, bra när du vill visa en idé. <b>Hela kören</b> – alla kan lyssna i Studio, och låten i Repertoar visar att det finns inspelningar från kören. Du väljer när du sparar, och kan ändra det när du vill med <b>Dela</b> på spårets rad.</p>
     <div class="tips">
       <b>Tips:</b> Sjung in en stämma i taget och lyssna på den tillsammans med originalstämman. Sänk låtens volym eller tysta sångspåren om du vill höra dig själv tydligare. <b>⬇ Mix av det som hörs</b> laddar ner allt som är påslaget som en ljudfil – bra att skicka till någon. Kortkommandon på dator: <b>R</b> = spela in, <b>mellanslag</b> = spela/stoppa, <b>Ctrl+Z</b> = ångra, <b>Ctrl+C / Ctrl+V</b> = kopiera markerat / klistra in vid spelhuvudet, <b>Ctrl+Shift+C</b> = markerat till nytt spår på samma plats, <b>Ctrl+Shift+X</b> = klipp ut markerat till nytt spår. Dra i en markerings kant för att sträcka biten (ändrar tempot, inte tonhöjden). <b>📸 Ögonblicksbilder</b>: läget sparas automatiskt så du fortsätter där du var, osparade spår blir privata utkast, och du kan spara namngivna lägen och dela dem med körledningen.
     </div>
@@ -306,7 +323,7 @@
           <p class="hint" style="margin:0">Läget – volym, tyst/solo, placering, reverb, ordning, markörer och zoom – sparas automatiskt, så du fortsätter där du var nästa gång. Osparade spår sparas som privata <b>utkast</b> (rensas efter 30 dagar). En <b>ögonblicksbild</b> är ett läge du vill behålla eller visa körledningen. Den sparar inställningarna, inte ljudet.</p>
           <div class="tool-row">
             <input type="text" id="snapName" maxlength="80" placeholder="Namn, t.ex. Före reverb">
-            <select id="snapVis" title="Vem som ser ögonblicksbilden"><option value="private">🔒 Privat</option><option value="leaders">👥 Körledningen</option><option value="all">🌍 Alla</option></select>
+            <label class="status" for="snapVis">Vem ser den</label> <select id="snapVis" title="Vem som ser ögonblicksbilden"><option value="private">Bara jag</option><option value="leaders">Körledningen</option><option value="all">Hela kören</option></select>
             <button type="button" id="snapSave">📸 Spara ögonblicksbild</button>
             <button type="button" class="btn-outline" id="snapExport" title="Ladda ner nuvarande läge som JSON-fil">⬇ Exportera JSON</button>
             <button type="button" class="btn-outline" id="snapImport" title="Läs in en ögonblicksbild från en JSON-fil">📂 Importera JSON</button>
@@ -325,9 +342,15 @@
     <p id="loadingNote" hidden></p>
   </div>
 
+  <div class="card static shared-card" id="sharedCard" style="margin-top:1.5rem;" hidden>
+    <h2 style="margin:0 0 0.3rem; font-size:1.15rem;">Delat med mig</h2>
+    <p class="hint" style="margin:0 0 0.7rem;">Inspelningar som andra i kören har delat med dig.</p>
+    <div class="recs" id="sharedRecs"></div>
+  </div>
+
   <div class="card static" style="margin-top:1.5rem;">
     <h2 style="margin:0 0 0.3rem; font-size:1.15rem;">Mina inspelningar</h2>
-    <p class="hint" style="margin:0 0 0.7rem;">🔒 Privat = bara du · 👥 Körledningen = du, admin och stämledare · 🌍 Alla = hela kören (i Studio för låten).</p>
+    <p class="hint" style="margin:0 0 0.7rem;">Bara jag = ingen annan · Körledningen = admin och stämledare · Hela kören = alla medlemmar. Ändra med <b>Dela</b> på spårets rad.</p>
     <div class="recs" id="myRecs"><span class="hint">Laddar…</span></div>
   </div>
 
@@ -378,7 +401,8 @@ const FIXED_STEMS = [
 ];
 const STEM_COLORS = ['#7d8796', '#60a5fa', '#c084fc', '#34d399', '#f472b6', '#facc15', '#fb923c', '#a3e635'];
 const REC_COLOR = '#ef4444', REC_OTHER = '#fca5a5';
-const VIS = { private: '🔒 Privat', leaders: '👥 Körledningen', all: '🌍 Alla' };
+const VIS = { private: 'Bara jag', leaders: 'Körledningen', all: 'Hela kören' };
+const VIS_DESC = { private: 'Ingen annan kan lyssna.', leaders: 'Admin och stämledare kan lyssna i Studio.', all: 'Alla i kören kan lyssna i Studio och ser den på låten i Repertoar.' };
 const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>';
 const MUTE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>';
 
@@ -619,8 +643,9 @@ const panel = TrackEditPanel.mount(document.getElementById('panel'), {
     <div class="tool-row" id="recRow1">
       <span class="k">Inspelning</span>
       <input type="text" id="recTitle" maxlength="80" placeholder="Namn, t.ex. Ters över refrängen">
-      <select id="recVis"><option value="private">${VIS.private}</option><option value="leaders">${VIS.leaders}</option><option value="all">${VIS.all}</option></select>
-      <button type="button" id="recSave">💾 Spara inspelning</button>
+      <select id="recVis" hidden aria-hidden="true" tabindex="-1"><option value="private">${VIS.private}</option><option value="leaders">${VIS.leaders}</option><option value="all">${VIS.all}</option></select>
+      <span class="vis-now" id="recVisNow"></span>
+      <button type="button" id="recSave">Spara inspelning…</button>
       <span class="status" id="recStatus"></span>
     </div>
     <div class="tool-row" id="recRow2">
@@ -973,6 +998,7 @@ function renderHead(t, head) {
       ${adminStem ? `<span class="ms-ctrl"><button class="btn-outline" data-d="-50">−50</button><button class="btn-outline" data-d="-10">−10</button><input type="number" step="1" aria-label="Förskjutning i ms"><span class="unit">ms</span><button class="btn-outline" data-d="10">+10</button><button class="btn-outline" data-d="50">+50</button></span>` : ''}
       ${t.kind === 'rec' ? '<span class="ms" title="Var inspelningen ligger i låten"></span>' : ''}
       ${canClone ? '<button class="btn-outline cloneBtn" title="Gör en egen kopia av spåret som du kan redigera och spara">⧉ Kopia</button>' : ''}
+      ${t.kind === 'rec' && t.mine && !isEmpty(t) ? `<button class="btn-outline shareBtn" title="Spara och välj vem som får höra inspelningen">Dela${t.id && !t.draft && t.visibility !== 'private' ? ' · ' + VIS[t.visibility] : ''}</button>` : ''}
       <input type="range" min="0" max="1.5" step="0.05" value="${t.vol ?? 1}" title="Volym" aria-label="Volym för ${esc(t.label)}">
       <button class="btn-outline muteBtn ${t.muted ? 'on' : ''}" title="Tysta">${MUTE_SVG}</button>
       <button class="btn-outline soloBtn ${t.solo ? 'on' : ''}" title="Solo">S</button>
@@ -993,6 +1019,7 @@ function renderHead(t, head) {
   head.querySelector('.soloBtn').addEventListener('click', e => { t.solo = !t.solo; e.currentTarget.classList.toggle('on', t.solo); applyGains(); tracks.forEach(tl.drawTrack); });
   const del = head.querySelector('.delBtn'); if (del) del.addEventListener('click', () => deleteTrack(t));
   const cl = head.querySelector('.cloneBtn'); if (cl) cl.addEventListener('click', () => cloneTrack(t));
+  const sh = head.querySelector('.shareBtn'); if (sh) sh.addEventListener('click', () => { setActive(t); openShareDialog(t, 'share'); });
 }
 function setActive(t) {
   active = t; tl.setActiveRow(); panel.refresh(); updateRecTools();
@@ -1015,6 +1042,7 @@ function updateRecTools() {
     const ti = document.getElementById('recTitle');
     if (document.activeElement !== ti) ti.value = t.label;
     document.getElementById('recVis').value = t.visibility || 'private';
+    document.getElementById('recVisNow').textContent = t.id && !t.draft ? 'Synlig för: ' + VIS[t.savedVis || t.visibility || 'private'] : '';
     const dirty = t.edited || !t.id || t.draft || t.offsetMs !== t.savedOffsetMs || t.label !== t.savedTitle || t.visibility !== t.savedVis;
     document.getElementById('recSave').disabled = !dirty || isEmpty(t);
     document.getElementById('recStatus').textContent = isEmpty(t) ? 'Tomt spår – spela in eller klistra in något först' : !t.id ? 'Inte sparad än' : t.draft ? 'Utkast – autosparat privat. Tryck Spara för att behålla som inspelning' : dirty ? 'Osparade ändringar' : 'Sparad ✓';
@@ -1344,8 +1372,49 @@ function download(blob, name) {
 document.getElementById('recTitle').addEventListener('input', e => { if (active && active.mine) { active.label = e.target.value.trim() || 'Inspelning'; updateRecTools(); } });
 document.getElementById('recTitle').addEventListener('change', () => tl.render());
 document.getElementById('recVis').addEventListener('change', e => { if (active && active.mine) { active.visibility = e.target.value; updateRecTools(); } });
-document.getElementById('recSave').addEventListener('click', async () => {
-  const t = active; if (!t || !t.mine || !t.clip) return;
+document.getElementById('recSave').addEventListener('click', () => { const t = active; if (t && t.mine && t.clip && !isEmpty(t)) openShareDialog(t, 'save'); });
+
+// ---------- Spara / dela-ruta: namn + vem som får höra ----------
+function openShareDialog(t, why) {
+  if (!t || !t.mine || !t.clip || isEmpty(t)) return;
+  document.querySelector('.share-back')?.remove();
+  const back = document.createElement('div');
+  back.className = 'share-back';
+  const opts = ['private', 'leaders', 'all'].map(k => `
+      <label class="share-opt"><input type="radio" name="shareVis" value="${k}" ${k === (t.visibility || 'private') ? 'checked' : ''}>
+        <span><b>${VIS[k]}</b><small>${VIS_DESC[k]}</small></span></label>`).join('');
+  back.innerHTML = `
+    <form class="share-box" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+      <h3 id="shareTitle">${why === 'share' ? 'Dela inspelningen' : 'Spara inspelningen'}</h3>
+      <label class="share-k" for="shareName">Namn</label>
+      <input type="text" id="shareName" maxlength="80" placeholder="T.ex. Ters över refrängen">
+      <fieldset class="share-opts"><legend class="share-k">Vem får höra den?</legend>${opts}</fieldset>
+      <div class="share-actions">
+        <button type="button" class="btn-outline" data-x>Avbryt</button>
+        <button type="submit">Spara</button>
+      </div>
+    </form>`;
+  document.body.appendChild(back);
+  const form = back.querySelector('form'), name = back.querySelector('#shareName');
+  name.value = t.label || '';
+  const close = () => { document.removeEventListener('keydown', onKey, true); back.remove(); };
+  const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  document.addEventListener('keydown', onKey, true);
+  back.addEventListener('click', e => { if (e.target === back) close(); });
+  back.querySelector('[data-x]').addEventListener('click', close);
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    t.label = name.value.trim() || t.label || 'Inspelning';
+    t.visibility = (form.querySelector('input[name=shareVis]:checked') || {}).value || 'private';
+    close();
+    setActive(t); tl.render();
+    await saveRecording(t);
+  });
+  setTimeout(() => { name.focus(); name.select(); }, 0);
+}
+
+async function saveRecording(t) {
+  if (!t || !t.mine || !t.clip) return;
   if (hasReverb(t) && confirm(`Reverben på ”${t.label}” hörs bara här i Studio än. Lägga på den i inspelningen innan den sparas?\n\nOK = spara med reverb · Avbryt = spara utan`)) {
     if (!(await bakeReverb(t))) return;
   }
@@ -1371,7 +1440,7 @@ document.getElementById('recSave').addEventListener('click', async () => {
     tl.render(); setActive(t); loadMyRecs();
     toast(`”${t.label}” sparad – ${VIS[t.visibility]}`);
   } catch (e) { setRecStatus('Kunde inte spara: ' + (e.message || e)); btn.disabled = false; }
-});
+}
 document.getElementById('dlVoice').addEventListener('click', async () => {
   const t = active; if (!t || !t.clip) return;
   try { const { blob, ext } = await encodeTrack(await clipWithFx(t)); download(blob, `${safeName(song.title)}-${safeName(t.label)}.${ext}`); setRecStatus(''); }
@@ -1737,6 +1806,35 @@ document.getElementById('resetBtn').addEventListener('click', () => {
 document.getElementById('refSelect').addEventListener('change', () => tl.render());
 
 // ---------- mina inspelningar ----------
+async function loadShared() {
+  const card = document.getElementById('sharedCard'), box = document.getElementById('sharedRecs');
+  const { data, error } = await supabaseClient.from('recordings').select('id, title, song_id, member_id, visibility, created_at, duration')
+    .neq('member_id', me.id).eq('draft', false).in('visibility', ['leaders', 'all']).order('created_at', { ascending: false }).limit(40);
+  if (error || !data) { card.hidden = true; return; }
+  const titles = Object.fromEntries(songs.map(s => [String(s.id), s.title]));
+  const list = data.filter(r => titles[String(r.song_id)]);
+  if (!list.length) { card.hidden = true; return; }
+  const ids = [...new Set(list.map(r => r.member_id))].filter(x => !names[x]);
+  if (ids.length) { const { data: ms } = await supabaseClient.from('members').select('id, name').in('id', ids); (ms || []).forEach(m => { names[m.id] = m.name; }); }
+  box.innerHTML = list.map(r => `<div class="rec-row"><div><b>${esc(r.title)}<span class="vis ${r.visibility}">${VIS[r.visibility]}</span></b>
+    <small>${esc(names[r.member_id] || 'Någon')} · ${esc(titles[String(r.song_id)])} · ${new Date(r.created_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })} · ${fmt(r.duration)}</small></div>
+    <button type="button" class="btn-outline" data-song="${r.song_id}" data-id="${r.id}">Lyssna</button></div>`).join('');
+  box.querySelectorAll('button[data-id]').forEach(b => b.addEventListener('click', () => openRec(b.dataset.song, b.dataset.id)));
+  card.hidden = false;
+}
+async function openRec(songId, recId) {
+  const sel = document.getElementById('songSelect');
+  if (String(song && song.id) !== String(songId)) {
+    if (unsaved() && !confirm('Du har osparade inspelningar. Byta låt ändå?')) return;
+    sel.value = songId; await loadSong(songId);
+  }
+  const t = tracks.find(x => x.id === recId);
+  if (t) {
+    if (!t.mine) { t.muted = false; applyGains(); tl.render(); }
+    setActive(t); document.getElementById('studio').scrollIntoView({ behavior: 'smooth' });
+  }
+}
+
 async function loadMyRecs() {
   const box = document.getElementById('myRecs');
   const { data, error } = await supabaseClient.from('recordings').select('*').eq('member_id', me.id).eq('draft', false).order('created_at', { ascending: false });
@@ -1960,7 +2058,7 @@ window.addEventListener('beforeunload', e => { if (rec || unsaved()) { e.prevent
 // Läget (mixer, reverb, placering, ordning, markörer, zoom, spelhuvud) är ett litet JSON-objekt.
 // Det senaste sparas automatiskt per medlem och låt (studio_state); namngivna ögonblicksbilder i studio_snapshots.
 // Osparade spår laddas upp automatiskt som privata utkast (recordings.draft) så att de finns kvar nästa gång.
-const SNAP_VIS = { private: '🔒 Privat', leaders: '👥 Körledningen', all: '🌍 Alla' };
+const SNAP_VIS = VIS;
 const DRAFT_DAYS = 30;
 let stateSaved = { song: null, json: null, at: null }, stateBusy = false, draftBusy = false, snapshots = [], beforeRestore = null;
 const round = (v, d = 3) => Math.round(v * 10 ** d) / 10 ** d;
@@ -2231,11 +2329,13 @@ snapEl('snapFile').addEventListener('change', e => { const f = e.target.files[0]
   const sel = document.getElementById('songSelect');
   if (error) { sel.innerHTML = `<option>Fel: ${esc(error.message)}</option>`; return; }
   songs = (data || []).filter(s => isAdmin || (s.published !== false && stemListFor(s).length));   // admin ser även låtar utan spår (kan ladda in filer)
-  loadMyRecs(); cleanOldDrafts().catch(() => {});
+  loadMyRecs(); loadShared().catch(() => {}); cleanOldDrafts().catch(() => {});
   if (!songs.length && !isAdmin) { sel.innerHTML = '<option value="">Inga låtar med stämfiler än</option>'; return; }
   fillSongSelect();
-  const pre = new URLSearchParams(location.search).get('song');
-  if (pre && songs.some(s => String(s.id) === pre)) { sel.value = pre; loadSong(pre); }
+  const qs = new URLSearchParams(location.search), pre = qs.get('song'), preRec = qs.get('rec');
+  if (pre && songs.some(s => String(s.id) === pre)) {
+    if (preRec) openRec(pre, preRec); else { sel.value = pre; loadSong(pre); }
+  }
 })();
 </script>
 </body>

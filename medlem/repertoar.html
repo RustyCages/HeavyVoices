@@ -389,6 +389,11 @@
   html[data-ui="stram"] #playerControls button[data-label]:hover { background: rgba(255,255,255,0.05); }
   html[data-ui="stram"] #playPauseBtn { width: 3.1rem; height: 3.1rem; }
   @media (max-width: 420px) { html[data-ui="stram"] #playerControls button[data-label] { min-width: 2.9rem; padding: 0 0.15rem; } }
+
+  /* Inspelningar som andra delat i Studio */
+  .rec-count { display: inline-block; margin-top: 0.2rem; font-size: 0.8rem; color: var(--text-muted); }
+  .rec-count::before { content: ''; display: inline-block; width: 0.45rem; height: 0.45rem; border-radius: 50%; background: #60a5fa; margin-right: 0.4rem; vertical-align: 0.05rem; }
+  .rec-link { margin-bottom: 0.9rem; font-size: 0.85rem; }
 </style>
 </head>
 <body>
@@ -915,6 +920,7 @@ async function saveVolumes(item) {
 // Repertoar
 // =========================================================
 let repertoarCache = [];
+let sharedRecCount = {};   // låt-id → antal inspelningar som andra delat (Studio)
 
 async function loadRepertoar() {
   const { data, error } = await supabaseClient.from('songs').select('*').order('title', { ascending: true });
@@ -922,6 +928,12 @@ async function loadRepertoar() {
   // Dolda låtar (published = false) syns bara för admin, och märks "Dold"
   const isAdmin = isSongEditor(currentMember);
   repertoarCache = (data || []).filter(s => s.published !== false || isAdmin);
+  sharedRecCount = {};
+  try {
+    const { data: recs } = await supabaseClient.from('recordings').select('song_id')
+      .neq('member_id', currentMember.id).eq('draft', false).in('visibility', ['leaders', 'all']);
+    (recs || []).forEach(r => { if (r.song_id) sharedRecCount[r.song_id] = (sharedRecCount[r.song_id] || 0) + 1; });
+  } catch (e) {}
   renderRepertoar();
   renderTexter();
 }
@@ -997,6 +1009,20 @@ function renderSongCard(s) {
 
   const body = document.createElement('div');
   body.style.marginTop = '1rem';
+
+  // Inspelningar som andra i kören delat i Studio
+  const nRec = sharedRecCount[s.id] || 0;
+  if (nRec) {
+    const tag = document.createElement('span');
+    tag.className = 'rec-count';
+    tag.textContent = nRec === 1 ? '1 inspelning från kören' : `${nRec} inspelningar från kören`;
+    const head = summary.querySelector('.song-head-text'); if (head) head.appendChild(tag);
+    const a = document.createElement('a');
+    a.className = 'btn btn-outline rec-link';
+    a.href = `/medlem/studio.html?song=${encodeURIComponent(s.id)}`;
+    a.textContent = nRec === 1 ? 'Lyssna på inspelningen från kören i Studio' : `Lyssna på ${nRec} inspelningar från kören i Studio`;
+    body.appendChild(a);
+  }
 
   // Docs (PDF) + stamtext + extra_lyrics links
   const docLinks = document.createElement('div');

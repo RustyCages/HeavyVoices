@@ -6,6 +6,7 @@
 <title>Mitt konto — Heavy Voices</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
+<script src="/js/ui-mode.js"></script>
 <style>
   .back-link { display: inline-block; margin-bottom: 1rem; color: var(--text-muted); }
   @media (min-width: 601px) {
@@ -38,7 +39,34 @@
       <p class="success" id="changeSuccess"></p>
     </form>
   </div>
+
+  <div class="card ui-mode-card" style="max-width: 360px; margin-top: 1.5rem;">
+    <h3>Utseende <span class="badge" style="margin-left: 0.4rem; vertical-align: middle;">Test</span></h3>
+    <p class="text-muted" style="margin: 0 0 0.9rem; font-size: 0.9rem;">Prova ett stramare utseende. Valet gäller bara den här webbläsaren och kan ändras när som helst.</p>
+    <div class="ui-mode-opts" role="radiogroup" aria-label="Utseende">
+      <label class="ui-mode-opt"><input type="radio" name="uiMode" value=""> <span><b>Nuvarande</b><small>Som sidan ser ut idag</small></span></label>
+      <label class="ui-mode-opt"><input type="radio" name="uiMode" value="stram"> <span><b>Stramare</b><small>Plattare ytor, färre effekter</small></span></label>
+    </div>
+  </div>
 </div>
+<style>
+  .ui-mode-opts { display: flex; flex-direction: column; gap: 0.5rem; }
+  .ui-mode-opt { display: flex; align-items: center; gap: 0.75rem; padding: 0.7rem 0.85rem; border: 1px solid var(--border); border-radius: 0.6rem; cursor: pointer; }
+  .ui-mode-opt:has(input:checked) { border-color: var(--accent); background: rgba(229, 169, 104, 0.08); }
+  .ui-mode-opt input { width: auto; margin: 0; accent-color: var(--accent); }
+  .ui-mode-opt b { display: block; font-weight: 600; }
+  .ui-mode-opt small { display: block; color: var(--text-muted); font-size: 0.85rem; }
+</style>
+<script>
+(function () {
+  let cur = '';
+  try { cur = localStorage.getItem('hv-ui') === 'stram' ? 'stram' : ''; } catch (e) {}
+  document.querySelectorAll('input[name="uiMode"]').forEach(r => {
+    r.checked = r.value === cur;
+    r.addEventListener('change', () => { if (r.checked && window.hvSetUiMode) hvSetUiMode(r.value); });
+  });
+})();
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>

@@ -17,7 +17,23 @@ Heavy Voices — Central Stilmall (style.css)
 --border-hover: rgba(229, 169, 104, 0.35);
 --card-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
 --card-shadow-hover: 0 14px 35px -10px rgba(0, 0, 0, 0.7), 0 0 20px rgba(229, 169, 104, 0.12);
+/* Gemensamma variabler – använd dessa i stället för hårdkodade färger och mått */
+--surface-3: #1f232c;
+--ok: #4ade80;
+--danger: #f87171;
+--danger-strong: #dc2626;
+--warn: #facc15;
+--info: #60a5fa;
+--on-accent: #111317;
+--radius-sm: 0.5rem;
+--radius-md: 1rem;
 color-scheme: dark;
+}
+
+/* Synlig fokusmarkering för tangentbord (syns inte vid musklick) */
+:focus-visible {
+outline: 2px solid var(--accent);
+outline-offset: 2px;
 }
 
 *, *::before, *::after {
@@ -411,3 +427,101 @@ box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
 .role-strip span { color: var(--text); opacity: 0.8; font-size: 0.78rem; }
 .role-strip:hover b { color: var(--accent-hover); }
 @media print { .role-strip { display: none; } }
+
+/* ==========================================================================
+   Utseendeläge "stram" (test) – slås på med <html data-ui="stram">
+   Sätts av js/ui-mode.js och växlas under Mitt konto (eller ?ui=stram / ?ui=klassisk).
+   Platta ytor, inga glöd- eller lyfteffekter, guld bara för huvudknappar och valt läge.
+   :where() håller specificiteten låg: reglerna ersätter grundstilen ovan,
+   men sidornas egna stilar vinner fortfarande.
+   ========================================================================== */
+html[data-ui="stram"] {
+--bg: #0f1115;
+--bg-gradient: none;
+--bg-elevated: #171a21;
+--surface-3: #1f232c;
+--text: #eceef2;
+--text-muted: #9aa1ad;
+--border: rgba(255, 255, 255, 0.08);
+--border-hover: rgba(255, 255, 255, 0.18);
+--card-shadow: none;
+--card-shadow-hover: none;
+--on-accent: #14161a;
+--radius-sm: 8px;
+--radius-md: 14px;
+}
+:where(html[data-ui="stram"]) body { background-image: none; animation: none; }
+
+/* Rubriker: Roboto Condensed bara för H1–H2, DM Sans för resten */
+:where(html[data-ui="stram"]) h1, :where(html[data-ui="stram"]) h2 { color: var(--text); }
+:where(html[data-ui="stram"]) h3, :where(html[data-ui="stram"]) h4 { font-family: 'DM Sans', system-ui, sans-serif; font-weight: 600; letter-spacing: 0; color: var(--text); }
+
+/* Kort: platta, ingen skugga, ingen animation */
+:where(html[data-ui="stram"]) .card, :where(html[data-ui="stram"]) .modern-card {
+background: var(--bg-elevated); border-color: var(--border); border-radius: var(--radius-md); box-shadow: none; transition: border-color 0.15s ease;
+}
+:where(html[data-ui="stram"]) .card:hover, :where(html[data-ui="stram"]) .modern-card:hover { border-color: var(--border); }
+:where(html[data-ui="stram"]) a.card:hover, :where(html[data-ui="stram"]) a.modern-card:hover { border-color: var(--border-hover); }
+
+/* Menyrader: neutrala ikoner, bakgrund vid hover i stället för genomskinlighet */
+:where(html[data-ui="stram"]) .card-icon-box {
+width: 2.5rem; height: 2.5rem; border-radius: 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); color: #c7ccd4;
+}
+:where(html[data-ui="stram"]) .nav-item:hover .card-icon-box,
+:where(html[data-ui="stram"]) a.card:hover .card-icon-box,
+:where(html[data-ui="stram"]) a.modern-card:hover .card-icon-box { transform: none; box-shadow: none; border-color: var(--border-hover); color: var(--text); }
+:where(html[data-ui="stram"]) .nav-item { border-radius: 10px; transition: background-color 0.15s ease; }
+:where(html[data-ui="stram"]) .nav-item:hover { opacity: 1; background: rgba(255, 255, 255, 0.03); }
+:where(html[data-ui="stram"]) .nav-item-text h3 { font-size: 1rem; font-weight: 600; }
+
+/* Knappar: samma höjd och hörn, bara färgskifte vid hover */
+:where(html[data-ui="stram"]) button, :where(html[data-ui="stram"]) .btn {
+border-radius: var(--radius-sm); transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+:where(html[data-ui="stram"]) button:hover, :where(html[data-ui="stram"]) .btn:hover { box-shadow: none; transform: none; }
+:where(html[data-ui="stram"]) .btn-outline, :where(html[data-ui="stram"]) button.btn-outline {
+background: var(--surface-3); color: var(--text); border: 1px solid rgba(255, 255, 255, 0.12);
+}
+:where(html[data-ui="stram"]) .btn-outline:hover, :where(html[data-ui="stram"]) button.btn-outline:hover { background: #262b35; color: var(--text); }
+:where(html[data-ui="stram"]) .back-btn { border-radius: var(--radius-sm); background: transparent; border-color: rgba(255, 255, 255, 0.12); min-height: 2.5rem; }
+:where(html[data-ui="stram"]) .back-btn:hover { background: rgba(255, 255, 255, 0.04); color: var(--text); border-color: var(--border-hover); }
+
+/* Ta bort-knappar: lugn röd text, fylls först vid hover */
+:where(html[data-ui="stram"]) button.btn-danger:hover,
+:where(html[data-ui="stram"]) button.btn-outline[data-act="del"]:hover,
+:where(html[data-ui="stram"]) button.btn-outline[data-op="del"]:hover,
+:where(html[data-ui="stram"]) button.btn-outline[data-op="tdel"]:hover,
+:where(html[data-ui="stram"]) button.btn-outline[data-sig-del]:hover,
+:where(html[data-ui="stram"]) button.btn-outline.u-del:hover,
+:where(html[data-ui="stram"]) button.btn-outline.danger:hover,
+:where(html[data-ui="stram"]) button#recDelete:hover,
+:where(html[data-ui="stram"]) button#tClear:hover { box-shadow: none; background: #b42318; border-color: #b42318; }
+
+/* Fält */
+:where(html[data-ui="stram"]) input, :where(html[data-ui="stram"]) select, :where(html[data-ui="stram"]) textarea {
+border-radius: var(--radius-sm); background: #0f1115; border-color: rgba(255, 255, 255, 0.12);
+}
+:where(html[data-ui="stram"]) input:focus, :where(html[data-ui="stram"]) select:focus, :where(html[data-ui="stram"]) textarea:focus { box-shadow: none; border-color: var(--accent); }
+
+/* Märken och etiketter: neutrala */
+:where(html[data-ui="stram"]) .badge { background: rgba(255, 255, 255, 0.06); color: #c7ccd4; border-color: rgba(255, 255, 255, 0.12); font-size: 0.75rem; letter-spacing: 0.04em; }
+:where(html[data-ui="stram"]) .wip-tag {
+transform: none; background: rgba(250, 204, 21, 0.12); color: var(--warn); border-color: rgba(250, 204, 21, 0.35); box-shadow: none;
+font-family: 'DM Sans', system-ui, sans-serif; font-weight: 600; letter-spacing: 0.02em; text-transform: none; font-size: 0.72rem;
+}
+
+/* Loggan: ingen glöd eller puls */
+:where(html[data-ui="stram"]) .site-logo-img { filter: none; animation: none !important; }
+:where(html[data-ui="stram"]) .site-logo-link:hover .site-logo-img { filter: none; }
+:where(html[data-ui="stram"]) .site-header--small .site-logo-link:hover .site-logo-text { filter: none; }
+
+/* Startsidan: inget intro, inga blinkande ikoner */
+:where(html[data-ui="stram"]).intro *, :where(html[data-ui="stram"]).intro *::before, :where(html[data-ui="stram"]).intro *::after { animation: none !important; }
+:where(html[data-ui="stram"]) .nav-item .card-icon-box::after { animation: none !important; display: none; }
+
+/* Adminrand: diskret */
+:where(html[data-ui="stram"]) .role-strip { background: #15181e; border-bottom-color: rgba(229, 169, 104, 0.35); height: 24px; }
+:where(html[data-ui="stram"]) .role-strip b { font-family: 'DM Sans', system-ui, sans-serif; font-weight: 600; letter-spacing: 0.06em; font-size: 0.72rem; }
+
+/* Siffror som inte hoppar */
+:where(html[data-ui="stram"]) time, :where(html[data-ui="stram"]) .tabular { font-variant-numeric: tabular-nums; }

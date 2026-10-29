@@ -91,7 +91,7 @@
     const url = 'https://the-trivia-api.com/v2/questions?' + new URLSearchParams({ limit: '50', categories: c.tta.join(','), difficulties: hard ? 'easy,medium,hard' : 'easy,medium' });
     const items = await getJson(url, { headers: { Accept: 'application/json' } });
     return (Array.isArray(items) ? items : []).filter(it => it && !it.isNiche).map(it => ({
-      id: 'tta:' + it.id, raw: it.id, cat, src: 'tta', lang: 'en',
+      id: 'tta:' + it.id, raw: it.id, cat, src: 'tta', lang: 'en', diff: it.difficulty || 'medium',
       q: decHtml(typeof it.question === 'object' ? it.question.text : it.question),
       correct: decHtml(it.correctAnswer), wrong: (it.incorrectAnswers || []).map(decHtml).slice(0, 3),
     })).filter(x => x.q && x.correct && x.wrong.length >= 1);
@@ -123,7 +123,7 @@
       }
       if (d.response_code === 1 && token) { token = null; d = await ask(); }   // för få frågor kvar med nyckeln
       return (d.results || []).filter(r => hard || r.difficulty !== 'hard').map(r => ({
-        id: 'otdb:' + norm(decUrl(r.question)).slice(0, 80), raw: 'otdb:' + pmNorm(decUrl(r.question)).slice(0, 60), cat, src: 'otdb', lang: 'en',
+        id: 'otdb:' + norm(decUrl(r.question)).slice(0, 80), raw: 'otdb:' + pmNorm(decUrl(r.question)).slice(0, 60), cat, src: 'otdb', lang: 'en', diff: r.difficulty || 'medium',
         q: decUrl(r.question), correct: decUrl(r.correct_answer), wrong: (r.incorrect_answers || []).map(decUrl).slice(0, 3),
       }));
     });
@@ -166,6 +166,16 @@
         return [...by.values()].filter(r => +r.y <= new Date().getFullYear()).map(r => ({ id: 'wd:ol:' + r.y, q: `Var hölls sommar-OS ${r.y}?`, correct: r.xLabel, wrong: pickWrong(all, r.xLabel, 3) })); } },
   };
   const WD_URL = 'https://query.wikidata.org/sparql?format=json&query=';
+  // fri SPARQL-fråga mot Wikidata, sparas i webbläsaren (days dagar). Rader: { kolumn: värde/Q-nummer }
+  async function sparql(query, cacheKey, days = 14) {
+    const c = cacheKey ? store.get('hv-wd-' + cacheKey, null) : null;
+    if (c && Date.now() - c.at < days * 864e5 && c.rows && c.rows.length) return c.rows;
+    const d = await getJson(WD_URL + encodeURIComponent(query), { headers: { Accept: 'application/sparql-results+json' } }, 25000);
+    const ent = v => v && v.value && v.value.startsWith('http://www.wikidata.org/entity/') ? v.value.slice(31) : (v ? v.value : '');
+    const rows = (d.results && d.results.bindings || []).map(b => { const o = {}; Object.keys(b).forEach(k => o[k] = ent(b[k])); return o; });
+    if (cacheKey && rows.length) store.set('hv-wd-' + cacheKey, { at: Date.now(), rows });
+    return rows;
+  }
   async function wikidataRows(key) {
     const c = store.get('hv-wd-' + key, null);
     if (c && Date.now() - c.at < 14 * 864e5 && c.rows && c.rows.length) return c.rows;
@@ -190,9 +200,9 @@
   // ---------- körens egen frågebank ----------
   async function fromBank(cats) {
     if (!sb()) return [];
-    const { data, error } = await sb().from('quiz_questions').select('id, category, question, correct, wrong').eq('active', true).in('category', cats).limit(1000);
+    const { data, error } = await sb().from('quiz_questions').select('id, category, question, correct, wrong, difficulty').eq('active', true).in('category', cats).limit(1000);
     if (error) return [];
-    return (data || []).map(r => ({ id: 'bank:' + r.id, bankId: r.id, cat: r.category, src: 'bank', lang: 'sv', q: r.question, correct: r.correct, wrong: (r.wrong || []).filter(Boolean).slice(0, 3) }));
+    return (data || []).map(r => ({ id: 'bank:' + r.id, bankId: r.id, cat: r.category, src: 'bank', lang: 'sv', diff: ({ latt: 'easy', medel: 'medium', svar: 'hard' })[r.difficulty] || 'medium', q: r.question, correct: r.correct, wrong: (r.wrong || []).filter(Boolean).slice(0, 3) }));
   }
 
   // ---------- repertoaren: "fortsätt raden" och "vilken låt" ----------
@@ -362,8 +372,13 @@
       const p = c === 'rock' ? fromRock(opts.hard) : (CATS[c] && CATS[c].music) ? fromGenre(c, 10) : c === 'kor' ? fromRepertoire() : Promise.allSettled([fromTriviaApi(c, opts.hard), fromOpenTdb(c, opts.hard)]).then(r => r.flatMap(x => x.status === 'fulfilled' ? x.value : []));
       job(p).finally(() => refilling.delete(c));
     }
-    function take(c, exceptId) {
-      const pick = arr => { const i = arr.findIndex(x => x.id !== exceptId); return i < 0 ? null : arr.splice(i, 1)[0]; };
+    // pred = önskemål (t.ex. svårighetsgrad) – finns ingen sådan tas vilken som helst
+    function take(c, exceptId, pred) {
+      const pick = arr => {
+        let i = pred ? arr.findIndex(x => x.id !== exceptId && pred(x)) : -1;
+        if (i < 0) i = arr.findIndex(x => x.id !== exceptId);
+        return i < 0 ? null : arr.splice(i, 1)[0];
+      };
       let q = pick(fresh[c] || []) || pick(reserve[c] || []);
       if ((fresh[c] || []).length < 3) refill(c);
       if (q) { markSeen(q.id); markQuizSeen(q.raw); }
@@ -372,5 +387,31 @@
     return { load, take, counts, cats, get note() { return lastNote; }, stop() { stopped = true; } };
   }
 
-  root.QuizSources = { CATS, THEMES, CREDIT, createPool, translate, block, fromTriviaApi, fromOpenTdb, fromWikidata, fromBank, fromRepertoire };
+  // statusrad i mobilspelens lobby (under "Minst N spelare behövs")
+  function lobbyNote(st, label) {
+    let p = document.getElementById('qsLobby'); const anchor = document.getElementById('minNote');
+    if (!p && anchor) { p = document.createElement('p'); p.id = 'qsLobby'; p.className = 'text-muted'; p.style.cssText = 'font-size:0.9rem;margin-top:0.4rem'; anchor.after(p); }
+    if (!p) return;
+    const n = st.counts || {};
+    p.innerHTML = `${label || '❓ Frågor'}: ${Object.keys(n).map(c => `${CATS[c] ? CATS[c].emo : ''} ${n[c]}`).join(' · ')} ${st.pending ? '⏳' : '✅'}${st.note ? '<br>⚠️ ' + String(st.note).replace(/</g, '&lt;') : ''}`;
+  }
+  // likhet mellan ett fritt skrivet svar och facit (för Ledtrådarna m.fl.)
+  function lev(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[a.length][b.length];
+  }
+  function answerMatch(guess, answers) {
+    const g = norm(guess).replace(/^(the|det|den) /, '');
+    if (!g) return false;
+    return answers.filter(Boolean).some(a => {
+      const t = norm(a).replace(/^(the|det|den) /, '');
+      if (!t) return false;
+      if (g === t) return true;
+      if (t.length >= 5 && lev(g, t) <= (t.length > 8 ? 2 : 1)) return true;
+      return t.length >= 5 && (g.includes(t) || (g.length >= 5 && t.includes(g) && g.length >= t.length * 0.6));
+    });
+  }
+  root.QuizSources = { lobbyNote, answerMatch, CATS, THEMES, CREDIT, sparql, norm, pmNorm, shuffle, pickWrong, createPool, translate, block, fromTriviaApi, fromOpenTdb, fromWikidata, fromBank, fromRepertoire };
 })(window);

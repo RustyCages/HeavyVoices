@@ -276,5 +276,5 @@
     } finally { clearTimeout(t); }
   }
 
-  root.PartyMusic = { createFeed, shuffle, norm, makeRockQuestions, openTriviaRock };
+  root.PartyMusic = { createFeed, shuffle, norm, makeRockQuestions, openTriviaRock, artistSongs };
 })(window);

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quizfrågor — Heavy Voices Admin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<script src="/js/ui-mode.js"></script>
+<style>
+  .tabs { display:flex; gap:0.4rem; flex-wrap:wrap; margin:0.8rem 0 1rem; }
+  .tabs button[aria-pressed="true"] { background:var(--accent); color:#111317; border-color:var(--accent); }
+  .qform label { display:block; font-size:0.85rem; color:var(--text-muted); margin:0.7rem 0 0.25rem; }
+  .qform input, .qform textarea, .qform select { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.55rem 0.8rem; font:inherit; }
+  .qform textarea { min-height:4.5rem; line-height:1.4; }
+  .row3 { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:0.5rem; }
+  @media (max-width: 640px) { .row3 { grid-template-columns:1fr; } }
+  .actions { display:flex; flex-wrap:wrap; gap:0.6rem; margin-top:1rem; align-items:center; }
+  .filters { display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; margin-bottom:0.8rem; }
+  .filters input[type=search] { flex:1 1 12rem; }
+  .filters select, .filters input { width:auto; min-width:0; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.45rem 0.7rem; font:inherit; }
+  .qlist { display:grid; gap:0.5rem; }
+  .qitem { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0.6rem; align-items:start; padding:0.7rem 0.9rem; border:1px solid var(--border); border-radius:8px; }
+  .qitem.off { opacity:0.5; }
+  .qitem .q { font-weight:600; white-space:pre-line; }
+  .qitem .a { font-size:0.88rem; color:var(--text-muted); margin-top:0.25rem; }
+  .qitem .a b { color:#4ade80; font-weight:600; }
+  .qitem .en { font-size:0.8rem; color:var(--text-muted); font-style:italic; margin-top:0.2rem; }
+  .qitem .btns { display:flex; gap:0.35rem; flex-wrap:wrap; justify-content:flex-end; }
+  .qitem .btns button { padding:0.3rem 0.6rem; font-size:0.82rem; }
+  .cat { display:inline-block; font-size:0.75rem; padding:0.1rem 0.5rem; border-radius:999px; margin-right:0.4rem; color:#111317; font-weight:700; vertical-align:1px; }
+  .danger { background:#ef4444; color:#fff; }
+  .muted-s { font-size:0.85rem; color:var(--text-muted); }
+</style>
+</head>
+<body>
+<header class="site-header site-header--small"><a href="/admin/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+<div class="container">
+  <a href="/admin/" class="back-btn" id="backLink">&larr; Admin</a>
+  <h1>Quizfrågor</h1>
+  <p class="text-muted">Körens egna frågor till frågesporterna (t.ex. Tårtbitarna) och de översatta frågorna från frågedatabaserna. Spärra en fråga som blivit konstig så visas den aldrig igen.</p>
+
+  <div class="tabs">
+    <button type="button" class="btn-outline" data-tab="bank" aria-pressed="true">✏️ Egna frågor</button>
+    <button type="button" class="btn-outline" data-tab="tr" aria-pressed="false">🌐 Översatta frågor</button>
+  </div>
+
+  <!-- egna frågor -->
+  <section id="tab-bank">
+    <div class="card qform" id="form">
+      <h3 style="margin:0" id="formTitle">Ny fråga</h3>
+      <label for="fCat">Kategori</label>
+      <select id="fCat"></select>
+      <label for="fQ">Fråga</label>
+      <textarea id="fQ" maxlength="400" placeholder="T.ex. Vilket år bildades Heavy Voices?"></textarea>
+      <label for="fA">Rätt svar</label>
+      <input id="fA" maxlength="150">
+      <label>Fel svar <span class="muted-s">(1–3 st. Lämna tomt om frågan bara ska svaras högt)</span></label>
+      <div class="row3"><input id="fW1" maxlength="150" placeholder="Fel svar 1"><input id="fW2" maxlength="150" placeholder="Fel svar 2"><input id="fW3" maxlength="150" placeholder="Fel svar 3"></div>
+      <label for="fD">Svårighet</label>
+      <select id="fD"><option value="latt">Lätt</option><option value="medel" selected>Medel</option><option value="svar">Svår</option></select>
+      <div class="actions">
+        <button type="button" id="saveBtn">Spara</button>
+        <button type="button" id="newBtn" class="btn-outline">Rensa / ny fråga</button>
+        <span class="muted-s" id="saved"></span>
+      </div>
+      <p class="error" id="err"></p>
+    </div>
+    <h2 style="margin-top:1.6rem">Frågebanken <span class="muted-s" id="bankCount"></span></h2>
+    <div class="filters"><select id="bankFilter"></select><input id="bankSearch" placeholder="Sök…" type="search"></div>
+    <div class="qlist" id="bankList"><p class="text-muted">Laddar…</p></div>
+  </section>
+
+  <!-- översatta -->
+  <section id="tab-tr" hidden>
+    <p class="muted-s">Frågor från The Trivia API och Open Trivia DB som översatts med DeepL. Varje fråga översätts bara en gång och sparas här. Frågor som bygger på engelska ord (rim, stavning …) spärras automatiskt.</p>
+    <div class="filters">
+      <select id="trFilter"><option value="all">Alla</option><option value="blocked">Bara spärrade</option><option value="ok">Bara aktiva</option></select>
+      <input id="trSearch" placeholder="Sök…" type="search">
+      <span class="muted-s" id="trCount"></span>
+    </div>
+    <div class="qlist" id="trList"><p class="text-muted">Laddar…</p></div>
+    <div class="actions"><button type="button" class="btn-outline" id="trMore" hidden>Visa fler</button></div>
+  </section>
+</div>
+<div id="toast" style="position:fixed;bottom:1.2rem;right:1.2rem;background:var(--accent);color:#111317;padding:0.6rem 1rem;border-radius:0.6rem;font-weight:600;display:none;z-index:50"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/quiz-sources.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+function toast(m) { const t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', 2500); }
+const CATS = Object.values(QuizSources.CATS);
+const catTag = id => { const c = QuizSources.CATS[id]; return c ? `<span class="cat" style="background:${c.color}">${c.emo} ${esc(c.name)}</span>` : `<span class="cat" style="background:#9ca3af">${esc(id || '?')}</span>`; };
+// översättningarnas kategorier kommer från källan (t.ex. "geography") – visa dem som våra
+const SRC_CAT = { geography: 'geo', film_and_tv: 'film', history: 'hist', arts_and_literature: 'konst', science: 'vet', sport_and_leisure: 'sport', rock: 'rock' };
+let bank = [], editing = null, trRows = [], trPage = 0;
+
+// ---------- egen frågebank ----------
+$('fCat').innerHTML = CATS.map(c => `<option value="${c.id}">${c.emo} ${esc(c.name)}</option>`).join('');
+$('bankFilter').innerHTML = '<option value="">Alla kategorier</option>' + CATS.map(c => `<option value="${c.id}">${c.emo} ${esc(c.name)}</option>`).join('');
+async function loadBank() {
+  const { data, error } = await supabaseClient.from('quiz_questions').select('*').order('created_at', { ascending: false });
+  if (error) { $('bankList').innerHTML = `<p class="error">${esc(error.message)}</p>`; return; }
+  bank = data || []; renderBank();
+}
+function renderBank() {
+  const f = $('bankFilter').value, s = $('bankSearch').value.trim().toLowerCase();
+  const list = bank.filter(q => (!f || q.category === f) && (!s || (q.question + ' ' + q.correct).toLowerCase().includes(s)));
+  $('bankCount').textContent = `(${bank.filter(q => q.active).length} aktiva)`;
+  $('bankList').innerHTML = list.length ? list.map(q => `<div class="qitem ${q.active ? '' : 'off'}" data-id="${q.id}">
+      <div><div class="q">${catTag(q.category)}${esc(q.question)}</div>
+        <div class="a">✅ <b>${esc(q.correct)}</b>${(q.wrong || []).length ? ' · ❌ ' + (q.wrong || []).map(esc).join(' · ') : ' · <i>svaras högt</i>'}</div></div>
+      <div class="btns"><button type="button" class="btn-outline" data-a="edit">Ändra</button>
+        <button type="button" class="btn-outline" data-a="toggle">${q.active ? 'Pausa' : 'Aktivera'}</button>
+        <button type="button" class="btn-outline danger" data-a="del">Ta bort</button></div></div>`).join('')
+    : '<p class="text-muted">Inga frågor än. Skriv den första ovan!</p>';
+}
+$('bankList').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-a]'); if (!b) return;
+  const q = bank.find(x => x.id === b.closest('.qitem').dataset.id); if (!q) return;
+  if (b.dataset.a === 'edit') { fill(q); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  if (b.dataset.a === 'toggle') { const { error } = await supabaseClient.from('quiz_questions').update({ active: !q.active }).eq('id', q.id); if (error) return toast(error.message); q.active = !q.active; renderBank(); return; }
+  if (b.dataset.a === 'del') { if (!confirm('Ta bort frågan?')) return; const { error } = await supabaseClient.from('quiz_questions').delete().eq('id', q.id); if (error) return toast(error.message); bank = bank.filter(x => x !== q); renderBank(); toast('Borttagen'); }
+});
+function fill(q) {
+  editing = q || null;
+  $('formTitle').textContent = q ? 'Ändra fråga' : 'Ny fråga';
+  $('fCat').value = q ? q.category : ($('fCat').value || 'kor');
+  $('fQ').value = q ? q.question : ''; $('fA').value = q ? q.correct : '';
+  ['fW1', 'fW2', 'fW3'].forEach((id, i) => $(id).value = q ? ((q.wrong || [])[i] || '') : '');
+  $('fD').value = q ? q.difficulty : 'medel'; $('err').textContent = ''; $('saved').textContent = '';
+}
+$('newBtn').addEventListener('click', () => { fill(null); $('fQ').focus(); });
+$('saveBtn').addEventListener('click', async () => {
+  const row = { category: $('fCat').value, question: $('fQ').value.trim(), correct: $('fA').value.trim(),
+    wrong: ['fW1', 'fW2', 'fW3'].map(id => $(id).value.trim()).filter(Boolean), difficulty: $('fD').value };
+  if (!row.question || !row.correct) { $('err').textContent = 'Skriv en fråga och rätt svar.'; return; }
+  if (row.wrong.some(w => w.toLowerCase() === row.correct.toLowerCase())) { $('err').textContent = 'Ett fel svar är samma som det rätta.'; return; }
+  const res = editing ? await supabaseClient.from('quiz_questions').update(row).eq('id', editing.id) : await supabaseClient.from('quiz_questions').insert(row);
+  if (res.error) { $('err').textContent = res.error.message; return; }
+  const keepCat = row.category; fill(null); $('fCat').value = keepCat;
+  $('saved').textContent = '✅ Sparad'; toast('Sparad');
+  await loadBank(); $('fQ').focus();
+});
+$('bankFilter').addEventListener('change', renderBank);
+$('bankSearch').addEventListener('input', renderBank);
+
+// ---------- översatta frågor ----------
+const PAGE = 60;
+async function loadTr(more) {
+  if (!more) { trPage = 0; trRows = []; }
+  let q = supabaseClient.from('quiz_translations').select('id, source, question_en, question_sv, correct_sv, wrong_sv, category, blocked, created_at').order('created_at', { ascending: false }).range(trPage * PAGE, trPage * PAGE + PAGE - 1);
+  const f = $('trFilter').value; if (f === 'blocked') q = q.eq('blocked', true); else if (f === 'ok') q = q.eq('blocked', false);
+  const s = $('trSearch').value.trim(); if (s) q = q.ilike('question_sv', '%' + s.replace(/[%_]/g, '') + '%');
+  const { data, error } = await q;
+  if (error) { $('trList').innerHTML = `<p class="error">${esc(error.message)}</p>`; return; }
+  trRows = trRows.concat(data || []); trPage++;
+  $('trMore').hidden = (data || []).length < PAGE;
+  $('trCount').textContent = `${trRows.length}${$('trMore').hidden ? '' : '+'} st`;
+  $('trList').innerHTML = trRows.length ? trRows.map(r => `<div class="qitem ${r.blocked ? 'off' : ''}" data-id="${r.id}">
+      <div><div class="q">${catTag(SRC_CAT[r.category] || r.category)}${r.blocked ? '🚫 ' : ''}${esc(r.question_sv)}</div>
+        <div class="a">✅ <b>${esc(r.correct_sv)}</b> · ❌ ${(r.wrong_sv || []).map(esc).join(' · ')}</div>
+        <div class="en">🇬🇧 ${esc(r.question_en)}</div></div>
+      <div class="btns"><button type="button" class="btn-outline ${r.blocked ? '' : 'danger'}" data-a="block">${r.blocked ? 'Släpp spärren' : '🚫 Spärra'}</button></div></div>`).join('')
+    : '<p class="text-muted">Inga översatta frågor än – de sparas här när ni spelar.</p>';
+}
+$('trList').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-a="block"]'); if (!b) return;
+  const r = trRows.find(x => x.id === b.closest('.qitem').dataset.id); if (!r) return;
+  const { error } = await supabaseClient.from('quiz_translations').update({ blocked: !r.blocked }).eq('id', r.id);
+  if (error) return toast(error.message);
+  r.blocked = !r.blocked; toast(r.blocked ? 'Spärrad' : 'Spärren borttagen');
+  const item = b.closest('.qitem'); item.classList.toggle('off', r.blocked);
+  b.textContent = r.blocked ? 'Släpp spärren' : '🚫 Spärra'; b.classList.toggle('danger', !r.blocked);
+});
+$('trFilter').addEventListener('change', () => loadTr());
+let st = null; $('trSearch').addEventListener('input', () => { clearTimeout(st); st = setTimeout(() => loadTr(), 350); });
+$('trMore').addEventListener('click', () => loadTr(true));
+
+document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-tab]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  $('tab-bank').hidden = b.dataset.tab !== 'bank'; $('tab-tr').hidden = b.dataset.tab !== 'tr';
+  if (b.dataset.tab === 'tr' && !trRows.length) loadTr();
+}));
+
+(async () => {
+  const me = await requireAuth('stamledare');
+  if (!me) return;
+  if (new URLSearchParams(location.search).get('from') === 'party') { $('backLink').href = '/medlem/party-spel.html'; $('backLink').innerHTML = '&larr; Mobilspel'; }
+  else if (me.role !== 'admin') { $('backLink').href = '/medlem/'; $('backLink').innerHTML = '&larr; Tillbaka'; }
+  fill(null); $('fCat').value = 'kor';
+  await loadBank();
+})();
+</script>
+</body>
+</html>

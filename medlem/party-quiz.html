@@ -109,7 +109,7 @@
       <div class="q-box">
         <h3>Omgångar</h3>
         <div class="round-pick">
-          <label><input type="checkbox" name="round" value="online" checked><span><b>🎸 Rockfrågor</b><small>Nya slumpade frågor varje gång – egna genererade frågor på svenska blandat med engelska frågor från the-trivia-api.com och opentdb.com.</small></span></label>
+          <label><input type="checkbox" name="round" value="online" checked><span><b>🎸 Rockfrågor</b><small>Nya slumpade frågor varje gång – egna genererade frågor blandat med frågor från the-trivia-api.com och opentdb.com, översatta till svenska.</small></span></label>
           <label id="rGuess"><input type="checkbox" name="round" value="guess" checked><span><b>🎧 Gissa låten</b><small>Ett klipp ur en slumpad rocklåt spelas – vilken låt är det? Hämtas från iTunes.</small></span></label>
           <label id="rLine"><input type="checkbox" name="round" value="line" checked><span><b>📝 Fortsätt raden</b><small>En rad ur en känd rocklåt – hur fortsätter den? Texter från lrclib.net (engelska).</small></span></label>
         </div>
@@ -174,7 +174,7 @@
       <button type="button" id="revealBtn">👀 Visa svaret</button>
       <button type="button" id="nextBtn" hidden>Nästa →</button>
     </div>
-    <p class="credit" id="credit" hidden>Källor: frågor från <a href="https://the-trivia-api.com" target="_blank" rel="noopener">The Trivia API</a> (CC BY-NC 4.0) och <a href="https://opentdb.com" target="_blank" rel="noopener">Open Trivia DB</a> (CC BY-SA 4.0), musikdata från iTunes och MusicBrainz, låtklipp från iTunes/Apple Music och Deezer, sångtexter från <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a>.</p>
+    <p class="credit" id="credit" hidden>Källor: frågor från <a href="https://the-trivia-api.com" target="_blank" rel="noopener">The Trivia API</a> (CC BY-NC 4.0) och <a href="https://opentdb.com" target="_blank" rel="noopener">Open Trivia DB</a> (CC BY-SA 4.0), musikdata från iTunes och MusicBrainz, låtklipp från iTunes/Apple Music och Deezer, sångtexter från <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a>. Översatt med DeepL.</p>
   </section>
 
   <!-- resultat -->
@@ -194,6 +194,7 @@
 <script src="/js/party.js"></script>
 <script src="/js/party-quiz-questions.js"></script>
 <script src="/js/party-music.js"></script>
+<script src="/js/quiz-sources.js"></script>
 <script src="/js/vendor/qrcode.js"></script>
 <script>
 const TEAM_COLORS = ['#E5A968', '#ff3d5a', '#60a5fa', '#4ade80'];
@@ -411,7 +412,7 @@ async function fetchOnline(n) {
       const correct = decodeHtml(it.correctAnswer), wrong = (it.incorrectAnswers || []).map(decodeHtml);
       if (!text || !correct || wrong.length < 1) return;
       got.add(it.id);
-      out.push({ kind: 'online', id: it.id, label: '🎸 Rockfrågor', text, correct, options: shuffle([correct, ...wrong.slice(0, 3)]) });
+      out.push({ kind: 'online', id: it.id, en: true, label: '🎸 Rockfrågor', text, correct, options: shuffle([correct, ...wrong.slice(0, 3)]) });
     });
   }
   return out;
@@ -437,7 +438,27 @@ async function buildQuiz() {
   if (!qs.length) return null;
   // blanda men undvik två "Gissa låten" med samma låt i rad
   qs = shuffle(qs).slice(0, qCount);
-  return qs;
+  return translateRock(qs);
+}
+// Engelska rockfrågor (The Trivia API, Open Trivia DB) översätts till svenska via translate-quiz (DeepL).
+// Varje fråga översätts bara en gång (sparas i quiz_translations). Går det inte visas engelska.
+async function translateRock(qs) {
+  if (!window.QuizSources) return qs;
+  const en = qs.filter(q => q.kind === 'online' && (q.en || String(q.id).startsWith('otdb:')));
+  if (!en.length) return qs;
+  const list = en.map(q => ({ q: q.text, correct: q.correct, wrong: q.options.filter(o => o !== q.correct), cat: 'rock', src: 'rock', lang: 'en', ref: q }));
+  try {
+    const tr = await QuizSources.translate(list, { keepBlocked: true });
+    tr.forEach(t => {
+      const q = t.ref;
+      if (t.blocked) { q.blocked = true; return; }
+      if (t.lang !== 'sv') return;
+      const wrongEn = q.options.filter(o => o !== q.correct);
+      const map = new Map([[q.correct, t.correct], ...wrongEn.map((o, i) => [o, t.wrong[i] || o])]);
+      q.text = t.q; q.options = q.options.map(o => map.get(o) || o); q.correct = t.correct;
+    });
+  } catch (e) {}
+  return qs.filter(q => !q.blocked);
 }
 
 // ---------- spelet ----------

@@ -9,26 +9,32 @@
   const die = (v, cls) => `<span class="die ${cls || ''}">${[...Array(9)].map((_, i) => `<i class="${v && PIPS[v].includes(i) ? 'p' : ''}"></i>`).join('')}</span>`;
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  // ---------- brädet: 36 rutor i ringen, 6 ekrar à 4 rutor, mitten ----------
-  // ring 0–35 (högkvarter på 0, 6, 12 …, "slå igen" mitt emellan), ekrar 36–59, mitten 60
-  const RING = 36, HUB = 60;
-  const spoke = (k, j) => 36 + k * 4 + j;
-  const RING_OFF = { 1: 1, 2: 3, 4: 4, 5: 2 }, SPOKE_OFF = [2, 4, 1, 5];
+  // ---------- brädet: K kategorier → ring med K×6 rutor, K ekrar à 4 rutor, mitten ----------
+  // ring 0…RING-1 (högkvarter på 0, 6, 12 …, "slå igen" mitt emellan), ekrar RING…, mitten HUB.
+  // K = 6 (allmänbildning) eller 4 (musik). Sätts med setK() innan brädet används.
+  let K = 6, RING = 36, HUB = 60, RING_OFF, SPOKE_OFF;
+  function setK(k) {
+    K = k; RING = K * 6; HUB = RING + K * 4;
+    RING_OFF = K >= 6 ? { 1: 1, 2: 3, 4: 4, 5: 2 } : { 1: 1, 2: 2, 4: 3, 5: 2 };
+    SPOKE_OFF = K >= 6 ? [2, 4, 1, 5] : [2, 3, 1, 2];
+  }
+  setK(6);
+  const spoke = (k, j) => RING + k * 4 + j;
   function info(n) {
     if (n === HUB) return { type: 'hub' };
     if (n < RING) {
       const k = Math.floor(n / 6), p = n % 6;
       if (p === 0) return { type: 'hq', cat: k };
       if (p === 3) return { type: 'again' };
-      return { type: 'sq', cat: (k + RING_OFF[p]) % 6 };
+      return { type: 'sq', cat: (k + RING_OFF[p]) % K };
     }
-    const k = Math.floor((n - 36) / 4), j = (n - 36) % 4;
-    return { type: 'sq', cat: (k + SPOKE_OFF[j]) % 6 };
+    const k = Math.floor((n - RING) / 4), j = (n - RING) % 4;
+    return { type: 'sq', cat: (k + SPOKE_OFF[j]) % K };
   }
   function nb(n) {
-    if (n === HUB) return [0, 1, 2, 3, 4, 5].map(k => spoke(k, 3));
+    if (n === HUB) return [...Array(K).keys()].map(k => spoke(k, 3));
     if (n < RING) { const a = [(n + 1) % RING, (n + RING - 1) % RING]; if (n % 6 === 0) a.push(spoke(n / 6, 0)); return a; }
-    const k = Math.floor((n - 36) / 4), j = (n - 36) % 4;
+    const k = Math.floor((n - RING) / 4), j = (n - RING) % 4;
     return [j === 0 ? k * 6 : spoke(k, j - 1), j === 3 ? HUB : spoke(k, j + 1)];
   }
   // alla rutor man kan landa på med exakt "steps" steg (utan att gå tillbaka samma väg)
@@ -42,11 +48,12 @@
   }
   const C = 500, RAD = Math.PI / 180;
   const polar = (r, a) => [C + r * Math.cos(a * RAD), C + r * Math.sin(a * RAD)];
-  const ringAng = i => -90 + i * 10, spokeAng = k => -90 + k * 60, SPOKE_R = [345, 272, 199, 126];
+  const ringAng = i => -90 + i * 360 / RING, spokeAng = k => -90 + k * 360 / K, SPOKE_R = [345, 272, 199, 126];
+  const half = () => 180 / RING;   // halva rutans bredd i grader
   function pos(n) {
     if (n === HUB) return [C, C];
     if (n < RING) return polar(n % 6 === 0 ? 428 : 430, ringAng(n));
-    const k = Math.floor((n - 36) / 4), j = (n - 36) % 4;
+    const k = Math.floor((n - RING) / 4), j = (n - RING) % 4;
     return polar(SPOKE_R[j], spokeAng(k));
   }
   function sector(r0, r1, a0, a1) {
@@ -58,17 +65,17 @@
     let sq = '';
     for (let n = 0; n < RING; n++) {
       const t = info(n), a = ringAng(n), [x, y] = pos(n);
-      if (t.type === 'hq') sq += `<g class="tb-n hq" data-n="${n}"><path d="${sector(372, 488, a - 4.9, a + 4.9)}" fill="${col(t.cat)}"/>
-        <path d="${sector(380, 480, a - 4.2, a + 4.2)}" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="4"/><text x="${x}" y="${y}" font-size="34">${emo(t.cat)}</text></g>`;
-      else sq += `<g class="tb-n" data-n="${n}"><path d="${sector(395, 465, a - 4.6, a + 4.6)}" fill="${t.type === 'again' ? '#3a3d46' : col(t.cat)}"/>
+      if (t.type === 'hq') sq += `<g class="tb-n hq" data-n="${n}"><path d="${sector(372, 488, a - half() + 0.1, a + half() - 0.1)}" fill="${col(t.cat)}"/>
+        <path d="${sector(380, 480, a - half() + 0.8, a + half() - 0.8)}" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="4"/><text x="${x}" y="${y}" font-size="34">${emo(t.cat)}</text></g>`;
+      else sq += `<g class="tb-n" data-n="${n}"><path d="${sector(395, 465, a - half() + 0.4, a + half() - 0.4)}" fill="${t.type === 'again' ? '#3a3d46' : col(t.cat)}"/>
         <text x="${x}" y="${y}" font-size="24">${t.type === 'again' ? '🎲' : emo(t.cat)}</text></g>`;
     }
-    for (let k = 0; k < 6; k++) for (let j = 0; j < 4; j++) {
+    for (let k = 0; k < K; k++) for (let j = 0; j < 4; j++) {
       const n = spoke(k, j), t = info(n), [x, y] = pos(n), a = spokeAng(k) + 90;
       sq += `<g class="tb-n" data-n="${n}"><rect x="${x - 31}" y="${y - 31}" width="62" height="62" rx="12" fill="${col(t.cat)}" transform="rotate(${a} ${x} ${y})"/><text x="${x}" y="${y}" font-size="24">${emo(t.cat)}</text></g>`;
     }
     let hub = '';
-    for (let k = 0; k < 6; k++) { const a = spokeAng(k); hub += `<path d="${sector(0.01, 84, a - 30, a + 30)}" fill="${col(k)}"/>`; }
+    for (let k = 0; k < K; k++) { const a = spokeAng(k), h = 180 / K; hub += `<path d="${sector(0.01, 84, a - h, a + h)}" fill="${col(k)}"/>`; }
     return `<svg viewBox="0 0 1000 1000" class="tb-svg" role="img" aria-label="Spelbräde">
       <circle cx="500" cy="500" r="496" fill="#16171d" stroke="rgba(229,169,104,0.35)" stroke-width="4"/>
       <circle cx="500" cy="500" r="360" fill="#0f1015"/>
@@ -78,13 +85,15 @@
   }
   function pieSVG(w, cats, color, size, label) {
     let s = '';
-    for (let k = 0; k < 6; k++) { const a = -90 + k * 60; const p0 = [Math.cos((a - 30) * RAD) * 20, Math.sin((a - 30) * RAD) * 20], p1 = [Math.cos((a + 30) * RAD) * 20, Math.sin((a + 30) * RAD) * 20];
+    const N = cats.length, h = 180 / N;
+    for (let k = 0; k < N; k++) { const a = -90 + k * 360 / N; const p0 = [Math.cos((a - h) * RAD) * 20, Math.sin((a - h) * RAD) * 20], p1 = [Math.cos((a + h) * RAD) * 20, Math.sin((a + h) * RAD) * 20];
       s += `<path d="M0,0 L${p0[0].toFixed(2)},${p0[1].toFixed(2)} A20,20 0 0 1 ${p1[0].toFixed(2)},${p1[1].toFixed(2)} Z" fill="${(w || []).includes(k) ? cats[k].color : '#2a2c33'}" stroke="#0b0c10" stroke-width="1.2"/>`; }
     return `<g>${s}<circle r="21" fill="none" stroke="${color}" stroke-width="5"/>${label ? `<text y="1" font-size="15" class="tb-ini">${esc(label)}</text>` : ''}</g>`;
   }
   const pieIcon = (w, cats, color, px) => `<svg viewBox="-26 -26 52 52" width="${px}" height="${px}" class="tb-pie">${pieSVG(w, cats, color, 1)}</svg>`;
   // ritar/uppdaterar brädet i en behållare. st: { cats, pieces:[{pid,node,w,c,i}], dests:[n], cur }
   function drawBoard(box, st, onPick) {
+    setK(st.cats.length);
     if (box.dataset.tbBuilt !== st.cats.map(c => c.id).join()) {
       box.innerHTML = boardSVG(st.cats); box.dataset.tbBuilt = st.cats.map(c => c.id).join();
       if (onPick) box.querySelector('svg').addEventListener('click', e => {
@@ -114,7 +123,7 @@
     });
     have.forEach(g => g.remove());
   }
-  function catOf(st, n) { const t = info(n); return t.type === 'hub' ? { label: '⭐ Mitten', color: '#E5A968' } : t.type === 'again' ? { label: '🎲 Slå igen', color: '#6b7280' } : { label: `${st.cats[t.cat].emo} ${st.cats[t.cat].name}${t.type === 'hq' ? ' – högkvarter 🥧' : ''}`, color: st.cats[t.cat].color }; }
+  function catOf(st, n) { setK(st.cats.length); const t = info(n); return t.type === 'hub' ? { label: '⭐ Mitten', color: '#E5A968' } : t.type === 'again' ? { label: '🎲 Slå igen', color: '#6b7280' } : { label: `${st.cats[t.cat].emo} ${st.cats[t.cat].name}${t.type === 'hq' ? ' – högkvarter 🥧' : ''}`, color: st.cats[t.cat].color }; }
 
   // ---------- storbilden ----------
   const host = (() => {
@@ -122,7 +131,8 @@
     let dests = new Map(), q = null, qi = 0, qKind = 'normal', qOpts = null, qCorrect = -1, qOral = false, answered = null, result = null, picker = null;
     let tips = new Map(), tm = null, nextT = null, stopped = false, startedAt = 0, winner = null, timeUp = false, rollAnim = null, walkT = null, lastNote = '';
     const el = id => document.getElementById(id);
-    const catIds = opts => ['geo', 'film', 'hist', 'konst', 'vet', opts.six || 'sport'];
+    const catIds = opts => opts.theme === 'musik' ? QuizSources.THEMES.musik.slice() : QuizSources.THEMES.allm.concat(opts.six || 'sport');
+    const needN = () => o.need ? Math.min(o.need, cats.length) : cats.length;   // 0 = alla bitar
     function makePool(opts) {
       const key = [catIds(opts).join(), opts.lang].join('|');
       if (pool && poolKey === key) return pool;
@@ -153,6 +163,7 @@
     async function start(opts, h) {
       H = h; o = opts; stopped = false; winner = null; timeUp = false;
       cats = catIds(o).map(id => QuizSources.CATS[id]);
+      setK(cats.length);
       pieces = new Map(); order = []; cur = null; sid = 0; result = null; q = null;
       H.order.forEach(pid => { const p = H.players.get(pid); if (p && p.on) addPiece(pid); });
       H.el.innerHTML = `<div class="tb">
@@ -225,7 +236,7 @@
       const t = info(node), me = pieces.get(cur);
       if (t.type === 'again') { H.toast(`🎲 ${H.pname(cur)} slår igen!`, 2200); go('roll'); return; }
       if (t.type === 'hub') {
-        if (me.w.size >= (o.need || 6)) {
+        if (me.w.size >= needN()) {
           const ord = onlineOrder(), i = ord.indexOf(cur);
           picker = ord.length > 1 ? ord[(i + 1) % ord.length] : cur;      // nästa spelare väljer kategori
           qKind = 'final'; go('pickcat'); return;
@@ -265,7 +276,7 @@
         if (qKind === 'final') { winner = cur; if (p) p.score += 500; }
       }
       if (!qOral) tips.forEach((i, pid) => { if (pid !== cur && i === qCorrect) { const x = pl(pid); if (x) x.score += 5; } });
-      result = { ok, wedge, correct: q.correct, all: me.w.size >= (o.need || 6) };
+      result = { ok, wedge, correct: q.correct, all: me.w.size >= needN() };
       H.msg({ k: 'res', pid: cur, ok, wedge });
       if (ok) H.confetti(wedge || winner ? 160 : 60, false);
       go('result');
@@ -277,7 +288,7 @@
       if (stopped) return;
       if (m.t === 'roll' && m.pid === cur) doRoll();
       else if (m.t === 'move' && m.pid === cur) doMove(+m.node);
-      else if (m.t === 'cat' && phase === 'pickcat' && m.pid === picker) ask(Math.max(0, Math.min(5, +m.i || 0)), qKind);
+      else if (m.t === 'cat' && phase === 'pickcat' && m.pid === picker) ask(Math.max(0, Math.min(cats.length - 1, +m.i || 0)), qKind);
       else if (m.t === 'ans' && phase === 'question' && !qOral) {
         const i = +m.i; if (!(i >= 0 && i < qOpts.length)) return;
         if (m.pid === cur) answer(i); else if (!tips.has(m.pid)) { tips.set(m.pid, i); render(); H.sendState(); }
@@ -299,7 +310,7 @@
       else if (a === 'bad' && phase === 'question' && q) {
         const bad = q; QuizSources.block(bad).then(okb => H.toast(okb ? '🚫 Frågan är spärrad och visas inte igen' : '🚫 Frågan byttes ut', 2500));
         ask(qi, qKind, bad.id);
-      } else if (a === 'randcat' && phase === 'pickcat') ask(Math.floor(Math.random() * 6), qKind);
+      } else if (a === 'randcat' && phase === 'pickcat') ask(Math.floor(Math.random() * cats.length), qKind);
     }
     function drawHostBoard() {
       const b = el('tbBoard'); if (!b) return;
@@ -314,7 +325,7 @@
       if (!el('tbCard')) return;
       drawHostBoard();
       const name = pid => H.esc(H.pname(pid)), me = pieces.get(cur), color = me ? me.c : '#fff';
-      const need = o.need || 6;
+      const need = needN();
       el('tbPlayers').innerHTML = [...pieces.entries()].sort((a, b) => (pl(b[0]) || {}).score - (pl(a[0]) || {}).score).map(([pid, p]) => {
         const x = pl(pid) || {};
         return `<div class="${pid === cur ? 'act' : ''} ${x.on ? '' : 'off'}">${pieIcon([...p.w], cats, p.c, 34)}<span>${name(pid)}</span><small>${p.w.size}/${need} 🥧</small><b>${x.score || 0}</b></div>`;
@@ -353,7 +364,7 @@
     const btn = (a, t) => `<button type="button" class="btn-outline" data-a="${a}">${t}</button>`;
     function timeLeftText() { if (!o.limit || !startedAt) return ''; const m = Math.max(0, Math.ceil((o.limit * 60000 - (Date.now() - startedAt)) / 60000)); return `⏱ ${m} min kvar · `; }
     function state() {
-      const s = { phase, sid, cur, picker, roll, kind: qKind, need: o.need || 6, mode: o.mode,
+      const s = { phase, sid, cur, picker, roll, kind: qKind, need: needN(), mode: o.mode,
         cats: cats.map(c => ({ id: c.id, name: c.name, emo: c.emo, color: c.color })), pieces: pieceList() };
       if (phase === 'move') s.dests = [...dests.keys()];
       if ((phase === 'question' || phase === 'result') && q) {
@@ -461,13 +472,14 @@
     id: 'tartbitar', emo: '🥧', name: '🥧 Tårtbitarna', title: 'Tårt<span class="hot">bitarna</span>', minPlayers: 2, bgMusic: true,
     desc: 'Frågesport med spelbräde! Slå tärningen och flytta din pjäs från mobilen, svara rätt på högkvarteren och samla tårtbitar. Spela i lag: ett lag = en mobil.',
     opts: [
-      { key: 'need', label: 'Tårtbitar för att vinna', values: [[3, '3 – snabbt'], [6, '6 – klassiskt']], def: 3, help: 'Med alla bitar tar man sig in till mitten och får en slutfråga – kategorin väljer motståndaren.' },
+      { key: 'theme', label: 'Tema', values: [['allm', '🧠 Allmänbildning'], ['musik', '🤘 Musik']], def: 'allm', help: 'Musik: fyra kategorier – Klassisk rock, Hårdrock, Metal och Punk.' },
+      { key: 'need', label: 'Tårtbitar för att vinna', values: [[3, '3 – snabbt'], [0, 'Alla – klassiskt']], def: 3, help: 'Med alla bitar tar man sig in till mitten och får en slutfråga – kategorin väljer motståndaren.' },
       { key: 'mode', label: 'Svar', values: [['mc', 'Flervalsfrågor'], ['oral', 'Svara högt']], def: 'mc', help: 'Flerval: svara på mobilen, de andra kan tippa för +5. Svara högt: de andra ser svaret på mobilen och dömer.' },
-      { key: 'six', label: 'Sjätte kategorin', values: [['sport', '⚽ Sport'], ['rock', '🤘 Rock'], ['kor', '🎤 Heavy Voices']], def: 'sport', help: 'Heavy Voices = frågor från körens egen frågebank och "fortsätt raden" ur repertoaren.' },
+      { key: 'six', label: 'Sjätte kategorin (allmänbildning)', values: [['sport', '⚽ Sport'], ['rock', '🤘 Rock'], ['kor', '🎤 Heavy Voices']], def: 'sport', help: 'Heavy Voices = frågor från körens egen frågebank och "fortsätt raden" ur repertoaren.' },
       { key: 'lang', label: 'Språk', values: [['sv', 'Svenska'], ['en', 'Engelska (original)']], def: 'sv' },
       { key: 'limit', label: 'Tidsgräns', values: [[0, 'Ingen'], [30, '30 min'], [45, '45 min']], def: 0, help: 'När tiden är ute vinner den med flest poäng (100 per tårtbit, 10 per rätt svar).' },
     ],
     host, player,
-    _test: { info, nb, reach, HUB },
+    _test: { info, nb, reach, setK, get HUB() { return HUB; } },
   };
 })();

@@ -62,3 +62,8 @@ create policy quiz_questions_editor_write on public.quiz_questions
   with check (public.is_song_editor());
 
 create index if not exists quiz_questions_category_idx on public.quiz_questions (category) where active;
+
+-- 3. Musiktemat i Tårtbitarna: genrer som kategorier i egen frågebank
+alter table public.quiz_questions drop constraint if exists quiz_questions_category_check;
+alter table public.quiz_questions add constraint quiz_questions_category_check
+  check (category in ('geo', 'film', 'hist', 'konst', 'vet', 'sport', 'rock', 'kor', 'klassisk', 'hardrock', 'metal', 'punk'));

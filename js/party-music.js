@@ -29,9 +29,12 @@
   const yearOf = d => { const y = parseInt(String(d || '').slice(0, 4), 10); return y >= 1940 && y <= THIS_YEAR ? y : null; };
 
   // Låtar för en artist. year = tidigaste årtalet bland alla iTunes-versioner av samma titel.
+  // Sparas även i webbläsaren i 7 dagar, så att nästa spel inte behöver fråga iTunes igen (de begränsar antalet anrop)
   const cache = new Map();
+  const LS = a => 'hv-it-' + norm(a);
   async function artistSongs(artist) {
     if (cache.has(artist)) return cache.get(artist);
+    try { const c = JSON.parse(localStorage.getItem(LS(artist)) || 'null'); if (c && Date.now() - c.at < 7 * 864e5 && c.songs && c.songs.length) { cache.set(artist, c.songs); return c.songs; } } catch (e) {}
     const url = 'https://itunes.apple.com/search?' + new URLSearchParams({ term: artist, entity: 'song', attribute: 'artistTerm', limit: '100', country: 'se' });
     const data = await jsonp(url);
     const want = norm(artist), byKey = new Map(), minYear = new Map(), album = new Map();
@@ -49,6 +52,7 @@
     });
     const out = [...byKey.entries()].map(([k, s]) => ({ ...s, year: minYear.get(k) || null, album: album.has(k) && album.get(k).y === minYear.get(k) ? album.get(k).name : null })).filter(s => s.year);
     cache.set(artist, out);
+    if (out.length) try { localStorage.setItem(LS(artist), JSON.stringify({ at: Date.now(), songs: out.slice(0, 40) })); } catch (e) {}
     return out;
   }
 
@@ -178,9 +182,10 @@
   // Typer: vilket band, vilket årtionde/år, vilket album, vilken låt är INTE av …
   const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
   const decadeLabel = d => d >= 2000 ? `${d}-talet` : `${String(d).slice(2)}-talet`;
-  async function makeRockQuestions(n, seenIds) {
+  // opts.artists = egen artistlista (t.ex. en genre i Tårtbitarna), opts.maxArtists = hur många artister som hämtas
+  async function makeRockQuestions(n, seenIds, opts = {}) {
     const seen = new Set(seenIds || []);
-    const artists = shuffle(root.ROCK_ARTISTS || []).slice(0, Math.min(22, n + 8));
+    const artists = shuffle(opts.artists || root.ROCK_ARTISTS || []).slice(0, opts.maxArtists || Math.min(22, n + 8));
     const res = await Promise.allSettled(artists.map(artistSongs));
     const pool = res.map((r, i) => ({ artist: artists[i], songs: r.status === 'fulfilled' ? r.value.slice(0, 30) : [] })).filter(x => x.songs.length >= 4);
     if (pool.length < 4) throw new Error('för få artister');

@@ -91,6 +91,16 @@
   .att-member .by-admin { font-size: 0.7rem; color: var(--text-muted); }
   .att-group { grid-column: 1 / -1; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 0.4rem; }
   .event-notes { white-space: pre-wrap; }
+  .att-export { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+  .att-export button { padding: 0.3rem 0.7rem; font-size: 0.85rem; }
+  .att-member .absent { font-size: 0.7rem; color: #f87171; }
+  .ax-card > summary { cursor: pointer; font-weight: 700; }
+  .ax-types { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0.2rem 0 0.8rem; font-size: 0.9rem; }
+  .ax-types label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+  .ax-types input { width: auto; margin: 0; accent-color: var(--accent); }
+  .ax-presets { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem; }
+  .ax-presets button { padding: 0.3rem 0.7rem; font-size: 0.85rem; }
+  .ax-info { font-size: 0.85rem; color: var(--text-muted); margin: 0 0 0.8rem; }
   .edit-btn { padding: 0.3rem 0.7rem; font-size: 0.85rem; background: transparent; border: 1px solid var(--accent); color: var(--accent); }
   .event-item.editing { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   #eventFormCard.editing { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
@@ -190,6 +200,36 @@
     <div class="m-day" id="mDay"></div>
   </details>
 
+  <details class="card ax-card" id="attExportCard" hidden>
+    <summary>📊 Exportera närvaro</summary>
+    <p class="ax-info" style="margin-top:0.8rem;">Alla datum i perioden samlade i en fil som öppnas i Excel. En rad per medlem och en kolumn per datum, med summa och procent. Närvaro för ett enskilt datum exporterar du under <em>Närvaro</em> på händelsen.</p>
+    <div class="ax-presets">
+      <button type="button" class="btn-outline" data-ax-preset="term">Denna termin</button>
+      <button type="button" class="btn-outline" data-ax-preset="prevterm">Förra terminen</button>
+      <button type="button" class="btn-outline" data-ax-preset="year">I år</button>
+      <button type="button" class="btn-outline" data-ax-preset="all">Alla datum</button>
+    </div>
+    <div class="form-row">
+      <label><span class="field-label">Från</span><input type="date" id="axFrom"></label>
+      <label><span class="field-label">Till</span><input type="date" id="axTo"></label>
+    </div>
+    <p class="field-label" style="margin:0 0 0.2rem;">Ta med</p>
+    <div class="ax-types">
+      <label><input type="checkbox" data-ax-type="rep" checked> Repetitioner</label>
+      <label><input type="checkbox" data-ax-type="konsert" checked> Konserter</label>
+      <label><input type="checkbox" data-ax-type="ovrigt" checked> Övrigt</label>
+      <label><input type="checkbox" data-ax-type="mote"> Möten</label>
+    </div>
+    <label><span class="field-label">Format</span>
+      <select id="axLayout">
+        <option value="matrix">Tabell: en kolumn per datum</option>
+        <option value="list">Lista: en rad per medlem och datum (för filter och pivottabell)</option>
+      </select>
+    </label>
+    <p class="ax-info" id="axCount"></p>
+    <button type="button" id="axDownload">⬇ Ladda ner (Excel .csv)</button>
+  </details>
+
   <div class="tabs" role="tablist">
     <button type="button" class="tab-btn active" data-tab="rep">Reptider<span class="count"></span></button>
     <button type="button" class="tab-btn" data-tab="konsert">Konserter<span class="count"></span></button>
@@ -258,6 +298,7 @@ function formatDate(dateStr) {
 let adminId = null;
 let approvedMembers = [];          // [{ id, name, stamma }]
 let attendanceByEvent = new Map(); // eventId -> Map(memberId -> { checked_by })
+let absencesByEvent = new Map();   // eventId -> Set(memberId) som anmält att de inte kan
 const openPanels = new Set();      // event-id:n vars närvarolista är utfälld
 const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' });
 const STAMMA_ORDER = ['sopran', 'alt', 'tenor', 'bas'];
@@ -270,10 +311,17 @@ function stammaRank(st) {
 }
 
 async function loadAttendanceData() {
-  const [{ data: mem }, { data: att }] = await Promise.all([
+  const [{ data: mem }, { data: att }, { data: abs }] = await Promise.all([
     supabaseClient.from('members').select('id, name, stamma').eq('status', 'approved'),
     supabaseClient.from('attendance').select('event_id, member_id, checked_by'),
+    supabaseClient.from('event_absences').select('event_id, member_id'),
   ]);
+  absencesByEvent = new Map();
+  (abs || []).forEach(a => {
+    const k = String(a.event_id);
+    if (!absencesByEvent.has(k)) absencesByEvent.set(k, new Set());
+    absencesByEvent.get(k).add(a.member_id);
+  });
   approvedMembers = (mem || []).sort((a, b) =>
     (stammaRank(a.stamma) - stammaRank(b.stamma)) || svCollator.compare(a.stamma || '', b.stamma || '') || svCollator.compare(a.name || '', b.name || ''));
   attendanceByEvent = new Map();
@@ -302,11 +350,14 @@ function renderAttPanel(evId, panel) {
     const head = group !== lastGroup ? `<div class="att-group">${escapeAtt(group)}</div>` : '';
     lastGroup = group;
     const p = present.get(m.id);
-    return `${head}<label class="att-member"><input type="checkbox" data-member="${m.id}" ${p ? 'checked' : ''}>${escapeAtt(m.name)}${p && p.checked_by ? '<span class="by-admin">(admin)</span>' : ''}</label>`;
+    const absent = !p && (absencesByEvent.get(String(evId)) || new Set()).has(m.id);
+    return `${head}<label class="att-member"><input type="checkbox" data-member="${m.id}" ${p ? 'checked' : ''}>${escapeAtt(m.name)}${p && p.checked_by ? '<span class="by-admin">(admin)</span>' : ''}${absent ? '<span class="absent">(anmält frånvaro)</span>' : ''}</label>`;
   }).join('');
   panel.innerHTML = `
     <div class="att-summary"><strong>${present.size} av ${approvedMembers.length}</strong> närvarande${parts ? ' — ' + parts : ''}</div>
-    <div class="att-grid">${rows || '<span class="text-muted">Inga godkända medlemmar.</span>'}</div>`;
+    <div class="att-grid">${rows || '<span class="text-muted">Inga godkända medlemmar.</span>'}</div>
+    <div class="att-export"><button type="button" class="btn-outline att-exp">⬇ Exportera närvaro (Excel)</button></div>`;
+  panel.querySelector('.att-exp').addEventListener('click', () => exportEventAttendance(evId));
 
   panel.querySelectorAll('input[data-member]').forEach(cb => cb.addEventListener('change', async () => {
     const memberId = cb.dataset.member;
@@ -324,6 +375,117 @@ function renderAttPanel(evId, panel) {
     const btn = document.querySelector(`.att-btn[data-id="${CSS.escape(String(evId))}"]`);
     if (btn) btn.textContent = `Närvaro (${attCount(evId)}) ${btn.classList.contains('open') ? '▴' : '▾'}`;
   }));
+}
+
+// ---------- Export av närvaro ----------
+// CSV med semikolon och BOM öppnas rätt i svensk Excel (å/ä/ö och kolumner).
+function csvCell(v) {
+  const s = String(v ?? '');
+  return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function downloadCsv(rows, baseName) {
+  const content = '\uFEFF' + rows.map(r => r.map(csvCell).join(';')).join('\r\n');
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = baseName.replace(/[\\/:*?"<>|]+/g, '-') + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function attStatus(evId, memberId) {
+  const p = (attendanceByEvent.get(String(evId)) || new Map()).get(memberId);
+  if (p) return { code: 'X', label: 'Närvarande', by: p.checked_by ? 'Admin' : 'Själv' };
+  if ((absencesByEvent.get(String(evId)) || new Set()).has(memberId)) return { code: 'F', label: 'Anmält frånvaro', by: '' };
+  return { code: '', label: 'Ej närvarande', by: '' };
+}
+function evHeader(ev) {
+  return `${ev.event_date}${ev.event_time ? ' ' + ev.event_time.slice(0, 5) : ''} ${typeLabels[ev.event_type] || 'Övrigt'}: ${ev.title || ''}`.trim();
+}
+function pct(n, of) { return of ? Math.round(n * 100 / of) + ' %' : ''; }
+
+function exportEventAttendance(evId) {
+  const ev = allEvents.get(String(evId));
+  if (!ev) return;
+  const rows = [
+    [`Närvaro: ${typeLabels[ev.event_type] || 'Övrigt'} – ${ev.title || ''}`],
+    [`Datum: ${ev.event_date}${timeRange(ev)}${ev.location ? ' · ' + ev.location : ''}`],
+    [],
+    ['Namn', 'Stämma', 'Status', 'Markerad av'],
+  ];
+  let n = 0;
+  approvedMembers.forEach(m => {
+    const st = attStatus(evId, m.id);
+    if (st.code === 'X') n++;
+    rows.push([m.name, m.stamma || '', st.label, st.by]);
+  });
+  rows.push([], ['Närvarande', `${n} av ${approvedMembers.length}`, pct(n, approvedMembers.length)]);
+  downloadCsv(rows, `Narvaro-${ev.event_date}-${ev.title || 'handelse'}`);
+}
+
+function axEvents() {
+  const from = document.getElementById('axFrom').value || '0000-01-01';
+  const to = document.getElementById('axTo').value || todayStr;
+  const types = new Set([...document.querySelectorAll('[data-ax-type]:checked')].map(c => c.dataset.axType));
+  const end = to < todayStr ? to : todayStr;   // framtida datum har ingen närvaro än
+  return [...allEvents.values()]
+    .filter(ev => ev.event_date >= from && ev.event_date <= end && types.has(ev.event_type || 'ovrigt'))
+    .sort((a, b) => a.event_date.localeCompare(b.event_date) || String(a.event_time || '').localeCompare(String(b.event_time || '')));
+}
+function axUpdateCount() {
+  const n = axEvents().length;
+  document.getElementById('axCount').textContent = n ? `${n} datum i perioden.` : 'Inga passerade händelser i perioden.';
+  document.getElementById('axDownload').disabled = !n;
+}
+function axSetPreset(kind) {
+  const y = Number(todayStr.slice(0, 4)), m = Number(todayStr.slice(5, 7));
+  const vt = m <= 6;   // VT jan–jun, HT jul–dec
+  let from = '', to = todayStr;
+  if (kind === 'term') from = vt ? `${y}-01-01` : `${y}-07-01`;
+  if (kind === 'prevterm') { from = vt ? `${y - 1}-07-01` : `${y}-01-01`; to = vt ? `${y - 1}-12-31` : `${y}-06-30`; }
+  if (kind === 'year') from = `${y}-01-01`;
+  if (kind === 'all') { const first = [...allEvents.values()].map(e => e.event_date).sort()[0]; from = first || ''; }
+  document.getElementById('axFrom').value = from;
+  document.getElementById('axTo').value = to;
+  axUpdateCount();
+}
+function exportRangeAttendance() {
+  const evs = axEvents();
+  if (!evs.length) return;
+  const from = document.getElementById('axFrom').value || evs[0].event_date;
+  const to = document.getElementById('axTo').value || todayStr;
+  const layout = document.getElementById('axLayout').value;
+  const rows = [];
+  if (layout === 'list') {
+    rows.push(['Datum', 'Tid', 'Typ', 'Händelse', 'Namn', 'Stämma', 'Status', 'Markerad av']);
+    evs.forEach(ev => approvedMembers.forEach(m => {
+      const st = attStatus(ev.id, m.id);
+      rows.push([ev.event_date, ev.event_time ? ev.event_time.slice(0, 5) : '', typeLabels[ev.event_type] || 'Övrigt', ev.title || '', m.name, m.stamma || '', st.label, st.by]);
+    }));
+  } else {
+    rows.push([`Närvaro ${from} – ${to}`], ['X = närvarande, F = anmält frånvaro'], []);
+    rows.push(['Namn', 'Stämma', ...evs.map(evHeader), 'Närvaro', 'Av', 'Procent', 'Anmäld frånvaro']);
+    approvedMembers.forEach(m => {
+      let n = 0, f = 0;
+      const cells = evs.map(ev => { const c = attStatus(ev.id, m.id).code; if (c === 'X') n++; if (c === 'F') f++; return c; });
+      rows.push([m.name, m.stamma || '', ...cells, n, evs.length, pct(n, evs.length), f]);
+    });
+    const perEv = evs.map(ev => approvedMembers.filter(m => attStatus(ev.id, m.id).code === 'X').length);
+    rows.push(['Antal närvarande', '', ...perEv]);
+    rows.push(['Andel', '', ...perEv.map(n => pct(n, approvedMembers.length))]);
+  }
+  downloadCsv(rows, `Narvaro-${from}--${to}${layout === 'list' ? '-lista' : ''}`);
+}
+function initAttExport() {
+  const card = document.getElementById('attExportCard');
+  if (!isFullAdmin) return;           // närvarodata kan bara läsas av admin (RLS)
+  card.hidden = false;
+  if (initAttExport.bound) { axUpdateCount(); return; }
+  initAttExport.bound = true;
+  card.querySelectorAll('[data-ax-preset]').forEach(b => b.addEventListener('click', () => axSetPreset(b.dataset.axPreset)));
+  ['axFrom', 'axTo'].forEach(id => document.getElementById(id).addEventListener('change', axUpdateCount));
+  card.querySelectorAll('[data-ax-type]').forEach(c => c.addEventListener('change', axUpdateCount));
+  document.getElementById('axDownload').addEventListener('click', exportRangeAttendance);
+  axSetPreset('term');
 }
 
 function escapeAtt(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
@@ -453,6 +615,7 @@ async function loadEvents() {
     d.open ? openPastGroups.add(d.dataset.type) : openPastGroups.delete(d.dataset.type);
   }));
   renderMonth();
+  initAttExport();
 
   document.querySelectorAll('.att-btn').forEach(btn => {
     const id = btn.dataset.id;

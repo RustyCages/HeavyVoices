@@ -31,6 +31,14 @@
   .forum-post > summary::-webkit-details-marker { display:none; }
   .forum-post > summary .forum-title::after { content:' ▾'; color:var(--text-muted); font-size:0.9em; }
   .forum-post[open] > summary .forum-title::after { content:' ▴'; }
+  .forum-aud { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.92rem; }
+  .forum-aud label { display:flex; align-items:center; gap:0.4rem; margin:0; cursor:pointer; }
+  .forum-picker { display:flex; flex-direction:column; gap:0.5rem; }
+  .forum-picker[hidden] { display:none; }
+  .forum-members { max-height:240px; overflow-y:auto; border:1px solid var(--border); border-radius:0.5rem; padding:0.3rem 0.6rem; }
+  .forum-members label { display:flex; align-items:center; gap:0.5rem; padding:0.35rem 0; margin:0; cursor:pointer; }
+  .forum-members label[hidden] { display:none; }
+  .forum-badge { display:inline-block; font-size:0.78rem; font-weight:500; padding:0.1rem 0.5rem; margin-left:0.5rem; border:1px solid var(--border); border-radius:999px; color:var(--text-muted); vertical-align:middle; }
   .forum-del { margin-top:0.6rem; font-size:0.82rem; padding:0.25rem 0.6rem; border-color:#f87171; color:#fca5a5; }
 
   /* Stramt utseende (test): "Nytt inlägg"-knapp i stället för formuläret överst */
@@ -45,7 +53,7 @@
 <div class="container">
   <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
   <div class="forum-title"><h1>Forum</h1><button type="button" class="btn-gold ui-stram-only" id="newPostBtn" aria-expanded="false">Nytt inlägg</button></div>
-  <p class="text-muted" style="margin:0 0 1rem;">Diskutera och dela filer med hela kören. Varje inlägg visar vilken stämma som skrev det.</p>
+  <p class="text-muted" style="margin:0 0 1rem;">Diskutera och dela filer med kören. Den som startar en tråd väljer vem som ser den: alla, körledningen eller valda medlemmar.</p>
 
   <p class="forum-status" id="forumStatus" role="status"></p>
 
@@ -61,7 +69,8 @@ const MAX_FILE_MB = 25;
 const MAX_FILES = 10;
 
 let me = null;
-let posts = [];   // alla inlägg, för hela kören
+let posts = [];   // alla inlägg som den inloggade får se (RLS)
+let medlemmar = [];   // godkända medlemmar {id, name}, för mottagarlistan och namn i märket
 const stangda = new Set();   // trådar som användaren har fällt ihop (behålls vid omladdning)
 
 function escapeHtml(str) {
@@ -88,7 +97,7 @@ function fileSize(bytes) {
 async function loadPosts() {
   const body = document.getElementById('forumBody');
   const { data, error } = await supabaseClient.from('forum_posts')
-    .select('id, stamma, author_id, parent_id, title, body, created_at, author:members!forum_posts_author_id_fkey(name), forum_attachments(id, path, name, size)')
+    .select('id, stamma, author_id, parent_id, title, body, created_at, visibility, recipients, author:members!forum_posts_author_id_fkey(name), forum_attachments(id, path, name, size)')
     .order('created_at', { ascending: true });
   if (error) {
     body.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
@@ -104,6 +113,24 @@ function attachmentsHtml(p) {
   return `<div class="forum-files">${files.map(f =>
     `<button type="button" class="btn-outline" data-att-path="${escapeHtml(f.path)}" data-att-name="${escapeHtml(f.name)}">📎 ${escapeHtml(f.name)}${f.size ? ` <span class="text-muted">(${fileSize(f.size)})</span>` : ''}</button>`
   ).join('')}</div>`;
+}
+
+async function loadMembers() {
+  const { data } = await supabaseClient.from('members').select('id, name').eq('status', 'approved').order('name');
+  medlemmar = data || [];
+}
+
+const memberName = id => (medlemmar.find(m => m.id === id) || {}).name || 'okänd';
+
+// Märke vid rubriken för trådar som inte är öppna för alla
+function synlighetHtml(p) {
+  if (p.visibility === 'korledning') return `<span class="forum-badge" title="Syns för stämledare, admin och trådskaparen">🔒 Körledningen</span>`;
+  if (p.visibility === 'valda') {
+    const namn = [p.author_id, ...(p.recipients || [])].filter((v, i, a) => a.indexOf(v) === i).map(memberName);
+    const kort = namn.length > 3 ? `${namn.slice(0, 3).join(', ')} +${namn.length - 3}` : namn.join(', ');
+    return `<span class="forum-badge" title="Syns bara för: ${escapeHtml(namn.join(', '))}">🔒 ${escapeHtml(kort)}</span>`;
+  }
+  return '';
 }
 
 function postHtml(p) {
@@ -128,7 +155,18 @@ function renderPosts() {
     <form class="forum-composer card" data-form="new" style="padding:1rem 1.2rem;">
       <label style="font-weight:700;">Nytt ämne</label>
       <input type="text" name="title" maxlength="150" required placeholder="Rubrik – vad handlar det om?">
-      <textarea name="body" maxlength="5000" required placeholder="Skriv något till stämgruppen..."></textarea>
+      <textarea name="body" maxlength="5000" required placeholder="Skriv något..."></textarea>
+      <div class="forum-aud" role="radiogroup" aria-label="Vem ser tråden?">
+        <strong>Vem ser tråden?</strong>
+        <label><input type="radio" name="visibility" value="alla" checked> Alla medlemmar</label>
+        <label><input type="radio" name="visibility" value="korledning"> Körledningen</label>
+        <label><input type="radio" name="visibility" value="valda"> Valda medlemmar</label>
+      </div>
+      <div class="forum-picker" hidden>
+        <input type="search" class="forum-search" placeholder="Sök medlem…">
+        <div class="forum-members">${medlemmar.filter(m => m.id !== me.id).map(m =>
+          `<label><input type="checkbox" class="forum-recipient" value="${m.id}"> ${escapeHtml(m.name)}</label>`).join('') || '<p class="text-muted">Inga andra medlemmar hittades.</p>'}</div>
+      </div>
       <div class="row">
         <input type="file" name="files" multiple>
         <button type="submit" class="btn">Publicera</button>
@@ -138,7 +176,7 @@ function renderPosts() {
   const inlagg = toppar.length
     ? toppar.map(p => `
         <details class="card forum-post" data-thread="${p.id}" ${stangda.has(p.id) ? '' : 'open'}>
-          <summary><h2 class="forum-title">${escapeHtml(p.title || '')}</h2></summary>
+          <summary><h2 class="forum-title">${escapeHtml(p.title || '')}${synlighetHtml(p)}</h2></summary>
           ${postHtml(p)}
           <div class="forum-replies">
             ${(svar[p.id] || []).map(r => `<div class="forum-reply">${postHtml(r)}</div>`).join('')}
@@ -181,6 +219,9 @@ async function skickaInlagg(form) {
   if (!parentId && !title) return setStatus('Skriv en rubrik först.', true);
   if (!text) return setStatus('Skriv något först.', true);
   if (files.length > MAX_FILES) return setStatus(`Max ${MAX_FILES} filer per inlägg.`, true);
+  const visibility = parentId ? 'alla' : (form.querySelector('[name=visibility]:checked')?.value || 'alla');
+  const recipients = visibility === 'valda' ? [...form.querySelectorAll('.forum-recipient:checked')].map(c => c.value) : [];
+  if (visibility === 'valda' && !recipients.length) return setStatus('Välj minst en medlem som ska se tråden.', true);
   const stora = files.find(f => f.size > MAX_FILE_MB * 1024 * 1024);
   if (stora) return setStatus(`${stora.name} är större än ${MAX_FILE_MB} MB.`, true);
 
@@ -191,6 +232,7 @@ async function skickaInlagg(form) {
     const postId = crypto.randomUUID();
     const { error } = await supabaseClient.from('forum_posts').insert({
       id: postId, stamma: STAMMOR.includes(me.stamma) ? me.stamma : null, author_id: me.id, parent_id: parentId, title, body: text,
+      visibility, recipients,
     });
     if (error) throw new Error(error.message);
     await laddaUppBilagor(postId, files);
@@ -228,6 +270,20 @@ document.getElementById('forumBody').addEventListener('toggle', (e) => {
   if (d.open) stangda.delete(d.dataset.thread); else stangda.add(d.dataset.thread);
 }, true);
 
+document.getElementById('forumBody').addEventListener('change', (e) => {
+  if (!e.target.matches('input[name=visibility]')) return;
+  const form = e.target.closest('form');
+  form.querySelector('.forum-picker').hidden = e.target.value !== 'valda';
+});
+
+document.getElementById('forumBody').addEventListener('input', (e) => {
+  if (!e.target.matches('.forum-search')) return;
+  const q = e.target.value.trim().toLowerCase();
+  e.target.closest('.forum-picker').querySelectorAll('.forum-members label').forEach(l => {
+    l.hidden = !!q && !l.textContent.toLowerCase().includes(q);
+  });
+});
+
 document.getElementById('forumBody').addEventListener('submit', (e) => {
   if (!e.target.matches('form[data-form]')) return;
   e.preventDefault();
@@ -244,6 +300,7 @@ document.getElementById('forumBody').addEventListener('click', (e) => {
 (async () => {
   me = await requireAuth();
   if (!me) return;
+  await loadMembers();
   await loadPosts();
 })();
 </script>

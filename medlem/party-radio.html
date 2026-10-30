@@ -19,6 +19,12 @@
 <style>html.gate body { visibility: hidden; }</style>
 <script>document.documentElement.classList.add('gate');</script>
 <style>
+  .cast-help { position: relative; max-width: 640px; margin: 1rem auto; padding: 1rem 1.2rem; border-radius: 0.9rem; background: rgba(255,255,255,0.05); border: 1px solid var(--accent); text-align: left; }
+  .cast-help h3 { margin: 0 0 0.5rem; font-size: 1.05rem; }
+  .cast-help p { margin: 0 0 0.5rem; color: var(--text-muted); }
+  .cast-help ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.45rem; }
+  .cast-help a { color: var(--accent); }
+  .cast-x { position: absolute; top: 0.4rem; right: 0.4rem; background: none; border: 0; color: var(--text-muted); font-size: 1.1rem; padding: 0.3rem 0.5rem; }
   /* Bergsprängaren: radio med riktiga hårdrockskanaler – kan castas till Google Home/Chromecast eller AirPlay */
   .bb-stage { display: grid; justify-items: center; margin-top: 2.2rem; }
   .bb { position: relative; width: min(100%, 980px); }
@@ -153,8 +159,18 @@
     </div>
     <div class="genres" id="genres" role="group" aria-label="Genre"></div>
     <div class="stations" id="stations" hidden></div>
-    <p class="info" style="font-size:0.75rem">Radiokanaler via radio-browser.info · 📡 Casta-knappen syns i Chrome när en Google Home/Nest/Chromecast finns i samma wifi</p>
-    <p class="info" style="font-size:0.75rem;max-width:640px;margin-left:auto;margin-right:auto">📱 iPhone: Casta-knappen finns inte i Safari. Prova appen <a href="https://www.webvideocaster.com/" target="_blank" rel="noopener">Web Video Caster</a> – öppna heavyvoices.se i appens webbläsare, logga in, starta en kanal här och tryck på ljudet som appen hittar.</p>
+    <div class="cast-help" id="castHelp" hidden>
+      <button type="button" class="cast-x" id="castHelpX" aria-label="Stäng">✕</button>
+      <h3>📡 Så spelar du radion på en högtalare</h3>
+      <p id="castHelpWhy"></p>
+      <ul>
+        <li><b>Android eller dator:</b> öppna sidan i <b>Chrome</b> (inte Firefox eller Samsung Internet). Mobilen/datorn och Google Home/Nest/Chromecast ska vara på <b>samma wifi</b>. Tryck 📡 Casta och välj högtalaren.</li>
+        <li><b>iPhone/iPad till AirPlay</b> (Apple TV, HomePod, AirPlay-högtalare): tryck på <b>AirPlay</b>-knappen bredvid ▶.</li>
+        <li><b>iPhone till Google Home:</b> Safari kan inte casta. Använd appen <a href="https://www.webvideocaster.com/" target="_blank" rel="noopener">Web Video Caster</a> – öppna heavyvoices.se i appens webbläsare, logga in, starta en kanal här och tryck på ljudet som appen hittar.</li>
+        <li>Eller prata med högtalaren – se <b>🗣️ Röstkommandon</b> nedan.</li>
+      </ul>
+    </div>
+    <p class="info" style="font-size:0.75rem">Radiokanaler via radio-browser.info · 📡 Casta spelar på Google Home/Nest/Chromecast i samma wifi (Chrome) · AirPlay i Safari</p>
     <details class="voice" id="voice" hidden>
       <summary><b>🗣️ Röstkommandon för Google Home</b> <span class="text-muted">– starta kanalerna med rösten</span></summary>
       <p class="text-muted">Google Home kan inte spela den här listan direkt med rösten – röststyrd radio hämtas från Googles egna radiotjänster (främst TuneIn). Kanaler som finns där startar du med kommandona nedan. Tryck 🔎 för att kolla att kanalen finns på TuneIn och vad den heter exakt.</p>
@@ -311,7 +327,14 @@ async function setGenre(id) {
 renderGenres();
 
 // ---------- casta till Google Home / Chromecast (och AirPlay i Safari) ----------
-PartyCast.button($('castBtn'), (on, dev) => on ? `📡 ${dev}` : '📡 Casta');
+PartyCast.button($('castBtn'), (on, dev) => on ? `📡 ${dev}` : '📡 Casta', () => {
+  $('castHelpWhy').textContent = PartyCast.ios
+    ? 'På iPhone/iPad går det inte att casta till Google Home direkt från webbläsaren – välj ett av sätten nedan.'
+    : 'Den här webbläsaren kan inte casta. Öppna sidan i Chrome i stället – eller välj ett av sätten nedan.';
+  $('castHelp').hidden = !$('castHelp').hidden;
+  if (!$('castHelp').hidden) $('castHelp').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+$('castHelpX').addEventListener('click', () => { $('castHelp').hidden = true; });
 PartyCast.airplay($('airBtn'), audio);
 PartyCast.on('session', on => {
   if (on) {

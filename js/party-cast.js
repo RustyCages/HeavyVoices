@@ -41,6 +41,7 @@
 
   const api = {
     get supported() { return canCast; },
+    get ios() { return isIOS; },
     get available() { return available; },
     get connected() { return !!(player && player.isConnected); },
     get device() { const s = ctx && ctx.getCurrentSession(); return s ? s.getCastDevice().friendlyName : ''; },
@@ -67,16 +68,20 @@
     stop() { if (ctrl && player.isConnected) { loadAt = Date.now(); ctrl.stop(); } },
     setVolume(v) { if (ctrl && player.isConnected) { player.volumeLevel = Math.max(0, Math.min(1, v)); ctrl.setVolumeLevel(); } },
 
-    // Knapp som syns när det finns en Cast-enhet i nätverket. label(connected, device) → text
-    button(btn, label) {
+    // Casta-knappen syns alltid. I Chrome öppnar den högtalarväljaren (Chrome letar själv efter enheter i wifi:t).
+    // I webbläsare som inte kan casta (iPhone, Firefox, Samsung Internet …) anropas onHelp() i stället – visa en instruktion.
+    // label(connected, device) → text
+    button(btn, label, onHelp) {
       const draw = () => {
-        btn.hidden = !(available || api.connected);
+        btn.hidden = false;
         btn.textContent = label ? label(api.connected, api.device) : (api.connected ? `📡 ${api.device}` : '📡 Casta');
         btn.setAttribute('aria-pressed', String(api.connected));
-        btn.title = api.connected ? `Castar till ${api.device} – tryck för att byta eller sluta` : 'Spela på Google Home / Chromecast';
+        btn.title = !canCast ? 'Så castar du från den här enheten' : api.connected ? `Castar till ${api.device} – tryck för att byta eller sluta` : 'Spela på Google Home / Nest / Chromecast';
       };
-      btn.hidden = true;
-      btn.addEventListener('click', () => api.pick());
+      btn.addEventListener('click', () => {
+        if (!canCast || !ctx) { if (onHelp) onHelp(); return; }
+        api.pick();
+      });
       api.on('avail', draw); api.on('session', draw);
       draw();
     },
@@ -85,7 +90,7 @@
       btn.hidden = true;
       if (!root.WebKitPlaybackTargetAvailabilityEvent || !el.webkitShowPlaybackTargetPicker) return;
       el.setAttribute('x-webkit-airplay', 'allow');
-      el.addEventListener('webkitplaybacktargetavailabilitychanged', e => { btn.hidden = e.availability !== 'available'; });
+      btn.hidden = false;      // visas alltid i Safari – väljaren säger själv om ingen AirPlay-enhet finns
       btn.addEventListener('click', () => { try { el.webkitShowPlaybackTargetPicker(); } catch (e) {} });
     },
   };

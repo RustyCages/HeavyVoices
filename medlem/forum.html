@@ -251,6 +251,7 @@ async function skickaInlagg(form) {
     });
     if (error) throw new Error(error.message);
     await laddaUppBilagor(postId, files);
+    if (parentId) supabaseClient.functions.invoke('forum-notify', { body: { post_id: postId } }).catch(() => {});
     if (!parentId) {
       nyttOppet = false;
       document.documentElement.classList.remove('forum-compose');

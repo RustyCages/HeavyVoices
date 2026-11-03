@@ -6,11 +6,12 @@
 //   warmup_videos.video_path / thumb_path   → area "warmup"  → R2-nyckel "warmup/<path>"
 //   filutforskaren                          → area "filer"   → R2-nyckel "filer/<path>"
 //   forum_attachments.path                  → area "forum"   → R2-nyckel "forum/<path>"
+//   inbox_messages.attachments[].path       → area "inbox"   → R2-nyckel "inbox/<path>"  (bara admin; skrivs av inbox-receive)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "jsr:@supabase/server@^1";
 import { BUCKET, del, list, presign, put } from "./r2.ts";
 
-type Area = "stems" | "warmup" | "filer" | "forum";
+type Area = "stems" | "warmup" | "filer" | "forum" | "inbox";
 type Action = "list" | "upload" | "download" | "sign" | "delete" | "mkdir";
 
 interface Payload {
@@ -24,7 +25,7 @@ interface Payload {
   filename?: string;     // namn vid nedladdning (annars sista delen av sökvägen)
 }
 
-const AREAS: Area[] = ["stems", "warmup", "filer", "forum"];
+const AREAS: Area[] = ["stems", "warmup", "filer", "forum", "inbox"];
 // Speglar Storage-policyerna: stems = is_song_editor(), övriga = is_admin().
 // forum: alla godkända kan ladda upp (i sin egen mapp), åtkomst till filen kontrolleras mot forum_attachments.
 const canWrite = (area: Area, m: { role: string; stamledare: boolean }) =>
@@ -70,6 +71,14 @@ const handler = withSupabase({ auth: "user" }, async (req, ctx) => {
     if (!AREAS.includes(area)) return json({ error: "Ogiltigt område" }, 400);
     if (WRITE_ACTIONS.includes(action) && !canWrite(area, caller)) {
       return json({ error: area === "stems" ? "Kräver admin eller stämledare" : "Kräver admin-behörighet" }, 403);
+    }
+
+    // Inkorgen: bara admin, och bara hämta/signera/ta bort (filerna skrivs av inbox-receive).
+    if (area === "inbox") {
+      if (caller.role !== "admin") return json({ error: "Kräver admin-behörighet" }, 403);
+      if (!["download", "sign", "delete"].includes(action)) {
+        return json({ error: "Åtgärden stöds inte för inkorgen" }, 400);
+      }
     }
 
     // Forum: bara uppladdning och nedladdning. Nedladdning släpps bara igenom för bilagor

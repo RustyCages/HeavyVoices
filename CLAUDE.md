@@ -77,6 +77,12 @@ Supabase-projekt: `scfudeyozwedohujsoua` ("heavy-voices").
 - Information: `admin/info.html` och `medlem/info.html` (tabell `choir_info`, kolumnen `upcoming` för "På gång").
 - Partyläget: `medlem/party*.html`, `js/party.js`, tabellerna `party_settings` och `party_videos`.
 
+**Nödstopp (killswitch)**
+- Admin → "🚨 Nödstopp" stänger sajten (tabell `site_status`, en rad). `is_approved_member()`/`is_song_editor()` släpper då bara in admin, `r2-files` likaså.
+- `functions/_middleware.js` (Cloudflare Pages Function) visar `stangd.html` (503) för alla sidor utom inloggning och `/admin/`. `_routes.json` håller bilder/skript utanför funktionen.
+- Hårt läge: miljövariabeln `SITE_CLOSED=1` i Cloudflare Pages stänger allt, även admin (kräver ny deploy).
+- `js/supabase-config.js` kollar var 30:e s och skickar icke-admin till stängt-sidan.
+
 **Testning**
 - Ingen byggprocess. Öppna sidan i webbläsaren, eller testa med Playwright mot Supabase-stubbar. Kontrollera JS med `node --check` på skriptdelen.
 

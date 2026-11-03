@@ -65,6 +65,11 @@ const handler = withSupabase({ auth: "user" }, async (req, ctx) => {
     if (!caller || caller.status !== "approved") {
       return json({ error: "Kontot är inte godkänt" }, 403);
     }
+    // Nödstopp: när admin stängt sajten (site_status.closed) får bara admin filer
+    if (caller.role !== "admin") {
+      const { data: st } = await supabase.from("site_status").select("closed").eq("id", 1).maybeSingle();
+      if (st?.closed) return json({ error: "Sajten är tillfälligt stängd" }, 503);
+    }
 
     const body: Payload = await req.json();
     const { action, area } = body;

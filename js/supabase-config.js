@@ -111,3 +111,31 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 
   storage.from = (bucket) => (R2_AREAS[bucket] ? routed(bucket, R2_AREAS[bucket]) : originalFrom(bucket));
 })();
+
+// ---------- Nödstopp (killswitch) ----------
+// Admin kan stänga sajten under Admin (tabell site_status). Öppna sidor kollar var 30:e sekund och när
+// fliken visas igen – den som inte är admin skickas till stängt-sidan. Nya sidvisningar stoppas redan
+// av Cloudflare (functions/_middleware.js), och databasen släpper bara in admin (is_approved_member).
+(function siteGuard() {
+  const p = location.pathname;
+  if (/^\/(logga-in|aterstall-losenord|satt-losenord|stangd)(\.html)?$/.test(p)) return;
+  let banner = null;
+  async function check() {
+    try {
+      const { data, error } = await supabaseClient.from('site_status').select('closed').eq('id', 1).maybeSingle();
+      if (error || !data || !data.closed) { if (banner) { banner.remove(); banner = null; } return; }
+      const { data: adm } = await supabaseClient.rpc('is_admin');
+      if (adm !== true) { location.replace('/stangd.html?from=' + encodeURIComponent(p + location.search)); return; }
+      if (!banner) {
+        banner = document.createElement('a');
+        banner.href = '/admin/#nodstopp';
+        banner.textContent = '🚨 Sajten är STÄNGD för medlemmar – bara admin kommer in. Tryck här för att öppna igen.';
+        banner.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#b91c1c;color:#fff;text-align:center;padding:0.55rem 1rem;font:600 0.9rem system-ui,sans-serif;text-decoration:none';
+        document.body.appendChild(banner);
+      }
+    } catch (e) { /* ingen kontakt – låt sidan vara */ }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', check); else check();
+  setInterval(check, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+})();

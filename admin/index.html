@@ -35,6 +35,16 @@
   .adm-tag { display: inline-block; vertical-align: middle; margin-left: 0.35rem; padding: 0.05rem 0.4rem; border-radius: 999px; border: 1px solid rgba(229,169,104,0.6);
     color: var(--accent); font: 700 0.62rem 'DM Sans', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; }
   @media (max-width: 600px) { h2.grp { margin-top: 0.9rem; } }
+  .ks { border: 1px solid rgba(239,68,68,0.5); margin-top: 1.6rem; }
+  .ks.closed { border-color: #ef4444; background: rgba(239,68,68,0.1); }
+  .ks-h { margin: 0 0 0.4rem; font-size: 1.1rem; }
+  .ks-state { margin: 0 0 0.6rem; font-weight: 600; }
+  .ks-lbl { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+  .ks textarea { width: 100%; min-height: 3.2rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.7rem; font: inherit; }
+  .ks-row { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; margin-top: 0.7rem; }
+  #ksBtn.stop { background: #dc2626; color: #fff; border-color: #dc2626; }
+  #ksBtn.open { background: #16a34a; color: #fff; border-color: #16a34a; }
+  .ks-note { font-size: 0.8rem; margin: 0.7rem 0 0; }
 </style>
 </head>
 <body>
@@ -128,6 +138,15 @@
     </ul>
   </div>
 
+  <div class="card ks" id="nodstopp" hidden>
+    <h2 class="ks-h">🚨 Nödstopp</h2>
+    <p class="ks-state" id="ksState">Laddar…</p>
+    <label class="ks-lbl" for="ksMsg">Meddelande på stängt-sidan (valfritt)</label>
+    <textarea id="ksMsg" maxlength="400" placeholder="T.ex. Vi gör underhåll – tillbaka i kväll."></textarea>
+    <div class="ks-row"><button type="button" id="ksBtn">…</button><span class="text-muted" id="ksInfo"></span></div>
+    <p class="text-muted ks-note">Stänger sajten direkt för alla utom admin: sidorna visar en stängt-sida, öppna sidor stängs inom 30 sekunder och databasen och filerna släpper bara in admin. Inloggning och adminvyn fungerar, så att du kan öppna igen härifrån.</p>
+  </div>
+
   <div class="page-footer">
     <div class="page-footer-actions">
       <a href="/konto.html" class="btn btn-outline" title="Byt lösenord och välj utseende">Mitt konto</a>
@@ -147,6 +166,7 @@
     const full = member.role === 'admin';
     document.getElementById('roleBadge').textContent = full ? member.role : 'stämledare';
     if (full) {
+      initKillswitch(member);
       // Antal olästa mejl i inkorgen (inkorgen nås från Medlemmar)
       supabaseClient.from('inbox_messages').select('id', { count: 'exact', head: true })
         .eq('direction', 'in').eq('is_read', false).eq('folder', 'inkorg')
@@ -172,6 +192,36 @@
 })();
  
 document.getElementById('logoutBtn').addEventListener('click', signOut);
+
+// ---------- Nödstopp: stäng/öppna sajten (bara admin) ----------
+async function initKillswitch(member) {
+  const card = document.getElementById('nodstopp'), btn = document.getElementById('ksBtn');
+  card.hidden = false;
+  let closed = false;
+  const draw = (row) => {
+    closed = !!(row && row.closed);
+    card.classList.toggle('closed', closed);
+    document.getElementById('ksState').textContent = closed ? '⛔ Sajten är STÄNGD för medlemmar.' : '✅ Sajten är öppen.';
+    btn.textContent = closed ? '✅ Öppna sajten igen' : '⛔ Stäng sajten nu';
+    btn.className = closed ? 'open' : 'stop';
+    document.getElementById('ksInfo').textContent = row && row.changed_at ? 'Senast ändrad ' + new Date(row.changed_at).toLocaleString('sv-SE') : '';
+    if (row && row.message != null && !document.getElementById('ksMsg').value) document.getElementById('ksMsg').value = row.message;
+  };
+  const { data, error } = await supabaseClient.from('site_status').select('*').eq('id', 1).maybeSingle();
+  if (error || !data) { document.getElementById('ksState').textContent = '⚠️ Nödstoppet är inte aktiverat i databasen än (kör SQL-filen 2026-11-03_killswitch.sql).'; btn.disabled = true; btn.textContent = 'Ej tillgängligt'; return; }
+  draw(data);
+  if (location.hash === '#nodstopp') card.scrollIntoView({ block: 'center' });
+  btn.addEventListener('click', async () => {
+    const next = !closed;
+    if (next && !confirm('Stänga sajten för ALLA utom admin – direkt?')) return;
+    btn.disabled = true;
+    const row = { closed: next, message: document.getElementById('ksMsg').value.trim() || null, changed_at: new Date().toISOString(), changed_by: member.id };
+    const { data: upd, error: e2 } = await supabaseClient.from('site_status').update(row).eq('id', 1).select().maybeSingle();
+    btn.disabled = false;
+    if (e2 || !upd) { alert('Kunde inte ändra: ' + (e2 ? e2.message : 'saknar behörighet')); return; }
+    draw(upd);
+  });
+}
 
 // Dold ingång till Party Mode: tryck 10 gånger på rollskylten (högst 2 s mellan trycken)
 (function () {

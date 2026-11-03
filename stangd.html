@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Tillfälligt stängt — Heavy Voices</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  body { min-height: 100vh; display: grid; place-items: center; text-align: center; padding: 1.5rem; }
+  .closed { max-width: 520px; display: grid; gap: 1rem; justify-items: center; }
+  .closed img { width: min(260px, 70vw); height: auto; }
+  .closed h1 { margin: 0; color: var(--accent); }
+  .closed .msg { white-space: pre-line; font-size: 1.05rem; }
+  .closed .small { font-size: 0.85rem; color: var(--text-muted); }
+  .closed .small a { color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="closed">
+  <img src="/icons/logo-text.png" alt="Heavy Voices" width="480" height="220">
+  <h1>Tillfälligt stängt</h1>
+  <p class="msg" id="msg">Heavy Voices sajt är stängd för tillfället. Försök igen senare.</p>
+  <button type="button" onclick="location.href='/'" id="retry">Försök igen</button>
+  <p class="small">Är du admin? <a href="/logga-in.html">Logga in</a> och öppna sajten under Admin.</p>
+</div>
+<script>
+// Visa adminens meddelande om det finns ett. Är sajten öppen igen – gå vidare.
+fetch('https://scfudeyozwedohujsoua.supabase.co/rest/v1/site_status?id=eq.1&select=closed,message', {
+  headers: { apikey: 'sb_publishable_lQf4A7LCOH42d_Di-B7oiw_1JzB_2sh' } })
+  .then(r => r.json()).then(j => {
+    const s = j && j[0]; if (!s) return;
+    if (s.message) document.getElementById('msg').textContent = s.message;
+    if (!s.closed && new URLSearchParams(location.search).get('from')) location.replace(new URLSearchParams(location.search).get('from'));
+  }).catch(() => {});
+</script>
+</body>
+</html>

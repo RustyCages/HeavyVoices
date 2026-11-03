@@ -71,17 +71,10 @@
           <p>Inlägg &amp; filer för hela kören</p>
         </span>
       </a></li>
-      <li><a href="/admin/inkorg.html" class="nav-item">
-        <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg></span>
-        <span class="nav-item-text">
-          <h3>Inkorg <span class="badge" id="inboxUnread" hidden></span></h3>
-          <p>Mejl till info@heavyvoices.se</p>
-        </span>
-      </a></li>
       <li><a href="/admin/medlemmar.html" class="nav-item">
         <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
         <span class="nav-item-text">
-          <h3>Medlemmar</h3>
+          <h3>Medlemmar <span class="badge" id="inboxUnread" hidden></span></h3>
           <p>Hantera medlemmar &amp; roller</p>
         </span>
       </a></li>
@@ -161,10 +154,10 @@
     const full = member.role === 'admin';
     document.getElementById('roleBadge').textContent = full ? member.role : 'stämledare';
     if (full) {
-      // Antal olästa mejl i inkorgen
+      // Antal olästa mejl i inkorgen (inkorgen nås från Medlemmar)
       supabaseClient.from('inbox_messages').select('id', { count: 'exact', head: true })
         .eq('direction', 'in').eq('is_read', false).eq('folder', 'inkorg')
-        .then(({ count }) => { const b = document.getElementById('inboxUnread'); if (b && count) { b.textContent = count + ' nya'; b.hidden = false; } });
+        .then(({ count }) => { const b = document.getElementById('inboxUnread'); if (b && count) { b.textContent = count + (count === 1 ? ' nytt mejl' : ' nya mejl'); b.hidden = false; } });
     }
     if (!full) {
       // Stämledare: bara låtverktygen. Resten tas bort (och skyddas dessutom i databasen / på sidorna).

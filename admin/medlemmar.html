@@ -108,8 +108,11 @@
   </div>
 
   <div class="card static" style="margin-top: 1.5rem;" id="mailCard">
-    <h3 style="margin-bottom: 0.2rem;">Skicka mejl</h3>
-    <p class="muted" style="margin-top: 0;">Mottagare: <span id="mailRecipients">inga markerade</span> — markera i listan ovan. Varje person får ett eget mejl och svar går till din e-postadress.</p>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.8rem; flex-wrap:wrap; margin-bottom:0.2rem;">
+      <h3 style="margin:0;">Skicka mejl</h3>
+      <button type="button" class="btn-gold" id="inboxBtn" onclick="location.href='/admin/inkorg.html'" title="Mejl till info@heavyvoices.se">Inkorg<span id="inboxUnread"></span></button>
+    </div>
+    <p class="muted" style="margin-top: 0;">Mottagare: <span id="mailRecipients">inga markerade</span> — markera i listan ovan. Varje person får ett eget mejl från info@heavyvoices.se, och svar hamnar i inkorgen.</p>
     <div class="toolbar" style="margin-top: 0; align-items: center;">
       <label for="mailTemplate" class="muted" style="margin:0;">Brevmall:</label>
       <select id="mailTemplate" style="max-width: 20rem;"><option value="">Ingen mall</option></select>
@@ -673,6 +676,10 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
     loadMembers();
     loadSignatures();
     loadLetterTemplates();
+    // Antal olästa mejl i inkorgen
+    supabaseClient.from('inbox_messages').select('id', { count: 'exact', head: true })
+      .eq('direction', 'in').eq('is_read', false).eq('folder', 'inkorg')
+      .then(({ count }) => { if (count) document.getElementById('inboxUnread').textContent = ` (${count} nya)`; });
   }
 })();
 </script>

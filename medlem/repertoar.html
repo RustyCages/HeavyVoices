@@ -180,10 +180,14 @@
   #loopBand[hidden] { display:none; }
   #loopBand.only-a { width:3px !important; }
   #playerScrubberRow span { font-size:0.75rem; color:var(--text-muted); min-width:38px; text-align:center; }
-  #repeatBtn.active, #karaokeBtn.active, #mixerBtn.active, #lyricsDocBtn.active { color:var(--accent); box-shadow:0 0 8px rgba(229,169,104,0.4); border-color:var(--accent); }
+  /* valda knappar under spelaren: fylld guld så att det syns tydligt vad som är på */
+  #repeatBtn.active, #karaokeBtn.active, #mixerBtn.active, #lyricsDocBtn.active, #splitBtn.active, #speedBtn.active {
+    background:var(--accent); color:#111317; border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(229,169,104,0.28), 0 0 14px rgba(229,169,104,0.6); }
+  #repeatBtn.active:hover, #karaokeBtn.active:hover, #mixerBtn.active:hover, #lyricsDocBtn.active:hover, #splitBtn.active:hover, #speedBtn.active:hover { background:#f0bd84; color:#111317; }
+  #karaokeBtn.active .voice-badge, #speedBtn.active .speed-badge { background:#111317; color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
   #karaokeBtn, #lyricsDocBtn { font-size:0.95rem; }
   #lyricsDocBtn.hidden, #splitBtn.hidden { display:none; }
-  #splitBtn.active { color:var(--accent); box-shadow:0 0 8px rgba(229,169,104,0.4); }
   /* Alla stämmor: en ruta per stämma som rullar samtidigt */
   .k-split { display:grid; grid-template-columns:repeat(var(--cols2, 2), minmax(0, 1fr)); gap:0.4rem; margin-bottom:0.25rem; }
   .k-split.hidden { display:none; }
@@ -374,7 +378,7 @@
   :where(html[data-ui="stram"]) details.new-pl summary { border-color: rgba(255,255,255,0.14); color: var(--text); background: var(--surface-3); }
   :where(html[data-ui="stram"]) #playerBar { background: #171a21; border-top: 1px solid var(--border); box-shadow: none; backdrop-filter: none; }
   :where(html[data-ui="stram"]) #repeatBtn.active, :where(html[data-ui="stram"]) #karaokeBtn.active, :where(html[data-ui="stram"]) #mixerBtn.active,
-  :where(html[data-ui="stram"]) #lyricsDocBtn.active, :where(html[data-ui="stram"]) #splitBtn.active { box-shadow: none; color: var(--text); background: #2a2f3a; border-color: rgba(255,255,255,0.28); }
+  :where(html[data-ui="stram"]) #lyricsDocBtn.active, :where(html[data-ui="stram"]) #splitBtn.active, :where(html[data-ui="stram"]) #speedBtn.active { box-shadow: 0 0 0 2px rgba(229,169,104,0.35); color: var(--accent); background: rgba(229,169,104,0.22); border-color: var(--accent); }
   :where(html[data-ui="stram"]) #playerMenu { background: #1f232c; box-shadow: none; }
   :where(html[data-ui="stram"]) .k-frame.has-bg-video .k-line.k-active { text-shadow: 0 2px 10px rgba(0,0,0,0.85); }
   :where(html[data-ui="stram"]) .k-dots i.on { box-shadow: none; }
@@ -385,7 +389,8 @@
   html[data-ui="stram"] #playerControls { gap: 0.35rem; }
   html[data-ui="stram"] #playerControls button[data-label] { width: auto; min-width: 3.3rem; height: 3.1rem; border-radius: 10px; flex-direction: column; gap: 2px; padding: 0 0.4rem; border-color: transparent; background: transparent; }
   html[data-ui="stram"] #playerControls button[data-label]::after { content: attr(data-label); font-size: 0.72rem; font-weight: 600; line-height: 1; color: var(--text-muted); }
-  html[data-ui="stram"] #playerControls button[data-label].active::after { color: var(--text); }
+  html[data-ui="stram"] #playerControls button[data-label].active::after { color: var(--accent); font-weight: 700; }
+  html[data-ui="stram"] #playerControls button[data-label].active { background: rgba(229,169,104,0.22); border-color: var(--accent); color: var(--accent); box-shadow: none; }
   html[data-ui="stram"] #playerControls button[data-label]:hover { background: rgba(255,255,255,0.05); }
   html[data-ui="stram"] #playPauseBtn { width: 3.1rem; height: 3.1rem; }
   @media (max-width: 420px) { html[data-ui="stram"] #playerControls button[data-label] { min-width: 2.9rem; padding: 0 0.15rem; } }

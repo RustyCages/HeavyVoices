@@ -388,6 +388,7 @@
 <script src="/js/audio-edit.js"></script>
 <script src="/js/effects.js"></script>
 <script src="/js/wave-timeline.js"></script>
+<script src="/js/cowbell.js"></script>
 <script src="/js/track-edit-panel.js"></script>
 <script src="/js/wav-convert.js"></script>
 <script src="/js/note-io.js"></script>
@@ -532,9 +533,7 @@ function scheduleClicks(when, pos) {
   for (let k = Math.ceil((pos - off) / per), n = 0; n < 4000; k++, n++) {
     const t = off + k * per; if (t > duration()) break;
     const st = when + (t - pos), one = ((k % bpb) + bpb) % bpb === 0;
-    const osc = audioCtx.createOscillator(); osc.type = 'square'; osc.frequency.value = one ? 1760 : 1175;
-    const g = audioCtx.createGain(); g.gain.setValueAtTime(0, st); g.gain.linearRampToValueAtTime(one ? 0.9 : 0.55, st + 0.002); g.gain.exponentialRampToValueAtTime(0.001, st + 0.05);
-    osc.connect(g); g.connect(out); osc.start(st); osc.stop(st + 0.06); sources.push({ src: osc });
+    Cowbell.hit(audioCtx, out, st, one).forEach(src => sources.push({ src }));   // koklocka
   }
 }
 

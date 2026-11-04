@@ -796,6 +796,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/pitch-analyze.js"></script>
+<script src="/js/cowbell.js"></script>
 <script src="/js/voice-tools.js"></script>
 <script src="/js/note-io.js"></script>
 <script src="/js/notblad.js"></script>
@@ -2326,16 +2327,7 @@ function scheduleClicks(when, pos) {
   nodes.push(out);
   beatTimes(pos, durationOf() + 0.01).forEach(([t, one]) => {
     const st = when + (t - pos);
-    const osc = audioCtx.createOscillator();
-    osc.type = 'square';
-    osc.frequency.value = one ? 1760 : 1175;
-    const g = audioCtx.createGain();
-    g.gain.setValueAtTime(0, st);
-    g.gain.linearRampToValueAtTime(one ? 0.9 : 0.55, st + 0.002);
-    g.gain.exponentialRampToValueAtTime(0.001, st + 0.05);
-    osc.connect(g); g.connect(out);
-    osc.start(st); osc.stop(st + 0.06);
-    nodes.push(osc);
+    nodes.push(...Cowbell.hit(audioCtx, out, st, one));   // koklocka
   });
 }
 

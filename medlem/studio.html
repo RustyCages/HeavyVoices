@@ -1928,7 +1928,7 @@ async function loadSong(id) {
   });
   const ids = [...new Set((recs || []).map(r => r.member_id))].filter(x => !names[x]);
   if (ids.length) { const { data: ms } = await supabaseClient.from('members').select('id, name').in('id', ids); (ms || []).forEach(m => { names[m.id] = m.name; }); }
-  let done = 0; const total = stemDefs.length + (recs || []).length;
+  const cnt = { s: 0, r: 0 }, nS = stemDefs.length, nR = (recs || []).length, total = nS + nR;
   loadStat = { bytes: 0, total: 0, cached: 0 };
   let lastShown = 0;
   const showNote = (force) => {
@@ -1936,15 +1936,16 @@ async function loadSong(id) {
     if (!force && now - lastShown < 120) return;
     lastShown = now;
     const mb = n => (n / 1048576).toLocaleString('sv-SE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-    let t = `Laddar låtens spår… ${done}/${total} klara`;
+    const done = cnt.s + cnt.r;
+    let t = nR ? `Laddar låtens spår… stämfiler ${cnt.s}/${nS} · inspelningar ${cnt.r}/${nR}` : `Laddar låtens spår… ${cnt.s}/${nS} klara`;
     if (loadStat.total > 0) t += ` · ${mb(loadStat.bytes)} av ${mb(loadStat.total)} MB (${Math.min(100, Math.round(loadStat.bytes / loadStat.total * 100))} %)`;
     if (loadStat.cached) t += ` · ${loadStat.cached} från den här enheten`;
     if (loadStat.total > 0 && loadStat.bytes >= loadStat.total && done < total) t += ' · avkodar ljud…';
     note.textContent = t;
   };
-  const prog = () => { done++; showNote(true); };
+  const prog = (k) => { cnt[k]++; showNote(true); };
   loadProgressCb = () => { if (my === loadToken) showNote(false); };
-  note.textContent = `Laddar låtens spår… 0/${total} klara`;
+  showNote(true);
   // länkar till alla filer i ett anrop per lagring; stämfiler som redan finns på enheten behöver ingen länk
   const stemCache = await clipCache();
   const needSign = [];
@@ -1952,22 +1953,25 @@ async function loadSong(id) {
   const [stemUrls, recUrls] = await Promise.all([signMany(STEMS_BUCKET, needSign), signMany(REC_BUCKET, (recs || []).map(r => r.path))]);
   if (my !== loadToken) return;
   try {
-    const stemTracks = await Promise.all(stemDefs.map(async (s, i) => {
-      const clip = await loadClip(STEMS_BUCKET, s.path, stemUrls[s.path]); prog();
+    const stemP = Promise.all(stemDefs.map(async (s, i) => {
+      const clip = await loadClip(STEMS_BUCKET, s.path, stemUrls[s.path]); prog('s');
       const ms = Math.round(Number(offs[s.key]) || 0);
       return { kind: 'stem', key: s.key, label: s.label, path: s.path, fixed: s.fixed, color: STEM_COLORS[i % STEM_COLORS.length], clip, orig: clip,
         offsetMs: ms, savedOffsetMs: ms, undo: [], edited: false,
         locked: !(isAdmin && stemEdit), readOnly: !(isAdmin && stemEdit), vol: 1, muted: false, solo: false };
     }));
-    const recTracks = (await Promise.all((recs || []).map(async r => {
+    const recP = Promise.all((recs || []).map(async r => {
       try {
-        const clip = await loadClip(REC_BUCKET, r.path, recUrls[r.path]); prog();
+        const clip = await loadClip(REC_BUCKET, r.path, recUrls[r.path]); prog('r');
         const mine = r.member_id === me.id;
         return { kind: 'rec', id: r.id, key: 'rec-' + r.id, label: r.title, path: r.path, memberId: r.member_id, mine, visibility: r.visibility,
           draft: !!r.draft, color: mine ? REC_COLOR : REC_OTHER, clip, orig: clip, offsetMs: r.offset_ms, savedOffsetMs: r.offset_ms, savedTitle: r.title, savedVis: r.visibility,
           locked: !mine, readOnly: !mine, undo: [], edited: false, vol: 1, muted: !mine, solo: false };
-      } catch (e) { prog(); return null; }
-    }))).filter(Boolean);
+      } catch (e) { prog('r'); return null; }
+    }));
+    // stämfiler och inspelningar hämtas samtidigt (förut väntade inspelningarna tills alla stämfiler var klara)
+    const [stemTracks, recAll] = await Promise.all([stemP, recP]);
+    const recTracks = recAll.filter(Boolean);
     if (my !== loadToken) return;
     tracks = applyTrackOrder([...stemTracks, ...recTracks]);
   } catch (e) { if (my === loadToken) note.textContent = 'Kunde inte ladda spåren: ' + (e.message || e); return; }

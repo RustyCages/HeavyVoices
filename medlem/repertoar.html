@@ -1391,19 +1391,34 @@ function decodeAudio(arrBuf) {
   });
 }
 
+// Räknare för filer som hämtas – visas i spelarens "laddar..."-text
+let loadStat = null;
+function showLoadStat() {
+  if (!loadStat) return;
+  const mb = (loadStat.bytes / 1048576).toFixed(1).replace('.', ',');
+  const txt = `laddar… ${loadStat.done}/${loadStat.total} filer · ${mb} MB`;
+  document.querySelectorAll('.loading-tag').forEach(el => { el.textContent = txt; });
+}
+
 async function fetchAndDecode(bucket, path) {
   const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 3600);
   if (error) throw error;
   const resp = await fetch(data.signedUrl);
   if (!resp.ok) throw new Error(`Kunde inte hämta ljudfil (HTTP ${resp.status})`);
-  return await decodeAudio(await resp.arrayBuffer());
+  const ab = await resp.arrayBuffer();
+  if (loadStat) { loadStat.bytes += ab.byteLength; loadStat.done++; showLoadStat(); }
+  return await decodeAudio(ab);
 }
 
 async function decodeStems(item) {
-  const entries = await Promise.all(item.stemDefs.map(async def => [def.key, await fetchAndDecode(STEMS_BUCKET, def.path)]));
-  const bufs = {};
-  entries.forEach(([k, b]) => { bufs[k] = b; });
-  return bufs;
+  loadStat = { total: item.stemDefs.length, done: 0, bytes: 0 };
+  showLoadStat();
+  try {
+    const entries = await Promise.all(item.stemDefs.map(async def => [def.key, await fetchAndDecode(STEMS_BUCKET, def.path)]));
+    const bufs = {};
+    entries.forEach(([k, b]) => { bufs[k] = b; });
+    return bufs;
+  } finally { loadStat = null; }
 }
 
 function writeWavHeader(dv, channels, rate, frames) {

@@ -469,10 +469,57 @@ async function signed(bucket, path) {
   const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrl(path, 3600);
   if (error) throw error; return data.signedUrl;
 }
-async function loadClip(bucket, path) {
-  const resp = await fetch(await signed(bucket, path));
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  return AudioEdit.fromBuffer(await getCtx().decodeAudioData(await resp.arrayBuffer()));
+// ---- hämtning av spår: räknare (MB / %), ett enda länkanrop per låt och lokal kopia av stämfilerna ----
+// Stämfilernas sökvägar är unika för varje uppladdning (nya versioner får nytt namn), så en sparad kopia på
+// enheten kan aldrig vara inaktuell. Andra gången en låt öppnas hämtas den direkt från enheten – inga anrop till servern.
+const CLIP_CACHE = 'hv-stems-v1', CLIP_CACHE_MAX = 80;
+const clipKey = path => 'https://cache.heavyvoices.local/stems/' + String(path).split('/').map(encodeURIComponent).join('/');
+let loadStat = { bytes: 0, total: 0, cached: 0 }, loadProgressCb = null;
+const bumpProgress = () => { if (loadProgressCb) loadProgressCb(); };
+async function clipCache() { try { return ('caches' in window) ? await caches.open(CLIP_CACHE) : null; } catch (e) { return null; } }
+async function trimClipCache(cache) {
+  try { const ks = await cache.keys(); for (const k of ks.slice(0, Math.max(0, ks.length - CLIP_CACHE_MAX))) await cache.delete(k); } catch (e) {}
+}
+async function signMany(bucket, paths) {   // alla nedladdningslänkar i ett anrop (faller tillbaka på ett anrop per fil i loadClip)
+  const map = {};
+  if (!paths.length) return map;
+  try {
+    const { data, error } = await supabaseClient.storage.from(bucket).createSignedUrls(paths, 3600);
+    if (!error) (data || []).forEach(d => { if (d && d.signedUrl) map[d.path] = d.signedUrl; });
+  } catch (e) {}
+  return map;
+}
+async function readWithProgress(resp) {
+  const total = Number(resp.headers.get('content-length')) || 0;
+  loadStat.total += total;
+  if (!resp.body || !resp.body.getReader) {
+    const b = await resp.arrayBuffer(); loadStat.bytes += b.byteLength; if (!total) loadStat.total += b.byteLength; bumpProgress(); return b;
+  }
+  const reader = resp.body.getReader(), chunks = []; let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value); got += value.length; loadStat.bytes += value.length; if (!total) loadStat.total += value.length; bumpProgress();
+  }
+  const out = new Uint8Array(got); let o = 0; chunks.forEach(c => { out.set(c, o); o += c.length; });
+  return out.buffer;
+}
+async function loadClip(bucket, path, url) {
+  const cache = bucket === STEMS_BUCKET ? await clipCache() : null;
+  let buf = null;
+  if (cache) {
+    try {
+      const hit = await cache.match(clipKey(path));
+      if (hit) { buf = await hit.arrayBuffer(); loadStat.cached++; loadStat.bytes += buf.byteLength; loadStat.total += buf.byteLength; bumpProgress(); }
+    } catch (e) { buf = null; }
+  }
+  if (!buf) {
+    const resp = await fetch(url || await signed(bucket, path));
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    buf = await readWithProgress(resp);
+    if (cache) cache.put(clipKey(path), new Response(buf.slice(0), { headers: { 'content-type': 'audio/mpeg' } })).then(() => trimClipCache(cache)).catch(() => {});
+  }
+  return AudioEdit.fromBuffer(await getCtx().decodeAudioData(buf));   // decodeAudioData tömmer bufferten, därför sparas en kopia ovan
 }
 
 // ---------- uppspelning ----------
@@ -1882,10 +1929,31 @@ async function loadSong(id) {
   const ids = [...new Set((recs || []).map(r => r.member_id))].filter(x => !names[x]);
   if (ids.length) { const { data: ms } = await supabaseClient.from('members').select('id, name').in('id', ids); (ms || []).forEach(m => { names[m.id] = m.name; }); }
   let done = 0; const total = stemDefs.length + (recs || []).length;
-  const prog = () => { note.textContent = `Laddar låtens spår… ${++done}/${total}`; };
+  loadStat = { bytes: 0, total: 0, cached: 0 };
+  let lastShown = 0;
+  const showNote = (force) => {
+    const now = performance.now();
+    if (!force && now - lastShown < 120) return;
+    lastShown = now;
+    const mb = n => (n / 1048576).toLocaleString('sv-SE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    let t = `Laddar låtens spår… ${done}/${total} klara`;
+    if (loadStat.total > 0) t += ` · ${mb(loadStat.bytes)} av ${mb(loadStat.total)} MB (${Math.min(100, Math.round(loadStat.bytes / loadStat.total * 100))} %)`;
+    if (loadStat.cached) t += ` · ${loadStat.cached} från den här enheten`;
+    if (loadStat.total > 0 && loadStat.bytes >= loadStat.total && done < total) t += ' · avkodar ljud…';
+    note.textContent = t;
+  };
+  const prog = () => { done++; showNote(true); };
+  loadProgressCb = () => { if (my === loadToken) showNote(false); };
+  note.textContent = `Laddar låtens spår… 0/${total} klara`;
+  // länkar till alla filer i ett anrop per lagring; stämfiler som redan finns på enheten behöver ingen länk
+  const stemCache = await clipCache();
+  const needSign = [];
+  for (const s of stemDefs) { let have = false; try { have = !!(stemCache && await stemCache.match(clipKey(s.path))); } catch (e) {} if (!have) needSign.push(s.path); }
+  const [stemUrls, recUrls] = await Promise.all([signMany(STEMS_BUCKET, needSign), signMany(REC_BUCKET, (recs || []).map(r => r.path))]);
+  if (my !== loadToken) return;
   try {
     const stemTracks = await Promise.all(stemDefs.map(async (s, i) => {
-      const clip = await loadClip(STEMS_BUCKET, s.path); prog();
+      const clip = await loadClip(STEMS_BUCKET, s.path, stemUrls[s.path]); prog();
       const ms = Math.round(Number(offs[s.key]) || 0);
       return { kind: 'stem', key: s.key, label: s.label, path: s.path, fixed: s.fixed, color: STEM_COLORS[i % STEM_COLORS.length], clip, orig: clip,
         offsetMs: ms, savedOffsetMs: ms, undo: [], edited: false,
@@ -1893,7 +1961,7 @@ async function loadSong(id) {
     }));
     const recTracks = (await Promise.all((recs || []).map(async r => {
       try {
-        const clip = await loadClip(REC_BUCKET, r.path); prog();
+        const clip = await loadClip(REC_BUCKET, r.path, recUrls[r.path]); prog();
         const mine = r.member_id === me.id;
         return { kind: 'rec', id: r.id, key: 'rec-' + r.id, label: r.title, path: r.path, memberId: r.member_id, mine, visibility: r.visibility,
           draft: !!r.draft, color: mine ? REC_COLOR : REC_OTHER, clip, orig: clip, offsetMs: r.offset_ms, savedOffsetMs: r.offset_ms, savedTitle: r.title, savedVis: r.visibility,
@@ -1907,7 +1975,7 @@ async function loadSong(id) {
   // första gången: komp + (helst) en sångstämma hörs, fulla mixen tyst om det finns ett komp
   const hasBacking = tracks.some(t => t.kind === 'stem' && isAccomp(t) && !/\bfull\b/i.test(t.label));
   tracks.forEach(t => { if (t.kind === 'stem' && hasBacking && /\bfull\b/i.test(t.label)) t.muted = true; });
-  note.hidden = true;
+  note.hidden = true; loadProgressCb = null;
   lines = parseLrc(song.lyrics_lrc || ''); lyIdx = -2;
   document.getElementById('lyric').hidden = !lines.some(l => l.text);
   document.getElementById('clickOpt').hidden = !(Number(song.bpm) >= 20);

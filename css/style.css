@@ -318,9 +318,25 @@ border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .btn-outline:hover, button.btn-outline:hover {
-background: rgba(255, 255, 255, 0.12);
+background: #3a4150;
+border-color: rgba(255, 255, 255, 0.4);
 color: #ffffff;
 }
+/* Klick (musknappen nedtryckt): ännu ljusare */
+.btn-outline:active, button.btn-outline:active {
+background: #566074;
+border-color: rgba(255, 255, 255, 0.6);
+color: #ffffff;
+transform: none;
+}
+/* Påslagen / vald knapp: tydligt ljusare än en vanlig, med ljus kant */
+button.btn-outline[aria-pressed="true"], button.btn-outline.active, button.btn-outline.on {
+background: #4a5365;
+border-color: rgba(255, 255, 255, 0.55);
+color: #ffffff;
+box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+button.btn-outline[aria-pressed="true"]:hover, button.btn-outline.active:hover, button.btn-outline.on:hover { background: #566074; }
 
 .back-btn {
 display: inline-flex;
@@ -482,7 +498,8 @@ border-radius: var(--radius-sm); transition: background-color 0.15s ease, border
 :where(html[data-ui="stram"]) .btn-outline, :where(html[data-ui="stram"]) button.btn-outline {
 background: var(--surface-3); color: var(--text); border: 1px solid rgba(255, 255, 255, 0.12);
 }
-:where(html[data-ui="stram"]) .btn-outline:hover, :where(html[data-ui="stram"]) button.btn-outline:hover { background: #262b35; color: var(--text); }
+:where(html[data-ui="stram"]) .btn-outline:hover, :where(html[data-ui="stram"]) button.btn-outline:hover { background: #3a4150; border-color: rgba(255, 255, 255, 0.4); color: #fff; }
+:where(html[data-ui="stram"]) .btn-outline:active, :where(html[data-ui="stram"]) button.btn-outline:active { background: #566074; border-color: rgba(255, 255, 255, 0.6); color: #fff; }
 :where(html[data-ui="stram"]) .back-btn { border-radius: var(--radius-sm); background: transparent; border-color: rgba(255, 255, 255, 0.12); min-height: 2.5rem; }
 :where(html[data-ui="stram"]) .back-btn:hover { background: rgba(255, 255, 255, 0.04); color: var(--text); border-color: var(--border-hover); }
 
@@ -584,15 +601,19 @@ html[data-ui="stram"] .ui-stram-only[hidden] { display: none !important; }
 /* --- Segmentväljare (t.ex. Öva / Förbered låten) --- */
 .seg { display: inline-flex; padding: 3px; border-radius: 10px; background: #171a21; border: 1px solid var(--border); gap: 2px; }
 .seg button { min-height: 2.1rem; padding: 0 0.9rem; border: none; border-radius: 7px; background: transparent; color: var(--text-muted); font-weight: 600; font-size: 0.9rem; }
-.seg button:hover { background: rgba(255, 255, 255, 0.04); color: var(--text); box-shadow: none; transform: none; }
-.seg button[aria-pressed="true"] { background: #2a2f3a; color: var(--text); }
+.seg button:hover { background: rgba(255, 255, 255, 0.12); color: #fff; box-shadow: none; transform: none; }
+.seg button:active { background: #566074; color: #fff; }
+.seg button[aria-pressed="true"] { background: #4a5365; color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
 
 /* --- Stram: valda lägen och flikar är neutrala (guld bara för huvudknappar) ---
    Medvetet högre specificitet än sidornas egna "vald"-regler. */
 html[data-ui="stram"] button[aria-pressed="true"]:not(.mic-btn):not(.muteBtn):not([data-keep-accent]),
 html[data-ui="stram"] .tab-btn.active {
-  background: #2a2f3a; color: var(--text); border-color: rgba(255, 255, 255, 0.28); box-shadow: none;
+  background: #4a5365; color: #fff; border-color: rgba(255, 255, 255, 0.55); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
+html[data-ui="stram"] button[aria-pressed="true"]:not(.mic-btn):not(.muteBtn):not([data-keep-accent]):hover,
+html[data-ui="stram"] .tab-btn.active:hover { background: #566074; }
+html[data-ui="stram"] button[aria-pressed="true"]:not(.mic-btn):not(.muteBtn):not([data-keep-accent]):active { background: #667086; }
 html[data-ui="stram"] .tab-btn { box-shadow: none; }
 /* Tystade spår ska synas tydligt även i stramt läge */
 html[data-ui="stram"] .muteBtn.muted, html[data-ui="stram"] .muteBtn.on { background: #b42318; color: #fff; border-color: #b42318; }

@@ -281,13 +281,16 @@ function wireDocField(s, field, bucket, containerSelector) {
   }
   const openLink = container.querySelector(`.open-link[data-id="${s.id}"][data-kind="${field.kind}"]`);
   if (openLink && s[field.kind]) {
-    supabaseClient.storage.from(bucket).createSignedUrl(s[field.kind], 3600).then(({ data: signed }) => {
-      if (!signed) return;
-      const isDocx = s[field.kind].toLowerCase().endsWith('.docx');
-      openLink.href = isDocx
+    // Signerad länk skapas först vid klick (tidigare ett anrop per dokument vid sidladdning)
+    openLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const win = window.open('', '_blank');
+      const { data: signed } = await supabaseClient.storage.from(bucket).createSignedUrl(s[field.kind], 3600);
+      if (!signed) { if (win) win.close(); return; }
+      const url = s[field.kind].toLowerCase().endsWith('.docx')
         ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(signed.signedUrl)}`
         : signed.signedUrl;
-      openLink.style.display = 'inline';
+      if (win) win.location.href = url; else window.location.href = url;
     });
   }
 }

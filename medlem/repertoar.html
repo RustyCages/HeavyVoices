@@ -585,13 +585,12 @@ async function init() {
   if (!member) return;
   currentMember = member;
   // Stämma används som standardval för karaoke per stämma
-  try {
-    const { data: me } = await supabaseClient.from('members').select('stamma').eq('id', member.id).single();
-    if (me) currentMember.stamma = me.stamma;
-  } catch (e) {}
+  const stammaP = supabaseClient.from('members').select('stamma').eq('id', member.id).single()
+    .then(({ data: me }) => { if (me) currentMember.stamma = me.stamma; })
+    .catch(() => {});
 
-  await loadPlaylists();
-  await loadRepertoar();
+  // Körs parallellt i stället för efter varandra
+  await Promise.all([stammaP, loadPlaylists(), loadRepertoar()]);
 }
 init();
 

@@ -857,6 +857,7 @@ async function loadSongs() {
           <div id="noterArea-${s.id}">${docRow(s, NOTER_FIELD, 'heavy-voices-noter')}</div>
 
           <button type="button" class="btn-small closeDetailsBtn" data-id="${s.id}" style="margin-top: 0.75rem;">OK / Stäng</button>
+          <button type="button" class="btn-small cloneSongBtn" data-id="${s.id}" title="Skapar en dold kopia med samma text och timing, men utan ljud- och dokumentfiler" style="margin-top: 0.75rem; margin-left: 0.5rem;">Klona låt</button>
           <button type="button" class="btn-danger btn-small deleteSongBtn" data-id="${s.id}" style="margin-top: 0.75rem; margin-left: 0.5rem;">Ta bort låt</button>
           <p class="error uploadError" data-id="${s.id}"></p>
         </div>
@@ -964,6 +965,27 @@ async function loadSongs() {
   document.querySelectorAll('.closeDetailsBtn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.target.closest('details').removeAttribute('open');
+    });
+  });
+
+  // Klona: ny DOLD låt med samma text, synk och takt – utan filer, så att ingen delar eller råkar radera andras filer
+  document.querySelectorAll('.cloneSongBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const src = songs.find(x => String(x.id) === String(e.target.dataset.id));
+      if (!src) return;
+      const title = prompt('Namn på den nya låten:', (src.title || '') + ' (kopia)');
+      if (!title || !title.trim()) return;
+      const copy = {
+        title: title.trim(), artist: src.artist || null, published: false,
+        lyrics_plain: src.lyrics_plain, lyrics_lrc: src.lyrics_lrc, lyrics_lrc_words: src.lyrics_lrc_words,
+        lyrics_lrc_voices: src.lyrics_lrc_voices || {}, lyrics_plain_voices: src.lyrics_plain_voices || {},
+        practice_backtrack: src.practice_backtrack, bpm: src.bpm, beat_offset: src.beat_offset, beats_per_bar: src.beats_per_bar
+      };
+      let { error } = await supabaseClient.from('songs').insert(copy);
+      if (error && /artist/i.test(error.message)) { delete copy.artist; ({ error } = await supabaseClient.from('songs').insert(copy)); }
+      if (error) { alert('Kunde inte klona: ' + error.message); return; }
+      alert('Klart. Kopian är dold – lägg till stämfiler och gör den synlig när den är klar.');
+      loadSongs();
     });
   });
 

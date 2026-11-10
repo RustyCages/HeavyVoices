@@ -859,6 +859,10 @@ async function loadSongs() {
         </button>
       </div>
       ${songChecklist(s, pitchIds)}
+      <div class="song-quick-actions" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin:0.6rem 0;">
+        <button type="button" class="btn-small btn-outline fullBackupBtn" data-id="${s.id}" title="Laddar ner låtdata och alla filer som en zip till datorn">⬇ Komplett kopia (zip)</button>
+        <button type="button" class="btn-small btn-outline cloneSongBtn" data-id="${s.id}" title="Skapar en dold kopia med samma text och timing, men utan ljud- och dokumentfiler">Klona låt</button>
+      </div>
 
       <details>
         <summary>Redigera text och filer</summary>
@@ -904,8 +908,6 @@ async function loadSongs() {
           <div id="noterArea-${s.id}">${docRow(s, NOTER_FIELD, 'heavy-voices-noter')}</div>
 
           <button type="button" class="btn-small closeDetailsBtn" data-id="${s.id}" style="margin-top: 0.75rem;">OK / Stäng</button>
-          <button type="button" class="btn-small fullBackupBtn" data-id="${s.id}" title="Laddar ner låtdata och alla filer som en zip till datorn" style="margin-top: 0.75rem; margin-left: 0.5rem;">⬇ Komplett kopia (zip)</button>
-          <button type="button" class="btn-small cloneSongBtn" data-id="${s.id}" title="Skapar en dold kopia med samma text och timing, men utan ljud- och dokumentfiler" style="margin-top: 0.75rem; margin-left: 0.5rem;">Klona låt</button>
           <button type="button" class="btn-danger btn-small deleteSongBtn" data-id="${s.id}" style="margin-top: 0.75rem; margin-left: 0.5rem;">Ta bort låt</button>
           <p class="error uploadError" data-id="${s.id}"></p>
         </div>

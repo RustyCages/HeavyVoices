@@ -223,6 +223,53 @@ async function downloadAllStems(s, btn) {
   }
 }
 
+// ---------- Komplett kopia lokalt: ZIP med låtdata (song.json) + alla ljud- och dokumentfiler ----------
+async function downloadFullBackup(s, btn) {
+  const stems = [
+    ...STEM_FIELDS.filter(f => s[f.kind]).map(f => ({ label: f.label, path: s[f.kind] })),
+    ...(s.extra_stems || []).filter(x => x.path).map(x => ({ label: x.label, path: x.path })),
+    ...(s.bg_video_path ? [{ label: 'Bakgrundsvideo', path: s.bg_video_path }] : []),
+  ].map(f => ({ ...f, bucket: 'heavy-voices-stems', dir: 'stamfiler' }));
+  const docs = [
+    ...DOC_FIELDS.filter(f => s[f.col || f.kind]).map(f => ({ label: f.label, path: s[f.col || f.kind] })),
+    ...STAMTEXT_FIELDS.filter(f => s[f.col || f.kind]).map(f => ({ label: f.label, path: s[f.col || f.kind] })),
+    ...(s.extra_lyrics || []).filter(x => x.path).map(x => ({ label: x.label, path: x.path })),
+  ].map(f => ({ ...f, bucket: 'heavy-voices-noter', dir: 'dokument' }));
+  const files = [...stems, ...docs];
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  try {
+    const zip = new JSZip();
+    const used = new Set();
+    const manifest = [];
+    zip.file('lat.json', JSON.stringify(s, null, 2));   // hela låtraden: text, synk, takt, stämmeta, sökvägar …
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      btn.textContent = `Hämtar ${i + 1}/${files.length}…`;
+      const { data, error } = await supabaseClient.storage.from(f.bucket).download(f.path);
+      if (error) throw new Error(`${f.label}: ${error.message}`);
+      let name = `${f.dir}/${f.label} - ${stemFilename(f.path)}`.replace(/[\\:*?"<>|]/g, '_');
+      while (used.has(name)) name = name.replace(/(\.[^.]*)?$/, ' (2)$1');
+      used.add(name);
+      manifest.push({ fil: name, ursprunglig_sokvag: f.path, bucket: f.bucket });
+      zip.file(name, data);
+    }
+    zip.file('filer.json', JSON.stringify(manifest, null, 2));
+    btn.textContent = 'Packar…';
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(s.title || 'lat').replace(/[\\/:*?"<>|]/g, '_')} - komplett kopia.zip`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (e) {
+    alert('Kunde inte skapa kopian: ' + (e.message || e));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
 function safeName(name) {
   return name.replace(/[^a-zA-Z0-9.\-]/g, '_');
 }
@@ -857,6 +904,7 @@ async function loadSongs() {
           <div id="noterArea-${s.id}">${docRow(s, NOTER_FIELD, 'heavy-voices-noter')}</div>
 
           <button type="button" class="btn-small closeDetailsBtn" data-id="${s.id}" style="margin-top: 0.75rem;">OK / Stäng</button>
+          <button type="button" class="btn-small fullBackupBtn" data-id="${s.id}" title="Laddar ner låtdata och alla filer som en zip till datorn" style="margin-top: 0.75rem; margin-left: 0.5rem;">⬇ Komplett kopia (zip)</button>
           <button type="button" class="btn-small cloneSongBtn" data-id="${s.id}" title="Skapar en dold kopia med samma text och timing, men utan ljud- och dokumentfiler" style="margin-top: 0.75rem; margin-left: 0.5rem;">Klona låt</button>
           <button type="button" class="btn-danger btn-small deleteSongBtn" data-id="${s.id}" style="margin-top: 0.75rem; margin-left: 0.5rem;">Ta bort låt</button>
           <p class="error uploadError" data-id="${s.id}"></p>
@@ -965,6 +1013,13 @@ async function loadSongs() {
   document.querySelectorAll('.closeDetailsBtn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.target.closest('details').removeAttribute('open');
+    });
+  });
+
+  document.querySelectorAll('.fullBackupBtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const src = songs.find(x => String(x.id) === String(btn.dataset.id));
+      if (src) downloadFullBackup(src, btn);
     });
   });
 

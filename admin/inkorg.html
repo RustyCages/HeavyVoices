@@ -216,6 +216,12 @@ async function openThreadView(id) {
       <label for="replyText" style="font-weight:700;">Svara ${escapeHtml(lastIn.from_name || lastIn.from_email)} <span class="text-muted" style="font-weight:400;">&lt;${escapeHtml(lastIn.from_email)}&gt;</span></label>
       <textarea id="replyText" maxlength="20000" required placeholder="Skriv ditt svar..."></textarea>
       <div class="row">
+        <button type="button" class="btn-outline" id="replyAttachBtn">Lägg till bilaga</button>
+        <input type="file" id="replyFiles" multiple hidden>
+        <span class="text-muted" style="font-size:0.85rem;">Max 5 filer, 10 MB totalt</span>
+      </div>
+      <ul id="replyFileList" style="list-style:none; margin:0; padding:0;"></ul>
+      <div class="row">
         <label for="replySig" class="text-muted" style="margin:0;font-size:0.9rem;">Signatur</label>
         <select id="replySig">
           <option value="">Hälsningar, ${escapeHtml(me.name || '')}, Heavy Voices</option>
@@ -226,6 +232,7 @@ async function openThreadView(id) {
       <p class="text-muted" style="margin:0;font-size:0.85rem;">Det ursprungliga mejlet citeras automatiskt under ditt svar.</p>
     </form>` : ''}`;
 
+  replyFiles = [];
   msgs.forEach(m => mountBody(m));
 
   // Markera som läst
@@ -345,19 +352,67 @@ async function openFile(path, name) {
   window.open(data.signedUrl, '_blank', 'noopener');
 }
 
+
+// ---------- Bilagor (max 5 filer, 10 MB totalt) ----------
+const ATT_MAX_FILES = 5, ATT_MAX_BYTES = 10 * 1024 * 1024;
+const ATT_BLOCKED = /\.(exe|bat|cmd|com|scr|pif|js|jse|vbs|vbe|msi|jar|ps1|sh|dll|lnk|hta|cpl|reg)$/i;
+function attFmt(n) { return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' kB'; }
+// Lägger till valda filer i listan 'arr' efter kontroll. Returnerar felmeddelande eller ''.
+function attAdd(arr, fileList) {
+  let err = '';
+  for (const f of fileList) {
+    if (ATT_BLOCKED.test(f.name)) { err = `"${f.name}": den filtypen kan inte skickas som bilaga.`; continue; }
+    if (arr.length >= ATT_MAX_FILES) { err = `Max ${ATT_MAX_FILES} bilagor.`; break; }
+    if (arr.some(x => x.name === f.name && x.size === f.size)) continue;
+    if (arr.reduce((s, x) => s + x.size, 0) + f.size > ATT_MAX_BYTES) { err = 'Bilagorna får vara högst 10 MB totalt.'; continue; }
+    arr.push(f);
+  }
+  return err;
+}
+function attRead(arr) {
+  return Promise.all(arr.map(f => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res({ filename: f.name, content: String(r.result).split(',')[1] || '' });
+    r.onerror = () => rej(new Error('Kunde inte läsa ' + f.name));
+    r.readAsDataURL(f);
+  })));
+}
+
+let replyFiles = [];
+function renderReplyFiles() {
+  const ul = document.getElementById('replyFileList'); if (!ul) return;
+  ul.innerHTML = replyFiles.map((f, i) => `<li style="display:flex; gap:0.6rem; align-items:center; margin:0.2rem 0;"><span>${escapeHtml(f.name)} <span class="text-muted">(${attFmt(f.size)})</span></span><button type="button" class="btn-outline" data-rmfile="${i}" style="padding:0.1rem 0.6rem;" aria-label="Ta bort bilagan">Ta bort</button></li>`).join('');
+}
+document.getElementById('ibView').addEventListener('click', e => {
+  if (e.target.closest('#replyAttachBtn')) { document.getElementById('replyFiles').click(); return; }
+  const b = e.target.closest('[data-rmfile]');
+  if (b) { replyFiles.splice(Number(b.dataset.rmfile), 1); renderReplyFiles(); }
+});
+document.getElementById('ibView').addEventListener('change', e => {
+  if (e.target.id !== 'replyFiles') return;
+  const err = attAdd(replyFiles, [...e.target.files]);
+  e.target.value = '';
+  setStatus(err, !!err);
+  renderReplyFiles();
+});
+
 async function sendReply(form) {
   const text = form.querySelector('#replyText').value.trim();
   if (!text) return setStatus('Skriv ett svar först.', true);
   const btn = form.querySelector('button[type=submit]');
   btn.disabled = true;
   setStatus('Skickar...');
+  let attachments;
+  try { attachments = replyFiles.length ? await attRead(replyFiles) : undefined; }
+  catch (err) { btn.disabled = false; return setStatus(err.message, true); }
   const { data, error } = await supabaseClient.functions.invoke('inbox-send', {
-    body: { thread_id: openThread, message: text, signature_id: form.querySelector('#replySig').value || undefined },
+    body: { thread_id: openThread, message: text, signature_id: form.querySelector('#replySig').value || undefined, attachments },
   });
   btn.disabled = false;
   let msg = error?.message || data?.error;
   if (error) { try { const j = await error.context?.json(); if (j?.error) msg = j.error; } catch (_) {} }
   if (msg) return setStatus('Kunde inte skicka: ' + msg, true);
+  replyFiles = [];
   setStatus(`Svaret är skickat till ${data.to}.`);
   const id = openThread;
   await loadList();

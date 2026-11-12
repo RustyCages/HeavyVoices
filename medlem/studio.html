@@ -260,20 +260,34 @@
     .st-page .hint { display: none; }
     html .container.st-wrap, html.app-wide .container.st-wrap { max-width: none; padding: 0 1rem 1.5rem; margin: 0; }
     .st-head { position: sticky; top: var(--strip-h, 0px); z-index: 60; margin: 0 -1rem; padding: 0 1rem; background: var(--st-panel); border-bottom: 1px solid var(--st-line); }
-    .st-top { flex-wrap: nowrap; height: 56px; padding: 0; }
-    .st-ctl { border-top: 1px solid var(--st-line); }
-    .st-ctl-main .transport { flex-wrap: wrap; }
-    .st-ctl-tools { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+    /* en rad överst: tillbaka, logga, Studio, låtval, spelkontroller, hjälp/röstövning/tema – rad två: verktyg, zoom och inspelningsval */
+    .st-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; padding-top: 0.45rem; padding-bottom: 0.45rem; }
+    .st-top, .st-ctl-main, .st-ctl-main > .transport { display: contents; }
+    .st-top .back-btn, .st-logo, .st-title, .st-song { order: 1; }
+    .st-song select { width: 11.5rem; }
+    @media (max-width: 1439px) { .st-title, .st-ctl-main > .transport > .meter { display: none; } .st-song select { width: 10rem; } }
+    .st-sp { display: none; }
+    .st-ctl-main > .transport > .play-btn, .st-ctl-main > .transport > #backBtn, .st-ctl-main > .transport > .rec-btn, .st-ctl-main > .transport > .meter, .st-ctl-main > .transport > .time, .st-ctl-main > .transport > .bpm-badge { order: 2; margin: 0; }
+    .st-ctl-main > .transport > .meter { width: 40px; flex: none; }
+    .st-ctl-main > .transport > .sp { display: none; }
+    .st-top > .title-actions { order: 3; margin-left: auto; }
+    .st-head::after { content: ''; flex: 0 0 100%; order: 4; height: 0; }
+    .st-ctl-tools { order: 5; flex: 1 1 0; display: flex; align-items: center; gap: 0.7rem; flex-wrap: nowrap; border-top: 0; min-width: 0; }
+    .st-ctl-tools > .transport { margin: 0 !important; flex: none; flex-wrap: nowrap; }
+    .st-ctl-main > .transport > .opt, .st-ctl-main > .transport > #calibBtn { order: 6; margin: 0; }
+    .st-ctl-main > #calib { order: 7; flex: 0 0 100%; }
     .st-ctl-tools .zoom { display: none; }
-    .st-ctl-tools .zoom-bar { margin: 0.35rem 0; flex: 1; min-width: 18rem; }
+    .st-ctl-tools .zoom-bar { margin: 0; flex: 1 1 8rem; min-width: 0; flex-wrap: nowrap; }
+    .st-ctl-tools .zoom-bar input[type=range] { flex: 1 1 4rem; max-width: none; min-width: 3rem; }
+    .st-ctl-tools .zoom-bar .zv { min-width: 2.4rem; }
     .st-ctl-tools .zoom-bar .zoom-hint { display: none; }
     .st-main { margin-top: 0.8rem; padding: 0; background: none; border: 0; box-shadow: none; }
     .st-main > .warn-box { margin: 0 0 0.7rem; }
     .st-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 1rem; align-items: start; }
-    .st-tracks { min-width: 0; border: 1px solid var(--st-line); border-radius: 0.6rem; overflow: clip; background: var(--st-row); }
+    .st-tracks { min-width: 0; border: 1px solid var(--st-line); border-radius: 0.6rem; overflow: clip; background: var(--st-row); position: sticky; top: calc(var(--strip-h, 0px) + var(--st-head-h, 110px) + 10px); }
     .st-tracks .lyric { margin: 0; padding: 0.4rem 0.8rem; background: var(--st-panel); border-bottom: 1px solid var(--st-line); }
     #tl { --wt-head-w: 270px; }
-    #tl .wt-scroll { max-height: calc(100vh - var(--strip-h, 0px) - var(--st-head-h, 170px) - 76px); min-height: 240px; overflow-y: auto; overflow-x: hidden; }
+    #tl .wt-scroll { max-height: calc(100vh - var(--strip-h, 0px) - var(--st-head-h, 110px) - 150px); min-height: 220px; overflow-y: auto; overflow-x: hidden; }
     #tl .wt-ruler { margin-left: var(--wt-head-w); width: calc(100% - var(--wt-head-w)); }
     #tl .wt-track { display: grid; grid-template-columns: var(--wt-head-w) minmax(0, 1fr); align-items: stretch; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--st-line); border-radius: 0; background: var(--st-row); box-shadow: none; min-height: 88px; }
     #tl .wt-track.active { background: var(--st-row-sel); box-shadow: inset 3px 0 0 var(--accent); }

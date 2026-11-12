@@ -21,6 +21,17 @@
   <h1 id="waitTitle">Väntar på godkännande</h1>
   <div class="card" style="max-width: 400px; margin-top: 1.5rem;">
     <p id="waitText">Ditt konto är registrerat men väntar fortfarande på att en admin godkänner det. Hör av dig till kören om det dröjer.</p>
+    <div id="pausedBox" style="display:none;">
+      <p style="margin-top:0; color:var(--text-muted);">Som pausad medlem kan du se kalender och information.</p>
+      <p style="display:flex; gap:0.5rem; flex-wrap:wrap; margin:0.8rem 0;">
+        <a class="btn-outline" href="/medlem/kalender.html" style="padding:0.5rem 1rem; border-radius:0.5rem; text-decoration:none;">Kalender</a>
+        <a class="btn-outline" href="/medlem/info.html" style="padding:0.5rem 1rem; border-radius:0.5rem; text-decoration:none;">Information</a>
+      </p>
+      <textarea id="reactNote" rows="3" maxlength="500" placeholder="Valfritt: skriv något till körledningen, t.ex. när du kan komma tillbaka"></textarea>
+      <button id="reactBtn" type="button" style="margin-top:0.5rem;">Jag vill bli aktiv igen</button>
+      <p id="reactMsg" style="min-height:1.2em; margin:0.5rem 0 0; font-weight:600; color:var(--accent);"></p>
+      <p style="margin:0.5rem 0 0; font-size:0.85rem; color:var(--text-muted);">Du kan också mejla <a href="mailto:info@heavyvoices.se">info@heavyvoices.se</a>.</p>
+    </div>
     <button id="logoutBtn" style="margin-top: 1rem;">Logga ut</button>
   </div>
 </div>
@@ -37,11 +48,32 @@ document.getElementById('logoutBtn').addEventListener('click', signOut);
     window.location.href = member.role === 'admin' ? '/admin/' : '/medlem/';
     return;
   }
+  if (member && member.status === 'ended') {
+    await supabaseClient.auth.signOut();
+    window.location.href = '/logga-in.html';
+    return;
+  }
+  if (member && member.status === 'queue') {
+    document.title = 'Du står i kö — Heavy Voices';
+    document.getElementById('waitTitle').textContent = 'Du står i kö';
+    document.getElementById('waitText').textContent =
+      'Du står i kö till kören. När det är din tur gör en admin ditt konto aktivt, och då kommer du åt medlemssidorna.';
+  }
   if (member && member.status === 'paused') {
     document.title = 'Medlemskap pausat — Heavy Voices';
     document.getElementById('waitTitle').textContent = 'Medlemskapet är pausat';
     document.getElementById('waitText').textContent =
-      'Ditt medlemskap är tillfälligt pausat, till exempel för att medlemsavgiften inte är registrerad som betald. Kontakta kören eller en admin så öppnar vi kontot igen.';
+      'Ditt medlemskap är pausat just nu. Dina inspelningar och inställningar finns kvar. Vill du vara med igen? Skicka en förfrågan här så öppnar en admin kontot.';
+    document.getElementById('pausedBox').style.display = '';
+    const btn = document.getElementById('reactBtn'), msg = document.getElementById('reactMsg');
+    const done = () => { btn.disabled = true; btn.textContent = 'Förfrågan skickad'; };
+    if (member.reactivation_requested_at) { done(); msg.textContent = 'Du har redan skickat en förfrågan. Vi hör av oss.'; }
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; msg.textContent = 'Skickar...';
+      const { error } = await supabaseClient.rpc('request_reactivation', { p_note: document.getElementById('reactNote').value.trim() || null });
+      if (error) { btn.disabled = false; msg.textContent = 'Kunde inte skicka: ' + error.message; return; }
+      done(); msg.textContent = 'Tack! Din förfrågan är skickad till körledningen.';
+    });
   }
 })();
 </script>

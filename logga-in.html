@@ -96,6 +96,11 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
       if (window.PasswordCredential) await navigator.credentials.store(new PasswordCredential(e.target));
     } catch (_) { /* inte kritiskt */ }
     const member = await getCurrentMember();
+    if (member && member.status === 'ended') {
+      await supabaseClient.auth.signOut();
+      errorEl.textContent = 'Ditt medlemskap är avslutat. Hör av dig till kören om du vill vara med igen.';
+      return;
+    }
     if (!member || member.status !== 'approved') {
       window.location.href = '/vantar.html';
       return;

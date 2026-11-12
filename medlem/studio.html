@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/css/style.css">
 <script src="/js/ui-mode.js"></script>
 <script src="/js/device.js"></script>
+<script>try { document.documentElement.setAttribute('data-st', localStorage.getItem('hv-st-theme') === 'black' ? 'black' : 'grey'); } catch (e) { document.documentElement.setAttribute('data-st', 'grey'); }</script>
 <style>
   .card.static:hover { transform: none; border-color: var(--border); box-shadow: var(--card-shadow); }
   /* studion är byggd för dator: använd hela bredden */
@@ -215,17 +216,151 @@
   .vis-now { font-size: 0.85rem; color: var(--text-muted); }
   .shareBtn { white-space: nowrap; }
   :where(html[data-ui="stram"]) .share-box { background: #1f232c; border-color: rgba(255,255,255,0.12); box-shadow: none; border-radius: 14px; }
+
+  /* ================= Studio – ny layout (svart eller grått) ================= */
+  html[data-st="black"] { --st-bg:#121418; --st-panel:#171a21; --st-panel2:#1f232c; --st-row:#121418; --st-row-sel:#1b2029; --st-field:#0d0f13; --st-line:#2a2f3a; --st-btn:#1f232c; --st-btn-line:#333948; --st-muted:#9ca3af; }
+  html[data-st="grey"]  { --st-bg:#1c2029; --st-panel:#2b313e; --st-panel2:#343b4a; --st-row:#262c3a; --st-row-sel:#2f3544; --st-field:#181c24; --st-line:#485064; --st-btn:#3b4354; --st-btn-line:#5a6580; --st-muted:#b0b7c5; }
+  html[data-st] { --bg: var(--st-bg); --bg-gradient: none; --text-muted: var(--st-muted); --border: var(--st-line); --surface-3: var(--st-btn); --wt-ruler-bg: var(--st-panel); }
+  html[data-st] body { background-image: none; }
+  :where(html[data-st]) .btn-outline { background: var(--st-btn); border-color: var(--st-btn-line); }
+  html[data-st] .st-main, html[data-st] .st-lib > .card, html[data-st] .st-below, html[data-st] details.wav-card { background: var(--st-panel); border-color: var(--st-line); box-shadow: none; }
+  html[data-st] .tep-sec { background: var(--st-panel2); border-color: var(--st-line); }
+  html[data-st] .snap-row, html[data-st] .rec-row { background: var(--st-panel2); border-color: var(--st-line); }
+  html[data-st] select, html[data-st] input[type=text], html[data-st] input[type=number] { background: var(--st-btn); border-color: var(--st-btn-line); }
+  html[data-st] .share-box { background: var(--st-panel); }
+  .st-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .st-top { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; padding: 0.4rem 0; }
+  .st-top .back-btn { margin: 0; }
+  .st-logo img { height: 36px; width: auto; display: block; }
+  .st-title { margin: 0; font-family: 'Roboto Condensed', sans-serif; font-size: 1.35rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  .st-song select { width: min(22rem, 100%); margin: 0; }
+  .st-sp { flex: 1; }
+  .st-head .transport { margin: 0.35rem 0; }
+  .st-head .calib { margin: 0 0 0.5rem; }
+  .st-head:has(~ .st-main #studio[hidden]) .st-ctl { display: none; }
+  #stThemeBtn { min-width: 5.2rem; }
+  #tl .wt-scroll { scrollbar-width: none; }
+  #tl .wt-scroll::-webkit-scrollbar { display: none; }
+  #tl .wt-ruler { background: var(--st-panel); }
+
+  /* mobil och surfplatta: som förut, men med svart/grått utseende */
+  @media (max-width: 999px) {
+    .st-head { background: var(--st-panel); margin: 0 -1rem 0.6rem; padding: 0 1rem; border-bottom: 1px solid var(--st-line); }
+    .st-logo, .st-title { display: none; }
+    .st-song { flex: 1; min-width: 10rem; }
+    .st-main { padding: 0.8rem; margin-top: 0.8rem; }
+    .st-below, .st-lib { margin-top: 1rem; }
+    .st-lib > .card { margin-top: 1rem !important; }
+    .st-tracks, .st-side { margin-top: 0.8rem; }
+  }
+
+  /* dator: överrad, verktygsrad, spår till vänster och verktygspanel till höger */
+  @media (min-width: 1000px) {
+    .st-page > .site-header { display: none; }
+    .st-page .hint { display: none; }
+    html .container.st-wrap, html.app-wide .container.st-wrap { max-width: none; padding: 0 1rem 1.5rem; margin: 0; }
+    .st-head { position: sticky; top: var(--strip-h, 0px); z-index: 60; margin: 0 -1rem; padding: 0 1rem; background: var(--st-panel); border-bottom: 1px solid var(--st-line); }
+    .st-top { flex-wrap: nowrap; height: 56px; padding: 0; }
+    .st-ctl { border-top: 1px solid var(--st-line); }
+    .st-ctl-main .transport { flex-wrap: wrap; }
+    .st-ctl-tools { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+    .st-ctl-tools .zoom { display: none; }
+    .st-ctl-tools .zoom-bar { margin: 0.35rem 0; flex: 1; min-width: 18rem; }
+    .st-ctl-tools .zoom-bar .zoom-hint { display: none; }
+    .st-main { margin-top: 0.8rem; padding: 0; background: none; border: 0; box-shadow: none; }
+    .st-main > .warn-box { margin: 0 0 0.7rem; }
+    .st-grid { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 1rem; align-items: start; }
+    .st-tracks { min-width: 0; border: 1px solid var(--st-line); border-radius: 0.6rem; overflow: clip; background: var(--st-row); }
+    .st-tracks .lyric { margin: 0; padding: 0.4rem 0.8rem; background: var(--st-panel); border-bottom: 1px solid var(--st-line); }
+    #tl { --wt-head-w: 270px; }
+    #tl .wt-scroll { max-height: calc(100vh - var(--strip-h, 0px) - var(--st-head-h, 170px) - 76px); min-height: 240px; overflow-y: auto; overflow-x: hidden; }
+    #tl .wt-ruler { margin-left: var(--wt-head-w); width: calc(100% - var(--wt-head-w)); }
+    #tl .wt-track { display: grid; grid-template-columns: var(--wt-head-w) minmax(0, 1fr); align-items: stretch; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--st-line); border-radius: 0; background: var(--st-row); box-shadow: none; min-height: 88px; }
+    #tl .wt-track.active { background: var(--st-row-sel); box-shadow: inset 3px 0 0 var(--accent); }
+    #tl .wt-head { flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: space-between; gap: 0.35rem; padding: 0.5rem 0.7rem; background: var(--st-panel); border-right: 1px solid var(--st-line); }
+    #tl.reorder .wt-head { padding-left: 1.6rem; }
+    #tl .wt-head::before { display: none; }
+    #tl .wt-head .t-name { flex-wrap: wrap; }
+    #tl .wt-head .t-ctrl { margin-left: 0; width: 100%; flex-wrap: wrap; gap: 0.3rem; }
+    #tl .wt-head .t-ctrl input[type=range] { flex: 1; min-width: 60px; width: auto; }
+    #tl .wt-wave { height: 88px; background: var(--st-field); }
+    #tl .wt-foot { grid-column: 1 / -1; }
+    #tl .wt-grip { top: 0.55rem; }
+    .st-side { position: sticky; top: calc(var(--strip-h, 0px) + var(--st-head-h, 170px) + 10px); max-height: calc(100vh - var(--strip-h, 0px) - var(--st-head-h, 170px) - 20px); overflow-y: auto; padding: 0.7rem; border: 1px solid var(--st-line); border-radius: 0.6rem; background: var(--st-panel); scrollbar-width: thin; }
+    .st-side .admin-sync { margin-top: 0.8rem; }
+    .st-below { margin-top: 1rem; padding: 0.8rem; border: 1px solid var(--st-line); border-radius: 0.6rem; }
+    .st-below .snap-sec { margin-top: 0; }
+    .st-lib { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; margin-top: 1rem; }
+    .st-lib > .card { margin-top: 0 !important; }
+    #studio { scroll-margin-top: 220px; }
+  }
 </style>
 </head>
-<body>
+<body class="st-page">
 <header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
-<div class="container">
-  <a href="/medlem/" class="back-btn" id="backLink">&larr; Tillbaka</a>
-  <div class="title-row">
-    <h1>🎙 Studio</h1>
-    <div class="title-actions">
-      <button type="button" class="btn-outline" id="guideBtn" aria-expanded="false" aria-controls="guide">❔ Så funkar det</button>
-      <a href="/medlem/rostovning.html" class="btn btn-outline">🎤 Röstövning</a>
+<div class="container st-wrap">
+  <div class="st-head">
+    <div class="st-top">
+      <a href="/medlem/" class="back-btn" id="backLink">&larr; Tillbaka</a>
+      <a href="/medlem/" class="st-logo" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" width="480" height="220"></picture></a>
+      <h1 class="st-title">Studio</h1>
+      <label class="st-song"><span class="st-sr">Låt</span><select id="songSelect"><option value="">Laddar låtar…</option></select></label>
+      <span class="st-sp"></span>
+      <div class="title-actions">
+        <button type="button" class="btn-outline" id="guideBtn" aria-expanded="false" aria-controls="guide">❔ Hjälp</button>
+        <a href="/medlem/rostovning.html" class="btn btn-outline">🎤 Röstövning</a>
+        <button type="button" class="btn-outline" id="stThemeBtn" title="Växla mellan svart och grått utseende" aria-label="Växla mellan svart och grått utseende"></button>
+      </div>
+    </div>
+    <div class="st-ctl st-ctl-main">
+      <div class="transport">
+        <button class="play-btn" id="playBtn" title="Spela/pausa (mellanslag)">▶&#xFE0E;</button>
+        <button class="btn-outline" id="backBtn" title="5 s bakåt">−5 s</button>
+        <button type="button" class="rec-btn" id="recBtn" title="Spela in från spelhuvudet (R)">⏺ Spela in</button>
+        <span class="meter" title="Mikrofonens nivå"><div id="meter"></div></span>
+        <span class="time" id="curTime">0:00.0</span><span class="time" id="durTime" style="min-width:auto">/ 0:00</span>
+        <span class="bpm-badge" id="bpmBadge" hidden title="Låtens tempo (ställs in under Röstövning → 🥁 Tempo & klick)"><b id="bpmVal">–</b> BPM <span id="meterVal"></span></span>
+        <span class="sp"></span>
+        <label class="opt" title="Så här mycket av låten spelas före inspelningen">Inräkning <select id="preRoll"><option value="0">0 s</option><option value="2" selected>2 s</option><option value="4">4 s</option></select></label>
+        <label class="opt" id="clickOpt" hidden><input type="checkbox" id="optClick"> Klick</label>
+        <label class="opt" id="gridOpt" hidden title="Visa takt- och slagstreck i spåren – gör det lättare att se om ett spår ligger i takt"><input type="checkbox" id="optGrid" checked> Taktrutnät</label>
+        <button type="button" class="btn-outline" id="calibBtn" title="Mät fördröjningen i din dator/hörlurar så att inspelningen hamnar i takt">🎯 Kalibrera</button>
+      </div>
+      <div class="calib" id="calib" hidden>
+        <div>Sätt i hörlurarna, tryck <b>Starta</b> och <b>klappa (eller säg ”ta”) i takt med de 8 klicken</b>. Sidan mäter hur långt efter inspelningen hamnar och rättar till det automatiskt.</div>
+        <div class="row">
+          <button type="button" id="calibGo">Starta</button>
+          <span>Fördröjning <input type="number" id="latency" step="1" min="0" max="800"> ms</span>
+          <span class="hint" style="margin:0;" id="calibStatus"></span>
+        </div>
+      </div>
+    </div>
+    <div class="st-ctl st-ctl-tools">
+      <div class="transport" style="margin-top:0">
+        <div class="seg" role="group" aria-label="Verktyg">
+          <button type="button" id="toolMove" aria-pressed="false" title="Slå på för att kunna dra ett spår i sidled (ändrar synken). Klicka igen för att stänga av.">↔ Flytta</button>
+          <button type="button" id="toolSelect" class="desktop-only" aria-pressed="false" title="Dra i ett spår för att markera ett område att klippa eller kopiera">▭ Markera</button>
+        </div>
+        <button class="btn-outline" id="markBtn" title="Sätt en markör vid spelhuvudet (M)">⚑ Markör</button>
+        <button class="btn-outline" id="newTrackBtn" title="Lägg till ett tomt spår att spela in eller klistra in i">➕ Nytt tomt spår</button>
+        <button class="btn-outline" id="importBtn" title="Ladda in en eller flera ljudfiler (MP3, WAV, M4A …) från datorn som nya spår – t.ex. en stämma som ett program sjungit. Du kan också dra filer till tidslinjen.">📂 Ladda in ljudfil</button>
+        <input type="file" id="importFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" multiple hidden>
+        <span class="sp"></span>
+        <div class="zoom" role="group" aria-label="Zoom">
+          <button type="button" class="btn-outline" id="zoomOut" title="Zooma ut (−)">−</button>
+          <span class="zv" id="zoomVal"></span>
+          <button type="button" class="btn-outline" id="zoomIn" title="Zooma in (+)">+</button>
+          <button type="button" class="btn-outline" id="zoomFit" style="width:auto; padding:0 0.6rem; font-size:0.8rem;" title="Visa hela låten">Allt</button>
+        </div>
+      </div>
+      <div class="zoom-bar">
+        <span class="zl">Zoom</span>
+        <button type="button" class="btn-outline" id="zoomOut2" title="Zooma ut">−</button>
+        <input type="range" id="zoomRange" min="0" max="1000" step="1" value="0" aria-label="Zoom i tidslinjen" title="Dra för att zooma in eller ut">
+        <button type="button" class="btn-outline" id="zoomIn2" title="Zooma in">+</button>
+        <span class="zv" id="zoomVal2"></span>
+        <span class="zoom-hint desktop-only"><kbd>Ctrl</kbd> + scroll = zooma in/ut · <kbd>Shift</kbd> + scroll = bläddra i sidled</span>
+      </div>
     </div>
   </div>
   <p class="hint">Sjung in en egen stämma eller idé till en låt. Du hör låtens spår i hörlurarna medan du spelar in, och kan sedan flytta, klippa och spara inspelningen. Dina inspelningar är privata tills du delar dem.</p>
@@ -250,60 +385,15 @@
     </div>
   </div>
 
-  <div class="card static">
-    <label class="field-k" for="songSelect">Låt</label>
-    <select id="songSelect"><option value="">Laddar låtar…</option></select>
+  <div class="card static st-main">
     <p class="warn-box">🎧 <b>Hörlurar krävs när du spelar in.</b> Annars spelas låten in tillsammans med din röst.</p>
-
     <div id="studio" hidden>
-      <div class="transport">
-        <button class="play-btn" id="playBtn" title="Spela/pausa (mellanslag)">▶&#xFE0E;</button>
-        <button class="btn-outline" id="backBtn" title="5 s bakåt">−5 s</button>
-        <button type="button" class="rec-btn" id="recBtn" title="Spela in från spelhuvudet (R)">⏺ Spela in</button>
-        <span class="meter" title="Mikrofonens nivå"><div id="meter"></div></span>
-        <span class="time" id="curTime">0:00.0</span><span class="time" id="durTime" style="min-width:auto">/ 0:00</span>
-        <span class="bpm-badge" id="bpmBadge" hidden title="Låtens tempo (ställs in under Röstövning → 🥁 Tempo & klick)"><b id="bpmVal">–</b> BPM <span id="meterVal"></span></span>
-        <span class="sp"></span>
-        <label class="opt" title="Så här mycket av låten spelas före inspelningen">Inräkning <select id="preRoll"><option value="0">0 s</option><option value="2" selected>2 s</option><option value="4">4 s</option></select></label>
-        <label class="opt" id="clickOpt" hidden><input type="checkbox" id="optClick"> Klick</label>
-        <label class="opt" id="gridOpt" hidden title="Visa takt- och slagstreck i spåren – gör det lättare att se om ett spår ligger i takt"><input type="checkbox" id="optGrid" checked> Taktrutnät</label>
-        <button type="button" class="btn-outline" id="calibBtn" title="Mät fördröjningen i din dator/hörlurar så att inspelningen hamnar i takt">🎯 Kalibrera</button>
-      </div>
-      <div class="calib" id="calib" hidden>
-        <div>Sätt i hörlurarna, tryck <b>Starta</b> och <b>klappa (eller säg ”ta”) i takt med de 8 klicken</b>. Sidan mäter hur långt efter inspelningen hamnar och rättar till det automatiskt.</div>
-        <div class="row">
-          <button type="button" id="calibGo">Starta</button>
-          <span>Fördröjning <input type="number" id="latency" step="1" min="0" max="800"> ms</span>
-          <span class="hint" style="margin:0;" id="calibStatus"></span>
-        </div>
-      </div>
-      <div class="transport" style="margin-top:0">
-        <div class="seg" role="group" aria-label="Verktyg">
-          <button type="button" id="toolMove" aria-pressed="false" title="Slå på för att kunna dra ett spår i sidled (ändrar synken). Klicka igen för att stänga av.">↔ Flytta</button>
-          <button type="button" id="toolSelect" class="desktop-only" aria-pressed="false" title="Dra i ett spår för att markera ett område att klippa eller kopiera">▭ Markera</button>
-        </div>
-        <button class="btn-outline" id="markBtn" title="Sätt en markör vid spelhuvudet (M)">⚑ Markör</button>
-        <button class="btn-outline" id="newTrackBtn" title="Lägg till ett tomt spår att spela in eller klistra in i">➕ Nytt tomt spår</button>
-        <button class="btn-outline" id="importBtn" title="Ladda in en eller flera ljudfiler (MP3, WAV, M4A …) från datorn som nya spår – t.ex. en stämma som ett program sjungit. Du kan också dra filer till tidslinjen.">📂 Ladda in ljudfil</button>
-        <input type="file" id="importFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" multiple hidden>
-        <span class="sp"></span>
-        <div class="zoom" role="group" aria-label="Zoom">
-          <button type="button" class="btn-outline" id="zoomOut" title="Zooma ut (−)">−</button>
-          <span class="zv" id="zoomVal"></span>
-          <button type="button" class="btn-outline" id="zoomIn" title="Zooma in (+)">+</button>
-          <button type="button" class="btn-outline" id="zoomFit" style="width:auto; padding:0 0.6rem; font-size:0.8rem;" title="Visa hela låten">Allt</button>
-        </div>
-      </div>
+      <div class="st-grid">
+        <div class="st-tracks">
       <div class="lyric" id="lyric" hidden><div class="now" id="lyNow">&nbsp;</div><div class="next" id="lyNext"></div></div>
       <div id="tl"></div>
-      <div class="zoom-bar">
-        <span class="zl">Zoom</span>
-        <button type="button" class="btn-outline" id="zoomOut2" title="Zooma ut">−</button>
-        <input type="range" id="zoomRange" min="0" max="1000" step="1" value="0" aria-label="Zoom i tidslinjen" title="Dra för att zooma in eller ut">
-        <button type="button" class="btn-outline" id="zoomIn2" title="Zooma in">+</button>
-        <span class="zv" id="zoomVal2"></span>
-        <span class="zoom-hint desktop-only"><kbd>Ctrl</kbd> + scroll = zooma in/ut · <kbd>Shift</kbd> + scroll = bläddra i sidled</span>
-      </div>
+        </div>
+        <aside class="st-side" aria-label="Verktyg för valt spår">
       <div id="panel"></div>
       <div class="admin-sync" id="adminSync" hidden>
         <span class="k">Admin · låtens spår</span>
@@ -317,6 +407,9 @@
           <span class="save-state" id="saveState"></span>
         </div>
       </div>
+        </aside>
+      </div>
+      <div class="st-below">
       <details class="tep-sec snap-sec" id="secSnap">
         <summary><span class="sec-t">📸 Ögonblicksbilder</span><span class="sec-d">Spara, dela och återställ mixen och spårens lägen · överblick</span><span class="sec-b auto-state" id="autoState"></span></summary>
         <div class="sec-body">
@@ -338,10 +431,12 @@
       <div class="guide-box">
         <b>Så gör du:</b> välj låt, sätt i hörlurarna och tryck <b>⏺ Spela in</b> (eller R). Du hör låten från spelhuvudet – med <b>inräkning</b> börjar den lite före. Tryck igen (eller mellanslag) för att stoppa. Varje tagning blir ett nytt spår. Lyssna, dra den i sidled om den inte ligger i takt, och klipp bort det du inte vill ha med <b>▭ Markera</b>. Ge den ett namn och tryck <b>💾 Spara inspelning</b>. <b>Kalibrera</b> en gång per dator/hörlurar så hamnar inspelningarna rätt från början.
       </div>
+      </div>
     </div>
     <p id="loadingNote" hidden></p>
   </div>
 
+  <div class="st-lib">
   <div class="card static shared-card" id="sharedCard" style="margin-top:1.5rem;" hidden>
     <h2 style="margin:0 0 0.3rem; font-size:1.15rem;">Delat med mig</h2>
     <p class="hint" style="margin:0 0 0.7rem;">Inspelningar som andra i kören har delat med dig.</p>
@@ -352,6 +447,8 @@
     <h2 style="margin:0 0 0.3rem; font-size:1.15rem;">Mina inspelningar</h2>
     <p class="hint" style="margin:0 0 0.7rem;">Bara jag = ingen annan · Körledningen = admin och stämledare · Hela kören = alla medlemmar. Ändra med <b>Dela</b> på spårets rad.</p>
     <div class="recs" id="myRecs"><span class="hint">Laddar…</span></div>
+  </div>
+
   </div>
 
   <details class="card static wav-card ai-home" style="margin-top:1.5rem;">
@@ -559,6 +656,15 @@ function pause() {
   document.getElementById('playBtn').textContent = '▶︎';
   tick();
 }
+// Spelmarkören dras sidledes: spåren står still. Ljudet pausas medan man drar och fortsätter vid släpp om det spelade.
+let scrubResume = false;
+function scrubPlayhead(t, phase) {
+  if (rec) return;
+  t = Math.max(0, Math.min(t, duration()));
+  if (phase === 'start') { scrubResume = playing; if (playing) { stopSources(); playing = false; cancelAnimationFrame(raf); } pausedPos = t; tick(); }
+  else if (phase === 'move') { pausedPos = t; tick(); }
+  else { pausedPos = t; if (scrubResume) startAt(t); else tick(); scrubResume = false; }
+}
 function seek(p) { p = Math.max(0, Math.min(p, duration())); if (rec) return; if (playing) startAt(p); else { pausedPos = p; tick(); } }
 function applyGains() { sources.forEach(({ t, gain }) => { if (t) gain.gain.value = gainOf(t); }); }
 function restartIfPlaying() { if (playing && !rec) startAt(position()); }
@@ -613,6 +719,7 @@ const tl = WaveTimeline.create(document.getElementById('tl'), {
   getTracks: () => tracks, getDuration: duration, getPosition: position,
   isAudible: audible, isActive: t => t === active,
   onSeek: seek,
+  onScrub: scrubPlayhead,
   onOffset: (t, ms, live) => setOffset(t, ms, live),
   onActive: t => setActive(t),
   onSelection: s => { sel = s; panel.selInfo(); },
@@ -2407,6 +2514,24 @@ snapEl('snapFile').addEventListener('change', e => { const f = e.target.files[0]
   if (pre && songs.some(s => String(s.id) === pre)) {
     if (preRec) openRec(pre, preRec); else { sel.value = pre; loadSong(pre); }
   }
+})();
+
+// ---------- utseende: svart eller grått (sparas i webbläsaren) ----------
+(function () {
+  const btn = document.getElementById('stThemeBtn');
+  const label = () => { btn.textContent = document.documentElement.getAttribute('data-st') === 'black' ? 'Svart' : 'Grå'; };
+  label();
+  btn.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-st') === 'black' ? 'grey' : 'black';
+    document.documentElement.setAttribute('data-st', next);
+    try { localStorage.setItem('hv-st-theme', next); } catch (e) {}
+    label(); tl.draw();
+  });
+  // överradens höjd (för klistrade paneler och spårytans maxhöjd)
+  const head = document.querySelector('.st-head');
+  const setH = () => document.documentElement.style.setProperty('--st-head-h', head.offsetHeight + 'px');
+  setH();
+  if (window.ResizeObserver) new ResizeObserver(() => { setH(); tl.draw(); }).observe(head); else window.addEventListener('resize', setH);
 })();
 </script>
 </body>

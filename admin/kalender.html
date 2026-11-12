@@ -3,166 +3,108 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kalender — Heavy Voices Admin</title>
+<title>Kalender — Heavy Voices</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/css/style.css">
 <script src="/js/ui-mode.js"></script>
 <style>
-  /* Flikar och kort – samma upplägg som medlemmarnas kalender */
-  .tabs { display: flex; gap: 0.75rem; margin: 2rem 0 1.25rem; flex-wrap: wrap; }
-  .tab-btn { background: rgba(255,255,255,0.06); color: #d1d5db; border: 1px solid rgba(255,255,255,0.12); padding: 0.6rem 1.2rem; }
-  .tab-btn.active { background: var(--accent); color: #111317; }
-  .tab-btn .count { opacity: 0.7; font-weight: 500; margin-left: 0.3rem; }
-  .tab-panel { display: none; }
-  .tab-panel.active { display: block; }
-  .event-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
-    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 0.9rem;
-    padding: 1.1rem 1.3rem; margin-bottom: 0.9rem; box-shadow: var(--card-shadow); }
-  .event-item.past { opacity: 0.55; }
-  .mn-btn { background: transparent; border: 1px solid var(--border); color: var(--text); }
-  .mn-panel { border-top: 1px solid var(--border); margin-top: 0.8rem; padding-top: 0.8rem; }
-  .mn-rec { display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin-bottom:0.6rem; }
-  .mn-dot { width:0.7rem; height:0.7rem; border-radius:50%; background:#ef4444; display:none; }
-  .mn-rec.live .mn-dot { display:inline-block; animation: mnPulse 1s infinite; }
-  @keyframes mnPulse { 50% { opacity: 0.3; } }
-  .mn-area { width:100%; min-height:120px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.6rem 0.9rem; font-family:inherit; line-height:1.5; }
-  .mn-saved { margin-top:0.8rem; }
-  .mn-note { border:1px solid var(--border); border-radius:8px; padding:0.6rem 0.9rem; margin-bottom:0.6rem; min-width:0; max-width:100%; box-sizing:border-box; overflow:hidden; }
-  .mn-note > summary { cursor:pointer; list-style:none; display:flex; align-items:center; gap:0.6rem; font-size:0.9rem; min-width:0; }
-  .mn-note > summary::-webkit-details-marker { display:none; }
-  .mn-note > summary::after { content:'▾'; margin-left:auto; flex:0 0 auto; color:var(--accent); font-size:1rem; }
-  .mn-note[open] > summary::after { content:'▴'; }
-  .mn-note > summary .mn-when { color:var(--text-muted); font-size:0.82rem; flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .mn-note > summary .mn-preview { color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1 1 0; }
-  .mn-note[open] > summary .mn-preview { display:none; }
-  .mn-note[open] > summary .mn-when { white-space:normal; }
-  .mn-note-body { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.5; margin-top:0.5rem; }
-  .mn-note-actions { display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.6rem; }
-  .mn-note-actions button { padding:0.25rem 0.6rem; font-size:0.8rem; }
-  .mn-send-panel { margin-top:0.6rem; }
-  .mn-send-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:0.3rem 1rem; max-height:260px; overflow:auto; padding:0.5rem 0; }
-  .mn-send-list label { display:flex; align-items:center; gap:0.4rem; font-size:0.9rem; }
-  .mn-send-list input { width:auto; margin:0; }
-  .mn-section { margin-top:2.5rem; }
-  .mn-section input[type=search] { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.55rem 0.8rem; margin-bottom:0.8rem; }
-  .event-date { font-family: 'Roboto Condensed', sans-serif; font-size: 1.15rem; min-width: 95px; }
-  .event-actions { display: flex; flex-direction: column; gap: 0.35rem; min-width: 7.5rem; }
-  .event-actions button { justify-content: center; }
-  details.past-group { margin-top: 1.5rem; }
-  details.past-group > summary { cursor: pointer; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.9rem; }
-  @media (max-width: 600px) {
-    .event-item { padding: 0.9rem 1rem; }
-    .event-actions { flex-direction: row; flex-wrap: wrap; flex-basis: 100%; }
-  }
-  .event-type-rep { color: #60a5fa; }
-  .event-type-konsert { color: var(--accent); }
-  .event-type-ovrigt { color: var(--text-muted); }
-  .event-type-mote { color: #34d399; }
-  .event-meta { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-  .form-row > label { display: block; min-width: 0; }
-  [hidden] { display: none !important; }
-  .choice-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
-  .choice-box { background: var(--bg); border: 1px solid var(--border); border-radius: 0.9rem; padding: 1.3rem 1.3rem 1rem; width: 100%; max-width: 380px; box-shadow: var(--card-shadow); }
-  .choice-box h3 { margin: 0 0 0.3rem; }
-  .choice-box p { margin: 0 0 1rem; color: var(--text-muted); font-size: 0.9rem; }
-  .choice-box .choice-btns { display: flex; flex-direction: column; gap: 0.5rem; }
-  .choice-box .choice-btns button { justify-content: center; padding: 0.7rem 1rem; font-size: 0.95rem; } /* knapp- och gridstilar får inte ta över hidden */
-  /* Egen tidsväljare: skriv tiden eller stega ±15 min (ersätter webbläsarens snurrhjul) */
-  .tp { display: flex; align-items: stretch; gap: 0.3rem; margin-bottom: 0.85rem; }
-  .tp .tp-text { flex: 1; min-width: 0; margin: 0; text-align: center; font-size: 1.05rem; font-variant-numeric: tabular-nums; letter-spacing: 0.03em; }
-  .tp .tp-step { flex: 0 0 auto; width: 2.75rem; padding: 0; justify-content: center; font-size: 1.25rem;
-    background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); }
-  .tp .tp-step:hover { border-color: var(--accent); color: var(--accent); }
-  @media (max-width: 520px) { .time-row { grid-template-columns: 1fr; gap: 0; } }
-  .tp .tp-text.invalid { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.2); }
-  .field-label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; }
-  .event-item { flex-wrap: wrap; }
-  /* Närvaro ser ut som Redigera; fylld när listan är utfälld */
-  .att-btn { padding: 0.3rem 0.7rem; font-size: 0.85rem; background: transparent; border: 1px solid var(--accent); color: var(--accent); justify-content: center; }
-  .att-btn.open { background: var(--accent); color: #111317; }
-  .att-panel { flex-basis: 100%; background: rgba(255,255,255,0.03); border-radius: 0.6rem; padding: 0.75rem 0.9rem; }
-  .att-summary { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem; }
-  .att-summary strong { color: var(--text); }
-  .att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.15rem 1rem; }
-  .att-member { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; padding: 0.25rem 0; cursor: pointer; }
-  .att-member input { width: 1.05rem; height: 1.05rem; margin: 0; accent-color: #4ade80; }
-  .att-member small { color: var(--text-muted); font-size: 0.75rem; }
-  .att-member .by-admin { font-size: 0.7rem; color: var(--text-muted); }
-  .att-group { grid-column: 1 / -1; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 0.4rem; }
-  .event-notes { white-space: pre-wrap; }
-  .att-export { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
-  .att-export button { padding: 0.3rem 0.7rem; font-size: 0.85rem; }
-  .att-member .absent { font-size: 0.7rem; color: #f87171; }
-  .ax-card > summary { cursor: pointer; font-weight: 700; }
-  .ax-types { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0.2rem 0 0.8rem; font-size: 0.9rem; }
-  .ax-types label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
-  .ax-types input { width: auto; margin: 0; accent-color: var(--accent); }
-  .ax-presets { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem; }
-  .ax-presets button { padding: 0.3rem 0.7rem; font-size: 0.85rem; }
-  .ax-info { font-size: 0.85rem; color: var(--text-muted); margin: 0 0 0.8rem; }
-  .edit-btn { padding: 0.3rem 0.7rem; font-size: 0.85rem; background: transparent; border: 1px solid var(--accent); color: var(--accent); }
-  .event-item.editing { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  #eventFormCard.editing { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .scope-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; font-size: 0.9rem; }
-  .scope-row label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
-  .scope-row input { width: auto; margin: 0; accent-color: var(--accent); }
-  .form-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-  .series-badge { font-size: 0.75rem; color: var(--text-muted); margin-left: 0.4rem; }
-  select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.9rem; width: 100%; margin-bottom: 0.75rem; }
+  .tabs { display:flex; gap:0.75rem; margin-bottom:1.75rem; flex-wrap:wrap; }
+  .tab-btn { background:rgba(255,255,255,0.06); color:#d1d5db; border:1px solid rgba(255,255,255,0.12); padding:0.6rem 1.2rem; }
+  .tab-btn.active { background:var(--accent); color:#111317; }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+
+  details.event-card { margin-bottom:1.1rem; padding:1.25rem 1.5rem; }
+  details.event-card summary { list-style:none; cursor:pointer; }
+  details.event-card summary::-webkit-details-marker { display:none; }
+  details.event-card[open] summary { margin-bottom:0.9rem; }
+  details.event-card.past { opacity:0.5; }
+
+  .row-between { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+  .event-summary-main { display:flex; align-items:baseline; gap:0.9rem; flex-wrap:wrap; }
+  .event-date { font-family:'Roboto Condensed', sans-serif; font-size:1.15rem; min-width:95px; }
+  .event-title { font-weight:700; }
+  .event-type-rep { color:#60a5fa; }
+  .event-type-konsert { color:var(--accent); }
+  .event-type-ovrigt { color:var(--text-muted); }
+  .event-type-mote { color:#34d399; }
+
+  .event-body-row { padding:0.3rem 0; }
+  .event-body-row > div:last-child { white-space:pre-wrap; } /* behåll radbrytningar i info-texten */
+  .event-body-label { font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.15rem; }
+
+  /* Mötesbokare */
+  .book-card { margin-bottom:1.2rem; }
+  .book-card > summary { cursor:pointer; font-weight:700; }
+  .book-form { margin-top:1rem; display:grid; gap:0.9rem; }
+  .book-form label { display:grid; gap:0.3rem; font-size:0.9rem; color:var(--text-muted); }
+  .book-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:0.7rem; }
+  .book-invitees { border:1px solid var(--border); border-radius:0.5rem; padding:0.6rem 0.8rem; margin:0; min-width:0; }
+  .book-invitees legend { color:var(--text-muted); font-size:0.9rem; padding:0 0.3rem; }
+  .book-tools { display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.4rem; }
+  .book-tools button { padding:0.3rem 0.7rem; font-size:0.85rem; }
+  .book-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:0.35rem 1rem; }
+  .book-form .book-person { display:flex; flex-direction:row; align-items:center; gap:0.5rem; color:var(--text); font-size:0.95rem; }
+  .book-person input { width:auto; margin:0; }
+  .form-status { margin:0 0 0.6rem; font-size:0.9rem; min-height:1.2em; color:var(--text-muted); }
+  .form-status.is-error { color:#f87171; }
+  .rsvp-row { display:flex; gap:0.5rem; flex-wrap:wrap; margin:0.3rem 0 0.8rem; }
+  .rsvp-btn { padding:0.45rem 0.9rem; border-radius:0.5rem; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:var(--text); cursor:pointer; font:inherit; }
+  .rsvp-btn[aria-pressed="true"] { background:var(--accent); color:#111317; border-color:var(--accent); font-weight:700; }
+  .invitee-list { list-style:none; padding:0; margin:0.3rem 0 0.8rem; font-size:0.92rem; }
+  .invitee-list li { display:flex; justify-content:space-between; gap:1rem; padding:0.25rem 0; border-top:1px solid var(--border); }
+
+  /* Stramt utseende (test) */
+  .next-card { margin-bottom: 1rem; border-color: rgba(229,169,104,0.35) !important; }
+  .next-k { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  .next-t { font-size: 1.2rem; font-weight: 600; margin-top: 0.25rem; }
+  .next-d { color: var(--text); font-variant-numeric: tabular-nums; margin-top: 0.15rem; }
+  .next-loc { display: block; color: var(--text-muted); }
+  .next-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; }
 </style>
 </head>
 <body>
-
-<header class="site-header site-header--small"><a href="/admin/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+<header class="site-header site-header--small"><a href="/medlem/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
 <div class="container">
-
-  <a href="/admin/" class="back-btn">&larr; Tillbaka</a>
+  <a href="/medlem/" class="back-btn">&larr; Tillbaka</a>
   <h1>Kalender</h1>
-  <p style="margin:0 0 1rem;"><a href="https://meet.jit.si/HeavyVoices-Mote-k7r2q9" target="_blank" rel="noopener" class="btn btn-outline" title="Öppnar körens videomöte i Jitsi Meet (gratis, inget konto behövs för att delta)">📹 Videomöte</a></p>
+  <p style="margin:0 0 1rem;"><a href="https://meet.jit.si/HeavyVoices-Mote-k7r2q9" target="_blank" rel="noopener" class="btn btn-outline" title="Öppnar körens videomöte i Jitsi Meet (gratis, inget konto behövs för att delta)">📹 Körens fasta videorum</a></p>
 
-  <div class="card" id="eventFormCard">
-    <h3 id="formHeading">Lägg till händelse</h3>
-    <form id="addEventForm">
-      <div id="scopeWrap" hidden>
-        <p class="field-label" style="margin:0 0 0.35rem;">Händelsen ingår i en serie. Ändra:</p>
-        <div class="scope-row">
-          <label><input type="radio" name="evScope" value="one" checked> Bara detta tillfälle</label>
-          <label><input type="radio" name="evScope" value="all"> Alla tillfällen i serien</label>
+  <p class="ui-stram-only" style="margin:0 0 1rem;"><button type="button" class="btn" id="bookTopBtn">📅 Boka möte</button></p>
+
+  <details class="card book-card" id="bookCard">
+    <summary>➕ Boka ett möte</summary>
+    <form class="book-form" id="bookForm">
+      <label>Titel
+        <input type="text" id="bTitle" value="Möte" maxlength="120" required>
+      </label>
+      <div class="book-row">
+        <label>Datum
+          <input type="date" id="bDate" required>
+        </label>
+        <label>Starttid
+          <input type="time" id="bTime" required>
+        </label>
+        <label>Sluttid (valfritt)
+          <input type="time" id="bEnd">
+        </label>
+      </div>
+      <label>Anteckningar (valfritt)
+        <textarea id="bNotes" rows="3" maxlength="1000" placeholder="T.ex. vad ni ska gå igenom"></textarea>
+      </label>
+      <fieldset class="book-invitees">
+        <legend>Bjud in</legend>
+        <div class="book-tools">
+          <button type="button" class="btn-outline" id="bAll">Välj alla</button>
+          <button type="button" class="btn-outline" id="bNone">Rensa</button>
         </div>
-      </div>
-      <input type="text" id="evTitle" placeholder="Titel" required>
-      <select id="evType">
-        <option value="rep">Repetition</option>
-        <option value="konsert">Konsert</option>
-        <option value="ovrigt">Övrigt</option>
-      </select>
-      <label><span class="field-label">Datum</span>
-        <input type="date" id="evDate" required></label>
-      <div class="form-row time-row">
-        <div><span class="field-label">Från</span><div class="tp" data-target="evTime"></div><input type="hidden" id="evTime"></div>
-        <div><span class="field-label">Till</span><div class="tp" data-target="evEndTime"></div><input type="hidden" id="evEndTime"></div>
-      </div>
-      <div class="form-row" id="repeatRow">
-        <label><span class="field-label">Upprepa</span>
-          <select id="evRepeat">
-            <option value="">Upprepas inte</option>
-            <option value="day">Varje dag</option>
-            <option value="week">Varje vecka</option>
-            <option value="month">Varje månad</option>
-          </select></label>
-        <label id="evRepeatUntilWrap" hidden><span class="field-label">Till och med</span>
-          <input type="date" id="evRepeatUntil"></label>
-      </div>
-      <input type="text" id="evLocation" placeholder="Plats">
-      <textarea id="evNotes" placeholder="Anteckningar / info till medlemmarna (t.ex. klädsel, insjungning, samlingstid)" style="width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.6rem 0.9rem; font-family:inherit; min-height:90px; margin-bottom:0.75rem;"></textarea>
-      <div class="form-actions">
-        <button type="submit" id="submitBtn">Lägg till</button>
-        <button type="button" class="btn-outline" id="cancelEditBtn" hidden>Avbryt</button>
-      </div>
-      <p class="error" id="addEventError"></p>
+        <div class="book-list" id="bList"><p class="text-muted">Laddar medlemmar...</p></div>
+      </fieldset>
+      <p class="form-status" id="bStatus" role="status"></p>
+      <button type="submit" class="btn" id="bSubmit">Boka och skicka inbjudningar</button>
+      <button type="button" class="btn-outline" id="bCancelEdit" hidden>Avbryt redigering</button>
     </form>
-  </div>
+  </details>
 
   <style>
     .month-view { margin-bottom: 1.2rem; }
@@ -188,6 +130,7 @@
     .m-day { margin-top: 0.8rem; }
     .m-ev { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-top: 1px solid var(--border); font-size: 0.92rem; }
   </style>
+  <section class="card next-card ui-stram-only" id="nextCard" hidden></section>
   <details class="card month-view" id="monthView">
     <summary>📅 Månadsvy</summary>
     <div class="month-nav">
@@ -200,93 +143,51 @@
     <div class="m-day" id="mDay"></div>
   </details>
 
-  <details class="card ax-card" id="attExportCard" hidden>
-    <summary>📊 Exportera närvaro</summary>
-    <p class="ax-info" style="margin-top:0.8rem;">Alla datum i perioden samlade i en fil som öppnas i Excel. En rad per medlem och en kolumn per datum, med summa och procent. Närvaro för ett enskilt datum exporterar du under <em>Närvaro</em> på händelsen.</p>
-    <div class="ax-presets">
-      <button type="button" class="btn-outline" data-ax-preset="term">Denna termin</button>
-      <button type="button" class="btn-outline" data-ax-preset="prevterm">Förra terminen</button>
-      <button type="button" class="btn-outline" data-ax-preset="year">I år</button>
-      <button type="button" class="btn-outline" data-ax-preset="all">Alla datum</button>
-    </div>
-    <div class="form-row">
-      <label><span class="field-label">Från</span><input type="date" id="axFrom"></label>
-      <label><span class="field-label">Till</span><input type="date" id="axTo"></label>
-    </div>
-    <p class="field-label" style="margin:0 0 0.2rem;">Ta med</p>
-    <div class="ax-types">
-      <label><input type="checkbox" data-ax-type="rep" checked> Repetitioner</label>
-      <label><input type="checkbox" data-ax-type="konsert" checked> Konserter</label>
-      <label><input type="checkbox" data-ax-type="ovrigt" checked> Övrigt</label>
-      <label><input type="checkbox" data-ax-type="mote"> Möten</label>
-    </div>
-    <label><span class="field-label">Format</span>
-      <select id="axLayout">
-        <option value="matrix">Tabell: en kolumn per datum</option>
-        <option value="list">Lista: en rad per medlem och datum (för filter och pivottabell)</option>
-      </select>
-    </label>
-    <p class="ax-info" id="axCount"></p>
-    <button type="button" id="axDownload">⬇ Ladda ner (Excel .csv)</button>
-  </details>
-
-  <div class="tabs" role="tablist">
-    <button type="button" class="tab-btn active" data-tab="rep">Reptider<span class="count"></span></button>
-    <button type="button" class="tab-btn" data-tab="konsert">Konserter<span class="count"></span></button>
-    <button type="button" class="tab-btn" data-tab="mote">Möten<span class="count"></span></button>
-    <button type="button" class="tab-btn" data-tab="ovrigt">Övrigt<span class="count"></span></button>
+  <div class="tabs">
+    <button class="tab-btn active" id="tabRepBtn">Reptider</button>
+    <button class="tab-btn" id="tabKonsertBtn">Konserter</button>
+    <button class="tab-btn" id="tabMoteBtn">Möten</button>
+    <button class="tab-btn" id="tabOvrigtBtn">Övrigt</button>
   </div>
-  <div class="tab-panel active" data-panel="rep"><p class="text-muted">Laddar...</p></div>
-  <div class="tab-panel" data-panel="konsert"><p class="text-muted">Laddar...</p></div>
-  <div class="tab-panel" data-panel="mote"><p class="text-muted">Laddar...</p></div>
-  <div class="tab-panel" data-panel="ovrigt"><p class="text-muted">Laddar...</p></div>
-</div>
 
-<div class="mn-section" id="mnSection" hidden>
-  <h2>Mötesanteckningar</h2>
-  <p class="text-muted" style="font-size:0.85rem;">Alla sparade anteckningar, nyast först. Klicka på en händelse ovan för att spela in nya.</p>
-  <input type="search" id="mnSearch" placeholder="Sök i anteckningarna...">
-  <div class="mn-note-actions" style="margin-bottom:0.8rem;">
-    <button type="button" class="btn-outline" id="mnExportTxt">Exportera listan till .txt</button>
-    <button type="button" class="btn-outline" id="mnExportDoc">Exportera listan till Word</button>
+  <div class="tab-panel active" id="tabRep">
+    <div id="listRep"><p class="text-muted">Laddar...</p></div>
   </div>
-  <div id="mnAll"><p class="text-muted">Laddar...</p></div>
+  <div class="tab-panel" id="tabKonsert">
+    <div id="listKonsert"><p class="text-muted">Laddar...</p></div>
+  </div>
+  <div class="tab-panel" id="tabMote">
+    <p class="form-status" id="moteStatus" role="status"></p>
+    <p class="text-muted" style="font-size:0.85rem;margin:0 0 0.8rem;">Skärminspelning fungerar bara i Google Chrome och Microsoft Edge på dator, på Windows och Mac. Be alla om tillåtelse innan du spelar in. På Mac behöver webbläsaren först behörighet under Systeminställningar › Integritet och säkerhet › Skärminspelning.</p>
+    <div id="listMote"><p class="text-muted">Laddar...</p></div>
+  </div>
+  <div class="tab-panel" id="tabOvrigt">
+    <div id="listOvrigt"><p class="text-muted">Laddar...</p></div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
 <script>
-const typeLabels = { rep: 'Repetition', konsert: 'Konsert', mote: 'Möte', ovrigt: 'Övrigt' };
+const typeLabels = { rep: 'Repetition', konsert: 'Konsert', ovrigt: 'Övrigt' };
+const emptyLabels = {
+  rep: 'Inga repetitioner inlagda än.',
+  konsert: 'Inga konserter inlagda än.',
+  ovrigt: 'Inget övrigt inlagt än.'
+};
+const SVAR_LABEL = { ja: 'Ja', nej: 'Nej', kanske: 'Kanske' };
+const FN_URL = name => `${SUPABASE_URL}/functions/v1/${name}`;
 
-const MAX_OCCURRENCES = 200;
+let me = null;                    // inloggad medlem
+let membersById = new Map();      // id -> namn (godkända medlemmar)
+let myInvites = new Map();        // event_id -> { token, response } (mina inbjudningar)
+let inviteesByEvent = new Map();  // event_id -> [{ name, response }] (för bokaren)
+let notesByEvent = new Map();     // event_id -> [{ body, created_at }] (mötesanteckningar, bara för inbjudna)
 
-function timeRange(ev) {
-  if (!ev.event_time) return '';
-  return ' ' + ev.event_time.slice(0,5) + (ev.end_time ? '–' + ev.end_time.slice(0,5) : '');
-}
-
-// Datumräkning i UTC så att sommartid inte flyttar dagar
-function parseYmd(str) { const [y,m,d] = str.split('-').map(Number); return { y, m: m - 1, d }; }
-function toYmd(y, m, d) { const dt = new Date(Date.UTC(y, m, d)); return dt.toISOString().slice(0, 10); }
-
-function buildDates(startStr, repeat, untilStr) {
-  if (!repeat) return [startStr];
-  const { y, m, d } = parseYmd(startStr);
-  const dates = [];
-  for (let i = 0; dates.length < MAX_OCCURRENCES; i++) {
-    let next;
-    if (repeat === 'day')  next = toYmd(y, m, d + i);
-    if (repeat === 'week') next = toYmd(y, m, d + i * 7);
-    if (repeat === 'month') {
-      // 31 jan → 28/29 feb → 31 mar: håll fast vid ursprungsdagen, kläm till månadens sista dag
-      const lastDay = new Date(Date.UTC(y, m + i + 1, 0)).getUTCDate();
-      next = toYmd(y, m + i, Math.min(d, lastDay));
-    }
-    if (next > untilStr) break;
-    dates.push(next);
-  }
-  return dates;
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function formatDate(dateStr) {
@@ -294,259 +195,459 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-// ---------- Närvaro ----------
-let adminId = null;
-let approvedMembers = [];          // [{ id, name, stamma }]
-let attendanceByEvent = new Map(); // eventId -> Map(memberId -> { checked_by })
-let absencesByEvent = new Map();   // eventId -> Set(memberId) som anmält att de inte kan
-const openPanels = new Set();      // event-id:n vars närvarolista är utfälld
-const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' });
-const STAMMA_ORDER = ['sopran', 'alt', 'tenor', 'bas'];
-const svCollator = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
-
-function stammaRank(st) {
-  const s = String(st || '').toLowerCase();
-  const i = STAMMA_ORDER.findIndex(k => s.startsWith(k));
-  return i === -1 ? 99 : i;
+function todayStockholm() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' });
 }
 
-async function loadAttendanceData() {
-  const [{ data: mem }, { data: att }, { data: abs }] = await Promise.all([
-    supabaseClient.from('members').select('id, name, stamma').eq('status', 'approved'),
-    supabaseClient.from('attendance').select('event_id, member_id, checked_by'),
-    supabaseClient.from('event_absences').select('event_id, member_id'),
-  ]);
-  absencesByEvent = new Map();
-  (abs || []).forEach(a => {
-    const k = String(a.event_id);
-    if (!absencesByEvent.has(k)) absencesByEvent.set(k, new Set());
-    absencesByEvent.get(k).add(a.member_id);
-  });
-  approvedMembers = (mem || []).sort((a, b) =>
-    (stammaRank(a.stamma) - stammaRank(b.stamma)) || svCollator.compare(a.stamma || '', b.stamma || '') || svCollator.compare(a.name || '', b.name || ''));
-  attendanceByEvent = new Map();
-  (att || []).forEach(a => {
-    const k = String(a.event_id);
-    if (!attendanceByEvent.has(k)) attendanceByEvent.set(k, new Map());
-    attendanceByEvent.get(k).set(a.member_id, { checked_by: a.checked_by });
+function setStatus(id, text, isError) {
+  const el = document.getElementById(id);
+  el.textContent = text || '';
+  el.classList.toggle('is-error', !!isError);
+}
+
+// =========================================================
+// Tabs
+// =========================================================
+const TAB_BTN = { rep: 'tabRepBtn', konsert: 'tabKonsertBtn', mote: 'tabMoteBtn', ovrigt: 'tabOvrigtBtn' };
+const TAB_PANEL = { rep: 'tabRep', konsert: 'tabKonsert', mote: 'tabMote', ovrigt: 'tabOvrigt' };
+Object.keys(TAB_BTN).forEach(name => {
+  document.getElementById(TAB_BTN[name]).addEventListener('click', () => switchTab(name));
+});
+
+function switchTab(name) {
+  Object.keys(TAB_BTN).forEach(n => {
+    document.getElementById(TAB_BTN[n]).classList.toggle('active', n === name);
+    document.getElementById(TAB_PANEL[n]).classList.toggle('active', n === name);
   });
 }
 
-function attCount(evId) { const m = attendanceByEvent.get(String(evId)); return m ? m.size : 0; }
-
-function renderAttPanel(evId, panel) {
-  const present = attendanceByEvent.get(String(evId)) || new Map();
-  const perStamma = {};
-  approvedMembers.forEach(m => {
-    const key = m.stamma || 'Ingen stämma';
-    perStamma[key] = perStamma[key] || { n: 0, of: 0 };
-    perStamma[key].of++;
-    if (present.has(m.id)) perStamma[key].n++;
-  });
-  const parts = Object.entries(perStamma).map(([k, v]) => `${escapeAtt(k)} ${v.n}/${v.of}`).join(' · ');
-  let lastGroup = null;
-  const rows = approvedMembers.map(m => {
-    const group = m.stamma || 'Ingen stämma';
-    const head = group !== lastGroup ? `<div class="att-group">${escapeAtt(group)}</div>` : '';
-    lastGroup = group;
-    const p = present.get(m.id);
-    const absent = !p && (absencesByEvent.get(String(evId)) || new Set()).has(m.id);
-    return `${head}<label class="att-member"><input type="checkbox" data-member="${m.id}" ${p ? 'checked' : ''}>${escapeAtt(m.name)}${p && p.checked_by ? '<span class="by-admin">(admin)</span>' : ''}${absent ? '<span class="absent">(anmält frånvaro)</span>' : ''}</label>`;
-  }).join('');
-  panel.innerHTML = `
-    <div class="att-summary"><strong>${present.size} av ${approvedMembers.length}</strong> närvarande${parts ? ' — ' + parts : ''}</div>
-    <div class="att-grid">${rows || '<span class="text-muted">Inga godkända medlemmar.</span>'}</div>
-    <div class="att-export"><button type="button" class="btn-outline att-exp">⬇ Exportera närvaro (Excel)</button></div>`;
-  panel.querySelector('.att-exp').addEventListener('click', () => exportEventAttendance(evId));
-
-  panel.querySelectorAll('input[data-member]').forEach(cb => cb.addEventListener('change', async () => {
-    const memberId = cb.dataset.member;
-    cb.disabled = true;
-    const { error } = cb.checked
-      ? await supabaseClient.from('attendance').insert({ event_id: evId, member_id: memberId, checked_by: adminId })
-      : await supabaseClient.from('attendance').delete().eq('event_id', evId).eq('member_id', memberId);
-    cb.disabled = false;
-    if (error && error.code !== '23505') { alert('Kunde inte spara närvaro: ' + error.message); cb.checked = !cb.checked; return; }
-    const k = String(evId);
-    if (!attendanceByEvent.has(k)) attendanceByEvent.set(k, new Map());
-    if (cb.checked) attendanceByEvent.get(k).set(memberId, { checked_by: adminId });
-    else attendanceByEvent.get(k).delete(memberId);
-    renderAttPanel(evId, panel);
-    const btn = document.querySelector(`.att-btn[data-id="${CSS.escape(String(evId))}"]`);
-    if (btn) btn.textContent = `Närvaro (${attCount(evId)}) ${btn.classList.contains('open') ? '▴' : '▾'}`;
-  }));
+// =========================================================
+// Events
+// =========================================================
+function timeRange(ev) {
+  if (!ev.event_time) return '';
+  return ' ' + ev.event_time.slice(0,5) + (ev.end_time ? '–' + ev.end_time.slice(0,5) : '');
 }
 
-// ---------- Export av närvaro ----------
-// CSV med semikolon och BOM öppnas rätt i svensk Excel (å/ä/ö och kolumner).
-function csvCell(v) {
-  const s = String(v ?? '');
-  return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
-function downloadCsv(rows, baseName) {
-  const content = '\uFEFF' + rows.map(r => r.map(csvCell).join(';')).join('\r\n');
-  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = baseName.replace(/[\\/:*?"<>|]+/g, '-') + '.csv';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-function attStatus(evId, memberId) {
-  const p = (attendanceByEvent.get(String(evId)) || new Map()).get(memberId);
-  if (p) return { code: 'X', label: 'Närvarande', by: p.checked_by ? 'Admin' : 'Själv' };
-  if ((absencesByEvent.get(String(evId)) || new Set()).has(memberId)) return { code: 'F', label: 'Anmält frånvaro', by: '' };
-  return { code: '', label: 'Ej närvarande', by: '' };
-}
-function evHeader(ev) {
-  return `${ev.event_date}${ev.event_time ? ' ' + ev.event_time.slice(0, 5) : ''} ${typeLabels[ev.event_type] || 'Övrigt'}: ${ev.title || ''}`.trim();
-}
-function pct(n, of) { return of ? Math.round(n * 100 / of) + ' %' : ''; }
+function renderEventCard(ev, isPast) {
+  const details = document.createElement('details');
+  details.className = 'event-card card modern-card' + (isPast ? ' past' : '');
 
-function exportEventAttendance(evId) {
-  const ev = allEvents.get(String(evId));
-  if (!ev) return;
-  const rows = [
-    [`Närvaro: ${typeLabels[ev.event_type] || 'Övrigt'} – ${ev.title || ''}`],
-    [`Datum: ${ev.event_date}${timeRange(ev)}${ev.location ? ' · ' + ev.location : ''}`],
-    [],
-    ['Namn', 'Stämma', 'Status', 'Markerad av'],
-  ];
-  let n = 0;
-  approvedMembers.forEach(m => {
-    const st = attStatus(evId, m.id);
-    if (st.code === 'X') n++;
-    rows.push([m.name, m.stamma || '', st.label, st.by]);
-  });
-  rows.push([], ['Närvarande', `${n} av ${approvedMembers.length}`, pct(n, approvedMembers.length)]);
-  downloadCsv(rows, `Narvaro-${ev.event_date}-${ev.title || 'handelse'}`);
-}
+  const summary = document.createElement('summary');
+  summary.innerHTML = `
+    <div class="row-between">
+      <div class="event-summary-main">
+        <span class="event-date">${formatDate(ev.event_date)}${timeRange(ev)}</span>
+        <span class="event-title event-type-${ev.event_type}">${escapeHtml(ev.title)}</span>
+      </div>
+      <span class="text-muted">Visa ▾</span>
+    </div>
+  `;
+  details.appendChild(summary);
 
-function axEvents() {
-  const from = document.getElementById('axFrom').value || '0000-01-01';
-  const to = document.getElementById('axTo').value || todayStr;
-  const types = new Set([...document.querySelectorAll('[data-ax-type]:checked')].map(c => c.dataset.axType));
-  const end = to < todayStr ? to : todayStr;   // framtida datum har ingen närvaro än
-  return [...allEvents.values()]
-    .filter(ev => ev.event_date >= from && ev.event_date <= end && types.has(ev.event_type || 'ovrigt'))
-    .sort((a, b) => a.event_date.localeCompare(b.event_date) || String(a.event_time || '').localeCompare(String(b.event_time || '')));
-}
-function axUpdateCount() {
-  const n = axEvents().length;
-  document.getElementById('axCount').textContent = n ? `${n} datum i perioden.` : 'Inga passerade händelser i perioden.';
-  document.getElementById('axDownload').disabled = !n;
-}
-function axSetPreset(kind) {
-  const y = Number(todayStr.slice(0, 4)), m = Number(todayStr.slice(5, 7));
-  const vt = m <= 6;   // VT jan–jun, HT jul–dec
-  let from = '', to = todayStr;
-  if (kind === 'term') from = vt ? `${y}-01-01` : `${y}-07-01`;
-  if (kind === 'prevterm') { from = vt ? `${y - 1}-07-01` : `${y}-01-01`; to = vt ? `${y - 1}-12-31` : `${y}-06-30`; }
-  if (kind === 'year') from = `${y}-01-01`;
-  if (kind === 'all') { const first = [...allEvents.values()].map(e => e.event_date).sort()[0]; from = first || ''; }
-  document.getElementById('axFrom').value = from;
-  document.getElementById('axTo').value = to;
-  axUpdateCount();
-}
-function exportRangeAttendance() {
-  const evs = axEvents();
-  if (!evs.length) return;
-  const from = document.getElementById('axFrom').value || evs[0].event_date;
-  const to = document.getElementById('axTo').value || todayStr;
-  const layout = document.getElementById('axLayout').value;
-  const rows = [];
-  if (layout === 'list') {
-    rows.push(['Datum', 'Tid', 'Typ', 'Händelse', 'Namn', 'Stämma', 'Status', 'Markerad av']);
-    evs.forEach(ev => approvedMembers.forEach(m => {
-      const st = attStatus(ev.id, m.id);
-      rows.push([ev.event_date, ev.event_time ? ev.event_time.slice(0, 5) : '', typeLabels[ev.event_type] || 'Övrigt', ev.title || '', m.name, m.stamma || '', st.label, st.by]);
-    }));
+  const body = document.createElement('div');
+  if (!ev.location && !ev.notes) {
+    body.innerHTML = '<p class="text-muted">Inga fler detaljer.</p>';
   } else {
-    rows.push([`Närvaro ${from} – ${to}`], ['X = närvarande, F = anmält frånvaro'], []);
-    rows.push(['Namn', 'Stämma', ...evs.map(evHeader), 'Närvaro', 'Av', 'Procent', 'Anmäld frånvaro']);
-    approvedMembers.forEach(m => {
-      let n = 0, f = 0;
-      const cells = evs.map(ev => { const c = attStatus(ev.id, m.id).code; if (c === 'X') n++; if (c === 'F') f++; return c; });
-      rows.push([m.name, m.stamma || '', ...cells, n, evs.length, pct(n, evs.length), f]);
-    });
-    const perEv = evs.map(ev => approvedMembers.filter(m => attStatus(ev.id, m.id).code === 'X').length);
-    rows.push(['Antal närvarande', '', ...perEv]);
-    rows.push(['Andel', '', ...perEv.map(n => pct(n, approvedMembers.length))]);
+    if (ev.location) {
+      body.innerHTML += `
+        <div class="event-body-row">
+          <div class="event-body-label">Plats</div>
+          <div>${escapeHtml(ev.location)}</div>
+        </div>`;
+    }
+    if (ev.notes) {
+      body.innerHTML += `
+        <div class="event-body-row">
+          <div class="event-body-label">Anteckningar</div>
+          <div>${escapeHtml(ev.notes)}</div>
+        </div>`;
+    }
   }
-  downloadCsv(rows, `Narvaro-${from}--${to}${layout === 'list' ? '-lista' : ''}`);
-}
-function initAttExport() {
-  const card = document.getElementById('attExportCard');
-  if (!isFullAdmin) return;           // närvarodata kan bara läsas av admin (RLS)
-  card.hidden = false;
-  if (initAttExport.bound) { axUpdateCount(); return; }
-  initAttExport.bound = true;
-  card.querySelectorAll('[data-ax-preset]').forEach(b => b.addEventListener('click', () => axSetPreset(b.dataset.axPreset)));
-  ['axFrom', 'axTo'].forEach(id => document.getElementById(id).addEventListener('change', axUpdateCount));
-  card.querySelectorAll('[data-ax-type]').forEach(c => c.addEventListener('change', axUpdateCount));
-  document.getElementById('axDownload').addEventListener('click', exportRangeAttendance);
-  axSetPreset('term');
+  details.appendChild(body);
+  return details;
 }
 
-function escapeAtt(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
-
-const EMPTY_LABELS = { rep: 'Inga kommande repetitioner.', konsert: 'Inga kommande konserter.', mote: 'Inga kommande möten.', ovrigt: 'Inget kommande inlagt.' };
-const moteInvites = new Map(); // event_id -> [{ name, response }]
-let isFullAdmin = false;       // stämledare ser möten men får bara avboka som admin
-
-function moteInfoHtml(ev) {
-  const list = moteInvites.get(String(ev.id)) || [];
-  const c = { ja: 0, kanske: 0, nej: 0, ingen: 0 };
-  list.forEach(i => { c[i.response || 'ingen']++; });
-  const bokare = ev.booker?.name || 'okänd';
-  const link = ev.meeting_url ? ` · <a href="${escapeAtt(ev.meeting_url)}" target="_blank" rel="noopener">Videomöte</a>` : '';
-  return `<div class="event-meta">Bokat av ${escapeAtt(bokare)} · ${list.length} inbjudna · Ja ${c.ja} · Kanske ${c.kanske} · Nej ${c.nej} · Inget svar ${c.ingen}${link}</div>`;
+function renderGroup(containerEl, events, type) {
+  containerEl.innerHTML = '';
+  if (!events.length) {
+    containerEl.innerHTML = `<p class="text-muted">${emptyLabels[type]}</p>`;
+    return;
+  }
+  const todayStr = new Date().toISOString().slice(0, 10);
+  events.forEach(ev => {
+    containerEl.appendChild(renderEventCard(ev, ev.event_date < todayStr));
+  });
 }
-const openPastGroups = new Set();
-let activeTab = 'rep';
 
-function eventHtml(ev) {
-  return `
-    <div class="event-item ${ev.event_date < todayStr ? 'past' : ''} ${editing && String(editing.id) === String(ev.id) ? 'editing' : ''}">
-      <div class="event-date">${formatDate(ev.event_date)}${timeRange(ev)}</div>
-      <div style="flex: 1; min-width: 0;">
-        <strong class="event-type-${ev.event_type}">${typeLabels[ev.event_type] || 'Övrigt'}</strong> — ${escapeAtt(ev.title)}${ev.series_id ? '<span class="series-badge">↻ serie</span>' : ''}
-        ${ev.location ? `<div class="event-meta">${escapeAtt(ev.location)}</div>` : ''}
-        ${ev.notes ? `<div class="event-meta event-notes">${escapeAtt(ev.notes)}</div>` : ''}
-        ${ev.event_type === 'mote' ? moteInfoHtml(ev) : ''}
+// ---------- möten ----------
+function renderMoteCard(ev, isPast) {
+  const isBooker = ev.created_by === me.id;
+  const canCancel = isBooker || me.role === 'admin';
+  const mine = myInvites.get(ev.id);
+  const bookerName = membersById.get(ev.created_by) || 'Okänd';
+
+  const details = document.createElement('details');
+  details.className = 'event-card card modern-card' + (isPast ? ' past' : '');
+  details.innerHTML = `
+    <summary>
+      <div class="row-between">
+        <div class="event-summary-main">
+          <span class="event-date">${formatDate(ev.event_date)}${timeRange(ev)}</span>
+          <span class="event-title event-type-mote">${escapeHtml(ev.title)}</span>
+        </div>
+        <span class="text-muted">Visa ▾</span>
       </div>
-      <div class="event-actions">
-        ${ev.event_date <= todayStr ? `<button type="button" class="att-btn" data-id="${ev.id}" aria-expanded="false">Närvaro (${attCount(ev.id)}) ▾</button>` : ''}
-        <button type="button" class="mn-btn mn-open" data-id="${ev.id}" aria-expanded="false">🎙 Anteckningar</button>
-        ${ev.event_type === 'mote'
-          ? (isFullAdmin ? `<button type="button" class="btn-danger mote-cancel" data-id="${ev.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Avboka</button>` : '')
-          : `<button type="button" class="edit-btn" data-id="${ev.id}">Redigera</button>
-        <button type="button" class="btn-danger deleteEventBtn" data-id="${ev.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort</button>`}
-        ${ev.series_id ? `<button type="button" class="btn-danger deleteEventBtn" data-series="${ev.series_id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort serie</button>` : ''}
-      </div>
-      <div class="att-panel" data-panel-att="${ev.id}" hidden></div>
-      <div class="mn-panel" data-panel-mn="${ev.id}" hidden></div>
+      <div class="text-muted" style="font-size:0.85rem;margin-top:0.2rem;">Bokat av ${escapeHtml(bookerName)}</div>
+    </summary>`;
+
+  let html = '';
+  if (mine) {
+    html += `<div class="event-body-label">Ditt svar</div><div class="rsvp-row">`
+      + ['ja', 'kanske', 'nej'].map(s =>
+          `<button type="button" class="rsvp-btn" data-svar="${s}" data-token="${escapeHtml(mine.token)}" aria-pressed="${mine.response === s}">${SVAR_LABEL[s]}</button>`
+        ).join('')
+      + `</div>`;
+  } else if (!isBooker) {
+    html += `<p class="text-muted">Du är inte inbjuden till det här mötet.</p>`;
+  }
+
+  if ((mine || isBooker) && ev.meeting_url) {
+    html += `<div class="event-body-row"><div class="event-body-label">Videomöte</div>
+      <div><a href="${escapeHtml(ev.meeting_url)}" target="_blank" rel="noopener" style="color:var(--accent);">Gå med i videomötet</a></div></div>`;
+  }
+  if (ev.notes) {
+    html += `<div class="event-body-row"><div class="event-body-label">Anteckningar</div><div>${escapeHtml(ev.notes)}</div></div>`;
+  }
+  if (isBooker) {
+    const list = inviteesByEvent.get(ev.id) || [];
+    const c = { ja: 0, kanske: 0, nej: 0, ingen: 0 };
+    list.forEach(i => { c[i.response || 'ingen']++; });
+    html += `<div class="event-body-label" style="margin-top:0.6rem;">Inbjudna (${list.length}) · Ja ${c.ja} · Kanske ${c.kanske} · Nej ${c.nej} · Inget svar ${c.ingen}</div>`;
+    html += `<ul class="invitee-list">` + list.map(i =>
+      `<li><span>${escapeHtml(i.name)}</span><span class="text-muted">${i.response ? SVAR_LABEL[i.response] : 'Inget svar'}</span></li>`
+    ).join('') + `</ul>`;
+  }
+  (notesByEvent.get(ev.id) || []).forEach(n => {
+    html += `<div class="event-body-row"><div class="event-body-label">Anteckningar från mötet, ${formatDate(n.created_at.slice(0, 10))}</div><div>${escapeHtml(n.body)}</div></div>`;
+  });
+  if (isBooker) {
+    (notesByEvent.get(ev.id) || []).forEach(n => {
+      html += `<div style="margin:0 0 0.8rem;"><button type="button" class="rsvp-btn" data-notesend="${escapeHtml(n.id)}" data-event="${escapeHtml(ev.id)}">Skicka till inbjudna…</button></div>
+        <div data-send-note="${escapeHtml(n.id)}" hidden style="margin:0 0 0.8rem;"></div>`;
+    });
+  }
+  if (canRecord && (mine || isBooker)) {
+    html += `<div style="margin:0.4rem 0 0.8rem;">${recButtonHtml()}</div>`;
+  }
+  if (isBooker) {
+    html += `<button type="button" class="btn-outline" data-edit="${escapeHtml(ev.id)}" style="margin-right:0.5rem;">✏️ Redigera mötet</button>`;
+  }
+  if (canCancel) {
+    html +=`<button type="button" class="btn-outline" data-cancel="${escapeHtml(ev.id)}" style="border-color:#f87171;color:#fca5a5;">Avboka mötet</button>`;
+  }
+
+  const body = document.createElement('div');
+  body.innerHTML = html || '<p class="text-muted">Inga fler detaljer.</p>';
+  details.appendChild(body);
+  return details;
+}
+
+function renderMoteList(evs) {
+  const el = document.getElementById('listMote');
+  if (!evs.length) {
+    el.innerHTML = '<p class="text-muted">Inga möten bokade än. Boka ett med formuläret ovan.</p>';
+    return;
+  }
+  const todayStr = todayStockholm();
+  const upcoming = evs.filter(e => e.event_date >= todayStr);
+  const past = evs.filter(e => e.event_date < todayStr).reverse();
+  el.innerHTML = '';
+  upcoming.concat(past).forEach(ev => el.appendChild(renderMoteCard(ev, ev.event_date < todayStr)));
+}
+
+async function respond(token, svar) {
+  setStatus('moteStatus', 'Sparar ditt svar...');
+  try {
+    const res = await fetch(FN_URL('meeting-rsvp'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ token, svar }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Svaret kunde inte sparas. Försök igen.');
+    setStatus('moteStatus', `Ditt svar ${SVAR_LABEL[svar].toLowerCase()} är sparat.`);
+    await loadEvents();
+  } catch (err) {
+    setStatus('moteStatus', err.message, true);
+  }
+}
+
+async function cancelMeeting(eventId) {
+  if (!confirm('Avboka mötet? Alla inbjudna får ett avbokningsmejl.')) return;
+  setStatus('moteStatus', 'Avbokar mötet...');
+  try {
+    const r = await callFn('meeting-invite', { action: 'cancel', event_id: eventId });
+    setStatus('moteStatus', `Mötet är avbokat. ${r.sent ?? 0} avbokningsmejl skickade.`);
+    await loadEvents();
+  } catch (err) {
+    setStatus('moteStatus', err.message, true);
+  }
+}
+
+// Anropar en Edge Function som kräver inloggning
+async function callFn(name, payload) {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) throw new Error('Du behöver logga in igen.');
+  const res = await fetch(FN_URL(name), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + session.access_token,
+      apikey: SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ('Fel ' + res.status));
+  return data;
+}
+
+// ---------- anteckningar: bokaren skickar till de inbjudna ----------
+function toggleNoteSend(btn) {
+  const card = btn.closest('details');
+  const panel = card.querySelector(`[data-send-note="${CSS.escape(btn.dataset.notesend)}"]`);
+  if (!panel) return;
+  if (!panel.hidden) { panel.hidden = true; return; }
+  const list = inviteesByEvent.get(btn.dataset.event) || [];
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="book-list" style="margin:0.4rem 0;">${list.length
+      ? list.map(i => `<label class="book-person"><input type="checkbox" value="${escapeHtml(i.id)}"> ${escapeHtml(i.name)}</label>`).join('')
+      : '<p class="text-muted">Inga inbjudna till mötet.</p>'}</div>
+    <div class="book-tools">
+      <button type="button" class="btn-outline" data-notes-all>Välj alla</button>
+      <button type="button" class="btn-outline" data-notes-go>Skicka mejl</button>
+      <span data-notes-status style="font-size:0.9rem;color:var(--text-muted);"></span>
     </div>`;
+  panel.querySelector('[data-notes-all]').onclick = () => panel.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = true; });
+  panel.querySelector('[data-notes-go]').onclick = () => sendNotesFromMember(btn.dataset.notesend, panel);
 }
 
-function showTab(type) {
-  activeTab = type;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === type));
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === type));
+async function sendNotesFromMember(noteId, panel) {
+  const statusEl = panel.querySelector('[data-notes-status]');
+  const ids = [...panel.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value);
+  if (!ids.length) { statusEl.textContent = 'Välj minst en mottagare.'; return; }
+  if (!confirm(`Skicka anteckningen till ${ids.length} inbjudna? Varje person får ett eget mejl.`)) return;
+  statusEl.textContent = 'Skickar...';
+  try {
+    const r = await callFn('send-meeting-notes', { note_id: noteId, member_ids: ids });
+    statusEl.textContent = `Skickat till ${r.sent} medlem(mar)${r.failed ? `, ${r.failed} misslyckades` : ''}.`;
+    panel.querySelectorAll('input:checked').forEach(c => { c.checked = false; });
+  } catch (err) {
+    statusEl.textContent = err.message;
+  }
 }
-document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
-// ---------- månadsvy ----------
+// ---------- skärminspelning (i webbläsaren, sparas som fil på datorn) ----------
+const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia
+  && window.MediaRecorder && matchMedia('(pointer: fine)').matches);
+let recorder = null;
+let recChunks = [];
+let recStream = null;
+
+function recButtonHtml() {
+  return recorder
+    ? `<button type="button" class="rsvp-btn" data-rec="stop">⏹ Stoppa inspelning</button>`
+    : `<button type="button" class="rsvp-btn" data-rec="start">⏺ Spela in skärm</button>`;
+}
+
+async function startRec() {
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+  } catch (err) {
+    setStatus('moteStatus', 'Inspelningen startade inte. Välj vilken skärm, fönster eller flik som ska spelas in.', true);
+    return;
+  }
+  recStream = stream;
+  recChunks = [];
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' : 'video/webm';
+  recorder = new MediaRecorder(stream, { mimeType });
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
+  recorder.onstop = () => {
+    const blob = new Blob(recChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Motesinspelning-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    if (recStream) recStream.getTracks().forEach(t => t.stop());
+    recStream = null;
+    recorder = null;
+    setStatus('moteStatus', 'Inspelningen är sparad som en fil på datorn.');
+    loadEvents();
+  };
+  stream.getVideoTracks()[0].addEventListener('ended', () => stopRec());
+  recorder.start(1000);
+  setStatus('moteStatus', 'Spelar in. Tryck på Stoppa inspelning när ni är klara.');
+  loadEvents();
+}
+
+function stopRec() {
+  if (recorder && recorder.state !== 'inactive') recorder.stop();
+}
+
+// Varna om sidan stängs medan en inspelning pågår, så att den inte försvinner
+window.addEventListener('beforeunload', (e) => {
+  if (recorder) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// ---------- bokningsformulär ----------
+async function loadMembers() {
+  const box = document.getElementById('bList');
+  const { data, error } = await supabaseClient
+    .from('members').select('id, name').eq('status', 'approved').order('name');
+  if (error) {
+    box.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  membersById = new Map((data || []).map(m => [m.id, m.name]));
+  const andra = (data || []).filter(m => m.id !== me.id);
+  box.innerHTML = andra.length
+    ? andra.map(m => `<label class="book-person"><input type="checkbox" value="${escapeHtml(m.id)}"> ${escapeHtml(m.name || 'Namnlös')}</label>`).join('')
+    : '<p class="text-muted">Inga andra godkända medlemmar.</p>';
+}
+
+// Boka möte: i det stramare utseendet ligger formuläret under fliken Möten, så byt flik först
+function goBook() {
+  if (document.documentElement.getAttribute('data-ui') === 'stram') document.getElementById('tabMoteBtn').click();
+  const card = document.getElementById('bookCard');
+  card.open = true;
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+document.getElementById('bookTopBtn').addEventListener('click', goBook);
+
+// ---------- redigera ett möte (bara bokaren) ----------
+let editingId = null;
+function setEditMode(on) {
+  editingId = on || null;
+  document.querySelector('#bookCard > summary').textContent = on ? '✏️ Redigera mötet' : '➕ Boka ett möte';
+  document.getElementById('bSubmit').textContent = on ? 'Spara ändringar och meddela inbjudna' : 'Boka och skicka inbjudningar';
+  document.getElementById('bCancelEdit').hidden = !on;
+}
+function stopEdit() {
+  const form = document.getElementById('bookForm');
+  form.reset();
+  document.getElementById('bTitle').value = 'Möte';
+  document.querySelectorAll('#bList input:checked').forEach(c => { c.checked = false; });
+  setEditMode(null);
+}
+async function startEdit(eventId) {
+  const { data: ev, error } = await supabaseClient.from('events').select('*').eq('id', eventId).single();
+  if (error || !ev) return setStatus('moteStatus', 'Kunde inte hämta mötet.', true);
+  if (ev.created_by !== me.id) return setStatus('moteStatus', 'Bara den som bokat mötet kan redigera det.', true);
+  document.getElementById('bTitle').value = ev.title || '';
+  document.getElementById('bDate').value = ev.event_date || '';
+  document.getElementById('bTime').value = String(ev.event_time || '').slice(0, 5);
+  document.getElementById('bEnd').value = String(ev.end_time || '').slice(0, 5);
+  document.getElementById('bNotes').value = ev.notes || '';
+  const chosen = new Set((inviteesByEvent.get(eventId) || []).map(i => i.id));
+  document.querySelectorAll('#bList input[type=checkbox]').forEach(c => { c.checked = chosen.has(c.value); });
+  setEditMode(eventId);
+  setStatus('bStatus', 'Ändra det du vill och tryck på Spara. Inbjudna får ett mejl om ändringen.');
+  const card = document.getElementById('bookCard');
+  card.open = true;
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+document.getElementById('bCancelEdit').addEventListener('click', () => { stopEdit(); setStatus('bStatus', ''); });
+
+document.getElementById('bAll').addEventListener('click', () =>
+  document.querySelectorAll('#bList input[type=checkbox]').forEach(c => { c.checked = true; }));
+document.getElementById('bNone').addEventListener('click', () =>
+  document.querySelectorAll('#bList input[type=checkbox]').forEach(c => { c.checked = false; }));
+
+document.getElementById('bookForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const bTitle = document.getElementById('bTitle');
+  const bDate = document.getElementById('bDate');
+  const bTime = document.getElementById('bTime');
+  const bEnd = document.getElementById('bEnd');
+  const bNotes = document.getElementById('bNotes');
+  const bSubmit = document.getElementById('bSubmit');
+
+  const title = bTitle.value.trim() || 'Möte';
+  const date = bDate.value;
+  const time = bTime.value;
+  const end = bEnd.value;
+  const ids = [...document.querySelectorAll('#bList input[type=checkbox]:checked')].map(c => c.value);
+
+  if (!date || !time) return setStatus('bStatus', 'Välj datum och starttid.', true);
+  if (end && end <= time) return setStatus('bStatus', 'Sluttiden måste vara efter starttiden.', true);
+  if (!ids.length) return setStatus('bStatus', 'Bjud in minst en medlem.', true);
+
+  bSubmit.disabled = true;
+  setStatus('bStatus', 'Bokar och skickar inbjudningar...');
+  try {
+    if (editingId) {
+      const u = await callFn('meeting-invite', {
+        action: 'update', event_id: editingId, title, date, time, end_time: end || '',
+        notes: bNotes.value.trim(), member_ids: ids,
+      });
+      const fel2 = u.failed?.length ? ` Mejl misslyckades för ${u.failed.length} st.` : '';
+      stopEdit();
+      setStatus('bStatus', `Mötet är uppdaterat. ${u.sent} mejl skickade.${fel2}`);
+      await loadEvents();
+      return;
+    }
+    const r = await callFn('meeting-invite', {
+      action: 'create',
+      title,
+      date,
+      time,
+      end_time: end || undefined,
+      notes: bNotes.value.trim() || undefined,
+      member_ids: ids,
+    });
+    const fel = r.failed?.length ? ` Mejl misslyckades för ${r.failed.length} st.` : '';
+    setStatus('bStatus', `Mötet är bokat och ${r.sent} inbjudningar är skickade.${fel}`);
+    e.target.reset();
+    bTitle.value = 'Möte';
+    document.querySelectorAll('#bList input:checked').forEach(c => { c.checked = false; });
+    await loadEvents();
+  } catch (err) {
+    setStatus('bStatus', err.message || 'Något gick fel.', true);
+  } finally {
+    bSubmit.disabled = false;
+  }
+});
+
+document.getElementById('listMote').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  if (btn.dataset.svar) respond(btn.dataset.token, btn.dataset.svar);
+  if (btn.dataset.cancel) cancelMeeting(btn.dataset.cancel);
+  if (btn.dataset.edit) startEdit(btn.dataset.edit);
+  if (btn.dataset.notesend) toggleNoteSend(btn);
+  if (btn.dataset.rec === 'start') startRec();
+  if (btn.dataset.rec === 'stop') stopRec();
+});
+
+// ---------- månadsvy (alla medlemmar, inkl. stämledare) ----------
+let monthEvents = [];
 let mYear = null, mMonth = null, mSelected = null;
 function renderMonth() {
-  if (!document.getElementById('monthView')) return;
   if (mYear === null) { const t = new Date(); mYear = t.getFullYear(); mMonth = t.getMonth(); }
+  const todayYmd = todayStockholm();
   const pad = n => String(n).padStart(2, '0');
   const first = new Date(mYear, mMonth, 1);
   const startDow = (first.getDay() + 6) % 7;                 // måndag = 0
   const daysIn = new Date(mYear, mMonth + 1, 0).getDate();
   const byDay = {};
-  allEvents.forEach(ev => { (byDay[ev.event_date] = byDay[ev.event_date] || []).push(ev); });
+  monthEvents.forEach(ev => { (byDay[ev.event_date] = byDay[ev.event_date] || []).push(ev); });
   document.getElementById('mTitle').textContent = first.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' });
   let cells = ['Mån', 'Tis', 'Ons', 'Tors', 'Fre', 'Lör', 'Sön'].map(w => `<div class="m-dow">${w}</div>`).join('');
   for (let i = 0; i < startDow; i++) cells += '<div class="m-cell empty"></div>';
@@ -554,7 +655,7 @@ function renderMonth() {
     const k = `${mYear}-${pad(mMonth + 1)}-${pad(d)}`;
     const types = [...new Set((byDay[k] || []).map(e => e.event_type || 'ovrigt'))];
     const dots = types.map(t => `<span class="m-dot ${t}"></span>`).join('');
-    cells += `<button type="button" class="m-cell${k === todayStr ? ' today' : ''}${k === mSelected ? ' sel' : ''}" data-day="${k}"><span class="m-num">${d}</span><span class="m-dots">${dots}</span></button>`;
+    cells += `<button type="button" class="m-cell${k === todayYmd ? ' today' : ''}${k === mSelected ? ' sel' : ''}" data-day="${k}"><span class="m-num">${d}</span><span class="m-dots">${dots}</span></button>`;
   }
   document.getElementById('mGrid').innerHTML = cells;
   document.querySelectorAll('#mGrid .m-cell[data-day]').forEach(b => b.addEventListener('click', () => {
@@ -565,7 +666,7 @@ function renderMonth() {
   else {
     const evs = byDay[mSelected] || [];
     dayEl.innerHTML = evs.length
-      ? evs.map(ev => `<div class="m-ev"><span class="m-dot ${ev.event_type || 'ovrigt'}"></span><span>${ev.event_time ? ev.event_time.slice(0, 5) + ' ' : ''}${escapeAtt(ev.title)}</span></div>`).join('')
+      ? evs.map(ev => `<div class="m-ev"><span class="m-dot ${ev.event_type || 'ovrigt'}"></span><span>${ev.event_time ? ev.event_time.slice(0, 5) + ' ' : ''}${escapeHtml(ev.title)}</span></div>`).join('')
       : '<p class="text-muted">Inget inlagt denna dag.</p>';
   }
   if (!renderMonth.bound) {
@@ -576,753 +677,104 @@ function renderMonth() {
 }
 
 async function loadEvents() {
-  const [{ data: events, error }, { data: invites }] = await Promise.all([
-    supabaseClient.from('events').select('*, booker:members!events_created_by_fkey(name)').order('event_date').order('event_time'),
-    supabaseClient.from('meeting_invites').select('event_id, response, members(name)'),
-    loadAttendanceData(),
+  const [evRes, mineRes, bookerRes, notesRes] = await Promise.all([
+    supabaseClient.from('events').select('*').order('event_date').order('event_time'),
+    supabaseClient.from('meeting_invites').select('event_id, token, response').eq('member_id', me.id),
+    supabaseClient.from('meeting_invites').select('event_id, member_id, response, members(name)'),
+    supabaseClient.from('meeting_notes').select('id, event_id, body, created_at').order('created_at'),
   ]);
 
+  const { data: events, error } = evRes;
   if (error) {
-    document.querySelectorAll('.tab-panel').forEach(p => p.innerHTML = `<p class="error">${escapeAtt(error.message)}</p>`);
+    ['listRep', 'listKonsert', 'listOvrigt', 'listMote'].forEach(id => {
+      document.getElementById(id).innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
+    });
     return;
   }
 
-  moteInvites.clear();
-  (invites || []).forEach(r => {
-    const arr = moteInvites.get(r.event_id) || [];
-    arr.push({ name: r.members?.name, response: r.response });
-    moteInvites.set(r.event_id, arr);
-  });
-  const byType = { rep: [], konsert: [], mote: [], ovrigt: [] };
-  allEvents = new Map((events || []).map(ev => [String(ev.id), ev]));
-  (events || []).forEach(ev => (byType[ev.event_type] || byType.ovrigt).push(ev));
-
-  Object.entries(byType).forEach(([type, list]) => {
-    const upcoming = list.filter(ev => ev.event_date >= todayStr);
-    const past = list.filter(ev => ev.event_date < todayStr).reverse();   // senaste först
-    const panel = document.querySelector(`.tab-panel[data-panel="${type}"]`);
-    let html = upcoming.length
-      ? upcoming.map(eventHtml).join('')
-      : `<p class="text-muted">${EMPTY_LABELS[type]}</p>`;
-    if (past.length) {
-      const open = openPastGroups.has(type) ? 'open' : '';
-      html += `<details class="past-group" data-type="${type}" ${open}><summary>Tidigare (${past.length})</summary>${past.map(eventHtml).join('')}</details>`;
-    }
-    panel.innerHTML = html;
-    document.querySelector(`.tab-btn[data-tab="${type}"] .count`).textContent = upcoming.length ? `(${upcoming.length})` : '';
-  });
-  document.querySelectorAll('details.past-group').forEach(d => d.addEventListener('toggle', () => {
-    d.open ? openPastGroups.add(d.dataset.type) : openPastGroups.delete(d.dataset.type);
-  }));
-  renderMonth();
-  initAttExport();
-
-  document.querySelectorAll('.att-btn').forEach(btn => {
-    const id = btn.dataset.id;
-    const ev = events.find(x => String(x.id) === id);
-    const panel = document.querySelector(`.att-panel[data-panel-att="${CSS.escape(id)}"]`);
-    const setState = isOpen => {
-      panel.hidden = !isOpen;
-      btn.classList.toggle('open', isOpen);
-      btn.setAttribute('aria-expanded', isOpen);
-      btn.textContent = `Närvaro (${attCount(ev.id)}) ${isOpen ? '▴' : '▾'}`;
-      if (isOpen) { renderAttPanel(ev.id, panel); openPanels.add(id); } else openPanels.delete(id);
-    };
-    if (openPanels.has(id)) setState(true);
-    btn.addEventListener('click', () => setState(panel.hidden));
+  // Inbjudningar: tolereras om tabellen saknas (migrationen inte körd än), så att resten av kalendern fungerar
+  myInvites = new Map((mineRes.data || []).map(r => [r.event_id, { token: r.token, response: r.response }]));
+  inviteesByEvent = new Map();
+  (bookerRes.data || []).forEach(r => {
+    const arr = inviteesByEvent.get(r.event_id) || [];
+    arr.push({ id: r.member_id, name: r.members?.name || 'Okänd', response: r.response });
+    inviteesByEvent.set(r.event_id, arr);
   });
 
-  document.querySelectorAll('.edit-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const ev = events.find(x => String(x.id) === btn.dataset.id);
-      if (!ev) return;
-      if (!ev.series_id) { startEdit(ev); return; }
-      const scope = await askSeriesScope(ev, events.filter(x => x.series_id === ev.series_id).length);
-      if (scope) startEdit(ev, scope);
-    });
-  });
-
-  document.querySelectorAll('.deleteEventBtn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const { id, series } = e.currentTarget.dataset;
-      const msg = series ? 'Ta bort ALLA tillfällen i serien?' : 'Ta bort denna händelse?';
-      if (!confirm(msg)) return;
-      const query = supabaseClient.from('events').delete();
-      const { error } = await (series ? query.eq('series_id', series) : query.eq('id', id));
-      if (error) { alert(error.message); return; }
-      if (editing && ((id && String(editing.id) === id) || (series && editing.series_id === series))) stopEdit();
-      loadEvents();
-    });
-  });
-}
-
-// ---------- Redigera ----------
-let editing = null;   // händelsen som redigeras, annars null
-const $f = id => document.getElementById(id);
-const scopeValue = () => (document.querySelector('input[name="evScope"]:checked') || {}).value || 'one';
-
-// Frågar om ändringen gäller ett tillfälle eller hela serien. Svarar 'one', 'all' eller null (avbryt).
-function askSeriesScope(ev, count) {
-  return new Promise(resolve => {
-    const wrap = document.createElement('div');
-    wrap.className = 'choice-backdrop';
-    wrap.innerHTML = `
-      <div class="choice-box" role="dialog" aria-modal="true" aria-labelledby="choiceTitle">
-        <h3 id="choiceTitle">Redigera återkommande händelse</h3>
-        <p>"${escapeAtt(ev.title)}" ingår i en serie med ${count} tillfällen. Vad vill du ändra?</p>
-        <div class="choice-btns">
-          <button type="button" data-v="one">Bara ${formatDate(ev.event_date)}</button>
-          <button type="button" data-v="all">Alla tillfällen i serien</button>
-          <button type="button" class="btn-outline" data-v="">Avbryt</button>
-        </div>
-      </div>`;
-    const done = v => { wrap.remove(); document.removeEventListener('keydown', onKey); resolve(v || null); };
-    const onKey = e => { if (e.key === 'Escape') done(null); };
-    wrap.addEventListener('click', e => {
-      if (e.target === wrap) return done(null);
-      const b = e.target.closest('button[data-v]');
-      if (b) done(b.dataset.v);
-    });
-    document.addEventListener('keydown', onKey);
-    document.body.appendChild(wrap);
-    wrap.querySelector('button[data-v="one"]').focus();
-  });
-}
-
-function startEdit(ev, scope) {
-  if (!ev) return;
-  editing = ev;
-  $f('addEventForm').reset();
-  $f('evTitle').value = ev.title || '';
-  $f('evType').value = ev.event_type || 'rep';
-  $f('evDate').value = ev.event_date || '';
-  $f('evTime').value = ev.event_time ? ev.event_time.slice(0, 5) : '';
-  $f('evEndTime').value = ev.end_time ? ev.end_time.slice(0, 5) : '';
-  refreshTimePickers();
-  $f('evLocation').value = ev.location || '';
-  $f('evNotes').value = ev.notes || '';
-  $f('repeatRow').hidden = true;
-  $f('evRepeat').value = '';
-  $f('evRepeatUntil').required = false;
-  $f('scopeWrap').hidden = !ev.series_id;
-  document.querySelector(`input[name="evScope"][value="${scope === 'all' && ev.series_id ? 'all' : 'one'}"]`).checked = true;
-  updateScopeUi();
-  $f('formHeading').textContent = scope === 'all' && ev.series_id ? 'Redigera hela serien' : 'Redigera händelse';
-  $f('submitBtn').textContent = 'Spara ändringar';
-  $f('cancelEditBtn').hidden = false;
-  $f('eventFormCard').classList.add('editing');
-  $f('addEventError').textContent = '';
-  document.querySelectorAll('.event-item.editing').forEach(x => x.classList.remove('editing'));
-  const row = document.querySelector(`.edit-btn[data-id="${CSS.escape(String(ev.id))}"]`);
-  if (row) row.closest('.event-item').classList.add('editing');
-  $f('eventFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  setTimeout(() => $f('evNotes').focus({ preventScroll: true }), 400);
-}
-
-function stopEdit() {
-  editing = null;
-  $f('addEventForm').reset();
-  $f('repeatRow').hidden = false;
-  $f('evRepeatUntilWrap').hidden = true;
-  $f('scopeWrap').hidden = true;
-  $f('evDate').disabled = false;
-  $f('formHeading').textContent = 'Lägg till händelse';
-  $f('submitBtn').textContent = 'Lägg till';
-  $f('cancelEditBtn').hidden = true;
-  $f('eventFormCard').classList.remove('editing');
-  $f('addEventError').textContent = '';
-  document.querySelectorAll('.event-item.editing').forEach(x => x.classList.remove('editing'));
-}
-
-// Vid "Alla tillfällen" ändras inte datumet (varje tillfälle behåller sitt eget datum)
-function updateScopeUi() {
-  const all = editing && editing.series_id && scopeValue() === 'all';
-  if (editing) $f('formHeading').textContent = all ? 'Redigera hela serien' : 'Redigera händelse';
-  $f('evDate').disabled = !!all;
-  $f('evDate').title = all ? 'Datumet ändras inte när hela serien redigeras' : '';
-}
-document.querySelectorAll('input[name="evScope"]').forEach(r => r.addEventListener('change', updateScopeUi));
-$f('cancelEditBtn').addEventListener('click', stopEdit);
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && editing) stopEdit(); });
-
-async function saveEdit(errorEl) {
-  const startTime = $f('evTime').value || null;
-  const endTime   = $f('evEndTime').value || null;
-  if (endTime && !startTime) { errorEl.textContent = 'Ange en starttid om du anger en sluttid.'; return; }
-  if (endTime && endTime <= startTime) { errorEl.textContent = 'Sluttiden måste vara efter starttiden.'; return; }
-
-  const changes = {
-    title: $f('evTitle').value,
-    event_type: $f('evType').value,
-    event_time: startTime,
-    end_time: endTime,
-    location: $f('evLocation').value || null,
-    notes: $f('evNotes').value || null,
-  };
-  const all = editing.series_id && scopeValue() === 'all';
-  let query = supabaseClient.from('events');
-  if (all) {
-    query = query.update(changes).eq('series_id', editing.series_id);
-  } else {
-    if (!$f('evDate').value) { errorEl.textContent = 'Välj ett datum.'; return; }
-    query = query.update({ ...changes, event_date: $f('evDate').value }).eq('id', editing.id);
-  }
-  $f('submitBtn').disabled = true;
-  const { error } = await query;
-  $f('submitBtn').disabled = false;
-  if (error) { errorEl.textContent = error.message; return; }
-  stopEdit();
-  showTab(changes.event_type);
-  loadEvents();
-}
-
-document.getElementById('addEventForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const errorEl = document.getElementById('addEventError');
-  errorEl.textContent = '';
-  if (editing) { await saveEdit(errorEl); return; }
-
-  const startDate = document.getElementById('evDate').value;
-  const startTime = document.getElementById('evTime').value || null;
-  const endTime   = document.getElementById('evEndTime').value || null;
-  const repeat    = document.getElementById('evRepeat').value;
-  const until     = document.getElementById('evRepeatUntil').value;
-
-  if (endTime && !startTime) { errorEl.textContent = 'Ange en starttid om du anger en sluttid.'; return; }
-  if (endTime && endTime <= startTime) { errorEl.textContent = 'Sluttiden måste vara efter starttiden.'; return; }
-  if (repeat && !until) { errorEl.textContent = 'Välj hur länge händelsen ska upprepas.'; return; }
-  if (repeat && until < startDate) { errorEl.textContent = '"Till och med" måste vara efter startdatumet.'; return; }
-
-  const dates = buildDates(startDate, repeat, until);
-  if (repeat && dates.length >= MAX_OCCURRENCES &&
-      !confirm(`Serien begränsas till ${MAX_OCCURRENCES} tillfällen (t.o.m. ${dates[dates.length - 1]}). Fortsätta?`)) return;
-
-  const seriesId = dates.length > 1 ? crypto.randomUUID() : null;
-  const base = {
-    title: document.getElementById('evTitle').value,
-    event_type: document.getElementById('evType').value,
-    event_time: startTime,
-    end_time: endTime,
-    location: document.getElementById('evLocation').value || null,
-    notes: document.getElementById('evNotes').value || null,
-    series_id: seriesId,
-  };
-
-  const { error } = await supabaseClient.from('events')
-    .insert(dates.map(d => ({ ...base, event_date: d })));
-
-  if (error) { errorEl.textContent = error.message; return; }
-
-  document.getElementById('addEventForm').reset();
-  document.getElementById('evRepeatUntilWrap').hidden = true;
-  showTab(base.event_type);
-  loadEvents();
-});
-
-document.getElementById('evRepeat').addEventListener('change', (e) => {
-  const wrap = document.getElementById('evRepeatUntilWrap');
-  wrap.hidden = !e.target.value;
-  document.getElementById('evRepeatUntil').required = !!e.target.value;
-});
-
-// ---------- Tidsväljare ----------
-// Skriv "19", "1900", "19.00" eller "19:00" → 19:00. −/+ , piltangenter och mushjul = 15 min per steg.
-// Radera texten för att ta bort tiden.
-const TP_STEP = 15;
-const tpToMin = v => { const [h, m] = v.split(':').map(Number); return h * 60 + m; };
-const tpFmt = m => { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
-function tpParse(str) {
-  const d = String(str).replace(/\D/g, '');
-  if (!d) return '';
-  let h, m;
-  if (d.length <= 2) { h = +d; m = 0; }
-  else if (d.length === 3) { h = +d[0]; m = +d.slice(1); }
-  else { h = +d.slice(0, 2); m = +d.slice(2, 4); }
-  if (h > 23 || m > 59) return null;
-  return tpFmt(h * 60 + m);
-}
-
-function initTimePicker(wrap) {
-  const hidden = $f(wrap.dataset.target);
-  const isEnd = wrap.dataset.target === 'evEndTime';
-  wrap.innerHTML = `
-    <button type="button" class="tp-step" data-d="-1" aria-label="15 minuter tidigare">−</button>
-    <input type="text" class="tp-text" inputmode="numeric" placeholder="--:--" maxlength="5" autocomplete="off" aria-label="${isEnd ? 'Sluttid' : 'Starttid'}">
-    <button type="button" class="tp-step" data-d="1" aria-label="15 minuter senare">+</button>`;
-  const text = wrap.querySelector('.tp-text');
-
-  const show = () => { text.value = hidden.value || ''; text.classList.remove('invalid'); };
-  const set = v => { hidden.value = v || ''; show(); };
-  wrap._refresh = show;
-
-  // Startvärde när fältet är tomt: sluttid = starttid + 2 h, annars 19:00
-  const defaultValue = () => {
-    const start = $f('evTime').value;
-    if (isEnd && start) return tpFmt(tpToMin(start) + 120);
-    return isEnd ? '21:00' : '19:00';
-  };
-  const step = dir => {
-    if (!hidden.value) { set(defaultValue()); return; }
-    const cur = tpToMin(hidden.value);
-    const next = dir > 0 ? Math.floor(cur / TP_STEP) * TP_STEP + TP_STEP : Math.ceil(cur / TP_STEP) * TP_STEP - TP_STEP;
-    set(tpFmt(next));
-  };
-
-  wrap.querySelectorAll('.tp-step').forEach(b => b.addEventListener('click', () => step(+b.dataset.d)));
-
-  const commit = () => {
-    const v = tpParse(text.value);
-    if (v === null) { text.classList.add('invalid'); return false; }
-    set(v); return true;
-  };
-  text.addEventListener('blur', commit);
-  text.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); commit(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); commit(); step(1); }
-    else if (e.key === 'ArrowDown') { e.preventDefault(); commit(); step(-1); }
-  });
-  text.addEventListener('input', () => text.classList.remove('invalid'));
-
-  // Mushjul: exakt ett steg per "hack", aldrig flera timmar på en gång
-  let acc = 0, lastStep = 0, lastEvent = 0;
-  wrap.addEventListener('wheel', e => {
-    e.preventDefault();
-    const now = Date.now();
-    // Ny gest eller bytt riktning → börja om, så att gammal fart inte följer med
-    if (now - lastEvent > 250 || Math.sign(e.deltaY) !== Math.sign(acc)) acc = 0;
-    lastEvent = now;
-    acc += e.deltaY;
-    if (Math.abs(acc) >= 40 && now - lastStep > 120) {
-      step(acc < 0 ? 1 : -1);
-      acc = 0; lastStep = now;
-    }
-  }, { passive: false });
-
-  show();
-}
-
-function refreshTimePickers() { document.querySelectorAll('.tp').forEach(w => w._refresh && w._refresh()); }
-document.querySelectorAll('.tp').forEach(initTimePicker);
-// form.reset() tömmer de dolda fälten – uppdatera visningen efteråt
-// (dolda fält nollställs inte av reset, så de töms här – innan ev. nya värden sätts i startEdit)
-$f('addEventForm').addEventListener('reset', () => {
-  $f('evTime').value = ''; $f('evEndTime').value = '';
-  setTimeout(refreshTimePickers, 0);
-});
-// Skriven tid som inte bekräftats med Enter/blur ska ändå räknas när man sparar
-$f('addEventForm').addEventListener('submit', () => {
-  document.querySelectorAll('.tp .tp-text').forEach(t => { const v = tpParse(t.value); if (v !== null) $f(t.closest('.tp').dataset.target).value = v; });
-}, true);
-
-
-// ---------- Mötesanteckningar (taligenkänning i webbläsaren, Web Speech API) ----------
-const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-let notesByEvent = new Map();   // eventId -> [{id, body, created_at}]
-let allEvents = new Map();      // eventId -> event
-let mnRecognizer = null, mnRecording = false, mnBaseText = '';
-
-function fmtNoteTime(iso) {
-  return new Date(iso).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-}
-
-async function loadNotes() {
-  const { data, error } = await supabaseClient.from('meeting_notes').select('*').order('created_at', { ascending: false });
+  // Anteckningar: RLS släpper bara igenom möten man är inbjuden till. Tolereras om tabellen saknas.
   notesByEvent = new Map();
-  if (error) { console.warn('meeting_notes saknas – kör migrationen 2026-10-13_meeting_notes.sql', error.message); return false; }
-  (data || []).forEach(n => {
-    const k = String(n.event_id);
-    if (!notesByEvent.has(k)) notesByEvent.set(k, []);
-    notesByEvent.get(k).push(n);
+  (notesRes.data || []).forEach(n => {
+    const arr = notesByEvent.get(n.event_id) || [];
+    arr.push({ id: n.id, body: n.body, created_at: n.created_at });
+    notesByEvent.set(n.event_id, arr);
   });
-  return true;
+
+  const byType = { rep: [], konsert: [], mote: [], ovrigt: [] };
+  (events || []).forEach(ev => {
+    (byType[ev.event_type] || byType.ovrigt).push(ev);
+  });
+
+  renderGroup(document.getElementById('listRep'), byType.rep, 'rep');
+  renderGroup(document.getElementById('listKonsert'), byType.konsert, 'konsert');
+  renderGroup(document.getElementById('listOvrigt'), byType.ovrigt, 'ovrigt');
+  renderMoteList(byType.mote);
+  monthEvents = events || [];
+  renderMonth();
+  if (document.documentElement.getAttribute('data-ui') === 'stram') renderNext(events || []);
 }
 
-function noteItemHtml(n, showEvent) {
-  const ev = allEvents.get(String(n.event_id));
-  const when = (showEvent && ev ? `${formatDate(ev.event_date)} — ${escapeAtt(ev.title)} · ` : '') + fmtNoteTime(n.created_at);
-  const preview = n.body.replace(/\s+/g, ' ').slice(0, 90);
-  return `<details class="mn-note" data-note="${n.id}">
-    <summary><span class="mn-when">${n.visible_to_members ? '👥 ' : ''}${when}</span><span class="mn-preview">${escapeAtt(preview)}${n.body.length > 90 ? '…' : ''}</span></summary>
-    <div class="mn-note-body">${escapeAtt(n.body)}</div>
-    <div class="mn-note-actions">
-      <button type="button" class="btn-outline mn-send" data-note="${n.id}">Skicka till…</button>
-      <button type="button" class="btn-outline mn-exp-txt" data-note="${n.id}">Till .txt</button>
-      <button type="button" class="btn-outline mn-exp-doc" data-note="${n.id}">Till Word</button>
-      <button type="button" class="btn-outline mn-vis-toggle" data-note="${n.id}" data-vis="${n.visible_to_members ? '1' : '0'}">${n.visible_to_members ? 'Dölj för medlemmar' : 'Visa för medlemmar'}</button>
-      <button type="button" class="btn-danger mn-del" data-note="${n.id}">Ta bort</button>
-    </div>
-    <div class="mn-send-panel" data-send="${n.id}" hidden></div>
-  </details>`;
+// ---------- Stramt utseende (test): nästa händelse överst, Boka möte under fliken Möten ----------
+const NEXT_TYPE = { rep: 'Repetition', konsert: 'Konsert', mote: 'Möte', ovrigt: 'Övrigt' };
+function renderNext(events) {
+  const el = document.getElementById('nextCard');
+  const today = todayStockholm();
+  const ev = events.find(e => e.event_date >= today);
+  if (!ev) { el.hidden = true; return; }
+  const loc = ev.location ? `<span class="next-loc">${escapeHtml(ev.location)}</span>` : '';
+  el.innerHTML = `
+    <div class="next-k">Nästa · ${NEXT_TYPE[ev.event_type] || 'Händelse'}</div>
+    <div class="next-t">${escapeHtml(ev.title)}</div>
+    <div class="next-d">${formatDate(ev.event_date)}${timeRange(ev)}</div>${loc}
+    <div class="next-actions">
+      ${ev.location ? `<a class="btn btn-outline" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.location)}">Vägbeskrivning</a>` : ''}
+      <button type="button" class="btn-outline" id="nextIcs">Lägg till i min kalender</button>
+    </div>`;
+  el.hidden = false;
+  document.getElementById('nextIcs').addEventListener('click', () => downloadIcs(ev));
 }
-
-// Växla om anteckningen syns för alla godkända medlemmar
-document.addEventListener('click', async (e) => {
-  const b = e.target.closest('.mn-vis-toggle');
-  if (!b) return;
-  const vis = b.dataset.vis !== '1';
-  b.disabled = true;
-  const { error } = await supabaseClient.from('meeting_notes').update({ visible_to_members: vis }).eq('id', b.dataset.note);
-  if (error) { alert('Kunde inte ändra synligheten: ' + error.message); b.disabled = false; return; }
-  await loadNotes();
-  renderAllNotes();
-  updateNoteCounts();
-});
-
-// ---------- Export ----------
-let mnFiltered = [];
-
-function noteEventLabel(n) {
-  const ev = allEvents.get(String(n.event_id));
-  return ev ? `${formatDate(ev.event_date)} — ${ev.title}` : 'Ingen händelse';
-}
-
-function exportNotesFile(notes, baseName, kind) {
-  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  let content, mime, ext;
-  if (kind === 'txt') {
-    ext = 'txt'; mime = 'text/plain;charset=utf-8';
-    content = notes.map(n => `${noteEventLabel(n)}\n${fmtNoteTime(n.created_at)}\n\n${n.body}`).join('\n\n----------\n\n');
-  } else {
-    // Word öppnar HTML-baserade .doc-filer direkt
-    ext = 'doc'; mime = 'application/msword';
-    const parts = notes.map(n => `<h2>${esc(noteEventLabel(n))}</h2><p><i>${esc(fmtNoteTime(n.created_at))}</i></p><p style="white-space:pre-wrap">${esc(n.body)}</p>`);
-    content = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${esc(baseName)}</title></head><body style="font-family:Calibri,Arial,sans-serif">${parts.join('<hr>')}</body></html>`;
+function downloadIcs(ev) {
+  const d = ev.event_date.replace(/-/g, '');
+  const t = (x) => x ? x.slice(0, 5).replace(':', '') + '00' : '';
+  const start = ev.event_time ? `DTSTART;TZID=Europe/Stockholm:${d}T${t(ev.event_time)}` : `DTSTART;VALUE=DATE:${d}`;
+  let end = '';
+  if (ev.event_time) {
+    let et = ev.end_time;
+    if (!et) { const [h, m] = ev.event_time.split(':').map(Number); et = String(Math.min(h + 2, 23)).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }
+    end = `DTEND;TZID=Europe/Stockholm:${d}T${t(et)}`;
   }
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
+  const esc = (x) => String(x || '').replace(/[\\,;]/g, m => '\\' + m).replace(/\n/g, '\\n');
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Heavy Voices//Kalender//SV', 'BEGIN:VEVENT',
+    `UID:hv-${ev.id}@heavyvoices.se`, 'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z',
+    start, end, `SUMMARY:${esc(ev.title)}`, ev.location ? `LOCATION:${esc(ev.location)}` : '', ev.notes ? `DESCRIPTION:${esc(ev.notes)}` : '',
+    'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
   const a = document.createElement('a');
-  a.href = url; a.download = `${baseName}.${ext}`;
+  a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+  a.download = (ev.title || 'handelse').replace(/[^\wåäöÅÄÖ -]/g, '') + '.ics';
   document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
-
-function todayFileStamp() { return new Date().toISOString().slice(0, 10); }
-
-function updateNoteCounts() {
-  document.querySelectorAll('.mn-open').forEach(b => {
-    const n = (notesByEvent.get(String(b.dataset.id)) || []).length;
-    b.textContent = n ? `🎙 Anteckningar (${n})` : '🎙 Anteckningar';
-  });
+if (document.documentElement.getAttribute('data-ui') === 'stram') {
+  const bc = document.getElementById('bookCard'), mp = document.getElementById('tabMote');
+  if (bc && mp) mp.prepend(bc);
 }
-
-function renderAllNotes() {
-  const q = (document.getElementById('mnSearch').value || '').trim().toLowerCase();
-  const list = [...notesByEvent.values()].flat()
-    .filter(n => !q || n.body.toLowerCase().includes(q) || ((allEvents.get(String(n.event_id)) || {}).title || '').toLowerCase().includes(q))
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
-  mnFiltered = list;
-  document.getElementById('mnAll').innerHTML = list.length
-    ? list.map(n => noteItemHtml(n, true)).join('')
-    : `<p class="text-muted">${q ? 'Inga träffar.' : 'Inga anteckningar sparade än.'}</p>`;
-  document.getElementById('mnSection').hidden = false;
-  bindNoteDeletes(document.getElementById('mnAll'));
-}
-
-// ---------- Skicka anteckning som mejl till valda medlemmar ----------
-let mailMembers = null;
-async function getMailMembers() {
-  if (!mailMembers) {
-    const { data, error } = await supabaseClient.from('members').select('id, name, email').eq('status', 'approved').order('name');
-    if (error) throw error;
-    mailMembers = data || [];
-  }
-  return mailMembers;
-}
-
-function bindNoteSend(root) {
-  root.querySelectorAll('.mn-send').forEach(b => b.onclick = async (e) => {
-    e.preventDefault();
-    const noteId = b.dataset.note;
-    const panel = root.querySelector(`.mn-send-panel[data-send="${CSS.escape(String(noteId))}"]`);
-    if (!panel) return;
-    if (!panel.hidden) { panel.hidden = true; return; }
-    panel.hidden = false;
-    panel.innerHTML = '<p class="text-muted">Laddar medlemmar...</p>';
-    try {
-      const members = await getMailMembers();
-      panel.innerHTML = `
-        <div class="mn-send-list">${members.filter(m => m.email).map(m =>
-          `<label><input type="checkbox" value="${escapeAtt(m.id)}"> ${escapeAtt(m.name || m.email)}</label>`).join('')}</div>
-        <div class="mn-note-actions">
-          <button type="button" class="btn-outline mn-send-all">Välj alla</button>
-          <button type="button" class="btn-outline mn-send-go">Skicka mejl</button>
-          <span class="mn-send-status text-muted"></span>
-        </div>`;
-    } catch (err) {
-      panel.innerHTML = `<p class="error">${escapeAtt(err.message)}</p>`;
-      return;
-    }
-    panel.querySelector('.mn-send-all').onclick = () => panel.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = true; });
-    panel.querySelector('.mn-send-go').onclick = () => sendNoteMail(noteId, panel);
-  });
-}
-
-async function sendNoteMail(noteId, panel) {
-  const statusEl = panel.querySelector('.mn-send-status');
-  const note = [...notesByEvent.values()].flat().find(n => String(n.id) === String(noteId));
-  if (!note) { statusEl.textContent = 'Anteckningen finns inte längre.'; return; }
-  const ids = [...panel.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value);
-  if (!ids.length) { statusEl.textContent = 'Välj minst en mottagare.'; return; }
-  if (!confirm(`Skicka anteckningen till ${ids.length} medlem(mar)? Mejlet går till varje mottagare med egen adress.`)) return;
-
-  statusEl.textContent = 'Skickar...';
-  try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-meeting-notes`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'apikey': SUPABASE_ANON_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ note_id: note.id, member_ids: ids }),
-    });
-    const result = await res.json().catch(() => ({}));
-    if (!res.ok) { statusEl.textContent = 'Kunde inte skicka: ' + (result.error || `fel ${res.status}`); return; }
-    statusEl.textContent = `Skickat till ${result.sent} medlem(mar)${result.failed ? `, ${result.failed} misslyckades` : ''}.`;
-    panel.querySelectorAll('input[type=checkbox]:checked').forEach(c => { c.checked = false; });
-  } catch (err) {
-    statusEl.textContent = 'Kunde inte skicka: ' + err.message;
-  }
-}
-
-function bindNoteDeletes(root) {
-  bindNoteSend(root);
-  const findNote = id => [...notesByEvent.values()].flat().find(n => String(n.id) === String(id));
-  root.querySelectorAll('.mn-exp-txt').forEach(b => b.onclick = (e) => { e.preventDefault(); const n = findNote(b.dataset.note); if (n) exportNotesFile([n], `Mote-${todayFileStamp()}-${n.id.slice(0, 8)}`, 'txt'); });
-  root.querySelectorAll('.mn-exp-doc').forEach(b => b.onclick = (e) => { e.preventDefault(); const n = findNote(b.dataset.note); if (n) exportNotesFile([n], `Mote-${todayFileStamp()}-${n.id.slice(0, 8)}`, 'doc'); });
-  root.querySelectorAll('.mn-del').forEach(btn => btn.onclick = async (e) => {
-    e.preventDefault();
-    if (!confirm('Ta bort anteckningen?')) return;
-    const { error } = await supabaseClient.from('meeting_notes').delete().eq('id', btn.dataset.note);
-    if (error) { alert('Kunde inte ta bort: ' + error.message); return; }
-    await loadNotes(); renderAllNotes(); updateNoteCounts();
-    const evPanel = btn.closest('.mn-panel');
-    if (evPanel && !mnRecording) renderEventNotes(evPanel.dataset.panelMn, evPanel);
-  });
-}
-
-function renderEventNotes(evId, panel) {
-  const saved = notesByEvent.get(String(evId)) || [];
-  panel.innerHTML = `
-    <div class="mn-rec">
-      <span class="mn-dot"></span>
-      <button type="button" class="mn-rec-btn btn-gold">${mnRecording && mnRecording === String(evId) ? 'Stoppa' : 'Spela in'}</button>
-      <span class="text-muted" style="font-size:0.85rem;">${SpeechRec ? 'Talet skrivs ut medan du pratar. Redigera gärna efteråt.' : 'Din webbläsare saknar taligenkänning – använd Chrome eller Edge. Du kan skriva direkt i rutan.'}</span>
-    </div>
-    <div class="mn-interim text-muted" style="font-style:italic; min-height:1.2em; font-size:0.9rem; margin-bottom:0.3rem;"></div>
-    <textarea class="mn-area" placeholder="Anteckningar från mötet..."></textarea>
-    <div class="actions" style="margin-top:0.6rem; display:flex; gap:0.6rem;">
-      <label style="display:flex; align-items:center; gap:0.4rem;"><input type="checkbox" class="mn-vis"> Synlig för alla medlemmar</label>
-      <button type="button" class="mn-save">Spara anteckning</button>
-      <button type="button" class="btn-outline mn-clear">Rensa</button>
-      <button type="button" class="btn-outline mn-close" style="margin-left:auto;">✕ Stäng</button>
-      <span class="mn-err error"></span>
-    </div>
-    <div class="mn-saved">${saved.length ? `<h4 style="margin:0.6rem 0;">Sparade (${saved.length})</h4>` + saved.map(n => noteItemHtml(n, false)).join('') : '<p class="text-muted">Inga sparade anteckningar för den här händelsen.</p>'}</div>`;
-
-  const area = panel.querySelector('.mn-area');
-  const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-  if (SpeechRec && IS_IOS) panel.querySelector('.mn-rec span.text-muted').textContent = 'På iPhone/iPad är taligenkänningen opålitlig (upprepningar, avbrott). Använd dator med Chrome eller Edge för inspelning, eller skriv direkt i rutan.';
-  const recBtn = panel.querySelector('.mn-rec-btn');
-  const recWrap = panel.querySelector('.mn-rec');
-  if (mnRecording === String(evId)) recWrap.classList.add('live');
-
-  recBtn.onclick = () => {
-    if (!SpeechRec) return;
-    if (mnRecording === String(evId)) { stopRecording(); return; }
-    if (mnRecording) stopRecording();
-    startRecording(evId, area, recBtn, recWrap);
-  };
-  panel.querySelector('.mn-clear').onclick = () => { area.value = ''; };
-  panel.querySelector('.mn-close').onclick = () => {
-    if (area.value.trim() && !confirm('Stäng utan att spara? Texten i rutan försvinner.')) return;
-    closeNotePanel(evId, panel);
-  };
-  panel.querySelector('.mn-save').onclick = async () => {
-    const err = panel.querySelector('.mn-err'); err.textContent = '';
-    const body = area.value.trim();
-    if (!body) { err.textContent = 'Anteckningen är tom.'; return; }
-    const visible_to_members = panel.querySelector('.mn-vis').checked;
-    const { error } = await supabaseClient.from('meeting_notes').insert({ event_id: evId, body, created_by: adminId, visible_to_members });
-    if (error) { err.textContent = error.message; return; }
-    await loadNotes();
-    renderAllNotes();
-    updateNoteCounts();
-    closeNotePanel(evId, panel);   // klart – stäng kortet
-  };
-  bindNoteDeletes(panel);
-}
-
-// Stänger anteckningspanelen för en händelse (avbryter ev. inspelning)
-function closeNotePanel(evId, panel) {
-  if (mnRecording === String(evId)) stopRecording();
-  panel.hidden = true;
-  const btn = document.querySelector(`.mn-open[data-id="${CSS.escape(String(evId))}"]`);
-  if (btn) btn.setAttribute('aria-expanded', 'false');
-}
-
-// Gör en slutgiltig fras läsbar: stor bokstav i början och punkt i slutet.
-// Taligenkänningen ger ingen interpunktion, så det här är en grov gissning vid pauser.
-// iPhone/iPad (Safari) ger ofta upprepade ord ("Malla Malla Malla"). Slå ihop direkt intill varandra.
-function dedupeWords(t) {
-  const out = [];
-  t.trim().split(/\s+/).forEach(w => {
-    if (!w) return;
-    const prev = out[out.length - 1];
-    if (!prev || prev.toLowerCase() !== w.toLowerCase()) out.push(w);
-  });
-  return out.join(' ');
-}
-
-// Slår ihop fraser som upprepas: samma fras två gånger, eller en fras som bara växer från föregående.
-function mergeItems(items) {
-  const norm = x => x.toLowerCase().replace(/[.,!?;:]/g, '').replace(/\s+/g, ' ').trim();
-  const out = [];
-  items.forEach(it => {
-    const n = norm(it.t);
-    if (!n) return;
-    const last = out[out.length - 1];
-    if (last) {
-      const ln = norm(last.t);
-      if (ln === n || ln.includes(n)) return;                  // dubblett eller kortare del av föregående
-      if (n.startsWith(ln)) { out[out.length - 1] = { t: it.t, gap: last.gap }; return; } // förlängning
-    }
-    out.push({ t: it.t, gap: it.gap });
-  });
-  return out;
-}
-
-// Bygger texten utifrån pauserna före varje fras:
-//  ≥ 5 s tyst → punkt + ny rad (stor bokstav)
-//  ≥ 3 s tyst → punkt + stor bokstav
-//  annars     → samma mening
-function buildText(items, startsFresh) {
-  let out = '';
-  items.forEach((it, i) => {
-    const t = dedupeWords(it.t);
-    if (!t) return;
-    const endPunct = out && !/[.!?]\s*$/.test(out) ? '.' : '';
-    if (!out) { out = startsFresh ? cap(t) : t; return; }
-    if (it.gap >= 5000) out = out.replace(/\s*$/, '') + endPunct + '\n' + cap(t);
-    else if (it.gap >= 3000) out = out.replace(/\s*$/, '') + endPunct + ' ' + cap(t);
-    else out = out + ' ' + t;
-  });
-  return out;
-}
-
-function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
-
-function startRecording(evId, area, recBtn, recWrap) {
-  const interimEl = recWrap.parentElement.querySelector('.mn-interim');
-  mnRecognizer = new SpeechRec();
-  mnRecognizer.lang = 'sv-SE';
-  mnRecognizer.continuous = true;
-  mnRecognizer.interimResults = true;
-  mnRecording = String(evId);
-  // Text från tidigare sessioner (efter omstart)
-  const hasBase = !!area.value.trim();
-  let sessionBase = hasBase ? area.value.trimEnd() + ' ' : '';
-  let committed = sessionBase;
-  // Pausmätning: tiden sedan webbläsaren senast skickade någon text.
-  // Under tal kommer nya händelser hela tiden, så en lång tystnad mellan två händelser = en paus.
-  // (Talhändelser som speechstart/speechend stöds inte av alla webbläsare, därför mäter vi så här.)
-  let lastEventAt = 0;
-  const gaps = [];   // gap per resultindex i aktuell session
-  mnRecognizer.onresult = (e) => {
-    const now = Date.now();
-    const silence = lastEventAt ? now - lastEventAt : 0;
-    lastEventAt = now;
-    // e.results innehåller HELA sessionen, så texten byggs om från början varje gång.
-    const finals = [];
-    let interim = '';
-    let pauseUsed = false;
-    for (let i = 0; i < e.results.length; i++) {
-      const r = e.results[i];
-      if (gaps[i] === undefined) { gaps[i] = pauseUsed ? 0 : silence; pauseUsed = true; }
-      if (r.isFinal) finals.push({ t: r[0].transcript.trim(), gap: gaps[i] });
-      else interim += r[0].transcript;
-    }
-    const merged = mergeItems(finals);
-    const body = buildText(merged, !hasBase && !sessionBase);
-    committed = sessionBase + body;
-    area.value = committed;
-    if (interimEl) interimEl.textContent = dedupeWords(interim);
-  };
-  mnRecognizer.onerror = (e) => {
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { mnRecording = false; alert('Mikrofonen är blockerad. Tillåt mikrofon i webbläsaren och försök igen.'); }
-  };
-  mnRecognizer.onend = () => {
-    // Webbläsaren stoppar ofta efter tystnad – starta om, med det hittills sagda som ny start
-    if (mnRecording === String(evId)) {
-      sessionBase = committed ? committed.trimEnd() + ' ' : '';
-      gaps.length = 0;
-      try { mnRecognizer.start(); } catch (e) { stopRecording(); }
-    } else {
-      recWrap.classList.remove('live'); recBtn.textContent = 'Spela in';
-      if (interimEl) interimEl.textContent = '';
-    }
-  };
-  try { mnRecognizer.start(); } catch (e) { mnRecording = false; return; }
-  recWrap.classList.add('live');
-  recBtn.textContent = 'Stoppa';
-}
-
-function stopRecording() {
-  const id = mnRecording;
-  mnRecording = false;
-  if (mnRecognizer) { try { mnRecognizer.stop(); } catch (e) {} }
-  const panel = id && document.querySelector(`.mn-panel[data-panel-mn="${CSS.escape(id)}"]`);
-  if (panel) { panel.querySelector('.mn-rec').classList.remove('live'); panel.querySelector('.mn-rec-btn').textContent = 'Spela in'; }
-}
-
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest('.mn-open');
-  if (!btn) return;
-  const id = btn.dataset.id;
-  const panel = document.querySelector(`.mn-panel[data-panel-mn="${CSS.escape(id)}"]`);
-  if (!panel) return;
-  const open = panel.hidden;
-  panel.hidden = !open;
-  btn.setAttribute('aria-expanded', String(open));
-  if (open) renderEventNotes(id, panel);
-});
-
-document.getElementById('mnSearch').addEventListener('input', renderAllNotes);
-document.getElementById('mnExportTxt').addEventListener('click', () => { if (mnFiltered.length) exportNotesFile(mnFiltered, `Motesanteckningar-${todayFileStamp()}`, 'txt'); });
-document.getElementById('mnExportDoc').addEventListener('click', () => { if (mnFiltered.length) exportNotesFile(mnFiltered, `Motesanteckningar-${todayFileStamp()}`, 'doc'); });
-
-async function callFnAdmin(name, payload) {
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) throw new Error('Du behöver logga in igen.');
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + session.access_token, apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || ('Fel ' + res.status));
-  return data;
-}
-
-// Avboka möte: skickar avbokningsmejl till de inbjudna (samma som bokaren gör)
-document.addEventListener('click', async (e) => {
-  const btn = e.target.closest('.mote-cancel');
-  if (!btn) return;
-  if (!confirm('Avboka mötet? Alla inbjudna får ett avbokningsmejl.')) return;
-  btn.disabled = true;
-  try {
-    await callFnAdmin('meeting-invite', { action: 'cancel', event_id: btn.dataset.id });
-    await loadEvents();
-  } catch (err) {
-    alert(err.message);
-    btn.disabled = false;
-  }
-});
 
 (async () => {
-  const member = await requireAuth('stamledare');
-  if (member) { adminId = member.id; isFullAdmin = member.role === 'admin'; await loadEvents(); if (await loadNotes()) { renderAllNotes(); updateNoteCounts(); } }
+  me = await requireAuth();
+  if (!me) return;
+  document.getElementById('bDate').min = todayStockholm();
+  await loadMembers();
+  await loadEvents();
+  if (location.hash === '#boka') goBook();   // länk från Adminkalendern (stämledare)
 })();
 </script>
 

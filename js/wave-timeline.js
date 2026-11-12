@@ -10,13 +10,16 @@
 //     getBeats(),                  // valfritt: { bpm, offset, bpb } ritar taktrutnät i spåren
 //     onStretch(track, {a,b}, {a,b}),  // valfritt: dra i markeringens kant för att sträcka det markerade (låttid i s)
 //     onReorder(from, to),         // valfritt: handtag till vänster – dra spåret upp/ner (index i getTracks())
+//     onScrub(t, fas),             // valfritt: spelmarkören dras sidledes (fas 'start' | 'move' | 'end') – spåren står still. Utan den hoppar markören först när man släpper.
 //   });
 //   Spår: { key, color, clip:{sampleRate,channels}, peaks, offsetMs, locked? }  (locked = går inte att dra)
 //   tl.render() bygger om raderna, tl.draw() ritar om, tl.tick() följer spelhuvudet.
 (function (root) {
   const CSS = `
   .wt { position: relative; user-select: none; }
-  .wt-ruler { display: block; width: 100%; height: 26px; cursor: pointer; border-bottom: 1px solid var(--border); touch-action: pan-y; }
+  .wt-scroll { position: relative; }
+  .wt-content { position: relative; }
+  .wt-ruler { display: block; width: 100%; height: 28px; cursor: ew-resize; border-top: 1px solid var(--border); touch-action: none; position: sticky; bottom: 0; z-index: 4; background: var(--wt-ruler-bg, var(--bg, #121418)); }
   .wt-track { border: 2px solid transparent; border-bottom-color: var(--border); border-radius: 0.5rem; padding: 0 calc(0.5rem - 2px); margin: 2px -0.5rem; transition: border-color 0.15s, background 0.15s; }
   .wt-track.active { border-color: var(--accent, #E5A968); background: rgba(229,169,104,0.09); box-shadow: inset 4px 0 0 var(--accent, #E5A968), 0 0 0 3px rgba(229,169,104,0.12); }
   .wt-head::before { content: ''; flex: none; width: 0.6rem; height: 0.6rem; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); }
@@ -40,7 +43,10 @@
   .wt-track.dragging .wt-grip { cursor: grabbing; opacity: 1; }
   .wt-drop { height: 3px; margin: -2px 0 -1px; border-radius: 2px; background: var(--accent, #E5A968); box-shadow: 0 0 8px rgba(229,169,104,0.8); }
   body.wt-reordering, body.wt-reordering * { cursor: grabbing !important; user-select: none; }
-  .wt-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 6px rgba(0,0,0,0.6); pointer-events: none; z-index: 3; }`;
+  .wt-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 6px rgba(0,0,0,0.6); pointer-events: none; z-index: 3; }
+  .wt-ph-flag { position: sticky; top: 0; display: block; width: 18px; height: 16px; margin-left: -8px; background: #fff; border-radius: 3px 3px 9px 9px; clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%); pointer-events: auto; cursor: ew-resize; touch-action: none; box-shadow: none; }
+  .wt-ph-flag:hover, .wt.scrubbing .wt-ph-flag { background: var(--accent, #E5A968); }
+  .wt.scrubbing, .wt.scrubbing * { cursor: ew-resize !important; }`;
   let cssDone = false;
   const fmt = (sec, tenths) => {
     const neg = sec < 0; sec = Math.abs(sec || 0);
@@ -54,8 +60,11 @@
     if (!cssDone) { cssDone = true; const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st); }
     rootEl.classList.add('wt', 'tool-pan');
     if (o.onReorder) rootEl.classList.add('reorder');
-    rootEl.innerHTML = '<canvas class="wt-ruler" title="Klicka för att hoppa, dra för att bläddra"></canvas><div class="wt-tracks"></div><div class="wt-playhead"></div>';
-    const ruler = rootEl.querySelector('.wt-ruler'), tracksEl = rootEl.querySelector('.wt-tracks'), ph = rootEl.querySelector('.wt-playhead');
+    // spåren i en rullningsbar yta, linjalen sist (alltid synlig), spelmarkören med ett handtag överst
+    rootEl.innerHTML = '<div class="wt-scroll"><div class="wt-content"><div class="wt-tracks"></div><div class="wt-playhead"><span class="wt-ph-flag" title="Dra i sidled för att flytta spelmarkören"></span></div></div></div><canvas class="wt-ruler" title="Klicka eller dra för att flytta spelmarkören"></canvas>';
+    const ruler = rootEl.querySelector('.wt-ruler'), tracksEl = rootEl.querySelector('.wt-tracks'), ph = rootEl.querySelector('.wt-playhead'), flag = rootEl.querySelector('.wt-ph-flag');
+    let scrubT = null;                // medan markören dras: dess läge (annars följer den uppspelningen)
+    let railLeft = 0, lastPhX = null; // linjalens vänsterkant relativt innehållet (rubrikkolumnen), och senast ritade markörläge
     const view = { t0: 0, pps: 20 };
     let tool = 'pan', sel = null;   // pan = inget verktyg valt: dra bläddrar i sidled
     let userNav = 0;                 // senast användaren bläddrade själv – då följer vyn inte spelhuvudet en stund
@@ -88,7 +97,10 @@
         ctx.fillText(step < 1 ? (t < 60 ? t.toFixed(step < 0.1 ? 2 : 1) + ' s' : fmt(t, true)) : fmt(t), x + 3 * dpr, 3 * dpr);
       }
       markers.forEach(m => { ctx.fillStyle = '#facc15'; ctx.fillText('⚑', xOf(m) * dpr - 4 * dpr, 12 * dpr); });
+      const px = xOf(curPos()) * dpr;   // spelmarkören syns även i linjalen
+      if (px >= 0 && px <= W) { ctx.fillStyle = scrubT != null ? '#E5A968' : '#fff'; ctx.fillRect(Math.round(px) - dpr, 0, 2 * dpr, H); ctx.beginPath(); ctx.moveTo(px - 6 * dpr, H); ctx.lineTo(px + 6 * dpr, H); ctx.lineTo(px, H - 8 * dpr); ctx.closePath(); ctx.fill(); }
     }
+    function curPos() { return scrubT != null ? scrubT : o.getPosition(); }
     // valfritt taktrutnät: o.getBeats() → { bpm, offset (s), bpb } eller null. Taktstreck starkare än slag.
     function drawGrid(ctx, W, H, dpr) {
       const g = o.getBeats && o.getBeats(); if (!g || !(g.bpm >= 20)) return;
@@ -170,11 +182,15 @@
       }
     }
     function placePlayhead() {
-      const x = xOf(o.getPosition());
+      const x = xOf(curPos());
       ph.style.display = x < 0 || x > width() ? 'none' : '';
-      ph.style.left = (ruler.offsetLeft + x - 1) + 'px';
+      ph.style.left = (railLeft + x - 1) + 'px';
+      if (lastPhX == null || Math.abs(x - lastPhX) >= 0.5) { lastPhX = x; drawRuler(); }
     }
-    function draw() { drawRuler(); tracks().forEach(drawTrack); placePlayhead(); if (o.onView) o.onView(api); }
+    function draw() {
+      railLeft = ruler.getBoundingClientRect().left - rootEl.getBoundingClientRect().left;   // rubrikkolumnen till vänster om spåren
+      lastPhX = null; drawRuler(); tracks().forEach(drawTrack); placePlayhead(); if (o.onView) o.onView(api);
+    }
 
     // sträck markeringen: dra i dess vänstra eller högra kant (fäster mot slagen när taktrutnätet visas, Alt = fritt)
     let stretch = null;
@@ -317,15 +333,52 @@
     }
     function setActiveRow() { tracks().forEach(tr => { if (tr._row) tr._row.classList.toggle('active', !!(o.isActive && o.isActive(tr))); drawTrack(tr); }); }
 
-    // linjalen: klick = hoppa, dra = bläddra
+    // spelmarkören: klicka i linjalen eller dra i den (eller i handtaget överst på markören) – bara markören flyttas, spåren står kvar.
+    // Nära kanten rullar vyn sakta åt sidan så att man kan dra längre. Bläddra i spåren genom att dra i dem, Shift + hjul eller sidled på styrplattan.
     { let d = null;
-      ruler.addEventListener('pointerdown', e => { d = { x: e.clientX, t0: view.t0, moved: false }; ruler.setPointerCapture(e.pointerId); });
-      ruler.addEventListener('pointermove', e => {
-        if (!d) return; const dx = e.clientX - d.x;
-        if (!d.moved && Math.abs(dx) < 4) return;
-        d.moved = true; view.t0 = d.t0 - dx / view.pps; clampView(); userNav = performance.now(); draw();
+      const rulerLeft = () => ruler.getBoundingClientRect().left;
+      const maxT = () => Math.max(o.getDuration(), 0);
+      const clampT = t => Math.max(0, Math.min(t, maxT()));
+      const apply = (final) => {
+        scrubT = clampT(tOf(d.cx - rulerLeft()));
+        if (o.onScrub) o.onScrub(scrubT, final ? 'end' : 'move');
+        if (!final) placePlayhead();
+      };
+      const edgeLoop = () => {
+        if (!d) return;
+        const w = width(), x = d.cx - rulerLeft(), zone = 36;
+        const dir = x < zone ? -1 : x > w - zone ? 1 : 0;
+        if (dir) {
+          const speed = (zone - (dir < 0 ? x : w - x)) / zone;   // 0..1, snabbare ju närmare kanten
+          view.t0 += dir * Math.max(0.15, Math.min(1.5, speed * 1.5)) * 6 / view.pps; clampView(); userNav = performance.now();
+          apply(false); draw();
+        }
+        d.raf = requestAnimationFrame(edgeLoop);
+      };
+      const start = e => {
+        if (e.button) return;
+        e.preventDefault(); e.stopPropagation();
+        d = { cx: e.clientX, raf: 0, el: e.currentTarget };
+        d.el.setPointerCapture(e.pointerId);
+        rootEl.classList.add('scrubbing'); userNav = performance.now();
+        scrubT = clampT(tOf(e.clientX - rulerLeft()));
+        if (o.onScrub) o.onScrub(scrubT, 'start');
+        placePlayhead(); drawRuler();
+        d.raf = requestAnimationFrame(edgeLoop);
+      };
+      const move = e => { if (!d) return; d.cx = e.clientX; apply(false); };
+      const end = e => {
+        if (!d) return;
+        d.cx = e.clientX; cancelAnimationFrame(d.raf);
+        apply(true);
+        const t = scrubT; d = null; rootEl.classList.remove('scrubbing');
+        if (!o.onScrub) o.onSeek(t);
+        scrubT = null; lastPhX = null; placePlayhead();
+      };
+      [ruler, flag].forEach(el => {
+        el.addEventListener('pointerdown', start); el.addEventListener('pointermove', move);
+        el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
       });
-      ruler.addEventListener('pointerup', e => { if (d && !d.moved) o.onSeek(tOf(e.clientX - ruler.getBoundingClientRect().left)); d = null; });
     }
     // hjul: Ctrl/⌘ = zoom runt pekaren, sidled (eller Shift) = bläddra
     rootEl.addEventListener('wheel', e => {

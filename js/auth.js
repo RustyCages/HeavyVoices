@@ -21,7 +21,7 @@ async function getCurrentMember() {
 
   const { data, error } = await supabaseClient
     .from('members')
-    .select('id, name, role, status, stamledare')
+    .select('id, name, role, status, stamledare, reactivation_requested_at')
     .eq('id', user.id)
     .single();
 
@@ -31,6 +31,25 @@ async function getCurrentMember() {
 
 // Admin eller stämledare = får redigera låtar/stämspår (Repertoar, Studio, Röstövning)
 function isSongEditor(m) { return !!m && (m.role === 'admin' || m.stamledare === true); }
+
+// Sidor en pausad medlem får öppna
+const PAUSED_OK = /^\/(medlem\/(kalender|info)\.html|konto\.html)$/;
+
+function showPausedBar() {
+  try {
+    if (window.top !== window || /[?&]embed\b/.test(location.search) || document.querySelector('.paused-bar')) return;
+    const add = () => {
+      const a = document.createElement('a');
+      a.className = 'paused-bar';
+      a.href = '/vantar.html';
+      a.setAttribute('data-no-transition', '');
+      a.style.cssText = 'display:block;text-align:center;padding:0.45rem 0.8rem;background:#facc15;color:#111317;font-size:0.85rem;font-weight:600;text-decoration:none;';
+      a.textContent = 'Ditt medlemskap är pausat – du ser bara kalender och information. Tryck här för att be om att bli aktiv igen.';
+      document.body.prepend(a);
+    };
+    if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
+  } catch (_) {}
+}
 
 // Anropa i toppen av admin/medlem-sidor. requiredRole: 'admin' | 'medlem' | null (valfri roll)
 async function requireAuth(requiredRole = null) {
@@ -43,6 +62,12 @@ async function requireAuth(requiredRole = null) {
     } catch (_) {}
     window.location.href = '/logga-in.html';
     return null;
+  }
+
+  // Pausad medlem: bara kalender, information och Mitt konto (databasen låser resten)
+  if (member.status === 'paused' && requiredRole === null && PAUSED_OK.test(location.pathname)) {
+    showPausedBar();
+    return member;
   }
 
   if (member.status !== 'approved') {

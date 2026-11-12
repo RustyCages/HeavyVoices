@@ -274,6 +274,7 @@
     .st-ctl-main > .transport > .meter { width: 40px; flex: none; }
     .st-ctl-main > .transport > .sp { display: none; }
     .st-top > .title-actions { order: 3; margin-left: auto; }
+    .st-head > .warn-box { order: 2; margin: 0; flex: 1 1 14rem; min-width: 0; padding: 0.25rem 0.6rem; font-size: 0.76rem; line-height: 1.25; max-height: 42px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
     .st-head::after { content: ''; flex: 0 0 100%; order: 4; height: 0; }
     .st-ctl-tools { order: 5; flex: 1 1 0; display: flex; align-items: center; gap: 0.7rem; flex-wrap: nowrap; border-top: 0; min-width: 0; }
     .st-ctl-tools > .transport { margin: 0 !important; flex: none; flex-wrap: nowrap; }
@@ -2622,6 +2623,15 @@ snapEl('snapFile').addEventListener('change', e => { const f = e.target.files[0]
   }
   apply();
   (mq.addEventListener ? mq.addEventListener('change', apply) : mq.addListener(apply));
+})();
+// ---------- "Hörlurar krävs" på bred skärm: i överraden bredvid spelaren (annars kvar ovanför spåren) ----------
+(function () {
+  const warn = document.querySelector('.st-main > .warn-box'); if (!warn) return;
+  const main = warn.parentNode, head = document.querySelector('.st-head');
+  const mq = matchMedia('(min-width: 1700px)');   // smalare skärm: kvar ovanför spåren, annars trängs knapparna
+  const place = () => { if (mq.matches) head.appendChild(warn); else main.insertBefore(warn, main.firstChild); };
+  place();
+  (mq.addEventListener ? mq.addEventListener('change', place) : mq.addListener(place));
 })();
 </script>
 </body>

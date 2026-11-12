@@ -41,6 +41,28 @@
   .toolbar button { padding: 0.35rem 0.8rem; font-size: 0.85rem; }
   .muted { color: var(--text-muted); font-size: 0.85rem; }
   .summary { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-muted); margin-top: 0.4rem; }
+  .status-select.st-queue { color: #60a5fa; border-color: rgba(96,165,250,0.5); }
+  .status-select.st-ended { color: #9ca3af; border-color: rgba(156,163,175,0.5); }
+  tr.row-ended td, tr.row-queue td { opacity: 0.6; }
+  .tabs { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.8rem; }
+  .tabs button { padding: 0.4rem 0.85rem; font-size: 0.88rem; border-radius: 999px; display: inline-flex; gap: 0.4rem; align-items: center; }
+  .tabs button .n { font-variant-numeric: tabular-nums; opacity: 0.75; }
+  .tabs button[aria-pressed="true"] { font-weight: 700; }
+  .tabs button .dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #facc15; }
+  .listbar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-top: 0.7rem; }
+  .listbar input[type="search"] { flex: 1; min-width: 10rem; max-width: 20rem; margin: 0; }
+  .bulkbar { display: none; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-top: 0.7rem; padding: 0.6rem 0.8rem; border: 1px solid var(--border); border-radius: 0.6rem; }
+  .bulkbar.on { display: flex; }
+  .bulkbar b { color: var(--accent); }
+  .table-wrap { max-height: min(70vh, 620px); overflow: auto; }
+  .table-wrap thead th { position: sticky; top: 0; background: var(--bg); z-index: 1; }
+  .req-badge { display: inline-block; margin-left: 0.4rem; padding: 0 0.45rem; border-radius: 999px; background: #facc15; color: #111317; font-size: 0.72rem; font-weight: 700; cursor: help; }
+  details.fold > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 0.6rem; }
+  details.fold > summary::-webkit-details-marker { display: none; }
+  details.fold > summary::before { content: '▸'; color: var(--text-muted); transition: transform 0.15s; }
+  details.fold[open] > summary::before { transform: rotate(90deg); }
+  details.fold > summary h3 { margin: 0; }
+  details.fold[open] > summary { margin-bottom: 0.8rem; }
   #mailMessage { min-height: 180px; line-height: 1.5; }
   #mailRecipients { font-weight: 600; color: var(--accent); }
 </style>
@@ -53,8 +75,8 @@
  <a href="/admin/" class="back-btn">&larr; Tillbaka</a>
   <h1>Medlemmar</h1>
 
-  <div class="card">
-    <h3>Bjud in ny medlem</h3>
+  <details class="card static fold" id="inviteFold">
+    <summary><h3>Bjud in ny medlem</h3></summary>
     <form id="inviteForm">
       <input type="text" id="inviteName" placeholder="Namn" required>
       <input type="email" id="inviteEmail" placeholder="E-post" required>
@@ -78,17 +100,37 @@
       <p class="error" id="inviteError"></p>
       <p class="success" id="inviteSuccess"></p>
     </form>
-  </div>
+  </details>
 
   <div class="card static" style="margin-top: 1.5rem;">
-    <h3 style="margin-bottom: 0.2rem;">Alla medlemmar</h3>
+    <h3 style="margin-bottom: 0.2rem;">Medlemmar</h3>
     <div class="summary" id="memberSummary"></div>
+    <div class="tabs" id="statusTabs" role="group" aria-label="Visa medlemmar efter status"></div>
+    <div class="listbar">
+      <input type="search" id="memberSearch" placeholder="Sök namn, e-post eller stämma" aria-label="Sök medlemmar">
+      <span class="muted" id="listCount"></span>
+    </div>
+    <div class="bulkbar" id="bulkBar">
+      <span><b id="bulkN">0</b> markerade:</span>
+      <label for="bulkStatus" class="muted" style="margin:0;">Ändra status till</label>
+      <select id="bulkStatus">
+        <option value="approved">Aktiv</option>
+        <option value="paused">Pausad</option>
+        <option value="queue">Kö</option>
+        <option value="ended">Avslutad</option>
+      </select>
+      <button type="button" id="bulkApplyBtn">Ändra</button>
+      <button type="button" class="btn-outline" id="bulkMailBtn">Skriv mejl</button>
+      <span class="muted" id="bulkStatusMsg"></span>
+    </div>
     <div class="toolbar">
       <span class="muted">Markera:</span>
-      <button type="button" class="btn-outline" id="selAllBtn">Alla godkända</button>
-      <button type="button" class="btn-outline" id="selUnpaidBtn">Ej betalt</button>
+      <button type="button" class="btn-outline" id="selAllBtn" title="Alla med status Aktiv, oavsett flik">Alla aktiva</button>
+      <button type="button" class="btn-outline" id="selVisibleBtn">Alla i listan</button>
+      <button type="button" class="btn-outline" id="selUnpaidBtn" title="Aktiva som inte betalat">Ej betalt</button>
       <button type="button" class="btn-outline" id="selNoneBtn">Inga</button>
       <span style="flex: 1;"></span>
+      <button type="button" class="btn-outline" onclick="location.href='/admin/inkorg.html'" title="Mejl till info@heavyvoices.se">Inkorg<span id="inboxUnread2"></span></button>
       <button type="button" class="btn-outline" id="exportCsvBtn" title="Laddar ner listan i nuvarande sortering. Är medlemmar markerade exporteras bara de.">Exportera CSV</button>
       <button type="button" class="btn-outline" id="resetFeesBtn" title="Nollställ 'Betalt' för alla inför ny termin/period">Ny avgiftsperiod…</button>
     </div>
@@ -107,9 +149,9 @@
     </div>
   </div>
 
-  <div class="card static" style="margin-top: 1.5rem;" id="mailCard">
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.8rem; flex-wrap:wrap; margin-bottom:0.2rem;">
-      <h3 style="margin:0;">Skicka mejl</h3>
+  <details class="card static fold" style="margin-top: 1.5rem;" id="mailCard">
+    <summary><h3>Skicka mejl</h3><span class="muted" id="mailSummaryN"></span></summary>
+    <div style="display:flex; justify-content:flex-end; margin-bottom:0.2rem;">
       <button type="button" class="btn-gold" id="inboxBtn" onclick="location.href='/admin/inkorg.html'" title="Mejl till info@heavyvoices.se">Inkorg<span id="inboxUnread"></span></button>
     </div>
     <p class="muted" style="margin-top: 0;">Mottagare: <span id="mailRecipients">inga markerade</span> — markera i listan ovan. Varje person får ett eget mejl från info@heavyvoices.se, och svar hamnar i inkorgen.</p>
@@ -146,7 +188,7 @@
       <button type="button" id="sendMailBtn">Skicka mejl</button>
       <span class="muted" id="mailStatus"></span>
     </div>
-  </div>
+  </details>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -159,7 +201,16 @@ let currentMember = null;
 let members = [];
 const selected = new Set();
 
-const STATUS_LABELS = { pending: 'Väntar', approved: 'Godkänd', paused: 'Pausad' };
+const STATUS_LABELS = { pending: 'Väntar', approved: 'Aktiv', paused: 'Pausad', queue: 'Kö', ended: 'Avslutad' };
+const STATUS_KEYS = ['approved', 'paused', 'pending', 'queue', 'ended'];
+const TAB_LABELS = { approved: 'Aktiva', paused: 'Pausade', pending: 'Väntar', queue: 'Kö', ended: 'Avslutade', all: 'Alla' };
+let tab = 'approved';   // aktiv flik
+let query = '';         // sökfilter
+const STATUS_WARN = {
+  paused: 'Pausa {n}? Hen kan fortfarande logga in och se kalender och information, men inte repertoar, stämfiler, studio, forum m.m. Hen kan be om att bli aktiv igen.',
+  ended: 'Avsluta {n}? Hen kan inte längre logga in. Kontot och inspelningarna ligger kvar, och du kan aktivera igen när som helst.',
+  queue: 'Sätt {n} i kö? Hen har ingen åtkomst tills du gör hen aktiv.'
+};
 // Samma val som på registreringssidan
 const STAMMOR = [['Sopran', 'Sopran'], ['Alt', 'Alt'], ['Tenor', 'Tenor'], ['Bas', 'Bas'], ['Osäker', 'Vet inte / osäker']];
 const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
@@ -185,7 +236,7 @@ function fmtDate(iso) {
 async function loadMembers() {
   const { data, error } = await supabaseClient
     .from('members')
-    .select('id, name, email, role, stamledare, stamma, status, fee_paid, fee_paid_at, created_at')
+    .select('id, name, email, role, stamledare, stamma, status, fee_paid, fee_paid_at, created_at, reactivation_requested_at, reactivation_note')
     .order('status')
     .order('name');
 
@@ -206,7 +257,7 @@ async function loadMembers() {
 // ---------- Sortering ----------
 let sortKey = null;   // null = standard (status, namn)
 let sortDir = 1;      // 1 = stigande, -1 = fallande
-const STATUS_ORDER = { pending: 0, approved: 1, paused: 2 };
+const STATUS_ORDER = { pending: 0, approved: 1, paused: 2, queue: 3, ended: 4 };
 const ROLE_ORDER = { admin: 0, stamledare: 1, medlem: 2 };
 const collator = new Intl.Collator('sv', { sensitivity: 'base', numeric: true });
 // Jämför namn utan inledande/avslutande mellanslag
@@ -252,20 +303,26 @@ function renderMembers() {
   const tbody = document.getElementById('membersTableBody');
   sortMembers();
 
-  if (!members.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-muted">Inga medlemmar än.</td></tr>`;
+  renderTabs();
+  const list = visibleMembers();
+  document.getElementById('listCount').textContent = list.length === members.length ? '' : `Visar ${list.length} av ${members.length}`;
+
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-muted">${members.length ? 'Inga medlemmar matchar.' : 'Inga medlemmar än.'}</td></tr>`;
+    updateSummary();
     updateSelectionUi();
     return;
   }
 
-  tbody.innerHTML = members.map(m => {
+  tbody.innerHTML = list.map(m => {
     const self = m.id === currentUserId;
-    const statusOpts = ['pending', 'approved', 'paused']
+    const statusOpts = STATUS_KEYS
       .map(st => `<option value="${st}" ${m.status === st ? 'selected' : ''}>${STATUS_LABELS[st]}</option>`).join('');
+    const req = m.reactivation_requested_at ? `<span class="req-badge" title="${esc('Vill bli aktiv igen (' + fmtDate(m.reactivation_requested_at) + ')' + (m.reactivation_note ? ': ' + m.reactivation_note : ''))}">Vill bli aktiv</span>` : '';
     return `
-    <tr class="${m.status === 'paused' ? 'row-paused' : ''}">
+    <tr class="row-${m.status}">
       <td><input type="checkbox" class="rowCheck" data-id="${m.id}" ${selected.has(m.id) ? 'checked' : ''} ${m.email ? '' : 'disabled title="Saknar e-post"'}></td>
-      <td>${esc(m.name)}</td>
+      <td>${esc(m.name)}${req}</td>
       <td>${esc(m.email || '—')}</td>
       <td><select data-id="${m.id}" class="stammaSelect" aria-label="Stämma för ${esc(m.name)}">${stammaOptions(m.stamma)}</select></td>
       <td class="col-paid">
@@ -318,7 +375,7 @@ function renderMembers() {
       const id = sel.dataset.id;
       const m = members.find(x => x.id === id);
       const newStatus = sel.value;
-      if (newStatus === 'paused' && !confirm(`Pausa ${m ? m.name : 'medlemmen'}? Hen kommer inte åt medlemssidorna förrän du ändrar tillbaka till Godkänd.`)) {
+      if (STATUS_WARN[newStatus] && !confirm(STATUS_WARN[newStatus].replace('{n}', m ? m.name : 'medlemmen'))) {
         sel.value = m ? m.status : 'approved';
         return;
       }
@@ -391,20 +448,61 @@ function renderMembers() {
 }
 
 function updateSummary() {
-  const count = st => members.filter(m => m.status === st).length;
   const active = members.filter(m => m.status === 'approved');
   const paid = active.filter(m => m.fee_paid).length;
-  const parts = [`${members.length} totalt`, `${count('approved')} godkända`];
-  if (count('pending')) parts.push(`${count('pending')} väntar`);
-  if (count('paused')) parts.push(`${count('paused')} pausade`);
-  parts.push(`Avgift betald: ${paid} av ${active.length} godkända`);
+  const parts = [`${active.length} aktiva`, `Avgift betald: ${paid} av ${active.length}`];
   document.getElementById('memberSummary').innerHTML = parts.map(p => `<span>${esc(p)}</span>`).join('');
 }
 
+// ---------- Flikar, sök, filter ----------
+function visibleMembers() {
+  const q = query.trim().toLowerCase();
+  return members.filter(m => (tab === 'all' || m.status === tab) &&
+    (!q || [m.name, m.email, m.stamma].some(v => String(v || '').toLowerCase().includes(q))));
+}
+function renderTabs() {
+  const el = document.getElementById('statusTabs');
+  const cnt = st => st === 'all' ? members.length : members.filter(m => m.status === st).length;
+  const reqN = members.filter(m => m.status === 'paused' && m.reactivation_requested_at).length;
+  // Visa bara flikar som har medlemmar (Aktiva och Alla visas alltid)
+  const keys = ['approved', 'paused', 'pending', 'queue', 'ended', 'all'].filter(k => k === 'approved' || k === 'all' || cnt(k) > 0 || k === tab);
+  el.innerHTML = keys.map(k => `<button type="button" class="btn-outline" data-tab="${k}" aria-pressed="${tab === k}">${TAB_LABELS[k]} <span class="n">${cnt(k)}</span>${k === 'paused' && reqN ? `<span class="dot" title="${reqN} vill bli aktiva igen"></span>` : ''}${k === 'pending' && cnt('pending') ? '<span class="dot" title="Väntar på godkännande"></span>' : ''}</button>`).join('');
+}
+document.getElementById('statusTabs').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-tab]'); if (!b) return;
+  tab = b.dataset.tab; renderMembers();
+});
+document.getElementById('memberSearch').addEventListener('input', (e) => { query = e.target.value; renderMembers(); });
+
+// ---------- Massändring av status ----------
+document.getElementById('bulkApplyBtn').addEventListener('click', async () => {
+  const ids = [...selected].filter(id => id !== currentUserId);
+  const st = document.getElementById('bulkStatus').value;
+  const msg = document.getElementById('bulkStatusMsg');
+  if (!ids.length) { msg.textContent = 'Markera medlemmar i listan först (du kan inte ändra dig själv).'; return; }
+  const n = `${ids.length} medlem${ids.length === 1 ? '' : 'mar'}`;
+  const warn = STATUS_WARN[st] ? STATUS_WARN[st].replace('{n}', n) : `Göra ${n} aktiva?`;
+  if (!confirm(warn)) return;
+  msg.textContent = 'Sparar...';
+  const { error } = await supabaseClient.from('members').update({ status: st }).in('id', ids);
+  if (error) { msg.textContent = 'Kunde inte ändra: ' + error.message; return; }
+  msg.textContent = `${n} ändrade till ${STATUS_LABELS[st]} ✓`;
+  selected.clear();
+  await loadMembers();
+});
+document.getElementById('bulkMailBtn').addEventListener('click', () => {
+  const d = document.getElementById('mailCard'); d.open = true;
+  d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => document.getElementById('mailSubject').focus({ preventScroll: true }), 350);
+});
+
 function updateSelectionUi() {
-  const selectable = members.filter(m => m.email);
+  const selectable = visibleMembers().filter(m => m.email);
   const n = selected.size;
   document.getElementById('mailRecipients').textContent = n ? `${n} markerad${n === 1 ? '' : 'e'}` : 'inga markerade';
+  document.getElementById('bulkBar').classList.toggle('on', n > 0);
+  document.getElementById('bulkN').textContent = n;
+  document.getElementById('mailSummaryN').textContent = n ? `${n} mottagare markerade` : '';
   const all = document.getElementById('checkAll');
   all.checked = selectable.length > 0 && selectable.every(m => selected.has(m.id));
   all.indeterminate = n > 0 && !all.checked;
@@ -418,10 +516,13 @@ function selectWhere(pred) {
 }
 
 document.getElementById('checkAll').addEventListener('change', (e) => {
-  e.target.checked ? selectWhere(() => true) : selectWhere(() => false);
+  // Markera/avmarkera bara det som syns i listan (aktuell flik och sökning)
+  visibleMembers().filter(m => m.email).forEach(m => e.target.checked ? selected.add(m.id) : selected.delete(m.id));
+  updateSelectionUi();
 });
 document.getElementById('selAllBtn').addEventListener('click', () => selectWhere(m => m.status === 'approved'));
-document.getElementById('selUnpaidBtn').addEventListener('click', () => selectWhere(m => m.status !== 'pending' && !m.fee_paid));
+document.getElementById('selVisibleBtn').addEventListener('click', () => { const v = new Set(visibleMembers().map(m => m.id)); selectWhere(m => v.has(m.id)); });
+document.getElementById('selUnpaidBtn').addEventListener('click', () => selectWhere(m => m.status === 'approved' && !m.fee_paid));
 document.getElementById('selNoneBtn').addEventListener('click', () => selectWhere(() => false));
 
 // ---------- CSV-export ----------
@@ -636,7 +737,9 @@ document.getElementById('sendMailBtn').addEventListener('click', async () => {
   if (!subject) { statusEl.textContent = 'Skriv ett ämne.'; return; }
   if (!message) { statusEl.textContent = 'Skriv ett meddelande.'; return; }
   if (mailFiles.length && ids.length > 100) { statusEl.textContent = 'Med bilagor kan du skicka till högst 100 mottagare åt gången.'; return; }
-  if (!confirm(`Skicka "${subject}" till ${ids.length} medlem${ids.length === 1 ? '' : 'mar'}${mailFiles.length ? ' med ' + mailFiles.length + ' bilaga' + (mailFiles.length === 1 ? '' : 'or') : ''}?`)) return;
+  const inactiveN = ids.filter(id => { const m = members.find(x => x.id === id); return m && m.status !== 'approved'; }).length;
+  const inactiveNote = inactiveN ? `\n\nObs: ${inactiveN} av mottagarna är inte aktiva (pausade, avslutade, i kö eller väntar).` : '';
+  if (!confirm(`Skicka "${subject}" till ${ids.length} medlem${ids.length === 1 ? '' : 'mar'}${mailFiles.length ? ' med ' + mailFiles.length + ' bilaga' + (mailFiles.length === 1 ? '' : 'or') : ''}?${inactiveNote}`)) return;
 
   btn.disabled = true;
   statusEl.textContent = 'Skickar...';
@@ -731,7 +834,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
     // Antal olästa mejl i inkorgen
     supabaseClient.from('inbox_messages').select('id', { count: 'exact', head: true })
       .eq('direction', 'in').eq('is_read', false).eq('folder', 'inkorg')
-      .then(({ count }) => { if (count) document.getElementById('inboxUnread').textContent = ` (${count} nya)`; });
+      .then(({ count }) => { if (count) { const t = ` (${count} nya)`; document.getElementById('inboxUnread').textContent = t; document.getElementById('inboxUnread2').textContent = t; } });
   }
 })();
 </script>

@@ -19,7 +19,7 @@
   .wt { position: relative; user-select: none; }
   .wt-scroll { position: relative; }
   .wt-content { position: relative; }
-  .wt-ruler { display: block; width: 100%; height: 28px; cursor: ew-resize; border-top: 1px solid var(--border); touch-action: none; position: sticky; bottom: 0; z-index: 4; background: var(--wt-ruler-bg, var(--bg, #121418)); }
+  .wt-ruler { display: block; width: 100%; height: 28px; cursor: ew-resize; border-bottom: 1px solid var(--border); touch-action: none; position: relative; z-index: 4; background: var(--wt-ruler-bg, var(--bg, #121418)); }
   .wt-track { border: 2px solid transparent; border-bottom-color: var(--border); border-radius: 0.5rem; padding: 0 calc(0.5rem - 2px); margin: 2px -0.5rem; transition: border-color 0.15s, background 0.15s; }
   .wt-track.active { border-color: var(--accent, #E5A968); background: rgba(229,169,104,0.09); box-shadow: inset 4px 0 0 var(--accent, #E5A968), 0 0 0 3px rgba(229,169,104,0.12); }
   .wt-head::before { content: ''; flex: none; width: 0.6rem; height: 0.6rem; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); }
@@ -44,6 +44,7 @@
   .wt-drop { height: 3px; margin: -2px 0 -1px; border-radius: 2px; background: var(--accent, #E5A968); box-shadow: 0 0 8px rgba(229,169,104,0.8); }
   body.wt-reordering, body.wt-reordering * { cursor: grabbing !important; user-select: none; }
   .wt-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 6px rgba(0,0,0,0.6); pointer-events: none; z-index: 3; }
+  .wt-ph-grab { position: absolute; top: 0; bottom: 0; left: -8px; width: 18px; cursor: ew-resize; pointer-events: auto; touch-action: none; }
   .wt-ph-flag { position: sticky; top: 0; display: block; width: 18px; height: 16px; margin-left: -8px; background: #fff; border-radius: 3px 3px 9px 9px; clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%); pointer-events: auto; cursor: ew-resize; touch-action: none; box-shadow: none; }
   .wt-ph-flag:hover, .wt.scrubbing .wt-ph-flag { background: var(--accent, #E5A968); }
   .wt.scrubbing, .wt.scrubbing * { cursor: ew-resize !important; }`;
@@ -61,8 +62,8 @@
     rootEl.classList.add('wt', 'tool-pan');
     if (o.onReorder) rootEl.classList.add('reorder');
     // spåren i en rullningsbar yta, linjalen sist (alltid synlig), spelmarkören med ett handtag överst
-    rootEl.innerHTML = '<div class="wt-scroll"><div class="wt-content"><div class="wt-tracks"></div><div class="wt-playhead"><span class="wt-ph-flag" title="Dra i sidled för att flytta spelmarkören"></span></div></div></div><canvas class="wt-ruler" title="Klicka eller dra för att flytta spelmarkören"></canvas>';
-    const ruler = rootEl.querySelector('.wt-ruler'), tracksEl = rootEl.querySelector('.wt-tracks'), ph = rootEl.querySelector('.wt-playhead'), flag = rootEl.querySelector('.wt-ph-flag');
+    rootEl.innerHTML = '<canvas class="wt-ruler" title="Klicka eller dra för att flytta spelmarkören"></canvas><div class="wt-scroll"><div class="wt-content"><div class="wt-tracks"></div><div class="wt-playhead"><span class="wt-ph-grab" title="Dra i sidled för att flytta spelmarkören"></span><span class="wt-ph-flag" title="Dra i sidled för att flytta spelmarkören"></span></div></div></div>';
+    const ruler = rootEl.querySelector('.wt-ruler'), tracksEl = rootEl.querySelector('.wt-tracks'), ph = rootEl.querySelector('.wt-playhead'), flag = rootEl.querySelector('.wt-ph-flag'), grab = rootEl.querySelector('.wt-ph-grab');
     let scrubT = null;                // medan markören dras: dess läge (annars följer den uppspelningen)
     let railLeft = 0, lastPhX = null; // linjalens vänsterkant relativt innehållet (rubrikkolumnen), och senast ritade markörläge
     const view = { t0: 0, pps: 20 };
@@ -98,7 +99,7 @@
       }
       markers.forEach(m => { ctx.fillStyle = '#facc15'; ctx.fillText('⚑', xOf(m) * dpr - 4 * dpr, 12 * dpr); });
       const px = xOf(curPos()) * dpr;   // spelmarkören syns även i linjalen
-      if (px >= 0 && px <= W) { ctx.fillStyle = scrubT != null ? '#E5A968' : '#fff'; ctx.fillRect(Math.round(px) - dpr, 0, 2 * dpr, H); ctx.beginPath(); ctx.moveTo(px - 6 * dpr, H); ctx.lineTo(px + 6 * dpr, H); ctx.lineTo(px, H - 8 * dpr); ctx.closePath(); ctx.fill(); }
+      if (px >= 0 && px <= W) { ctx.fillStyle = scrubT != null ? '#E5A968' : '#fff'; ctx.fillRect(Math.round(px) - dpr, 0, 2 * dpr, H); ctx.beginPath(); ctx.moveTo(px - 6 * dpr, H - 9 * dpr); ctx.lineTo(px + 6 * dpr, H - 9 * dpr); ctx.lineTo(px, H); ctx.closePath(); ctx.fill(); }
     }
     function curPos() { return scrubT != null ? scrubT : o.getPosition(); }
     // valfritt taktrutnät: o.getBeats() → { bpm, offset (s), bpb } eller null. Taktstreck starkare än slag.
@@ -347,7 +348,7 @@
       const edgeLoop = () => {
         if (!d) return;
         const w = width(), x = d.cx - rulerLeft(), zone = 36;
-        const dir = x < zone ? -1 : x > w - zone ? 1 : 0;
+        const dir = x < zone ? (view.t0 > 0 ? -1 : 0) : x > w - zone ? 1 : 0;
         if (dir) {
           const speed = (zone - (dir < 0 ? x : w - x)) / zone;   // 0..1, snabbare ju närmare kanten
           view.t0 += dir * Math.max(0.15, Math.min(1.5, speed * 1.5)) * 6 / view.pps; clampView(); userNav = performance.now();
@@ -375,7 +376,7 @@
         if (!o.onScrub) o.onSeek(t);
         scrubT = null; lastPhX = null; placePlayhead();
       };
-      [ruler, flag].forEach(el => {
+      [ruler, flag, grab].forEach(el => {
         el.addEventListener('pointerdown', start); el.addEventListener('pointermove', move);
         el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
       });

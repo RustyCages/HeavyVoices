@@ -136,6 +136,12 @@
         <span id="sigStatus" style="font-weight:600; color: var(--accent);"></span>
       </div>
     </div>
+    <div class="toolbar" style="margin-top: 0; align-items: center;">
+      <button type="button" class="btn-outline" id="mailAttachBtn">Lägg till bilaga</button>
+      <input type="file" id="mailFiles" multiple hidden>
+      <span class="muted" style="font-size:0.85rem;">Max 5 filer, 10 MB totalt. Med bilagor kan mejlet gå till högst 100 mottagare åt gången.</span>
+    </div>
+    <ul id="mailFileList" style="list-style:none; margin:0 0 0.8rem; padding:0;"></ul>
     <div class="toolbar" style="margin-top: 0;">
       <button type="button" id="sendMailBtn">Skicka mejl</button>
       <span class="muted" id="mailStatus"></span>
@@ -575,6 +581,49 @@ document.getElementById('sigSaveBtn').addEventListener('click', async () => {
   }
 });
 
+
+// ---------- Bilagor (max 5 filer, 10 MB totalt) ----------
+const ATT_MAX_FILES = 5, ATT_MAX_BYTES = 10 * 1024 * 1024;
+const ATT_BLOCKED = /\.(exe|bat|cmd|com|scr|pif|js|jse|vbs|vbe|msi|jar|ps1|sh|dll|lnk|hta|cpl|reg)$/i;
+function attFmt(n) { return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' kB'; }
+// Lägger till valda filer i listan 'arr' efter kontroll. Returnerar felmeddelande eller ''.
+function attAdd(arr, fileList) {
+  let err = '';
+  for (const f of fileList) {
+    if (ATT_BLOCKED.test(f.name)) { err = `"${f.name}": den filtypen kan inte skickas som bilaga.`; continue; }
+    if (arr.length >= ATT_MAX_FILES) { err = `Max ${ATT_MAX_FILES} bilagor.`; break; }
+    if (arr.some(x => x.name === f.name && x.size === f.size)) continue;
+    if (arr.reduce((s, x) => s + x.size, 0) + f.size > ATT_MAX_BYTES) { err = 'Bilagorna får vara högst 10 MB totalt.'; continue; }
+    arr.push(f);
+  }
+  return err;
+}
+function attRead(arr) {
+  return Promise.all(arr.map(f => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res({ filename: f.name, content: String(r.result).split(',')[1] || '' });
+    r.onerror = () => rej(new Error('Kunde inte läsa ' + f.name));
+    r.readAsDataURL(f);
+  })));
+}
+
+const mailFiles = [];
+function renderMailFiles() {
+  const ul = document.getElementById('mailFileList');
+  ul.innerHTML = mailFiles.map((f, i) => `<li style="display:flex; gap:0.6rem; align-items:center; margin:0.2rem 0;"><span>${escapeHtmlSig(f.name)} <span class="muted">(${attFmt(f.size)})</span></span><button type="button" class="btn-outline" data-rmfile="${i}" style="padding:0.1rem 0.6rem;" aria-label="Ta bort bilagan">Ta bort</button></li>`).join('');
+}
+document.getElementById('mailAttachBtn').addEventListener('click', () => document.getElementById('mailFiles').click());
+document.getElementById('mailFiles').addEventListener('change', (e) => {
+  const err = attAdd(mailFiles, [...e.target.files]);
+  e.target.value = '';
+  document.getElementById('mailStatus').textContent = err;
+  renderMailFiles();
+});
+document.getElementById('mailFileList').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-rmfile]'); if (!b) return;
+  mailFiles.splice(Number(b.dataset.rmfile), 1); renderMailFiles();
+});
+
 document.getElementById('sendMailBtn').addEventListener('click', async () => {
   const subject = document.getElementById('mailSubject').value.trim();
   const message = document.getElementById('mailMessage').value.trim();
@@ -586,11 +635,13 @@ document.getElementById('sendMailBtn').addEventListener('click', async () => {
   if (!ids.length) { statusEl.textContent = 'Markera minst en mottagare i listan.'; return; }
   if (!subject) { statusEl.textContent = 'Skriv ett ämne.'; return; }
   if (!message) { statusEl.textContent = 'Skriv ett meddelande.'; return; }
-  if (!confirm(`Skicka "${subject}" till ${ids.length} medlem${ids.length === 1 ? '' : 'mar'}?`)) return;
+  if (mailFiles.length && ids.length > 100) { statusEl.textContent = 'Med bilagor kan du skicka till högst 100 mottagare åt gången.'; return; }
+  if (!confirm(`Skicka "${subject}" till ${ids.length} medlem${ids.length === 1 ? '' : 'mar'}${mailFiles.length ? ' med ' + mailFiles.length + ' bilaga' + (mailFiles.length === 1 ? '' : 'or') : ''}?`)) return;
 
   btn.disabled = true;
   statusEl.textContent = 'Skickar...';
   try {
+    const attachments = mailFiles.length ? await attRead(mailFiles) : undefined;
     const { data: { session } } = await supabaseClient.auth.getSession();
     const res = await fetch(`${SUPABASE_URL}/functions/v1/send-member-email`, {
       method: 'POST',
@@ -599,7 +650,7 @@ document.getElementById('sendMailBtn').addEventListener('click', async () => {
         'apikey': SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ subject, message, member_ids: ids, signature_id: document.getElementById('mailSignature').value || undefined }),
+      body: JSON.stringify({ subject, message, member_ids: ids, signature_id: document.getElementById('mailSignature').value || undefined, attachments }),
     });
     const result = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -611,6 +662,7 @@ document.getElementById('sendMailBtn').addEventListener('click', async () => {
       document.getElementById('mailSubject').value = '';
       document.getElementById('mailMessage').value = '';
       document.getElementById('mailTemplate').value = '';
+      mailFiles.length = 0; renderMailFiles();
     }
   } catch (err) {
     statusEl.textContent = 'Kunde inte nå servern: ' + err.message;

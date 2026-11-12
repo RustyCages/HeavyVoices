@@ -1,0 +1,8 @@
+.git
+.github
+functions
+supabase
+node_modules
+wrangler.jsonc
+.assetsignore
+CLAUDE.md

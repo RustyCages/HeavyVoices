@@ -6,7 +6,10 @@ if (/^\/(admin|medlem)(\/|$)/.test(location.pathname)) document.documentElement.
 async function signIn(email, password) {
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) throw error;
-  try { sessionStorage.removeItem('hvNoticeSeen'); sessionStorage.removeItem('hvIntroSeen'); } catch (e) {}
+  try {
+    sessionStorage.removeItem('hvNoticeSeen'); sessionStorage.removeItem('hvIntroSeen');
+    Object.keys(sessionStorage).filter(k => k.indexOf('hv-notice-s-') === 0).forEach(k => sessionStorage.removeItem(k));   // meddelanden som visas en gång per inloggning
+  } catch (e) {}
   return data;
 }
 
@@ -74,6 +77,12 @@ function showPausedBar() {
   } catch (_) {}
 }
 
+// Talar om för js/notices.js vem som är inloggad så att admins popup-meddelanden kan visas
+function announceMember(member) {
+  window.__hvNoticeMember = member;
+  try { document.dispatchEvent(new CustomEvent('hv-member', { detail: member })); } catch (e) {}
+}
+
 // Anropa i toppen av admin/medlem-sidor. requiredRole: 'admin' | 'medlem' | null (valfri roll)
 async function requireAuth(requiredRole = null) {
   let member;
@@ -93,6 +102,7 @@ async function requireAuth(requiredRole = null) {
   // Pausad medlem: bara kalender, information och Mitt konto (databasen låser resten)
   if (member.status === 'paused' && requiredRole === null && PAUSED_OK.test(location.pathname)) {
     showPausedBar();
+    announceMember(member);
     return member;
   }
 
@@ -113,6 +123,7 @@ async function requireAuth(requiredRole = null) {
 
   showRoleStrip(member);
   showTabbar(member);
+  announceMember(member);
   return member;
 }
 
@@ -199,5 +210,12 @@ function showRoleStrip(member) {
 (function () {
   if (window.__themeSelectLoaded) return; window.__themeSelectLoaded = true;
   var s = document.createElement('script'); s.src = '/js/theme-select.js'; s.defer = true;
+  (document.head || document.documentElement).appendChild(s);
+})();
+
+// Popup-meddelanden från admin (js/notices.js)
+(function () {
+  if (window.__noticesLoaded) return; window.__noticesLoaded = true;
+  var s = document.createElement('script'); s.src = '/js/notices.js'; s.defer = true;
   (document.head || document.documentElement).appendChild(s);
 })();

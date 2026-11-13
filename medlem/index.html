@@ -54,6 +54,9 @@
   .nav-item .card-icon-box::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; box-shadow: 0 0 0 2px rgba(229,169,104,0.7), 0 0 18px rgba(229,169,104,0.55); animation: hvWave 9s ease-in-out infinite; animation-delay: calc(var(--i, 0) * 0.22s + 3s); }
   .nav-list > li:nth-child(1) { --i: 0; } .nav-list > li:nth-child(2) { --i: 1; } .nav-list > li:nth-child(3) { --i: 2; } .nav-list > li:nth-child(4) { --i: 3; } .nav-list > li:nth-child(5) { --i: 4; } .nav-list > li:nth-child(6) { --i: 5; } .nav-list > li:nth-child(7) { --i: 6; } .nav-list > li:nth-child(8) { --i: 7; } .nav-list > li:nth-child(9) { --i: 8; }
   @media (prefers-reduced-motion: reduce) { .site-logo-img, .nav-item .card-icon-box::after { animation: none; } }
+  .fdot { display: inline-block; width: 0.62rem; height: 0.62rem; margin-left: 0.5rem; border-radius: 50%; background: #facc15; vertical-align: middle; box-shadow: 0 0 0 3px rgba(250,204,21,0.28); }
+  .hv-tile { position: relative; }
+  .hv-tile > .fdot { position: absolute; top: 0.5rem; right: 0.5rem; margin: 0; }
 </style>
 <style>
   #checkinCard { margin-top: 1.5rem; border-color: var(--border-hover); }
@@ -240,6 +243,21 @@
 <script src="/js/auth.js"></script>
 <script src="/js/install-app.js" defer></script>
 <script>
+// Gul prick vid Forum när någon annan skrivit sedan du senast tittade i forumet (senaste besöket sparas i webbläsaren)
+async function forumDot(member) {
+  try {
+    let seen = null; try { seen = localStorage.getItem('hv-forum-seen'); } catch (e) {}
+    if (!seen) { try { localStorage.setItem('hv-forum-seen', new Date().toISOString()); } catch (e) {} return; }   // första gången: inga gamla inlägg räknas som nya
+    const { count } = await supabaseClient.from('forum_posts').select('id', { count: 'exact', head: true }).gt('created_at', seen).neq('author_id', member.id);
+    if (!count) return;
+    document.querySelectorAll('a[href="/medlem/forum.html"]').forEach(a => {
+      const dot = document.createElement('span');
+      dot.className = 'fdot'; dot.title = count + (count === 1 ? ' nytt inlägg' : ' nya inlägg'); dot.setAttribute('aria-label', dot.title);
+      const t = a.querySelector('h3') || a;
+      t.appendChild(dot);
+    });
+  } catch (e) {}
+}
 (async () => {
   const member = await requireAuth();
   if (member) {
@@ -253,6 +271,7 @@
     document.getElementById('roleBadge').textContent = (member.role !== 'admin' && member.stamledare) ? 'stämledare' : member.role;
     loadCheckin(member);
     showParty(member);
+    forumDot(member);
     if (member.role !== 'admin') setTimeout(showUpdateNotice, document.documentElement.classList.contains('intro') ? 2600 : 0);
     if (member.role !== 'admin' && member.stamledare) {
       const a = document.createElement('a');

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meddelanden — Heavy Voices Admin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<script src="/js/ui-mode.js"></script>
+<style>
+  .nt-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .nt-lead { color: var(--text-muted); margin: 0.2rem 0 1rem; }
+  .nt-card { margin-top: 0.8rem; padding: 0.9rem 1rem; }
+  .nt-card.off { opacity: 0.65; }
+  .nt-head { display: flex; align-items: flex-start; gap: 0.8rem; }
+  .nt-ico { font-size: 1.6rem; line-height: 1; }
+  .nt-title { margin: 0; font-size: 1.1rem; }
+  .nt-body { margin: 0.35rem 0 0; color: var(--text-muted); font-size: 0.9rem; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .nt-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+  .nt-tag { display: inline-block; padding: 0.1rem 0.55rem; border: 1px solid var(--border); border-radius: 999px; font-size: 0.78rem; color: var(--text-muted); }
+  .nt-tag.on { border-color: #4ade80; color: #4ade80; }
+  .nt-tag.plan { border-color: #facc15; color: #facc15; }
+  .nt-tag.end { border-color: #9ca3af; }
+  .nt-tone { width: 0.75rem; height: 0.75rem; border-radius: 50%; margin-top: 0.4rem; flex: none; }
+  .nt-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
+  .nt-actions button { font-size: 0.82rem; padding: 0.3rem 0.7rem; }
+  .nt-form { margin-top: 1rem; padding: 1rem 1.1rem; display: grid; gap: 0.9rem; }
+  .nt-form label.lbl { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+  .nt-form input[type=text], .nt-form input[type=datetime-local], .nt-form select, .nt-form textarea { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.7rem; font: inherit; margin: 0; }
+  .nt-form textarea { min-height: 7rem; }
+  .nt-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.9rem; }
+  .nt-checks { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; }
+  .nt-checks label { display: flex; align-items: center; gap: 0.45rem; margin: 0; cursor: pointer; white-space: nowrap; font-size: 0.92rem; }
+  .nt-checks input { width: auto !important; margin: 0; flex: none; accent-color: var(--gold, #E5A968); }
+  .nt-hint { font-size: 0.8rem; color: var(--text-muted); margin: 0.25rem 0 0; }
+  .nt-btns { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+  .nt-msg { font-size: 0.9rem; }
+  .nt-msg.err { color: #f87171; }
+  .nt-msg.ok { color: #4ade80; }
+</style>
+</head>
+<body>
+<header class="site-header site-header--small"><a href="/admin/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+<div class="container">
+  <a href="/admin/" class="back-btn">&larr; Tillbaka</a>
+  <div class="nt-top">
+    <h1>Meddelanden</h1>
+    <button type="button" class="btn-gold" id="newBtn">＋ Nytt meddelande</button>
+  </div>
+  <p class="nt-lead">Popup-rutor som visas ovanpå sidan, till exempel "Det är fullt i kören" på inloggningssidan eller "Sidan byggs fortfarande" när medlemmar loggat in. Du väljer vilka sidor de visas på, hur ofta och under vilken tid.</p>
+
+  <form class="card static nt-form" id="form" hidden>
+    <h3 id="formTitle" style="margin:0">Nytt meddelande</h3>
+    <div class="nt-row">
+      <div style="grid-column: 1 / -1;"><label class="lbl" for="fTitle">Rubrik</label><input type="text" id="fTitle" maxlength="120" required placeholder="T.ex. Kören är full just nu"></div>
+    </div>
+    <div><label class="lbl" for="fBody">Text</label><textarea id="fBody" maxlength="1500" placeholder="Skriv meddelandet. Tom rad = nytt stycke."></textarea></div>
+    <div class="nt-row">
+      <div><label class="lbl" for="fIcon">Symbol (emoji)</label><input type="text" id="fIcon" maxlength="8" placeholder="📣"></div>
+      <div><label class="lbl" for="fTone">Färg</label>
+        <select id="fTone"><option value="info">Vanlig (guld)</option><option value="varning">Varning (gul)</option><option value="viktigt">Viktigt (röd)</option></select></div>
+      <div><label class="lbl" for="fBtn">Text på knappen</label><input type="text" id="fBtn" maxlength="40" placeholder="Uppfattat!"></div>
+    </div>
+    <div>
+      <label class="lbl">Var ska det visas?</label>
+      <div class="nt-checks" id="fPages"></div>
+      <p class="nt-hint">Inloggningssidan visas för alla som besöker den, även de som inte loggat in. Övriga sidor visas först när man är inloggad.</p>
+    </div>
+    <div class="nt-row">
+      <div><label class="lbl" for="fAud">Vem ser det (inloggade)?</label>
+        <select id="fAud"><option value="alla">Alla</option><option value="medlemmar">Bara medlemmar (inte admin)</option></select></div>
+      <div><label class="lbl" for="fFreq">Hur ofta?</label>
+        <select id="fFreq"><option value="session">En gång per inloggning</option><option value="once">Bara en gång (tills du ändrar texten)</option><option value="always">Varje gång sidan öppnas</option></select></div>
+      <div><label class="lbl" for="fOrder">Ordning (lägst först)</label><input type="text" id="fOrder" inputmode="numeric" placeholder="0"></div>
+    </div>
+    <div class="nt-row">
+      <div><label class="lbl" for="fFrom">Visas från (valfritt)</label><input type="datetime-local" id="fFrom"></div>
+      <div><label class="lbl" for="fTo">Visas till (valfritt)</label><input type="datetime-local" id="fTo"></div>
+    </div>
+    <div class="nt-checks"><label><input type="checkbox" id="fActive" checked> Aktivt (visas nu)</label></div>
+    <div class="nt-btns">
+      <button type="submit" class="btn-gold" id="saveBtn">Spara</button>
+      <button type="button" class="btn-outline" id="previewBtn">Förhandsvisa</button>
+      <button type="button" class="btn-outline" id="cancelBtn">Avbryt</button>
+      <span class="nt-msg" id="formMsg"></span>
+    </div>
+  </form>
+
+  <div id="list"><p class="text-muted">Laddar...</p></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+const PAGE_LABELS = [
+  ['logga-in', 'Inloggningssidan'], ['medlem-hem', 'Medlemmarnas startsida'], ['kalender', 'Kalender'], ['forum', 'Forum'],
+  ['repertoar', 'Repertoar'], ['rostovning', 'Röstövning'], ['studio', 'Studio'], ['info', 'Information']
+];
+const PAGE_NAME = Object.fromEntries(PAGE_LABELS);
+const TONE_COLOR = { info: '#E5A968', varning: '#facc15', viktigt: '#ef4444' };
+const FREQ_NAME = { session: 'en gång per inloggning', once: 'en gång', always: 'varje gång' };
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let me = null, items = [], editing = null;   // editing: id | 'new' | null
+
+$('fPages').innerHTML = PAGE_LABELS.map(([k, l]) => `<label><input type="checkbox" name="page" value="${k}"> ${l}</label>`).join('');
+
+// datetime-local <-> ISO
+const toLocal = iso => { if (!iso) return ''; const d = new Date(iso), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+const fromLocal = v => v ? new Date(v).toISOString() : null;
+const fmt = iso => new Date(iso).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' });
+
+function statusOf(n) {
+  const now = Date.now();
+  if (!n.active) return ['Av', ''];
+  if (n.starts_at && new Date(n.starts_at) > now) return ['Planerad från ' + fmt(n.starts_at), 'plan'];
+  if (n.ends_at && new Date(n.ends_at) <= now) return ['Utgången ' + fmt(n.ends_at), 'end'];
+  return ['Visas nu', 'on'];
+}
+
+function render() {
+  if (!items.length) { $('list').innerHTML = '<p class="text-muted">Inga meddelanden än. Tryck på "Nytt meddelande".</p>'; return; }
+  $('list').innerHTML = items.map(n => {
+    const [st, cls] = statusOf(n);
+    const pages = (n.pages || []).map(p => `<span class="nt-tag">${esc(PAGE_NAME[p] || p)}</span>`).join('') || '<span class="nt-tag">Ingen sida vald</span>';
+    const window_ = (n.starts_at || n.ends_at) ? `<span class="nt-tag">${n.starts_at ? 'från ' + fmt(n.starts_at) : ''}${n.starts_at && n.ends_at ? ' ' : ''}${n.ends_at ? 'till ' + fmt(n.ends_at) : ''}</span>` : '';
+    return `<div class="card static nt-card ${n.active ? '' : 'off'}" data-id="${n.id}">
+      <div class="nt-head"><span class="nt-tone" style="background:${TONE_COLOR[n.tone] || TONE_COLOR.info}"></span>
+        <div style="flex:1;min-width:0"><h3 class="nt-title">${n.icon ? esc(n.icon) + ' ' : ''}${esc(n.title)}</h3><p class="nt-body">${esc(n.body)}</p></div></div>
+      <div class="nt-meta"><span class="nt-tag ${cls}">${esc(st)}</span>${pages}<span class="nt-tag">${FREQ_NAME[n.frequency] || n.frequency}</span>${n.audience === 'medlemmar' ? '<span class="nt-tag">bara medlemmar</span>' : ''}${window_}</div>
+      <div class="nt-actions">
+        <button type="button" class="btn-outline" data-act="toggle">${n.active ? 'Stäng av' : 'Slå på'}</button>
+        <button type="button" class="btn-outline" data-act="edit">Redigera</button>
+        <button type="button" class="btn-outline" data-act="preview">Förhandsvisa</button>
+        <button type="button" class="btn-outline" data-act="copy">Kopiera</button>
+        <button type="button" class="btn-outline" data-act="del" style="border-color:#f87171;color:#fca5a5">Ta bort</button>
+      </div></div>`;
+  }).join('');
+}
+
+async function load() {
+  const { data, error } = await supabaseClient.from('site_notices').select('*').order('sort_order').order('created_at');
+  if (error) { $('list').innerHTML = `<p class="error">Kunde inte hämta meddelanden: ${esc(error.message)}</p>`; return; }
+  items = data || []; render();
+}
+
+function fillForm(n) {
+  $('fTitle').value = n.title || ''; $('fBody').value = n.body || ''; $('fIcon').value = n.icon || '';
+  $('fTone').value = n.tone || 'info'; $('fBtn').value = n.button_text || '';
+  document.querySelectorAll('#fPages input').forEach(c => { c.checked = (n.pages || []).includes(c.value); });
+  $('fAud').value = n.audience || 'alla'; $('fFreq').value = n.frequency || 'session'; $('fOrder').value = n.sort_order || 0;
+  $('fFrom').value = toLocal(n.starts_at); $('fTo').value = toLocal(n.ends_at); $('fActive').checked = n.active !== false;
+  $('formMsg').textContent = ''; $('formMsg').className = 'nt-msg';
+}
+function readForm() {
+  return {
+    title: $('fTitle').value.trim(), body: $('fBody').value.trim(), icon: $('fIcon').value.trim(),
+    tone: $('fTone').value, button_text: $('fBtn').value.trim() || 'Uppfattat!',
+    pages: [...document.querySelectorAll('#fPages input:checked')].map(c => c.value),
+    audience: $('fAud').value, frequency: $('fFreq').value, sort_order: parseInt($('fOrder').value, 10) || 0,
+    starts_at: fromLocal($('fFrom').value), ends_at: fromLocal($('fTo').value), active: $('fActive').checked
+  };
+}
+function openForm(n, id) {
+  editing = id; fillForm(n);
+  $('formTitle').textContent = id === 'new' ? 'Nytt meddelande' : 'Redigera meddelande';
+  $('form').hidden = false; $('form').scrollIntoView({ behavior: 'smooth', block: 'start' }); $('fTitle').focus();
+}
+function closeForm() { editing = null; $('form').hidden = true; }
+
+$('newBtn').addEventListener('click', () => openForm({ icon: '📣', tone: 'info', button_text: 'Uppfattat!', pages: ['logga-in'], audience: 'alla', frequency: 'session', active: true }, 'new'));
+$('cancelBtn').addEventListener('click', closeForm);
+$('previewBtn').addEventListener('click', () => { const n = readForm(); if (!n.title) { $('formMsg').textContent = 'Skriv en rubrik först.'; $('formMsg').className = 'nt-msg err'; return; } HVNotices.preview(n); });
+
+$('form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const row = readForm(), msg = $('formMsg');
+  msg.className = 'nt-msg err';
+  if (!row.title) { msg.textContent = 'Rubrik saknas.'; return; }
+  if (!row.pages.length) { msg.textContent = 'Välj minst en sida där meddelandet ska visas.'; return; }
+  if (row.starts_at && row.ends_at && new Date(row.ends_at) <= new Date(row.starts_at)) { msg.textContent = '"Till" måste vara efter "Från".'; return; }
+  $('saveBtn').disabled = true;
+  let res;
+  if (editing === 'new') { row.created_by = me.id; res = await supabaseClient.from('site_notices').insert(row); }
+  else res = await supabaseClient.from('site_notices').update(row).eq('id', editing);
+  $('saveBtn').disabled = false;
+  if (res.error) { msg.textContent = 'Kunde inte spara: ' + res.error.message; return; }
+  closeForm(); await load();
+});
+
+$('list').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const id = b.closest('[data-id]').dataset.id, n = items.find(x => x.id === id); if (!n) return;
+  const act = b.dataset.act;
+  if (act === 'edit') return openForm(n, id);
+  if (act === 'preview') return HVNotices.preview(n);
+  if (act === 'copy') return openForm({ ...n, title: n.title + ' (kopia)', active: false }, 'new');
+  if (act === 'toggle') {
+    const { error } = await supabaseClient.from('site_notices').update({ active: !n.active }).eq('id', id);
+    if (error) return alert('Kunde inte ändra: ' + error.message);
+    return load();
+  }
+  if (act === 'del') {
+    if (!confirm('Ta bort meddelandet "' + n.title + '"?')) return;
+    const { error } = await supabaseClient.from('site_notices').delete().eq('id', id);
+    if (error) return alert('Kunde inte ta bort: ' + error.message);
+    return load();
+  }
+});
+
+(async () => {
+  me = await requireAuth('admin');
+  if (!me) return;
+  load();
+})();
+</script>
+</body>
+</html>

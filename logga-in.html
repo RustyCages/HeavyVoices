@@ -63,6 +63,12 @@
 <script src="/js/auth.js"></script>
 <script src="/js/install-app.js" defer></script>
 <script>
+// Info efter automatisk utloggning (1 h utan aktivitet)
+if (/[?&]utlogg=1/.test(location.search)) {
+  const n = document.createElement('p'); n.className = 'text-muted'; n.style.cssText = 'margin:.5rem 0 1rem;font-size:.9rem';
+  n.textContent = 'Du loggades ut efter 1 timme utan aktivitet. Logga in igen.';
+  const f = document.getElementById('loginForm'); f.parentNode.insertBefore(n, f);
+}
 // Dölj "Registrera dig här" när admin stängt registreringen
 (async () => {
   try {

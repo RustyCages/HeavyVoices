@@ -233,14 +233,25 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('sv-SE');
 }
 
-async function loadMembers() {
-  const { data, error } = await supabaseClient
-    .from('members')
-    .select('id, name, email, role, stamledare, stamma, status, fee_paid, fee_paid_at, created_at, reactivation_requested_at, reactivation_note')
-    .order('status')
-    .order('name');
-
+async function loadMembers(attempt = 0) {
   const tbody = document.getElementById('membersTableBody');
+  let res;
+  try {
+    // ibland hänger anropet (inloggningslåset) – ge upp efter 10 s och försök en gång till innan felet visas
+    res = await Promise.race([
+      supabaseClient
+        .from('members')
+        .select('id, name, email, role, stamledare, stamma, status, fee_paid, fee_paid_at, created_at, reactivation_requested_at, reactivation_note')
+        .order('status')
+        .order('name'),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))
+    ]);
+  } catch (e) {
+    if (attempt < 1) return loadMembers(attempt + 1);
+    tbody.innerHTML = '<tr><td colspan="9" class="error">Medlemslistan svarar inte. <button type="button" class="btn-outline" onclick="location.reload()">Ladda om sidan</button></td></tr>';
+    return;
+  }
+  const { data, error } = res;
 
   if (error) {
     tbody.innerHTML = `<tr><td colspan="9" class="error">Kunde inte hämta medlemmar: ${esc(error.message)}</td></tr>`;

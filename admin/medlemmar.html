@@ -94,6 +94,10 @@
         <input type="radio" name="inviteMode" value="direct" style="width: auto; margin-right: 0.4rem;">
         Sätt lösenord direkt (inget mejl skickas)
       </label>
+      <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">
+        <input type="radio" name="inviteMode" value="temp" style="width: auto; margin-right: 0.4rem;">
+        Skicka engångslösenord via mejl (skapas automatiskt, personen kan byta under Konto)
+      </label>
       <label style="display: block; margin-bottom: 0.75rem; font-size: 0.9rem;">
         <input type="radio" name="inviteMode" value="queue" style="width: auto; margin-right: 0.4rem;">
         Lägg i kölistan (inget mejl nu – välkomstmejl skickas när du gör personen Aktiv)
@@ -851,7 +855,10 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   const isQueue = mode === 'queue';
   // Kö: kontot skapas med slumpat lösenord (inget mejl). Personen väljer eget via "Glömt lösenord?" när hen blir Aktiv.
   const rnd = () => { const a = new Uint8Array(18); crypto.getRandomValues(a); return Array.from(a, b => b.toString(36).padStart(2, '0')).join('').slice(0, 24) + 'Aa1'; };
-  const password = mode === 'direct' ? document.getElementById('invitePassword').value : (isQueue ? rnd() : undefined);
+  const isTemp = mode === 'temp';
+  // Engångslösenord: lättläst (utan 0/O, 1/l/I), 10 tecken
+  const tempPw = () => { const c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const a = new Uint8Array(10); crypto.getRandomValues(a); return Array.from(a, b => c[b % c.length]).join(''); };
+  const password = mode === 'direct' ? document.getElementById('invitePassword').value : (isQueue ? rnd() : (isTemp ? tempPw() : undefined));
   const errorEl = document.getElementById('inviteError');
   const successEl = document.getElementById('inviteSuccess');
   errorEl.textContent = '';
@@ -876,12 +883,30 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
       return;
     }
 
+    let newId = result.id || result.member_id || (result.member && result.member.id) || (result.user && result.user.id);
+    if ((isQueue || isTemp) && !newId) {
+      const { data: row } = await supabaseClient.from('members').select('id').ilike('email', email.trim()).limit(1).maybeSingle();
+      newId = row && row.id;
+    }
+    let tempMsg = '';
+    if (isTemp) {
+      if (!newId) { errorEl.textContent = `Medlemmen skapades men mejlet kunde inte skickas (hittade inte raden). Engångslösenord: ${password}`; loadMembers(); return; }
+      const { data: { session: s2 } } = await supabaseClient.auth.getSession();
+      const mres = await fetch(`${SUPABASE_URL}/functions/v1/send-member-email`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${s2.access_token}`, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject: 'Ditt konto på Heavy Voices',
+          message: `Hej {fornamn}!\n\nDu har fått ett konto i Heavy Voices.\n\nInloggning: https://heavyvoices.se/logga-in\nE-post: {epost}\nEngångslösenord: ${password}\n\nByt gärna lösenord efter första inloggningen (under Konto), eller använd "Glömt lösenord?" för att välja ett eget direkt.`,
+          member_ids: [newId],
+        }),
+      });
+      const mr = await mres.json().catch(() => ({}));
+      tempMsg = (mres.ok && !(mr.failed && mr.failed.length))
+        ? ` Engångslösenord skickat till ${email}.`
+        : ` Mejlet kunde inte skickas (${mr.error || 'fel'}) – ge personen lösenordet själv: ${password}`;
+    }
     if (isQueue) {
-      let newId = result.id || result.member_id || (result.member && result.member.id) || (result.user && result.user.id);
-      if (!newId) {
-        const { data: row } = await supabaseClient.from('members').select('id').ilike('email', email.trim()).limit(1).maybeSingle();
-        newId = row && row.id;
-      }
       if (!newId) { errorEl.textContent = 'Medlemmen skapades men hittades inte i listan – ändra status till Kö manuellt.'; loadMembers(); return; }
       const { error: qErr } = await supabaseClient.from('members').update({ status: 'queue' }).eq('id', newId);
       if (qErr) { errorEl.textContent = 'Medlemmen skapades men kunde inte läggas i kön: ' + qErr.message; loadMembers(); return; }
@@ -891,6 +916,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
       ? `${name} ligger nu i kölistan. Välkomstmejl skickas när du ändrar status till Aktiv.`
       : mode === 'direct'
       ? `${name} kan nu logga in direkt med det satta lösenordet.`
+      : isTemp ? `${name} är tillagd.${tempMsg}`
       : `Inbjudan skickad till ${email}.`;
     document.getElementById('inviteForm').reset();
     document.getElementById('invitePassword').style.display = 'none';

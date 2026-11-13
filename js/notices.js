@@ -73,11 +73,13 @@
   async function run(member) {
     if (started) return;
     const page = PAGES[location.pathname];
-    if (!page || !window.supabaseClient) return;
+    // supabaseClient är en const i supabase-config.js (inte en egenskap på window), men går att nå som global variabel
+    const sb = (typeof supabaseClient !== 'undefined') ? supabaseClient : window.supabaseClient;
+    if (!page || !sb) return;
     if (window.top !== window || /[?&]embed\b/.test(location.search)) return;
     started = true;
     try {
-      const { data, error } = await window.supabaseClient.from('site_notices')
+      const { data, error } = await sb.from('site_notices')
         .select('id, title, body, icon, tone, button_text, pages, audience, frequency, updated_at, sort_order, created_at')
         .contains('pages', [page]).order('sort_order').order('created_at');
       if (error || !data) return;

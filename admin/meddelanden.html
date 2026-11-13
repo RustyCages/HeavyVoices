@@ -49,6 +49,13 @@
   </div>
   <p class="nt-lead">Popup-rutor som visas ovanpå sidan, till exempel "Det är fullt i kören" på inloggningssidan eller "Sidan byggs fortfarande" när medlemmar loggat in. Du väljer vilka sidor de visas på, hur ofta och under vilken tid.</p>
 
+  <div class="card static" id="regCard" style="margin-top:1rem;padding:.9rem 1.1rem;display:flex;gap:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap">
+    <div><strong>Registrering</strong>
+      <div class="text-muted" id="regState" style="font-size:.85rem">Laddar...</div>
+      <div class="text-muted" style="font-size:.8rem">Stängd = länken "Registrera dig här" döljs och sidan /registrera visar att kören är full.</div></div>
+    <button type="button" class="btn-outline" id="regToggle" disabled>—</button>
+  </div>
+
   <form class="card static nt-form" id="form" hidden>
     <h3 id="formTitle" style="margin:0">Nytt meddelande</h3>
     <div class="nt-row">
@@ -209,10 +216,29 @@ $('list').addEventListener('click', async e => {
   }
 });
 
+async function loadReg() {
+  const st = document.getElementById('regState'), bt = document.getElementById('regToggle');
+  const { data, error } = await supabaseClient.from('site_settings').select('value').eq('key', 'registration_open').maybeSingle();
+  if (error) { st.textContent = 'Kunde inte läsa inställningen (har SQL:en körts?): ' + error.message; return; }
+  const open = !data || data.value !== 'false';
+  st.innerHTML = open ? '🟢 Öppen – nya kan registrera sig' : '🔴 Stängd – kören är full';
+  bt.textContent = open ? 'Stäng registreringen' : 'Öppna registreringen';
+  bt.disabled = false; bt.dataset.open = open ? '1' : '0';
+}
+document.getElementById('regToggle').addEventListener('click', async (e) => {
+  const bt = e.currentTarget; const toOpen = bt.dataset.open !== '1';
+  if (!toOpen && !confirm('Stänga registreringen? Inga nya kan då registrera sig.')) return;
+  bt.disabled = true;
+  const { error } = await supabaseClient.from('site_settings').upsert({ key: 'registration_open', value: toOpen ? 'true' : 'false' });
+  if (error) alert('Kunde inte spara: ' + error.message);
+  loadReg();
+});
+
 (async () => {
   me = await requireAuth('admin');
   if (!me) return;
   load();
+  loadReg();
 })();
 </script>
 </body>

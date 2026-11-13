@@ -94,6 +94,10 @@
         <input type="radio" name="inviteMode" value="direct" style="width: auto; margin-right: 0.4rem;">
         Sätt lösenord direkt (inget mejl skickas)
       </label>
+      <label style="display: block; margin-bottom: 0.75rem; font-size: 0.9rem;">
+        <input type="radio" name="inviteMode" value="queue" style="width: auto; margin-right: 0.4rem;">
+        Lägg i kölistan (inget mejl nu – välkomstmejl skickas när du gör personen Aktiv)
+      </label>
 
       <input type="password" id="invitePassword" autocomplete="off" placeholder="Lösenord (minst 6 tecken)" style="display: none;" minlength="6">
 
@@ -391,8 +395,10 @@ function renderMembers() {
         sel.value = m ? m.status : 'approved';
         return;
       }
+      const wasQueue = m && m.status === 'queue';
       const { error } = await supabaseClient.from('members').update({ status: newStatus }).eq('id', id);
       if (error) { alert('Kunde inte ändra status: ' + error.message); }
+      else if (wasQueue && newStatus === 'approved') sendWelcomeMails([id]);
       loadMembers();
     });
   });
@@ -496,9 +502,11 @@ document.getElementById('bulkApplyBtn').addEventListener('click', async () => {
   const warn = STATUS_WARN[st] ? STATUS_WARN[st].replace('{n}', n) : `Göra ${n} aktiva?`;
   if (!confirm(warn)) return;
   msg.textContent = 'Sparar...';
+  const fromQueue = st === 'approved' ? ids.filter(id => { const m = members.find(x => x.id === id); return m && m.status === 'queue'; }) : [];
   const { error } = await supabaseClient.from('members').update({ status: st }).in('id', ids);
   if (error) { msg.textContent = 'Kunde inte ändra: ' + error.message; return; }
-  msg.textContent = `${n} ändrade till ${STATUS_LABELS[st]} ✓`;
+  msg.textContent = `${n} ändrade till ${STATUS_LABELS[st]} ✓` + (fromQueue.length ? ` – skickar välkomstmejl till ${fromQueue.length}...` : '');
+  if (fromQueue.length) sendWelcomeMails(fromQueue);
   selected.clear();
   await loadMembers();
 });
@@ -574,6 +582,46 @@ document.getElementById('resetFeesBtn').addEventListener('click', async () => {
 // =========================================================
 // Brevmallar (tabellen letter_templates, redigeras på admin/brevmallar.html)
 let letterTemplates = [];
+
+// =========================================================
+// Välkomstmejl när status ändras Kö -> Aktiv
+// Använder brevmallen "Välkomst" om den finns (admin/brevmallar.html), annars standardtexten.
+// =========================================================
+const WELCOME_DEFAULT = {
+  subject: 'Välkommen till Heavy Voices, {fornamn}!',
+  body: 'Hej {fornamn}!\n\nNu har du en plats i Heavy Voices – välkommen! Ditt konto är aktiverat.\n\nSå här loggar du in:\n1. Gå till https://heavyvoices.se/logga-in\n2. Logga in med {epost}. Har du inget lösenord än, eller har glömt det, klicka på "Glömt lösenord?" så får du en länk för att välja ett.\n\nI medlemsområdet hittar du repertoar, röstövning, kalender och forum.\n\nVi ses på nästa repetition!',
+};
+function toast(text, isErr) {
+  let el = document.getElementById('hvToast');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'hvToast';
+    el.style.cssText = 'position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);z-index:9999;max-width:90vw;padding:.7rem 1.1rem;border-radius:10px;background:#1f2937;color:#f3f4f6;border:1px solid #374151;box-shadow:0 6px 24px rgba(0,0,0,.45);font-size:.9rem';
+    document.body.appendChild(el);
+  }
+  el.textContent = text; el.style.borderColor = isErr ? '#ef4444' : '#22c55e'; el.style.display = 'block';
+  clearTimeout(toast._t); toast._t = setTimeout(() => { el.style.display = 'none'; }, isErr ? 9000 : 5000);
+}
+async function sendWelcomeMails(ids) {
+  if (!ids.length) return;
+  try {
+    const t = letterTemplates.find(x => /^v[äa]lkomst/i.test((x.name || '').trim()));
+    const subject = (t && t.subject) || WELCOME_DEFAULT.subject;
+    const message = (t && t.body) || WELCOME_DEFAULT.body;
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-member-email`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject, message, member_ids: ids }),
+    });
+    const r = await res.json().catch(() => ({}));
+    if (!res.ok) { toast('Status ändrad, men välkomstmejlet kunde inte skickas: ' + (r.error || 'fel ' + res.status), true); return; }
+    if (r.failed && r.failed.length) toast('Välkomstmejl misslyckades till: ' + r.failed.join(', '), true);
+    else toast(`Välkomstmejl skickat till ${r.sent} ${r.sent === 1 ? 'person' : 'personer'} ✓`);
+  } catch (err) {
+    toast('Status ändrad, men välkomstmejlet kunde inte skickas: ' + err.message, true);
+  }
+}
+
 
 async function loadLetterTemplates() {
   const { data, error } = await supabaseClient.from('letter_templates').select('id, name, subject, body').order('name');
@@ -800,7 +848,10 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   const email = document.getElementById('inviteEmail').value;
   const role = document.getElementById('inviteRole').value;
   const mode = document.querySelector('input[name="inviteMode"]:checked').value;
-  const password = mode === 'direct' ? document.getElementById('invitePassword').value : undefined;
+  const isQueue = mode === 'queue';
+  // Kö: kontot skapas med slumpat lösenord (inget mejl). Personen väljer eget via "Glömt lösenord?" när hen blir Aktiv.
+  const rnd = () => { const a = new Uint8Array(18); crypto.getRandomValues(a); return Array.from(a, b => b.toString(36).padStart(2, '0')).join('').slice(0, 24) + 'Aa1'; };
+  const password = mode === 'direct' ? document.getElementById('invitePassword').value : (isQueue ? rnd() : undefined);
   const errorEl = document.getElementById('inviteError');
   const successEl = document.getElementById('inviteSuccess');
   errorEl.textContent = '';
@@ -816,7 +867,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
         'apikey': SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name, email, role, password }),
+      body: JSON.stringify({ name, email, role: isQueue ? 'medlem' : role, password }),
     });
     const result = await res.json();
 
@@ -825,7 +876,20 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
       return;
     }
 
-    successEl.textContent = mode === 'direct'
+    if (isQueue) {
+      let newId = result.id || result.member_id || (result.member && result.member.id) || (result.user && result.user.id);
+      if (!newId) {
+        const { data: row } = await supabaseClient.from('members').select('id').ilike('email', email.trim()).limit(1).maybeSingle();
+        newId = row && row.id;
+      }
+      if (!newId) { errorEl.textContent = 'Medlemmen skapades men hittades inte i listan – ändra status till Kö manuellt.'; loadMembers(); return; }
+      const { error: qErr } = await supabaseClient.from('members').update({ status: 'queue' }).eq('id', newId);
+      if (qErr) { errorEl.textContent = 'Medlemmen skapades men kunde inte läggas i kön: ' + qErr.message; loadMembers(); return; }
+    }
+
+    successEl.textContent = isQueue
+      ? `${name} ligger nu i kölistan. Välkomstmejl skickas när du ändrar status till Aktiv.`
+      : mode === 'direct'
       ? `${name} kan nu logga in direkt med det satta lösenordet.`
       : `Inbjudan skickad till ${email}.`;
     document.getElementById('inviteForm').reset();

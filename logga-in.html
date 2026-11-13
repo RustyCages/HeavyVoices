@@ -49,7 +49,7 @@
       <a href="/aterstall-losenord.html" class="text-muted" style="display: inline-block; margin-left: 0.75rem; font-size: 0.85rem;">Glömt lösenord?</a>
       <p class="error" id="loginError"></p>
     </form>
-    <p class="text-muted" style="margin-top: 1rem; font-size: 0.85rem;">Ny i kören? <a href="/registrera.html">Registrera dig här</a>.</p>
+    <p class="text-muted" id="regLinkRow" style="margin-top: 1rem; font-size: 0.85rem;">Ny i kören? <a href="/registrera.html">Registrera dig här</a>.</p>
   </div>
   <div style="display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; align-items: center;">
     <a href="/guide.html?guide=registrera" class="btn btn-outline" style="text-decoration: none;">Så funkar det</a>
@@ -62,6 +62,15 @@
 <script src="/js/password-toggle.js" defer></script>
 <script src="/js/auth.js"></script>
 <script src="/js/install-app.js" defer></script>
+<script>
+// Dölj "Registrera dig här" när admin stängt registreringen
+(async () => {
+  try {
+    const { data } = await supabaseClient.from('site_settings').select('value').eq('key', 'registration_open').maybeSingle();
+    if (data && data.value === 'false') { const r = document.getElementById('regLinkRow'); if (r) r.style.display = 'none'; }
+  } catch (e) {}
+})();
+</script>
 <script>
 // Snygg övergång: formuläret tonas bort, loggan flammar upp och sidan går ner i svart
 function playEnter() {

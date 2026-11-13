@@ -52,6 +52,7 @@
   #ksBtn.stop { background: #dc2626; color: #fff; border-color: #dc2626; }
   #ksBtn.open { background: #16a34a; color: #fff; border-color: #16a34a; }
   .ks-note { font-size: 0.8rem; margin: 0.7rem 0 0; }
+  .badge.ib-new::before { content: ''; display: inline-block; width: 0.55rem; height: 0.55rem; margin-right: 0.4rem; border-radius: 50%; background: #facc15; vertical-align: middle; }
 </style>
 </head>
 <body>
@@ -177,7 +178,7 @@
       // Antal olästa mejl i inkorgen (inkorgen nås från Medlemmar)
       supabaseClient.from('inbox_messages').select('id', { count: 'exact', head: true })
         .eq('direction', 'in').eq('is_read', false).eq('folder', 'inkorg')
-        .then(({ count }) => { const b = document.getElementById('inboxUnread'); if (b && count) { b.textContent = count + (count === 1 ? ' nytt mejl' : ' nya mejl'); b.hidden = false; } });
+        .then(({ count }) => { const b = document.getElementById('inboxUnread'); if (b && count) { b.textContent = count + (count === 1 ? ' nytt mejl' : ' nya mejl'); b.classList.add('ib-new'); b.hidden = false; } });
     }
     if (!full) {
       // Stämledare: bara låtverktygen. Resten tas bort (och skyddas dessutom i databasen / på sidorna).

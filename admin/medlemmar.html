@@ -65,6 +65,7 @@
   details.fold[open] > summary { margin-bottom: 0.8rem; }
   #mailMessage { min-height: 180px; line-height: 1.5; }
   #mailRecipients { font-weight: 600; color: var(--accent); }
+  .ib-dot { display: inline-block; width: 0.62rem; height: 0.62rem; margin-left: 0.5rem; border-radius: 50%; background: #facc15; vertical-align: middle; box-shadow: 0 0 0 3px rgba(250,204,21,0.28); }
 </style>
 </head>
   
@@ -845,7 +846,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
     // Antal olästa mejl i inkorgen
     supabaseClient.from('inbox_messages').select('id', { count: 'exact', head: true })
       .eq('direction', 'in').eq('is_read', false).eq('folder', 'inkorg')
-      .then(({ count }) => { if (count) { const t = ` (${count} nya)`; document.getElementById('inboxUnread').textContent = t; document.getElementById('inboxUnread2').textContent = t; } });
+      .then(({ count }) => { if (count) { ['inboxUnread', 'inboxUnread2'].forEach(id => { const e = document.getElementById(id); e.className = 'ib-dot'; e.title = count + (count === 1 ? ' nytt mejl' : ' nya mejl'); }); } });
   }
 })();
 </script>

@@ -37,7 +37,14 @@
   @media (max-width: 600px) { h2.grp { margin-top: 0.9rem; } }
   .ks { border: 1px solid rgba(239,68,68,0.5); margin-top: 1.6rem; }
   .ks.closed { border-color: #ef4444; background: rgba(239,68,68,0.1); }
-  .ks-h { margin: 0 0 0.4rem; font-size: 1.1rem; }
+  .ks-h { margin: 0; font-size: 1.1rem; }
+  .ks-sum { display: flex; align-items: center; gap: 0.6rem; cursor: pointer; list-style: none; user-select: none; }
+  .ks-sum::-webkit-details-marker { display: none; }
+  .ks-sum::before { content: '\25B8\FE0E'; color: var(--text-muted); font-size: 1.1rem; transition: transform 0.15s; }
+  .ks[open] > .ks-sum::before { transform: rotate(90deg); }
+  .ks-badge { margin-left: auto; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+  .ks.closed .ks-badge { color: #fca5a5; }
+  .ks[open] > .ks-sum { margin-bottom: 0.6rem; }
   .ks-state { margin: 0 0 0.6rem; font-weight: 600; }
   .ks-lbl { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem; }
   .ks textarea { width: 100%; min-height: 3.2rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.7rem; font: inherit; }
@@ -138,14 +145,14 @@
     </ul>
   </div>
 
-  <div class="card ks" id="nodstopp" hidden>
-    <h2 class="ks-h">🚨 Nödstopp</h2>
+  <details class="card ks" id="nodstopp" hidden>
+    <summary class="ks-sum"><h2 class="ks-h">🚨 Nödstopp</h2><span class="ks-badge" id="ksBadge"></span></summary>
     <p class="ks-state" id="ksState">Laddar…</p>
     <label class="ks-lbl" for="ksMsg">Meddelande på stängt-sidan (valfritt)</label>
     <textarea id="ksMsg" maxlength="400" placeholder="T.ex. Vi gör underhåll – tillbaka i kväll."></textarea>
     <div class="ks-row"><button type="button" id="ksBtn">…</button><span class="text-muted" id="ksInfo"></span></div>
     <p class="text-muted ks-note">Stänger sajten direkt för alla utom admin: sidorna visar en stängt-sida, öppna sidor stängs inom 30 sekunder och databasen och filerna släpper bara in admin. Inloggning och adminvyn fungerar, så att du kan öppna igen härifrån.</p>
-  </div>
+  </details>
 
   <div class="page-footer">
     <div class="page-footer-actions">
@@ -202,6 +209,7 @@ async function initKillswitch(member) {
     closed = !!(row && row.closed);
     card.classList.toggle('closed', closed);
     document.getElementById('ksState').textContent = closed ? '⛔ Sajten är STÄNGD för medlemmar.' : '✅ Sajten är öppen.';
+    document.getElementById('ksBadge').textContent = closed ? '⛔ Stängd' : '✅ Öppen';
     btn.textContent = closed ? '✅ Öppna sajten igen' : '⛔ Stäng sajten nu';
     btn.className = closed ? 'open' : 'stop';
     document.getElementById('ksInfo').textContent = row && row.changed_at ? 'Senast ändrad ' + new Date(row.changed_at).toLocaleString('sv-SE') : '';
@@ -210,7 +218,7 @@ async function initKillswitch(member) {
   const { data, error } = await supabaseClient.from('site_status').select('*').eq('id', 1).maybeSingle();
   if (error || !data) { document.getElementById('ksState').textContent = '⚠️ Nödstoppet är inte aktiverat i databasen än (kör SQL-filen 2026-11-03_killswitch.sql).'; btn.disabled = true; btn.textContent = 'Ej tillgängligt'; return; }
   draw(data);
-  if (location.hash === '#nodstopp') card.scrollIntoView({ block: 'center' });
+  if (location.hash === '#nodstopp') { card.open = true; card.scrollIntoView({ block: 'center' }); }
   btn.addEventListener('click', async () => {
     const next = !closed;
     if (next && !confirm('Stänga sajten för ALLA utom admin – direkt?')) return;

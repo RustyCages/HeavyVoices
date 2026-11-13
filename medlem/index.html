@@ -272,7 +272,6 @@ async function forumDot(member) {
     loadCheckin(member);
     showParty(member);
     forumDot(member);
-    if (member.role !== 'admin') setTimeout(showUpdateNotice, document.documentElement.classList.contains('intro') ? 2600 : 0);
     if (member.role !== 'admin' && member.stamledare) {
       const a = document.createElement('a');
       a.href = '/admin/';
@@ -301,28 +300,7 @@ function showContinue() {
   a.hidden = false;
 }
 
-// ---------- Info-ruta efter inloggning (en gång per inloggning) ----------
-function showUpdateNotice() {
-  try { if (sessionStorage.getItem('hvNoticeSeen')) return; sessionStorage.setItem('hvNoticeSeen', '1'); } catch (e) {}
-  const wrap = document.createElement('div');
-  wrap.className = 'notice-backdrop';
-  wrap.innerHTML = `
-    <div class="notice-box" role="dialog" aria-modal="true" aria-labelledby="noticeTitle">
-      <h3 id="noticeTitle">🛠️ Sidan byggs fortfarande</h3>
-      <p>Heavy Voices-sidan uppdateras hela tiden, så saker kan flytta sig eller ändras medan du är här.</p>
-      <p><strong>Feedback och önskemål är varmt välkomna!</strong> Tipsa gärna om vad som funkar bra och vad du saknar.</p>
-      <p>Klagomål däremot… förbises. 😉</p>
-      <button type="button" class="btn-gold" id="noticeOk">Uppfattat!</button>
-    </div>`;
-  const close = () => { document.removeEventListener('keydown', onKey); wrap.classList.remove('show'); setTimeout(() => wrap.remove(), 450); };
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
-  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
-  wrap.querySelector('#noticeOk').addEventListener('click', close);
-  document.addEventListener('keydown', onKey);
-  document.body.appendChild(wrap);
-  requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('show')));
-  wrap.querySelector('#noticeOk').focus();
-}
+// Info-rutor efter inloggning styrs numera från admin/meddelanden.html (js/notices.js)
 
 document.getElementById('logoutBtn').addEventListener('click', signOut);
 

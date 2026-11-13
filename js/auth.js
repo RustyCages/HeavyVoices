@@ -6,6 +6,7 @@ if (/^\/(admin|medlem)(\/|$)/.test(location.pathname)) document.documentElement.
 async function signIn(email, password) {
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) throw error;
+  try { localStorage.setItem('hv-last-active', String(Date.now())); } catch (e) {}
   try {
     sessionStorage.removeItem('hvNoticeSeen'); sessionStorage.removeItem('hvIntroSeen');
     Object.keys(sessionStorage).filter(k => k.indexOf('hv-notice-s-') === 0).forEach(k => sessionStorage.removeItem(k));   // meddelanden som visas en gång per inloggning
@@ -13,7 +14,38 @@ async function signIn(email, password) {
   return data;
 }
 
+// Automatisk utloggning efter 1 timme utan aktivitet (delas mellan flikar via localStorage)
+var HV_IDLE_LIMIT = 60 * 60 * 1000;
+var __hvIdleOn = false;
+function startIdleWatch() {
+  if (__hvIdleOn) return; __hvIdleOn = true;
+  var KEY = 'hv-last-active', last = 0;
+  function get() { try { return parseInt(localStorage.getItem(KEY), 10) || 0; } catch (e) { return 0; } }
+  function touch() { var n = Date.now(); if (n - last < 5000) return; last = n; try { localStorage.setItem(KEY, String(n)); } catch (e) {} }
+  function playing() { return Array.prototype.some.call(document.querySelectorAll('audio,video'), function (m) { return !m.paused && !m.ended; }); }
+  async function expire() {
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    try { await supabaseClient.auth.signOut(); } catch (e) {}
+    location.href = '/logga-in.html?utlogg=1';
+  }
+  function check() {
+    if (playing()) { touch(); return; }
+    var t = get();
+    if (t && Date.now() - t > HV_IDLE_LIMIT) expire();
+  }
+  var t0 = get();
+  if (t0 && Date.now() - t0 > HV_IDLE_LIMIT) { expire(); return; }
+  touch();
+  ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click', 'wheel'].forEach(function (ev) {
+    window.addEventListener(ev, touch, { passive: true, capture: true });
+  });
+  setInterval(check, 30000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+  window.addEventListener('focus', check);
+}
+
 async function signOut() {
+  try { localStorage.removeItem('hv-last-active'); } catch (e) {}
   await supabaseClient.auth.signOut();
   window.location.href = '/';
 }
@@ -89,6 +121,7 @@ async function requireAuth(requiredRole = null) {
   try { member = await withTimeout(getCurrentMember(), 10000); }
   catch (e) { authHangRecover(); return null; }
   try { sessionStorage.removeItem('hvAuthReload'); } catch (e) {}
+  if (member) startIdleWatch();
 
   if (!member) {
     // i en installerad app (t.ex. Bergsprängaren/Rock-TV) – kom tillbaka hit efter inloggningen

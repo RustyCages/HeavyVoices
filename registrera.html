@@ -56,6 +56,20 @@
 <script src="/js/supabase-config.js"></script>
 <script src="/js/password-toggle.js" defer></script>
 <script>
+// Stängd registrering (satt av admin under Meddelanden). Vid fel på uppslaget lämnas formuläret öppet.
+(async () => {
+  try {
+    const { data } = await supabaseClient.from('site_settings').select('value').eq('key', 'registration_open').maybeSingle();
+    if (data && data.value === 'false') {
+      document.getElementById('registerForm').style.display = 'none';
+      const card = document.getElementById('registerForm').parentNode;
+      const p = document.createElement('p');
+      p.innerHTML = '<strong>Registreringen är stängd just nu.</strong><br>Kören är full. Hör av dig till oss så sätter vi dig i kö.';
+      card.insertBefore(p, card.firstChild);
+      const lead = document.querySelector('.container > p.text-muted'); if (lead) lead.style.display = 'none';
+    }
+  } catch (e) {}
+})();
 document.getElementById('registerForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = document.getElementById('regName').value;

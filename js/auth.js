@@ -15,6 +15,29 @@ async function signOut() {
   window.location.href = '/';
 }
 
+// Ibland hänger ett Supabase-anrop (inloggningslåset i webbläsaren) och sidan blir stående på "Laddar…" tills man laddar om.
+// Därför: tidsgräns på inloggningskollen, en automatisk omladdning (högst en gång per minut) och annars ett tydligt meddelande med knapp.
+function withTimeout(p, ms) {
+  return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+}
+
+function authHangRecover() {
+  let last = 0;
+  try { last = Number(sessionStorage.getItem('hvAuthReload') || 0); } catch (e) {}
+  if (Date.now() - last > 60000) {
+    try { sessionStorage.setItem('hvAuthReload', String(Date.now())); } catch (e) {}
+    location.reload();
+    return;
+  }
+  const add = () => {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:9999;padding:0.7rem 1rem;background:#7f1d1d;color:#fff;text-align:center;font-size:0.9rem;';
+    d.innerHTML = 'Inloggningen svarar inte. <button type="button" style="margin-left:0.6rem;padding:0.25rem 0.8rem;border-radius:6px;border:0;cursor:pointer;" onclick="location.reload()">Ladda om sidan</button>';
+    document.body.appendChild(d);
+  };
+  if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
+}
+
 async function getCurrentMember() {
   const { data: { user } } = await supabaseClient.auth.getUser();
   if (!user) return null;
@@ -53,7 +76,10 @@ function showPausedBar() {
 
 // Anropa i toppen av admin/medlem-sidor. requiredRole: 'admin' | 'medlem' | null (valfri roll)
 async function requireAuth(requiredRole = null) {
-  const member = await getCurrentMember();
+  let member;
+  try { member = await withTimeout(getCurrentMember(), 10000); }
+  catch (e) { authHangRecover(); return null; }
+  try { sessionStorage.removeItem('hvAuthReload'); } catch (e) {}
 
   if (!member) {
     // i en installerad app (t.ex. Bergsprängaren/Rock-TV) – kom tillbaka hit efter inloggningen

@@ -2,12 +2,12 @@
 // Visas som en ruta ovanpå sidan; vilka sidor, vem som ser dem och hur ofta bestäms per meddelande.
 // Laddas av auth.js. På inloggade sidor startas det av requireAuth; på inloggningssidan startar det själv.
 (function () {
+  // nycklar utan ".html" och utan avslutande snedstreck – så att både /logga-in.html och /logga-in (rena adresser) fungerar
   const PAGES = {
-    '/logga-in.html': 'logga-in',
-    '/medlem/': 'medlem-hem', '/medlem/index.html': 'medlem-hem',
-    '/medlem/kalender.html': 'kalender', '/medlem/forum.html': 'forum', '/medlem/repertoar.html': 'repertoar',
-    '/medlem/rostovning.html': 'rostovning', '/medlem/studio.html': 'studio', '/medlem/info.html': 'info'
+    '/logga-in': 'logga-in', '/medlem': 'medlem-hem', '/medlem/kalender': 'kalender', '/medlem/forum': 'forum',
+    '/medlem/repertoar': 'repertoar', '/medlem/rostovning': 'rostovning', '/medlem/studio': 'studio', '/medlem/info': 'info'
   };
+  const normPath = () => location.pathname.replace(/\.html$/, '').replace(/\/index$/, '').replace(/(.)\/$/, '$1');
   const TONES = { info: '#E5A968', varning: '#facc15', viktigt: '#ef4444' };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const bodyHtml = t => String(t || '').split(/\n{2,}/).map(p => '<p>' + esc(p.trim()).replace(/\n/g, '<br>') + '</p>').filter(p => p !== '<p></p>').join('');
@@ -72,7 +72,7 @@
   let started = false;
   async function run(member) {
     if (started) return;
-    const page = PAGES[location.pathname];
+    const page = PAGES[normPath()];
     // supabaseClient är en const i supabase-config.js (inte en egenskap på window), men går att nå som global variabel
     const sb = (typeof supabaseClient !== 'undefined') ? supabaseClient : window.supabaseClient;
     if (!page || !sb) return;
@@ -93,7 +93,7 @@
   window.HVNotices = { run, preview: n => showOne(n, 0, 1), pages: PAGES };
   document.addEventListener('hv-member', e => run(e.detail));
   if (window.__hvNoticeMember) run(window.__hvNoticeMember);
-  else if (location.pathname === '/logga-in.html') {
+  else if (normPath() === '/logga-in') {
     const go = () => run(null);
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
   }

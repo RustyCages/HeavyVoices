@@ -1,10 +1,10 @@
 // Popup-meddelanden som admin styr från admin/meddelanden.html (tabellen site_notices).
 // Visas som en ruta ovanpå sidan; vilka sidor, vem som ser dem och hur ofta bestäms per meddelande.
-// Laddas av auth.js. På inloggade sidor startas det av requireAuth; på inloggningssidan startar det själv.
+// Laddas av auth.js. På inloggade sidor startas det av requireAuth; på inloggnings- och registreringssidan (ej inloggade) startar det själv.
 (function () {
   // nycklar utan ".html" och utan avslutande snedstreck – så att både /logga-in.html och /logga-in (rena adresser) fungerar
   const PAGES = {
-    '/logga-in': 'logga-in', '/medlem': 'medlem-hem', '/medlem/kalender': 'kalender', '/medlem/forum': 'forum',
+    '/logga-in': 'logga-in', '/registrera': 'registrera', '/medlem': 'medlem-hem', '/medlem/kalender': 'kalender', '/medlem/forum': 'forum',
     '/medlem/repertoar': 'repertoar', '/medlem/rostovning': 'rostovning', '/medlem/studio': 'studio', '/medlem/info': 'info'
   };
   const normPath = () => location.pathname.replace(/\.html$/, '').replace(/\/index$/, '').replace(/(.)\/$/, '$1');
@@ -93,7 +93,7 @@
   window.HVNotices = { run, preview: n => showOne(n, 0, 1), pages: PAGES };
   document.addEventListener('hv-member', e => run(e.detail));
   if (window.__hvNoticeMember) run(window.__hvNoticeMember);
-  else if (normPath() === '/logga-in') {
+  else if (normPath() === '/logga-in' || normPath() === '/registrera') {   // sidor utan inloggning: starta själv
     const go = () => run(null);
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
   }

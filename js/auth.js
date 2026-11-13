@@ -216,6 +216,6 @@ function showRoleStrip(member) {
 // Popup-meddelanden från admin (js/notices.js)
 (function () {
   if (window.__noticesLoaded) return; window.__noticesLoaded = true;
-  var s = document.createElement('script'); s.src = '/js/notices.js'; s.defer = true;
+  var s = document.createElement('script'); s.src = '/js/notices.js?v=2'; s.defer = true;
   (document.head || document.documentElement).appendChild(s);
 })();

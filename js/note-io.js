@@ -134,12 +134,17 @@
 
     // sångtext: lyric-händelsen hör till noten som börjar på samma tick i samma spår
     // ("lju-" = ordet fortsätter, "\" eller "/" först = ny rad i .kar-filer)
-    const lyrAt = new Map();
+    const lyrAt = new Map(), spaceAt = new Set(), spaceTick = new Set();
     lyr.forEach(e => {
-      const tx = e.text.replace(/^[\\/\r\n]+/, '').replace(/[\r\n]+$/, '');
-      if (!tx.trim()) return;
+      // "\" eller "/" först (ny rad/vers i .kar) räknas som ordgräns
+      const tx = e.text.replace(/\0+$/, '').replace(/^[\\/\r\n]+/, m => (e.text.length > m.length ? ' ' : '')).replace(/[\r\n]+$/, '');
+      if (!tx.trim()) { spaceAt.add(e.track); spaceTick.add(e.track + ':' + e.tick); return; }   // eget blankstegs-event = ordgräns
       lyrAt.set(e.track + ':' + e.tick, tx);
     });
+    // .kar m.fl.: texten ligger i ett eget spår utan noter ("Words") → den får höra till noterna på samma tick i alla spår
+    const noteTracks = new Set(raw.map(x => x.track));
+    const freeAt = new Map();
+    lyrAt.forEach((tx, k) => { const [tr, tk] = k.split(':'); if (!noteTracks.has(Number(tr))) freeAt.set(tk, { tx, tr: Number(tr) }); });
     const used = new Set();
     const groups = new Map();
     raw.sort((a, b) => a.on - b.on || b.n - a.n).forEach(x => {
@@ -151,13 +156,30 @@
       const note = { t: t0, d: t1 - t0, n: x.n };
       // format 0: all text ligger i samma spår – den hör till kanalen som har en not på ticket
       const lk = (fmt === 0 ? 0 : x.track) + ':' + x.on;
-      if (lyrAt.has(lk) && !used.has(lk)) {
-        used.add(lk);
-        const tx = lyrAt.get(lk);
+      const free = !lyrAt.has(lk) && freeAt.get(String(x.on)), fk = k + '@' + x.on;
+      if ((lyrAt.has(lk) && !used.has(lk)) || (free && !used.has(fk))) {
+        used.add(free ? fk : lk);
+        const tx = free ? free.tx : lyrAt.get(lk);
         note.cont = /-\s*$/.test(tx);
         note.syl = tx.replace(/-\s*$/, '').trim();
+        note._raw = tx; note._tk = x.on; note._tr = free ? free.tr : fmt === 0 ? 0 : x.track;
       }
       groups.get(k).notes.push(note);
+    });
+    // Två sätt att skriva sångtext i MIDI:
+    //  - notprogram (MuseScore m.fl.): "Ev-" "ery" "time" – bindestreck = ordet fortsätter
+    //  - karaoke (.kar m.fl.): " Ev" "ery" " time" – blanksteg först/sist = nytt ord, inget blanksteg = samma ord
+    // Har spåret blanksteg i texten (och inga bindestreck) används karaokesättet.
+    groups.forEach(g => {
+      const sy = g.notes.filter(n => n._raw != null);
+      const kar = sy.length > 1 && !sy.some(n => /-\s*$/.test(n._raw))
+        && (sy.some(n => /^\s|\s$/.test(n._raw)) || sy.some(n => spaceAt.has(n._tr)));
+      if (kar) sy.forEach((n, i) => {
+        const nx = sy[i + 1];
+        const gapSpace = nx && [...spaceTick].some(k => { const [tr, tk] = k.split(':').map(Number); return tr === n._tr && tk > n._tk && tk <= nx._tk; });
+        n.cont = !!nx && !/\s$/.test(n._raw) && !/^\s/.test(nx._raw) && !gapSpace;
+      });
+      sy.forEach(n => { delete n._raw; delete n._tk; delete n._tr; });
     });
     const out = [...groups.values()].filter(g => g.notes.length);
     if (!out.length) throw new Error('MIDI-filen innehåller inga noter');
@@ -235,7 +257,8 @@
       if (/^P\s*\d/i.test(line)) { newTrack(head['DUETSINGERP' + line.replace(/\D/g, '')] || head['P' + line.replace(/\D/g, '')] || 'Röst ' + line.replace(/\D/g, '')); continue; }
       if (line[0] === 'E') break;
       if (!cur) newTrack('Sång');
-      const m = line.match(/^([:*FRG])\s*(-?\d+)\s+(\d+)\s+(-?\d+)\s?(.*)$/);
+      // notrader: blanksteg sist i stavelsen betyder ordgräns ("Every " "time ") – ta bara bort radslutet
+      const m = rawLine.replace(/[\r\n]+$/, '').match(/^([:*FRG])\s*(-?\d+)\s+(\d+)\s+(-?\d+)\s?(.*)$/);
       if (m) {
         if (m[1] === 'F') continue;
         cur.notes.push({ beat: relBase + parseInt(m[2], 10), len: parseInt(m[3], 10), pitch: parseInt(m[4], 10), syl: m[5] || '' });
@@ -253,6 +276,7 @@
     // stavelser: " ord" (blanksteg först) = nytt ord, utan blanksteg = samma ord, "~" = samma vokal (melisma)
     tracks.forEach(t => {
       const ns = t.notes;
+      const noSpaces = !ns.some(x => /\s/.test((x.syl || '').replace(/^\s+$/, '')));
       ns.forEach((x, i) => {
         const rawS = x.syl || '';
         if (!rawS.replace(/~/g, '').trim()) { x.cleanSyl = null; return; }
@@ -260,7 +284,8 @@
         let j = i + 1; while (j < ns.length && !(ns[j].syl || '').replace(/~/g, '').trim()) j++;
         const nx = j < ns.length ? ns[j].syl : null;
         const brk = t.lines.some(b => b > x.beat && j < ns.length && b <= ns[j].beat);
-        x.cont = !!nx && !brk && !/\s$/.test(rawS) && !/^\s/.test(nx);
+        x.cont = noSpaces ? /-$/.test(x.cleanSyl) : !!nx && !brk && !/\s$/.test(rawS) && !/^\s/.test(nx);
+        if (noSpaces) x.cleanSyl = x.cleanSyl.replace(/-$/, '') || x.cleanSyl;
       });
     });
     const out = tracks.filter(t => t.notes.length).map(t => ({
@@ -656,8 +681,8 @@
 
   // ---------- sångtext → textrutor och rader ----------
   // Stavelserna på noterna slås ihop till ord: en ruta per ord, från första noten till sista (melismer räknas in).
-  function lyricBoxes(notes) {
-    const ns = (notes || []).slice().sort((a, b) => a.t - b.t);
+  function lyricBoxes(notes, plain) {
+    const ns = fixWordBreaks((notes || []).slice().sort((a, b) => a.t - b.t), plain);
     const out = [];
     let cur = null, open = false;
     ns.forEach(x => {
@@ -671,6 +696,33 @@
     const boxes = out.map(b => ({ t: r2(b.t), d: r2(Math.max(0.05, b.end - b.t)), w: b.w }));
     for (let k = 0; k < boxes.length - 1; k++) if (boxes[k].t + boxes[k].d > boxes[k + 1].t) boxes[k].d = Math.max(0.05, r2(boxes[k + 1].t - boxes[k].t));
     return boxes;
+  }
+  // Ordgränser från låtens vanliga text: stavelserna letas upp i texten i tur och ordning, och
+  // "ordet fortsätter" sätts efter om det står ett blanksteg efter stavelsen i texten.
+  // Används bara om de flesta stavelserna hittas (annars är det fel text eller en annan version).
+  function fixWordBreaks(ns, plain) {
+    if (!plain || !String(plain).trim()) return ns;
+    const norm = s => String(s).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    const chars = [], brk = [];
+    String(plain).replace(/\[[^\]]*\]/g, ' ').split(/\s+/).forEach(w => {
+      const n = norm(w); if (!n) return;
+      for (let i = 0; i < n.length; i++) { chars.push(n[i]); brk.push(i === n.length - 1); }
+    });
+    const txt = chars.join('');
+    if (!txt) return ns;
+    if (String(plain).split(/\s+/).some(w => norm(w).length >= 18)) return ns;   // texten har själv ihopsatta ord – lita inte på den
+    const sy = ns.map((x, i) => ({ i, s: x.syl != null ? norm(x.syl) : '' })).filter(o => o.s);
+    if (sy.length < 2) return ns;
+    const cont = new Map();
+    let p = 0, hit = 0;
+    sy.forEach(o => {
+      let k = txt.indexOf(o.s, p);
+      if (k < 0 || k - p > 80) { const k0 = txt.indexOf(o.s); if (k0 >= 0 && (k < 0 || k0 < p)) k = k0; }   // repris: börja om i texten
+      if (k < 0) return;
+      hit++; cont.set(o.i, !brk[k + o.s.length - 1]); p = k + o.s.length;
+    });
+    if (hit < sy.length * 0.7) return ns;
+    return ns.map((x, i) => (cont.has(i) ? { ...x, cont: cont.get(i) } : x));
   }
   // textrutor → rader för karaoken: ny rad vid paus, efter skiljetecken eller stor bokstav efter ett andetag
   function linesFromBoxes(boxes) {
@@ -1057,7 +1109,7 @@
   }
 
   const api = { ultraStarToLrc, isUltraStar, toJson, fromJson, toMidi, fromMidi, fromUltraStar, fromMusicXml, decodeText, autoSync, applySync, topLine, saveFile,
-    lyricBoxes, linesFromBoxes, linesToLrc, warpMap, fineSync, applyWarp, matchScore, dtwSync, jointSync, bestSync, mapNotes, sameMeasures, medianTable, consensusTable, tableMap, scoreMap, FORMAT };
+    lyricBoxes, fixWordBreaks, linesFromBoxes, linesToLrc, warpMap, fineSync, applyWarp, matchScore, dtwSync, jointSync, bestSync, mapNotes, sameMeasures, medianTable, consensusTable, tableMap, scoreMap, FORMAT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.NoteIO = api;
 })(typeof window !== 'undefined' ? window : globalThis);

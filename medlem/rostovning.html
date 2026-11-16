@@ -3645,7 +3645,7 @@ function applyImported(list, from, syncText, score) {
       withSyl.push({ t, d, n: 0, ...(x.syl != null ? { syl: x.syl, cont: x.cont } : {}) });
     }
   });
-  const boxes = document.getElementById('xMakeLrc').checked && withSyl.some(x => x.syl) ? NoteIO.lyricBoxes(withSyl) : null;
+  const boxes = document.getElementById('xMakeLrc').checked && withSyl.some(x => x.syl) ? NoteIO.lyricBoxes(withSyl, song.lyrics_plain) : null;
   if (!notes.length) { xStatus('Inga noter att importera (kolla förskjutningen)'); return; }
   if (eNotes().length && !confirm(`Ersätt de ${eNotes().length} noterna i ${current.label} med ${notes.length} importerade noter?\n\n(Inget sparas förrän du trycker Spara noter – Ångra fungerar också.)`)) return;
   if (!editMode) setEditMode(true);
@@ -3663,12 +3663,22 @@ function applyImported(list, from, syncText, score) {
 // Låten saknar synkad text → skapa den från notbladets ord (radbrytning vid pauser och skiljetecken).
 // Textrutorna är i stämfilens tid; låtens text ligger på den gemensamma tidslinjen.
 async function makeLrcFromBoxes(boxes, st) {
-  if (!document.getElementById('xMakeLrc').checked || !boxes.length || song.lyrics_lrc) return;
+  if (!document.getElementById('xMakeLrc').checked || !boxes.length) return;
   const off = (Number((song.stem_offsets || {})[st.key]) || 0) / 1000;
   const lines = NoteIO.linesFromBoxes(boxes.map(b => ({ ...b, t: b.t + off })));
   if (!lines.length) return;
+  // finns karaoketext redan: ersätt den bara om det är samma text där orden satt ihop ("Everytimethat…")
+  if (song.lyrics_lrc) {
+    const letters = s => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    const old = parseLrc(song.lyrics_lrc).map(l => l.text).join(' ');
+    const glued = Math.max(0, ...old.split(/\s+/).map(w => letters(w).length)) >= 18;
+    if (!glued || letters(old) !== letters(lines.map(l => l.text).join(' '))) return;
+  }
   const patch = { lyrics_lrc: NoteIO.linesToLrc(lines, song.title) };
-  if (!(song.lyrics_plain || '').trim()) patch.lyrics_plain = lines.map(l => l.text).join('\n');
+  const plainNow = (song.lyrics_plain || '').trim();
+  const lettersOf = x => x.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+  const plainGlued = plainNow && plainNow.split(/\s+/).some(w => lettersOf(w).length >= 18) && lettersOf(plainNow) === lettersOf(lines.map(l => l.text).join(' '));
+  if (!plainNow || plainGlued) patch.lyrics_plain = lines.map(l => l.text).join('\n');
   const { error } = await supabaseClient.from('songs').update(patch).eq('id', song.id);
   if (error) { toast('Kunde inte spara karaoketexten: ' + error.message, 6000); return; }
   Object.assign(song, patch);
@@ -4042,7 +4052,7 @@ async function importMidiAll(pairs, ref, fileName, opts = {}) {
       const shiftSt = (ref ? offOf(ref) - offOf(st) : 0) + sh;
       const sci = scoreInfo(opts.score, tr.part, x => map(x) + shiftSt, refMatch);
       if (sci) data.score = sci; else delete data.score;
-      const boxes = document.getElementById('xMakeLrc').checked && notes.some(n => n.syl) ? NoteIO.lyricBoxes(notes) : null;
+      const boxes = document.getElementById('xMakeLrc').checked && notes.some(n => n.syl) ? NoteIO.lyricBoxes(notes, song.lyrics_plain) : null;
       if (boxes && boxes.length) {
         data.lyrics = boxes;
         // karaoketexten tas från sopranen (eller första stämman med text)
@@ -4204,7 +4214,7 @@ document.getElementById('xScoreAlign')?.addEventListener('click', async () => {
       const data = { ...st.raw };
       if (data.edited_notes) data.edited_notes_backup = data.edited_notes;
       data.edited_notes = notes.map(n => ({ t: n.t, d: n.d, n: n.n }));
-      const boxes = notes.some(n => n.syl) ? NoteIO.lyricBoxes(notes) : null;
+      const boxes = notes.some(n => n.syl) ? NoteIO.lyricBoxes(notes, song.lyrics_plain) : null;
       if (boxes && boxes.length) data.lyrics = boxes;
       data.score = { ...data.score, match: Math.round(own * 100) / 100,
         measures: v.sc.measures.map(m => ({ i: m.i, len: m.len, s0: m.s0, s1: m.s1, a: r3(js.map(m.s0) - v.off), b: r3(js.map(m.s1) - v.off) })) };

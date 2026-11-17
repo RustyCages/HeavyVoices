@@ -1022,7 +1022,7 @@ function renderAllNotes() {
 let mailMembers = null;
 async function getMailMembers() {
   if (!mailMembers) {
-    const { data, error } = await supabaseClient.from('members').select('id, name, email').eq('status', 'approved').order('name');
+    const { data, error } = await supabaseClient.from('members').select('id, name, has_email').eq('status', 'approved').order('name');
     if (error) throw error;
     mailMembers = data || [];
   }
@@ -1041,8 +1041,8 @@ function bindNoteSend(root) {
     try {
       const members = await getMailMembers();
       panel.innerHTML = `
-        <div class="mn-send-list">${members.filter(m => m.email).map(m =>
-          `<label><input type="checkbox" value="${escapeAtt(m.id)}"> ${escapeAtt(m.name || m.email)}</label>`).join('')}</div>
+        <div class="mn-send-list">${members.filter(m => m.has_email).map(m =>
+          `<label><input type="checkbox" value="${escapeAtt(m.id)}"> ${escapeAtt(m.name || '(utan namn)')}</label>`).join('')}</div>
         <div class="mn-note-actions">
           <button type="button" class="btn-outline mn-send-all">Välj alla</button>
           <button type="button" class="btn-outline mn-send-go">Skicka mejl</button>

@@ -168,7 +168,7 @@ $('chips').querySelectorAll('button').forEach(b => b.onclick = () => {
 (async () => {
   me = await requireAuth('admin');
   if (!me) return;
-  const { data } = await supabaseClient.from('members').select('id, name, email, stamma, status').order('name');
+  const { data } = await supabaseClient.from('members_admin').select('id, name, email, stamma, status').order('name');
   members = (data || []).filter(m => m.status === 'approved');
   $('memberSel').innerHTML = '<option value="">Exempel (Anna Andersson)</option>' + members.map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
   await load();

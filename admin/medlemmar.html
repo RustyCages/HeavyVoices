@@ -249,7 +249,7 @@ async function loadMembers(attempt = 0) {
     // ibland hänger anropet (inloggningslåset) – ge upp efter 10 s och försök en gång till innan felet visas
     res = await Promise.race([
       supabaseClient
-        .from('members')
+        .from('members_admin')
         .select('id, name, email, role, stamledare, stamma, status, fee_paid, fee_paid_at, created_at, reactivation_requested_at, reactivation_note')
         .order('status')
         .order('name'),
@@ -576,9 +576,7 @@ document.getElementById('exportCsvBtn').addEventListener('click', () => {
 
 document.getElementById('resetFeesBtn').addEventListener('click', async () => {
   if (!confirm('Starta ny avgiftsperiod?\n\nAlla medlemmar markeras som "Ej betalt". Detta går inte att ångra.')) return;
-  const { error } = await supabaseClient.from('members')
-    .update({ fee_paid: false, fee_paid_at: null })
-    .eq('fee_paid', true);
+  const { error } = await supabaseClient.rpc('admin_reset_fees');
   if (error) { alert('Kunde inte nollställa: ' + error.message); return; }
   loadMembers();
 });
@@ -885,7 +883,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
 
     let newId = result.id || result.member_id || (result.member && result.member.id) || (result.user && result.user.id);
     if ((isQueue || isTemp) && !newId) {
-      const { data: row } = await supabaseClient.from('members').select('id').ilike('email', email.trim()).limit(1).maybeSingle();
+      const { data: row } = await supabaseClient.from('members_admin').select('id').ilike('email', email.trim()).limit(1).maybeSingle();
       newId = row && row.id;
     }
     let tempMsg = '';

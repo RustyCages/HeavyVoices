@@ -8,7 +8,7 @@
 //   forum_attachments.path                  → area "forum"   → R2-nyckel "forum/<path>"
 //   inbox_messages.attachments[].path       → area "inbox"   → R2-nyckel "inbox/<path>"  (bara admin; skrivs av inbox-receive)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { withSupabase } from "jsr:@supabase/server@^1";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { BUCKET, del, head, list, presign, put } from "./r2.ts";
 
 type Area = "stems" | "warmup" | "filer" | "forum" | "inbox";
@@ -55,8 +55,26 @@ const signGet = (key: string, download = false, filename?: string) =>
         `attachment; filename*=UTF-8''${encodeURIComponent(filename || key.split("/").pop()!)}` }
     : {});
 
-const handler = withSupabase({ auth: "user" }, async (req, ctx) => {
-  const { supabase, userClaims } = ctx;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+// Publik nyckel (samma som i js/supabase-config.js) – används för att fråga med användarens egen inloggning (RLS)
+const PUBLISHABLE_KEY = "sb_publishable_lQf4A7LCOH42d_Di-B7oiw_1JzB_2sh";
+const admin = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+// Inloggningskontroll utan jsr:@supabase/server (withSupabase hängde vid samtidiga anrop efter omdeploy 2026-11-17)
+async function handler(req: Request): Promise<Response> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token) return json({ error: "Inte inloggad" }, 401);
+  const { data: u, error: uErr } = await admin.auth.getUser(token);
+  if (uErr || !u?.user) return json({ error: "Ogiltig inloggning" }, 401);
+  const userClaims = { id: u.user.id };
+  // Klient som kör som den inloggade användaren, så att RLS gäller (t.ex. forum_attachments)
+  const supabase = createClient(SUPABASE_URL, PUBLISHABLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
   try {
     if (!BUCKET) return json({ error: "R2 är inte konfigurerat (secrets saknas)" }, 503);
 
@@ -178,7 +196,7 @@ const handler = withSupabase({ auth: "user" }, async (req, ctx) => {
     console.error(e);
     return json({ error: (e as Error).message }, 500);
   }
-});
+}
 
 export default {
   fetch: async (req: Request) => {

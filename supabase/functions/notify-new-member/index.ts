@@ -30,6 +30,14 @@ function esc(s: unknown): string {
   );
 }
 
+// Jämförelse i konstant tid (samma som i inbox-receive)
+function safeEqual(a: string, b: string): boolean {
+  if (!a || !b || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -49,8 +57,8 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   // Bara triggern får anropa funktionen
-  const secret = Deno.env.get("WEBHOOK_SECRET");
-  if (!secret || req.headers.get("x-webhook-secret") !== secret) {
+  const secret = Deno.env.get("WEBHOOK_SECRET") ?? "";
+  if (secret.length < 32 || !safeEqual(req.headers.get("x-webhook-secret") ?? "", secret)) {
     return json({ error: "Unauthorized" }, 401);
   }
 

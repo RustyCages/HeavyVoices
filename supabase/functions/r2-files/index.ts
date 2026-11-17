@@ -9,7 +9,7 @@
 //   inbox_messages.attachments[].path       → area "inbox"   → R2-nyckel "inbox/<path>"  (bara admin; skrivs av inbox-receive)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "jsr:@supabase/server@^1";
-import { BUCKET, del, list, presign, put } from "./r2.ts";
+import { BUCKET, del, head, list, presign, put } from "./r2.ts";
 
 type Area = "stems" | "warmup" | "filer" | "forum" | "inbox";
 type Action = "list" | "upload" | "download" | "sign" | "delete" | "mkdir";
@@ -95,8 +95,17 @@ const handler = withSupabase({ auth: "user" }, async (req, ctx) => {
       const key = toKey(area, body.key);
       if (!key) return json({ error: "key krävs" }, 400);
       const rel = key.slice(area.length + 1);
-      if (action === "upload" && !/^[0-9a-f-]{36}\/[^/]+$/i.test(rel)) {
-        return json({ error: "Ogiltig sökväg för forum" }, 400);
+      if (action === "upload") {
+        const m = rel.match(/^([0-9a-f-]{36})\/[^/]+$/i);
+        if (!m) return json({ error: "Ogiltig sökväg för forum" }, 400);
+        // Bara författaren till inlägget får ladda upp bilagor till det
+        const { data: post } = await supabase
+          .from("forum_posts").select("author_id").eq("id", m[1]).maybeSingle();
+        if (!post || post.author_id !== userClaims!.id) {
+          return json({ error: "Du kan bara bifoga filer till dina egna inlägg" }, 403);
+        }
+        // Skriv aldrig över en befintlig fil
+        if ((await head(key)) !== null) return json({ error: "Filen finns redan" }, 409);
       }
       if (action === "download") {
         const { data: bilaga } = await supabase

@@ -85,10 +85,12 @@
       <input type="email" id="inviteEmail" placeholder="E-post" required>
       <select id="inviteRole" style="width: 100%; margin-bottom: 0.75rem;">
         <option value="medlem">Medlem</option>
-        <option value="tillfallig">Tillfällig medlem (tidsbestämd)</option>
         <option value="admin">Admin</option>
       </select>
-      <label id="inviteUntilRow" style="display:none;margin:-.3rem 0 .75rem;font-size:.9rem">Kontot gäller till och med
+      <label style="display:block;margin:-.3rem 0 .5rem;font-size:.9rem">
+        <input type="checkbox" id="inviteTempChk" style="width:auto;margin-right:.4rem">Tillfällig (kontot gäller bara en viss tid)
+      </label>
+      <label id="inviteUntilRow" style="display:none;margin:0 0 .75rem;font-size:.9rem">Gäller till och med
         <input type="date" id="inviteUntil" style="width:auto;margin-left:.4rem">
       </label>
 
@@ -217,7 +219,7 @@ const selected = new Set();
 
 const STATUS_LABELS = { pending: 'Väntar', approved: 'Aktiv', paused: 'Pausad', queue: 'Kö', ended: 'Avslutad' };
 const STATUS_KEYS = ['approved', 'paused', 'pending', 'queue', 'ended'];
-const TAB_LABELS = { approved: 'Aktiva', paused: 'Pausade', pending: 'Väntar', queue: 'Kö', ended: 'Avslutade', all: 'Alla' };
+const TAB_LABELS = { approved: 'Aktiva', temp: 'Tillfälliga', paused: 'Pausade', pending: 'Väntar', queue: 'Kö', ended: 'Avslutade', all: 'Alla' };
 let tab = 'approved';   // aktiv flik
 let query = '';         // sökfilter
 const STATUS_WARN = {
@@ -341,8 +343,11 @@ function renderMembers() {
 
   tbody.innerHTML = list.map(m => {
     const self = m.id === currentUserId;
-    const statusOpts = STATUS_KEYS
-      .map(st => `<option value="${st}" ${m.status === st ? 'selected' : ''}>${STATUS_LABELS[st]}</option>`).join('');
+    const isTmp = isTempMember(m);
+    const statusOpts = STATUS_KEYS.flatMap(st => st === 'approved'
+      ? [`<option value="approved" ${m.status === 'approved' && !isTmp ? 'selected' : ''}>Aktiv</option>`, `<option value="temp" ${isTmp ? 'selected' : ''}>Tillfällig</option>`]
+      : [`<option value="${st}" ${m.status === st ? 'selected' : ''}>${STATUS_LABELS[st]}</option>`]).join('');
+    const untilLbl = m.access_until && m.role !== 'admin' ? `<div class="tempUntil${Date.parse(m.access_until) <= Date.now() ? ' expired' : ''}" data-id="${m.id}" title="Klicka för att ändra slutdatum">${Date.parse(m.access_until) <= Date.now() ? 'Gick ut ' : 't.o.m. '}${fmtDate(m.access_until)} ✎</div>` : '';
     const req = m.reactivation_requested_at ? `<span class="req-badge" title="${esc('Vill bli aktiv igen (' + fmtDate(m.reactivation_requested_at) + ')' + (m.reactivation_note ? ': ' + m.reactivation_note : ''))}">Vill bli aktiv</span>` : '';
     return `
     <tr class="row-${m.status}">
@@ -355,15 +360,14 @@ function renderMembers() {
       </td>
       <td class="col-reg" title="${m.created_at ? 'Registrerad ' + new Date(m.created_at).toLocaleString('sv-SE', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Stockholm' }) : ''}">${m.created_at ? fmtDate(m.created_at) : '—'}${regNew(m) ? ' <span class="reg-new">Ny</span>' : ''}</td>
       <td>
-        <select data-id="${m.id}" class="statusSelect status-select st-${m.status}" ${self ? 'disabled title="Du kan inte ändra din egen status"' : ''}>${statusOpts}</select>
+        <select data-id="${m.id}" class="statusSelect status-select st-${m.status}" ${self ? 'disabled title="Du kan inte ändra din egen status"' : ''}>${statusOpts}</select>${untilLbl}
       </td>
       <td>
         <select data-id="${m.id}" class="roleSelect" ${self ? 'disabled title="Du kan inte ändra din egen roll"' : ''}>
-          <option value="medlem" ${m.role === 'medlem' && !m.stamledare && !m.access_until ? 'selected' : ''}>Medlem</option>
-          <option value="tillfallig" ${m.role === 'medlem' && !m.stamledare && m.access_until ? 'selected' : ''}>Tillfällig</option>
+          <option value="medlem" ${m.role === 'medlem' && !m.stamledare ? 'selected' : ''}>Medlem</option>
           <option value="stamledare" ${m.role === 'medlem' && m.stamledare ? 'selected' : ''}>Stämledare</option>
           <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
-        </select>${m.access_until && m.role !== 'admin' ? `<div class="tempUntil${Date.parse(m.access_until) <= Date.now() ? ' expired' : ''}" data-id="${m.id}" title="Klicka för att ändra slutdatum">${Date.parse(m.access_until) <= Date.now() ? 'Gick ut ' : 't.o.m. '}${fmtDate(m.access_until)} ✎</div>` : ''}
+        </select>
       </td>
       <td style="white-space: nowrap;">
         <button class="btn-outline trash-btn editBtn" data-id="${m.id}" title="Redigera ${esc(m.name)}" aria-label="Redigera ${esc(m.name)}">✎</button>
@@ -401,6 +405,7 @@ function renderMembers() {
     sel.addEventListener('change', async () => {
       const id = sel.dataset.id;
       const m = members.find(x => x.id === id);
+      if (sel.value === 'temp') { openTemp(id); return; }
       const newStatus = sel.value;
       if (STATUS_WARN[newStatus] && !confirm(STATUS_WARN[newStatus].replace('{n}', m ? m.name : 'medlemmen'))) {
         sel.value = m ? m.status : 'approved';
@@ -413,6 +418,8 @@ function renderMembers() {
         if (v === null) { sel.value = m.status; return; }
         if (v.trim()) { if (!/^\d{4}-\d{2}-\d{2}$/.test(v.trim()) || isNaN(Date.parse(v.trim()))) { alert('Ogiltigt datum.'); sel.value = m.status; return; } patchSt.access_until = untilIso(v.trim()); }
         else patchSt.access_until = null;
+      } else if (newStatus === 'approved' && m && m.access_until) {
+        patchSt.access_until = null;   // "Aktiv" = tillsvidare
       }
       const { error } = await supabaseClient.from('members').update(patchSt).eq('id', id);
       if (error) { alert('Kunde inte ändra status: ' + error.message); }
@@ -426,10 +433,9 @@ function renderMembers() {
       const id = e.target.dataset.id;
       const v = e.target.value;
       // "Stämledare" = vanlig medlem med flaggan stamledare (får redigera låtar, inget annat)
-      if (v === 'tillfallig') { openTemp(id); return; }
-      const patch = v === 'stamledare' ? { role: 'medlem', stamledare: true, access_until: null }
-                  : v === 'admin' ? { role: 'admin', stamledare: false, access_until: null }
-                  : { role: 'medlem', stamledare: false, access_until: null };
+      const patch = v === 'stamledare' ? { role: 'medlem', stamledare: true }
+                  : v === 'admin' ? { role: 'admin', stamledare: false }
+                  : { role: 'medlem', stamledare: false };
       const { error } = await supabaseClient.from('members').update(patch).eq('id', id);
       if (error) {
         alert('Kunde inte ändra roll: ' + error.message);
@@ -498,17 +504,19 @@ function updateSummary() {
 }
 
 // ---------- Flikar, sök, filter ----------
+function isTempMember(m) { return m.status === 'approved' && !!m.access_until && m.role !== 'admin'; }
+const inTab = (m, k) => k === 'all' || (k === 'temp' ? isTempMember(m) : m.status === k);
 function visibleMembers() {
   const q = query.trim().toLowerCase();
-  return members.filter(m => (tab === 'all' || m.status === tab) &&
+  return members.filter(m => inTab(m, tab) &&
     (!q || [m.name, m.email, m.stamma].some(v => String(v || '').toLowerCase().includes(q))));
 }
 function renderTabs() {
   const el = document.getElementById('statusTabs');
-  const cnt = st => st === 'all' ? members.length : members.filter(m => m.status === st).length;
+  const cnt = st => members.filter(m => inTab(m, st)).length;
   const reqN = members.filter(m => m.status === 'paused' && m.reactivation_requested_at).length;
   // Visa bara flikar som har medlemmar (Aktiva och Alla visas alltid)
-  const keys = ['approved', 'paused', 'pending', 'queue', 'ended', 'all'].filter(k => k === 'approved' || k === 'all' || cnt(k) > 0 || k === tab);
+  const keys = ['approved', 'temp', 'paused', 'pending', 'queue', 'ended', 'all'].filter(k => k === 'approved' || k === 'all' || cnt(k) > 0 || k === tab);
   el.innerHTML = keys.map(k => `<button type="button" class="btn-outline" data-tab="${k}" aria-pressed="${tab === k}">${TAB_LABELS[k]} <span class="n">${cnt(k)}</span>${k === 'paused' && reqN ? `<span class="dot" title="${reqN} vill bli aktiva igen"></span>` : ''}${k === 'pending' && cnt('pending') ? '<span class="dot" title="Väntar på godkännande"></span>' : ''}</button>`).join('');
 }
 document.getElementById('statusTabs').addEventListener('click', (e) => {
@@ -881,7 +889,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   const role = document.getElementById('inviteRole').value;
   const mode = document.querySelector('input[name="inviteMode"]:checked').value;
   const isQueue = mode === 'queue';
-  const isTempRole = role === 'tillfallig';
+  const isTempRole = document.getElementById('inviteTempChk').checked;
   const untilVal = document.getElementById('inviteUntil').value;
   if (isTempRole && (!untilVal || Date.parse(untilVal + 'T23:59:59') <= Date.now())) { errorEl.textContent = 'Välj ett slutdatum i framtiden för det tillfälliga kontot.'; return; }
   // Kö: kontot skapas med slumpat lösenord (inget mejl). Personen väljer eget via "Glömt lösenord?" när hen blir Aktiv.
@@ -905,7 +913,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
         'apikey': SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name, email, role: (isQueue || isTempRole) ? 'medlem' : role, password }),
+      body: JSON.stringify({ name, email, role: isQueue ? 'medlem' : role, password }),
     });
     const result = await res.json();
 
@@ -997,6 +1005,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   <h3 style="margin:0 0 .7rem">Status</h3>
   <dl style="margin:0;display:grid;gap:.7rem;font-size:.92rem">
     <div><dt><strong>Aktiv</strong></dt><dd style="margin:.1rem 0 0" class="muted">Full medlem. Ser allt i medlemsområdet: repertoar, stämfiler, röstövning, studio, forum, kalender och info. Får mejl du skickar. Räknas i avgiftslistan.</dd></div>
+    <div><dt><strong>Tillfällig</strong></dt><dd style="margin:.1rem 0 0" class="muted">Samma behörighet som Aktiv, men kontot gäller bara till valt slutdatum. Därefter sätts personen automatiskt till Avslutad. Slutdatumet syns under statusen och kan ändras med ett klick. Välj Aktiv för att ta bort tidsgränsen.</dd></div>
     <div><dt><strong>Pausad</strong></dt><dd style="margin:.1rem 0 0" class="muted">Tillfälligt uppehåll. Kan logga in och se kalender och information, men inte repertoar, stämfiler, studio eller forum. Kan själv be om att bli aktiv igen (då syns "Vill bli aktiv").</dd></div>
     <div><dt><strong>Väntar</strong></dt><dd style="margin:.1rem 0 0" class="muted">Har registrerat sig själv och väntar på ditt godkännande. Ingen åtkomst till medlemsområdet än. Gör personen Aktiv för att godkänna.</dd></div>
     <div><dt><strong>Kö</strong></dt><dd style="margin:.1rem 0 0" class="muted">Står i kölistan när kören är full. Ingen åtkomst tills du gör personen Aktiv. Då skickas ett välkomstmejl automatiskt.</dd></div>
@@ -1005,7 +1014,6 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   <h3 style="margin:1.2rem 0 .7rem">Roller</h3>
   <dl style="margin:0;display:grid;gap:.7rem;font-size:.92rem">
     <div><dt><strong>Medlem</strong></dt><dd style="margin:.1rem 0 0" class="muted">Vanlig medlem utan tidsgräns. Använder medlemsområdet, men har ingen tillgång till adminsidorna.</dd></div>
-    <div><dt><strong>Tillfällig</strong></dt><dd style="margin:.1rem 0 0" class="muted">Samma behörighet som en medlem, men kontot gäller bara till valt slutdatum. Därefter sätts personen automatiskt till Avslutad. Slutdatumet syns under rollen och kan ändras med ett klick.</dd></div>
     <div><dt><strong>Stämledare</strong></dt><dd style="margin:.1rem 0 0" class="muted">Medlem som även får redigera låtar, noter och textsynk. Ingen annan administration.</dd></div>
     <div><dt><strong>Admin</strong></dt><dd style="margin:.1rem 0 0" class="muted">Full tillgång till adminsidorna: medlemmar, mejl, inkorg, meddelanden, kalender, låtar m.m. Påverkas inte av status eller slutdatum.</dd></div>
   </dl>
@@ -1055,17 +1063,18 @@ document.getElementById('tempSave').addEventListener('click', async () => {
   const v = document.getElementById('tempDate').value, err = document.getElementById('tempError');
   if (!v || Date.parse(v + 'T23:59:59') <= Date.now()) { err.textContent = 'Välj ett datum i framtiden.'; return; }
   const m = members.find(x => x.id === tempId);
-  const patch = { role: 'medlem', stamledare: false, access_until: untilIso(v) };
-  if (m && m.status === 'ended' && m.access_until) { /* behåll status, admin väljer själv */ }
+  const patch = { status: 'approved', access_until: untilIso(v) };
+  const wasQueue = m && m.status === 'queue';
   const { error } = await supabaseClient.from('members').update(patch).eq('id', tempId);
   if (error) { err.textContent = 'Kunde inte spara: ' + error.message; return; }
   document.getElementById('tempDlg').close();
+  if (wasQueue) sendWelcomeMails([tempId]);
   await loadMembers();
 });
-document.getElementById('inviteRole').addEventListener('change', e => {
-  document.getElementById('inviteUntilRow').style.display = e.target.value === 'tillfallig' ? 'block' : 'none';
+document.getElementById('inviteTempChk').addEventListener('change', e => {
+  document.getElementById('inviteUntilRow').style.display = e.target.checked ? 'block' : 'none';
   const u = document.getElementById('inviteUntil'); u.min = ymd(new Date(Date.now() + 864e5));
-  if (e.target.value === 'tillfallig' && !u.value) u.value = ymd(new Date(Date.now() + 30 * 864e5));
+  if (e.target.checked && !u.value) u.value = ymd(new Date(Date.now() + 30 * 864e5));
 });
 let editingId = null;
 function openEdit(id) {

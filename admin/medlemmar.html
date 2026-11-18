@@ -112,7 +112,8 @@
   </details>
 
   <div class="card static" style="margin-top: 1.5rem;">
-    <h3 style="margin-bottom: 0.2rem;">Medlemmar</h3>
+    <h3 style="margin-bottom: 0.2rem; display:flex; align-items:center; gap:.5rem;">Medlemmar
+      <button type="button" id="statusHelpBtn" class="btn-outline" style="width:1.7rem;height:1.7rem;padding:0;border-radius:50%;font-size:.95rem;line-height:1;font-weight:700" title="Vad betyder statusarna?" aria-label="Vad betyder statusarna?">?</button></h3>
     <div class="summary" id="memberSummary"></div>
     <div class="tabs" id="statusTabs" role="group" aria-label="Visa medlemmar efter status"></div>
     <div class="listbar">
@@ -942,6 +943,17 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
 })();
 </script>
 
+<dialog id="statusDlg" style="max-width:520px;width:94vw;border:1px solid var(--border,#374151);border-radius:12px;background:var(--card-bg,#1f2937);color:inherit;padding:1.2rem">
+  <h3 style="margin:0 0 .7rem">Vad betyder statusarna?</h3>
+  <dl style="margin:0;display:grid;gap:.7rem;font-size:.92rem">
+    <div><dt><strong>Aktiv</strong></dt><dd style="margin:.1rem 0 0" class="muted">Full medlem. Ser allt i medlemsområdet: repertoar, stämfiler, röstövning, studio, forum, kalender och info. Får mejl du skickar. Räknas i avgiftslistan.</dd></div>
+    <div><dt><strong>Pausad</strong></dt><dd style="margin:.1rem 0 0" class="muted">Tillfälligt uppehåll. Kan logga in och se kalender och information, men inte repertoar, stämfiler, studio eller forum. Kan själv be om att bli aktiv igen (då syns "Vill bli aktiv").</dd></div>
+    <div><dt><strong>Väntar</strong></dt><dd style="margin:.1rem 0 0" class="muted">Har registrerat sig själv och väntar på ditt godkännande. Ingen åtkomst till medlemsområdet än. Gör personen Aktiv för att godkänna.</dd></div>
+    <div><dt><strong>Kö</strong></dt><dd style="margin:.1rem 0 0" class="muted">Står i kölistan när kören är full. Ingen åtkomst tills du gör personen Aktiv. Då skickas ett välkomstmejl automatiskt.</dd></div>
+    <div><dt><strong>Avslutad</strong></dt><dd style="margin:.1rem 0 0" class="muted">Har lämnat kören. Kan inte logga in längre, men kontot och inspelningarna ligger kvar och du kan aktivera personen igen när som helst.</dd></div>
+  </dl>
+  <div style="display:flex;justify-content:flex-end;margin-top:1rem"><button type="button" id="statusDlgClose">Stäng</button></div>
+</dialog>
 <dialog id="editDlg" style="max-width:420px;width:92vw;border:1px solid var(--border,#374151);border-radius:12px;background:var(--card-bg,#1f2937);color:inherit;padding:1.2rem">
   <form id="editForm" method="dialog">
     <h3 style="margin:0 0 .8rem">Redigera medlem</h3>
@@ -960,6 +972,9 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   </form>
 </dialog>
 <script>
+document.getElementById('statusHelpBtn').addEventListener('click', () => document.getElementById('statusDlg').showModal());
+document.getElementById('statusDlgClose').addEventListener('click', () => document.getElementById('statusDlg').close());
+document.getElementById('statusDlg').addEventListener('click', (e) => { if (e.target.id === 'statusDlg') e.target.close(); });
 let editingId = null;
 function openEdit(id) {
   const m = members.find(x => x.id === id); if (!m) return;

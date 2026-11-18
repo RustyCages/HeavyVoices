@@ -69,11 +69,22 @@ if (/[?&]utlogg=1/.test(location.search)) {
   n.textContent = 'Du loggades ut efter 1 timme utan aktivitet. Logga in igen.';
   const f = document.getElementById('loginForm'); f.parentNode.insertBefore(n, f);
 }
-// Dölj "Registrera dig här" när admin stängt registreringen
+// Stängd registrering: länken "Registrera dig här" syns kvar men öppnar inte sidan – den visar i stället popupen
+// som admin satt under Meddelanden (först de för "Registreringssidan", annars de för "Inloggningssidan").
 (async () => {
   try {
     const { data } = await supabaseClient.from('site_settings').select('value').eq('key', 'registration_open').maybeSingle();
-    if (data && data.value === 'false') { const r = document.getElementById('regLinkRow'); if (r) r.style.display = 'none'; }
+    if (!(data && data.value === 'false')) return;
+    const a = document.querySelector('#regLinkRow a');
+    if (!a) return;
+    a.addEventListener('click', async (e) => {
+      e.preventDefault();
+      let shown = false;
+      try { if (window.HVNotices && HVNotices.showFor) shown = await HVNotices.showFor(['registrera', 'logga-in']); } catch (_) {}
+      if (!shown && window.HVNotices) {
+        HVNotices.preview({ icon: '📣', title: 'Registreringen är stängd just nu', body: 'Kören är full. Hör av dig till oss så sätter vi dig i kö.', button_text: 'Uppfattat!', tone: 'info' });
+      }
+    });
   } catch (e) {}
 })();
 </script>

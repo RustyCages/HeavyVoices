@@ -90,7 +90,25 @@
     } catch (e) { /* meddelanden är aldrig viktigare än sidan */ }
   }
 
-  window.HVNotices = { run, preview: n => showOne(n, 0, 1), pages: PAGES };
+  // Visar aktuella meddelanden för en sida direkt (oavsett "visas en gång"), t.ex. när någon trycker på en stängd "Registrera dig här".
+  // Först meddelanden som valts för sidan (pageKeys i ordning), saknas de returneras false så att anroparen kan visa en reservtext.
+  async function showFor(pageKeys) {
+    const sb = (typeof supabaseClient !== 'undefined') ? supabaseClient : window.supabaseClient;
+    if (!sb) return false;
+    try {
+      for (const key of [].concat(pageKeys)) {
+        const { data, error } = await sb.from('site_notices')
+          .select('id, title, body, icon, tone, button_text, pages, audience, frequency, updated_at, sort_order, created_at')
+          .contains('pages', [key]).order('sort_order').order('created_at');
+        if (error || !data || !data.length) continue;
+        for (let i = 0; i < data.length; i++) await showOne(data[i], i, data.length);
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  window.HVNotices = { run, showFor, preview: n => showOne(n, 0, 1), pages: PAGES };
   document.addEventListener('hv-member', e => run(e.detail));
   if (window.__hvNoticeMember) run(window.__hvNoticeMember);
   else if (normPath() === '/logga-in' || normPath() === '/registrera') {   // sidor utan inloggning: starta själv

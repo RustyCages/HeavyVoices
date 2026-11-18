@@ -65,6 +65,8 @@
   details.fold[open] > summary { margin-bottom: 0.8rem; }
   #mailMessage { min-height: 180px; line-height: 1.5; }
   #mailRecipients { font-weight: 600; color: var(--accent); }
+  .tempUntil { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; cursor: pointer; white-space: nowrap; }
+  .tempUntil.expired { color: #f87171; }
   .ib-dot { display: inline-block; width: 0.62rem; height: 0.62rem; margin-left: 0.5rem; border-radius: 50%; background: #facc15; vertical-align: middle; box-shadow: 0 0 0 3px rgba(250,204,21,0.28); }
 </style>
 </head>
@@ -83,8 +85,12 @@
       <input type="email" id="inviteEmail" placeholder="E-post" required>
       <select id="inviteRole" style="width: 100%; margin-bottom: 0.75rem;">
         <option value="medlem">Medlem</option>
+        <option value="tillfallig">Tillfällig medlem (tidsbestämd)</option>
         <option value="admin">Admin</option>
       </select>
+      <label id="inviteUntilRow" style="display:none;margin:-.3rem 0 .75rem;font-size:.9rem">Kontot gäller till och med
+        <input type="date" id="inviteUntil" style="width:auto;margin-left:.4rem">
+      </label>
 
       <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">
         <input type="radio" name="inviteMode" value="email" checked style="width: auto; margin-right: 0.4rem;">
@@ -249,7 +255,7 @@ async function loadMembers(attempt = 0) {
     res = await Promise.race([
       supabaseClient
         .from('members_admin')
-        .select('id, name, email, role, stamledare, stamma, status, fee_paid, fee_paid_at, created_at, reactivation_requested_at, reactivation_note')
+        .select('id, name, email, role, stamledare, stamma, status, fee_paid, fee_paid_at, created_at, reactivation_requested_at, reactivation_note, access_until')
         .order('status')
         .order('name'),
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))
@@ -353,10 +359,11 @@ function renderMembers() {
       </td>
       <td>
         <select data-id="${m.id}" class="roleSelect" ${self ? 'disabled title="Du kan inte ändra din egen roll"' : ''}>
-          <option value="medlem" ${m.role === 'medlem' && !m.stamledare ? 'selected' : ''}>Medlem</option>
+          <option value="medlem" ${m.role === 'medlem' && !m.stamledare && !m.access_until ? 'selected' : ''}>Medlem</option>
+          <option value="tillfallig" ${m.role === 'medlem' && !m.stamledare && m.access_until ? 'selected' : ''}>Tillfällig</option>
           <option value="stamledare" ${m.role === 'medlem' && m.stamledare ? 'selected' : ''}>Stämledare</option>
           <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
-        </select>
+        </select>${m.access_until && m.role !== 'admin' ? `<div class="tempUntil${Date.parse(m.access_until) <= Date.now() ? ' expired' : ''}" data-id="${m.id}" title="Klicka för att ändra slutdatum">${Date.parse(m.access_until) <= Date.now() ? 'Gick ut ' : 't.o.m. '}${fmtDate(m.access_until)} ✎</div>` : ''}
       </td>
       <td style="white-space: nowrap;">
         <button class="btn-outline trash-btn editBtn" data-id="${m.id}" title="Redigera ${esc(m.name)}" aria-label="Redigera ${esc(m.name)}">✎</button>
@@ -400,7 +407,14 @@ function renderMembers() {
         return;
       }
       const wasQueue = m && m.status === 'queue';
-      const { error } = await supabaseClient.from('members').update({ status: newStatus }).eq('id', id);
+      const patchSt = { status: newStatus };
+      if (newStatus === 'approved' && m && m.access_until && Date.parse(m.access_until) <= Date.now()) {
+        const v = prompt(`${m.name}s tillfälliga konto gick ut ${fmtDate(m.access_until)}. Ange nytt slutdatum (ÅÅÅÅ-MM-DD), eller lämna tomt för tillsvidare:`, '');
+        if (v === null) { sel.value = m.status; return; }
+        if (v.trim()) { if (!/^\d{4}-\d{2}-\d{2}$/.test(v.trim()) || isNaN(Date.parse(v.trim()))) { alert('Ogiltigt datum.'); sel.value = m.status; return; } patchSt.access_until = untilIso(v.trim()); }
+        else patchSt.access_until = null;
+      }
+      const { error } = await supabaseClient.from('members').update(patchSt).eq('id', id);
       if (error) { alert('Kunde inte ändra status: ' + error.message); }
       else if (wasQueue && newStatus === 'approved') sendWelcomeMails([id]);
       loadMembers();
@@ -412,9 +426,10 @@ function renderMembers() {
       const id = e.target.dataset.id;
       const v = e.target.value;
       // "Stämledare" = vanlig medlem med flaggan stamledare (får redigera låtar, inget annat)
-      const patch = v === 'stamledare' ? { role: 'medlem', stamledare: true }
-                  : v === 'admin' ? { role: 'admin', stamledare: false }
-                  : { role: 'medlem', stamledare: false };
+      if (v === 'tillfallig') { openTemp(id); return; }
+      const patch = v === 'stamledare' ? { role: 'medlem', stamledare: true, access_until: null }
+                  : v === 'admin' ? { role: 'admin', stamledare: false, access_until: null }
+                  : { role: 'medlem', stamledare: false, access_until: null };
       const { error } = await supabaseClient.from('members').update(patch).eq('id', id);
       if (error) {
         alert('Kunde inte ändra roll: ' + error.message);
@@ -422,6 +437,8 @@ function renderMembers() {
       }
     });
   });
+
+  tbody.querySelectorAll('.tempUntil').forEach(el => el.addEventListener('click', () => openTemp(el.dataset.id)));
 
   tbody.querySelectorAll('.stammaSelect').forEach(sel => {
     sel.addEventListener('change', async () => {
@@ -510,8 +527,17 @@ document.getElementById('bulkApplyBtn').addEventListener('click', async () => {
   const warn = STATUS_WARN[st] ? STATUS_WARN[st].replace('{n}', n) : `Göra ${n} aktiva?`;
   if (!confirm(warn)) return;
   msg.textContent = 'Sparar...';
+  let idsApply = ids;
+  if (st === 'approved') {
+    const expiredIds = ids.filter(id => { const m = members.find(x => x.id === id); return m && m.access_until && Date.parse(m.access_until) <= Date.now(); });
+    if (expiredIds.length) {
+      if (confirm(`${expiredIds.length} av dem har ett utgånget slutdatum. OK = ta bort slutdatumet (tillsvidare). Avbryt = hoppa över dem.`)) {
+        await supabaseClient.from('members').update({ access_until: null }).in('id', expiredIds);
+      } else idsApply = ids.filter(id => !expiredIds.includes(id));
+    }
+  }
   const fromQueue = st === 'approved' ? ids.filter(id => { const m = members.find(x => x.id === id); return m && m.status === 'queue'; }) : [];
-  const { error } = await supabaseClient.from('members').update({ status: st }).in('id', ids);
+  const { error } = await supabaseClient.from('members').update({ status: st }).in('id', idsApply);
   if (error) { msg.textContent = 'Kunde inte ändra: ' + error.message; return; }
   msg.textContent = `${n} ändrade till ${STATUS_LABELS[st]} ✓` + (fromQueue.length ? ` – skickar välkomstmejl till ${fromQueue.length}...` : '');
   if (fromQueue.length) sendWelcomeMails(fromQueue);
@@ -855,6 +881,9 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
   const role = document.getElementById('inviteRole').value;
   const mode = document.querySelector('input[name="inviteMode"]:checked').value;
   const isQueue = mode === 'queue';
+  const isTempRole = role === 'tillfallig';
+  const untilVal = document.getElementById('inviteUntil').value;
+  if (isTempRole && (!untilVal || Date.parse(untilVal + 'T23:59:59') <= Date.now())) { errorEl.textContent = 'Välj ett slutdatum i framtiden för det tillfälliga kontot.'; return; }
   // Kö: kontot skapas med slumpat lösenord (inget mejl). Personen väljer eget via "Glömt lösenord?" när hen blir Aktiv.
   const rnd = () => { const a = new Uint8Array(18); crypto.getRandomValues(a); return Array.from(a, b => b.toString(36).padStart(2, '0')).join('').slice(0, 24) + 'Aa1'; };
   const isTemp = mode === 'temp';
@@ -876,7 +905,7 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
         'apikey': SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name, email, role: isQueue ? 'medlem' : role, password }),
+      body: JSON.stringify({ name, email, role: (isQueue || isTempRole) ? 'medlem' : role, password }),
     });
     const result = await res.json();
 
@@ -886,9 +915,13 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
     }
 
     let newId = result.id || result.member_id || (result.member && result.member.id) || (result.user && result.user.id);
-    if ((isQueue || isTemp) && !newId) {
+    if ((isQueue || isTemp || isTempRole) && !newId) {
       const { data: row } = await supabaseClient.from('members_admin').select('id').ilike('email', email.trim()).limit(1).maybeSingle();
       newId = row && row.id;
+    }
+    if (isTempRole) {
+      const { error: tErr } = newId ? await supabaseClient.from('members').update({ access_until: untilIso(untilVal) }).eq('id', newId) : { error: { message: 'hittade inte raden' } };
+      if (tErr) { errorEl.textContent = 'Medlemmen skapades men slutdatumet kunde inte sparas (' + tErr.message + '). Sätt det via rollen i listan.'; loadMembers(); return; }
     }
     let tempMsg = '';
     if (isTemp) {
@@ -943,6 +976,23 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
 })();
 </script>
 
+<dialog id="tempDlg" style="max-width:400px;width:92vw;border:1px solid var(--border,#374151);border-radius:12px;background:var(--card-bg,#1f2937);color:inherit;padding:1.2rem">
+  <h3 style="margin:0 0 .4rem">Tillfällig medlem</h3>
+  <p class="muted" style="margin:0 0 .8rem;font-size:.9rem">Samma behörighet som en medlem, men kontot slutar gälla efter valt datum. Då sätts personen till Avslutad automatiskt.</p>
+  <label class="muted" for="tempDate">Gäller till och med</label>
+  <input type="date" id="tempDate" style="width:100%;margin-bottom:.5rem">
+  <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.8rem">
+    <button type="button" class="btn-outline tempQuick" data-d="7">+1 vecka</button>
+    <button type="button" class="btn-outline tempQuick" data-d="30">+1 månad</button>
+    <button type="button" class="btn-outline tempQuick" data-d="90">+3 månader</button>
+    <button type="button" class="btn-outline tempQuick" data-d="180">+6 månader</button>
+  </div>
+  <p class="error" id="tempError"></p>
+  <div style="display:flex;gap:.6rem;justify-content:flex-end">
+    <button type="button" class="btn-outline" id="tempCancel">Avbryt</button>
+    <button type="button" id="tempSave">Spara</button>
+  </div>
+</dialog>
 <dialog id="statusDlg" style="max-width:520px;width:94vw;border:1px solid var(--border,#374151);border-radius:12px;background:var(--card-bg,#1f2937);color:inherit;padding:1.2rem">
   <h3 style="margin:0 0 .7rem">Vad betyder statusarna?</h3>
   <dl style="margin:0;display:grid;gap:.7rem;font-size:.92rem">
@@ -975,6 +1025,41 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
 document.getElementById('statusHelpBtn').addEventListener('click', () => document.getElementById('statusDlg').showModal());
 document.getElementById('statusDlgClose').addEventListener('click', () => document.getElementById('statusDlg').close());
 document.getElementById('statusDlg').addEventListener('click', (e) => { if (e.target.id === 'statusDlg') e.target.close(); });
+// Tillfälliga medlemmar
+const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+function untilIso(dateStr) { return new Date(dateStr + 'T23:59:59').toISOString(); }
+let tempId = null;
+function openTemp(id) {
+  const m = members.find(x => x.id === id); if (!m) return;
+  tempId = id;
+  const inp = document.getElementById('tempDate');
+  const tomorrow = new Date(Date.now() + 864e5);
+  inp.min = ymd(tomorrow);
+  inp.value = m.access_until && Date.parse(m.access_until) > Date.now() ? ymd(new Date(m.access_until)) : ymd(new Date(Date.now() + 30 * 864e5));
+  document.getElementById('tempError').textContent = '';
+  document.getElementById('tempDlg').showModal();
+}
+document.querySelectorAll('.tempQuick').forEach(b => b.addEventListener('click', () => {
+  document.getElementById('tempDate').value = ymd(new Date(Date.now() + parseInt(b.dataset.d, 10) * 864e5));
+}));
+document.getElementById('tempCancel').addEventListener('click', () => { document.getElementById('tempDlg').close(); renderMembers(); });
+document.getElementById('tempDlg').addEventListener('cancel', () => setTimeout(renderMembers, 0));
+document.getElementById('tempSave').addEventListener('click', async () => {
+  const v = document.getElementById('tempDate').value, err = document.getElementById('tempError');
+  if (!v || Date.parse(v + 'T23:59:59') <= Date.now()) { err.textContent = 'Välj ett datum i framtiden.'; return; }
+  const m = members.find(x => x.id === tempId);
+  const patch = { role: 'medlem', stamledare: false, access_until: untilIso(v) };
+  if (m && m.status === 'ended' && m.access_until) { /* behåll status, admin väljer själv */ }
+  const { error } = await supabaseClient.from('members').update(patch).eq('id', tempId);
+  if (error) { err.textContent = 'Kunde inte spara: ' + error.message; return; }
+  document.getElementById('tempDlg').close();
+  await loadMembers();
+});
+document.getElementById('inviteRole').addEventListener('change', e => {
+  document.getElementById('inviteUntilRow').style.display = e.target.value === 'tillfallig' ? 'block' : 'none';
+  const u = document.getElementById('inviteUntil'); u.min = ymd(new Date(Date.now() + 864e5));
+  if (e.target.value === 'tillfallig' && !u.value) u.value = ymd(new Date(Date.now() + 30 * 864e5));
+});
 let editingId = null;
 function openEdit(id) {
   const m = members.find(x => x.id === id); if (!m) return;

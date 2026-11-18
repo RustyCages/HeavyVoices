@@ -47,6 +47,11 @@
   .forum-members label { display:flex; align-items:center; gap:0.5rem; padding:0.35rem 0; margin:0; cursor:pointer; }
   .forum-members label[hidden] { display:none; }
   .forum-badge { display:inline-block; font-size:0.78rem; font-weight:500; padding:0.1rem 0.5rem; margin-left:0.5rem; border:1px solid var(--border); border-radius:999px; color:var(--text-muted); vertical-align:middle; }
+  .forum-follow-row { display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; margin-top:0.6rem; font-size:0.85rem; }
+  .forum-follow { font-size:0.85rem; padding:0.3rem 0.7rem; }
+  .forum-follow.on { border-color:var(--gold, #E5A968); color:var(--gold, #E5A968); }
+  .forum-follow-chk { display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; margin:0.4rem 0; color:var(--text-muted); }
+  .forum-follow-chk input { width:auto; margin:0; }
   .forum-del { margin-top:0.6rem; font-size:0.82rem; padding:0.25rem 0.6rem; border-color:#f87171; color:#fca5a5; }
 
   /* Stramt utseende (test): "Nytt inlägg"-knapp i stället för formuläret överst */
@@ -111,6 +116,27 @@ function fileSize(bytes) {
 }
 
 // ---------- hämta och visa ----------
+// Trådar jag följer (mejl vid nya svar skickas bara till följare)
+let foljer = new Set();
+async function loadFollows() {
+  const { data } = await supabaseClient.from('forum_follows').select('thread_id').eq('user_id', me.id);
+  foljer = new Set((data || []).map(r => r.thread_id));
+}
+async function setFollow(threadId, on) {
+  if (on === foljer.has(threadId)) return true;
+  const q = on
+    ? supabaseClient.from('forum_follows').insert({ user_id: me.id, thread_id: threadId })
+    : supabaseClient.from('forum_follows').delete().eq('user_id', me.id).eq('thread_id', threadId);
+  const { error } = await q;
+  if (error) { setStatus('Kunde inte ändra: ' + error.message, true); return false; }
+  if (on) foljer.add(threadId); else foljer.delete(threadId);
+  return true;
+}
+function followBtnHtml(id) {
+  const on = foljer.has(id);
+  return `<button type="button" class="btn-outline forum-follow${on ? ' on' : ''}" data-follow="${id}" aria-pressed="${on}" title="${on ? 'Klicka för att sluta följa' : 'Få ett mejl när någon svarar'}">${on ? '🔔 Du följer tråden' : '🔕 Följ tråden'}</button>`;
+}
+
 const SEEN_KEY = 'hv-forum-seen';
 let nyaTradar = new Set();
 async function loadPosts() {
@@ -192,6 +218,7 @@ function renderPosts() {
         <div class="forum-members">${medlemmar.filter(m => m.id !== me.id).map(m =>
           `<label><input type="checkbox" class="forum-recipient" value="${m.id}"> ${escapeHtml(m.name)}</label>`).join('') || '<p class="text-muted">Inga andra medlemmar hittades.</p>'}</div>
       </div>
+      <label class="forum-follow-chk"><input type="checkbox" name="follow"> Följ tråden (mejl vid svar)</label>
       <div class="row">
         <input type="file" name="files" multiple>
         <button type="submit" class="btn">Publicera</button>
@@ -204,11 +231,13 @@ function renderPosts() {
         <details class="card forum-post" data-thread="${p.id}" ${stangda.has(p.id) ? '' : 'open'}>
           <summary><h2 class="forum-title">${escapeHtml(p.title || '')}${nyaTradar.has(p.id) ? '<span class="forum-nytt">Nytt</span>' : ''}${synlighetHtml(p)}</h2></summary>
           ${postHtml(p)}
+          <div class="forum-follow-row">${followBtnHtml(p.id)}<span class="text-muted">Mejl när någon svarar</span></div>
           <div class="forum-replies">
             ${(svar[p.id] || []).map(r => `<div class="forum-reply">${postHtml(r)}</div>`).join('')}
           </div>
           <form class="forum-composer forum-reply-box" data-form="reply" data-parent="${p.id}">
             <textarea name="body" maxlength="5000" required placeholder="Skriv ett svar..."></textarea>
+            <label class="forum-follow-chk"><input type="checkbox" name="follow" ${foljer.has(p.id) ? 'checked' : ''}> Följ tråden (mejl vid nya svar)</label>
             <div class="row">
               <input type="file" name="files" multiple>
               <button type="submit" class="btn-outline">Skicka svar</button>
@@ -262,6 +291,7 @@ async function skickaInlagg(form) {
     });
     if (error) throw new Error(error.message);
     await laddaUppBilagor(postId, files);
+    await setFollow(parentId || postId, !!form.querySelector('[name=follow]')?.checked);
     if (parentId) supabaseClient.functions.invoke('forum-notify', { body: { post_id: postId } }).catch(() => {});
     if (!parentId) {
       nyttOppet = false;
@@ -326,6 +356,15 @@ document.getElementById('forumBody').addEventListener('submit', (e) => {
 });
 
 document.getElementById('forumBody').addEventListener('click', (e) => {
+  const fol = e.target.closest('button[data-follow]');
+  if (fol) {
+    const id = fol.dataset.follow, vill = !foljer.has(id);
+    fol.disabled = true;
+    return setFollow(id, vill).then(() => {
+      fol.outerHTML = followBtnHtml(id);
+      document.querySelectorAll(`details[data-thread="${id}"] input[name=follow]`).forEach(c => { c.checked = foljer.has(id); });
+    });
+  }
   const att = e.target.closest('button[data-att-path]');
   if (att) return oppnaBilaga(att.dataset.attPath, att.dataset.attName);
   const del = e.target.closest('button[data-del]');
@@ -336,6 +375,7 @@ document.getElementById('forumBody').addEventListener('click', (e) => {
   me = await requireAuth();
   if (!me) return;
   await loadMembers();
+  await loadFollows();
   await loadPosts();
 })();
 </script>

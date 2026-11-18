@@ -358,6 +358,7 @@ function renderMembers() {
         </select>
       </td>
       <td style="white-space: nowrap;">
+        <button class="btn-outline trash-btn editBtn" data-id="${m.id}" title="Redigera ${esc(m.name)}" aria-label="Redigera ${esc(m.name)}">✎</button>
         <button class="btn-outline trash-btn removeBtn" data-id="${m.id}" ${self ? 'disabled title="Du kan inte ta bort dig själv"' : `title="Ta bort ${esc(m.name)}" aria-label="Ta bort ${esc(m.name)}"`}>${TRASH_SVG}</button>
       </td>
     </tr>`;
@@ -433,6 +434,10 @@ function renderMembers() {
       if (error) { alert('Kunde inte ändra stämma: ' + error.message); sel.value = prev || ''; return; }
       if (m) m.stamma = value;
     });
+  });
+
+  tbody.querySelectorAll('.editBtn').forEach(btn => {
+    btn.addEventListener('click', () => openEdit(btn.dataset.id));
   });
 
   tbody.querySelectorAll('.removeBtn').forEach(btn => {
@@ -937,5 +942,61 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
 })();
 </script>
 
+<dialog id="editDlg" style="max-width:420px;width:92vw;border:1px solid var(--border,#374151);border-radius:12px;background:var(--card-bg,#1f2937);color:inherit;padding:1.2rem">
+  <form id="editForm" method="dialog">
+    <h3 style="margin:0 0 .8rem">Redigera medlem</h3>
+    <label class="muted" for="editName">Namn</label>
+    <input type="text" id="editName" required maxlength="100" style="width:100%;margin-bottom:.6rem">
+    <label class="muted" for="editEmail">E-post</label>
+    <input type="email" id="editEmail" required maxlength="200" style="width:100%;margin-bottom:.2rem">
+    <p class="muted" style="font-size:.8rem;margin:0 0 .6rem">Byter du e-post ändras även inloggningen. Personen loggar då in med den nya adressen.</p>
+    <label class="muted" for="editStamma">Stämma</label>
+    <select id="editStamma" style="width:100%;margin-bottom:.8rem"></select>
+    <p class="error" id="editError"></p>
+    <div style="display:flex;gap:.6rem;justify-content:flex-end">
+      <button type="button" class="btn-outline" id="editCancel">Avbryt</button>
+      <button type="submit" id="editSave">Spara</button>
+    </div>
+  </form>
+</dialog>
+<script>
+let editingId = null;
+function openEdit(id) {
+  const m = members.find(x => x.id === id); if (!m) return;
+  editingId = id;
+  document.getElementById('editName').value = m.name || '';
+  document.getElementById('editEmail').value = m.email || '';
+  document.getElementById('editStamma').innerHTML = stammaOptions(m.stamma);
+  document.getElementById('editError').textContent = '';
+  document.getElementById('editDlg').showModal();
+}
+document.getElementById('editCancel').addEventListener('click', () => document.getElementById('editDlg').close());
+document.getElementById('editForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const m = members.find(x => x.id === editingId); if (!m) return;
+  const name = document.getElementById('editName').value.trim();
+  const email = document.getElementById('editEmail').value.trim();
+  const stamma = document.getElementById('editStamma').value || null;
+  const err = document.getElementById('editError'), btn = document.getElementById('editSave');
+  err.textContent = '';
+  if (email.toLowerCase() !== (m.email || '').toLowerCase() && !confirm(`Byta e-post för ${m.name} till ${email}? Personen måste då logga in med den nya adressen.`)) return;
+  btn.disabled = true;
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/update-member`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editingId, name, email, stamma }),
+    });
+    const r = await res.json().catch(() => ({}));
+    if (!res.ok) { err.textContent = r.error || ('Fel ' + res.status); return; }
+    document.getElementById('editDlg').close();
+    await loadMembers();
+    if (typeof toast === 'function') toast('Sparat ✓');
+  } catch (ex) {
+    err.textContent = 'Kunde inte nå servern: ' + ex.message;
+  } finally { btn.disabled = false; }
+});
+</script>
 </body>
 </html>

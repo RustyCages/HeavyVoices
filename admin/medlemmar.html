@@ -159,10 +159,8 @@
   </div>
 
   <details class="card static fold" style="margin-top: 1.5rem;" id="mailCard">
-    <summary><h3>Skicka mejl</h3><span class="muted" id="mailSummaryN"></span></summary>
-    <div style="display:flex; justify-content:flex-end; margin-bottom:0.2rem;">
-      <button type="button" class="btn-gold" id="inboxBtn" onclick="location.href='/admin/inkorg.html'" title="Mejl till info@heavyvoices.se">Inkorg<span id="inboxUnread"></span></button>
-    </div>
+    <summary><h3>Skicka mejl</h3><span class="muted" id="mailSummaryN"></span>
+      <button type="button" class="btn-gold" id="inboxBtn" style="margin-left:auto" onclick="event.preventDefault();event.stopPropagation();location.href='/admin/inkorg.html'" title="Mejl till info@heavyvoices.se">Inkorg<span id="inboxUnread"></span></button></summary>
     <p class="muted" style="margin-top: 0;">Mottagare: <span id="mailRecipients">inga markerade</span> — markera i listan ovan. Varje person får ett eget mejl från info@heavyvoices.se, och svar hamnar i inkorgen.</p>
     <div class="toolbar" style="margin-top: 0; align-items: center;">
       <label for="mailTemplate" class="muted" style="margin:0;">Brevmall:</label>

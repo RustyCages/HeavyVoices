@@ -408,6 +408,7 @@
       
   <a href="/medlem/" class="back-btn" id="backLink">&larr; Tillbaka</a>
   <h1>Repertoar</h1>
+  <div class="live-row" id="liveRow"></div>
 
   <div class="tabs">
     <button class="tab-btn active" id="tabRepertoarBtn">Låtar</button>
@@ -475,6 +476,8 @@
 <script src="/js/pdf-viewer.js"></script>
 <script src="/js/pitch-analyze.js"></script>
 <script src="/js/note-roll.js"></script>
+<script src="/js/vendor/qrcode.js"></script>
+<script src="/js/live-sync.js"></script>
 <script>
 const NOTER_BUCKET = 'heavy-voices-noter';
 const STEMS_BUCKET = 'heavy-voices-stems';
@@ -581,6 +584,8 @@ if (new URLSearchParams(location.search).get('from') === 'admin') document.getEl
 // Init
 // =========================================================
 async function init() {
+  // QR-länk till live-text: kom tillbaka hit efter inloggningen
+  if (/[?&]live=\d{4}/.test(location.search)) { try { sessionStorage.setItem('hv-after-login', location.pathname + location.search); } catch (e) {} }
   const member = await requireAuth();
   if (!member) return;
   currentMember = member;
@@ -591,8 +596,48 @@ async function init() {
 
   // Körs parallellt i stället för efter varandra
   await Promise.all([stammaP, loadPlaylists(), loadRepertoar()]);
+  initLiveSync();
 }
 init();
+
+// =========================================================
+// Live-text: värden spelar, medlemmarna följer texten (js/live-sync.js)
+// =========================================================
+function initLiveSync() {
+  ['play', 'pause', 'seeked', 'ratechange'].forEach(ev => audioEl.addEventListener(ev, () => LiveSync.notify()));
+  const bar = () => document.getElementById('playerBar');
+  LiveSync.init({
+    client: supabaseClient,
+    member: currentMember,
+    canHost: isSongEditor(currentMember),
+    rowId: 'liveRow',
+    toast,
+    getState: () => ({
+      songId: playerSong && playerSong.id, title: playerSong && playerSong.title,
+      pos: isLoadingTrack || !currentMixUrl ? 0 : (audioEl.currentTime || 0),
+      playing: isPlaying && !isLoadingTrack, rate: playbackSpeed,
+    }),
+    onFollowStart() {
+      if (isPlaying) pauseAll();
+      bar().classList.add('live-follow');
+      setPlayerTitle('<span class="live-follow-tag">📡 Följer live</span>Väntar på värden…');
+      bar().classList.remove('hidden');
+    },
+    onFollowSong(st) {
+      if (!st.songId) { setPlayerTitle('<span class="live-follow-tag">📡 Följer live</span>Väntar på att en låt ska spelas…'); return; }
+      // dolda låtar syns inte för medlemmar – visa titeln ändå
+      const song = repertoarCache.find(x => String(x.id) === String(st.songId)) || { id: st.songId, title: st.title || 'Okänd låt' };
+      setPlayerSong(song);
+      const hasSync = karaokeLines.some(l => l.text);
+      setPlayerTitle(`<span class="live-follow-tag">📡 Följer live</span>${escapeHtml(song.title)}${hasSync ? '' : ' <span class="text-muted">(ingen synkad text)</span>'}`);
+    },
+    onFollowEnd() {
+      bar().classList.remove('live-follow');
+      if (!currentMixUrl) bar().classList.add('hidden');
+      else if (playerSong) setPlayerTitle(escapeHtml(playerSong.title));
+    },
+  });
+}
 
 // =========================================================
 // Spellistor
@@ -1639,6 +1684,7 @@ function playSongPreview(song, stemDefs, previewId, mix) {
 }
   
 async function playTrackAt(index, offsetSeconds) {
+  if (window.LiveSync && LiveSync.following) LiveSync.leave();   // spelar man själv slutar man följa
   if (isLoadingTrack) { toast('Väntar på att föregående låt ska laddas klart...'); return; }
   if (!currentPlaylist) return;
   const items = currentPlaylist.items;
@@ -2018,6 +2064,7 @@ function parseLrc(lrc) {
 }
 
 function currentElapsed() {
+  if (window.LiveSync && LiveSync.following) return LiveSync.pos();
   if (isLoadingTrack || !currentMixUrl) return 0;
   return audioEl.currentTime || 0;
 }
@@ -2042,6 +2089,7 @@ function setPlayerSong(song) {
   renderKaraoke(true);
   updateVoiceBadge();
   syncSplit();
+  if (window.LiveSync) LiveSync.notify();
 }
 
 // Tonriktning som admin skrivit in i texten: ↑ = upp, ↓ = ned (se admin/text-synk.html)
@@ -2229,7 +2277,8 @@ function renderKaraoke(force) {
   renderKaraoke(false);
   const kb = document.getElementById('karaoke');
   if (roll && kb.classList.contains('roll-mode') && !kb.classList.contains('hidden')) roll.render(currentElapsed());
-  kVideo.sync(currentElapsed(), isPlaying, playbackSpeed);
+  if (window.LiveSync && LiveSync.following) kVideo.sync(currentElapsed(), LiveSync.playing, LiveSync.rate);
+  else kVideo.sync(currentElapsed(), isPlaying, playbackSpeed);
   requestAnimationFrame(karaokeLoop);
 })();
 

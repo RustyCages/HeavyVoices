@@ -871,7 +871,7 @@ const panel = TrackEditPanel.mount(document.getElementById('panel'), {
       <label class="status" for="fmt" title="Gäller bara nedladdning. Det som sparas på nätet blir alltid MP3, så att lagringen inte fylls.">Ladda ner som</label>
       <select id="fmt" title="Gäller bara nedladdning – det som sparas på nätet blir alltid MP3"><option value="mp3">MP3</option><option value="wav">WAV (bara på datorn)</option></select>
       <button type="button" class="btn-outline" id="dlVoice" title="Ladda ner det valda spåret">⬇ Bara spåret</button>
-      <label class="status" title="Filen börjar där låten börjar och slutar där låten slutar (tystnad där inget är inspelat), så att den hamnar rätt när den laddas in igen"><input type="checkbox" id="dlFull" checked> hela låtens längd</label>
+      <label class="opt status" style="white-space: nowrap" title="Filen börjar där låten börjar och slutar där låten slutar (tystnad där inget är inspelat), så att den hamnar rätt när den laddas in igen"><input type="checkbox" id="dlFull" checked> hela låtens längd</label>
       <button type="button" class="btn-outline" id="fillSong" title="Fyll ut spåret med tystnad före och efter, så att det börjar och slutar som låtens huvudspår">↔ Fyll ut till hela låten</button>
       <button type="button" class="btn-outline" id="dlMix" title="Ladda ner allt som hörs just nu, mixat till en fil">⬇ Mix av det som hörs</button>
       <button type="button" class="btn-outline" id="recDelete">🗑 Ta bort</button>

@@ -871,6 +871,8 @@ const panel = TrackEditPanel.mount(document.getElementById('panel'), {
       <label class="status" for="fmt" title="Gäller bara nedladdning. Det som sparas på nätet blir alltid MP3, så att lagringen inte fylls.">Ladda ner som</label>
       <select id="fmt" title="Gäller bara nedladdning – det som sparas på nätet blir alltid MP3"><option value="mp3">MP3</option><option value="wav">WAV (bara på datorn)</option></select>
       <button type="button" class="btn-outline" id="dlVoice" title="Ladda ner det valda spåret">⬇ Bara spåret</button>
+      <label class="status" title="Filen börjar där låten börjar och slutar där låten slutar (tystnad där inget är inspelat), så att den hamnar rätt när den laddas in igen"><input type="checkbox" id="dlFull" checked> hela låtens längd</label>
+      <button type="button" class="btn-outline" id="fillSong" title="Fyll ut spåret med tystnad före och efter, så att det börjar och slutar som låtens huvudspår">↔ Fyll ut till hela låten</button>
       <button type="button" class="btn-outline" id="dlMix" title="Ladda ner allt som hörs just nu, mixat till en fil">⬇ Mix av det som hörs</button>
       <button type="button" class="btn-outline" id="recDelete">🗑 Ta bort</button>
       <button type="button" class="btn-outline" id="toStem" hidden title="Lägg inspelningen som ett nytt spår i låten (syns för alla)">➕ Gör till stämfil i låten</button>
@@ -1256,6 +1258,7 @@ function updateRecTools() {
   ['recDelete'].forEach(id => { document.getElementById(id).hidden = !isRec || !(mine || (isAdmin && t.id)); });
   document.getElementById('toStem').hidden = !(isAdmin && isRec);
   document.getElementById('dlVoice').disabled = !(t && t.clip) || isEmpty(t);
+  document.getElementById('fillSong').disabled = !movable(t) || t.readOnly || (t.offsetMs === 0 && tDur(t) >= songEnd() - 0.01);
   if (mine) {
     const ti = document.getElementById('recTitle');
     if (document.activeElement !== ti) ti.value = t.label;
@@ -1659,9 +1662,25 @@ async function saveRecording(t) {
     toast(`”${t.label}” sparad – ${VIS[t.visibility]}`);
   } catch (e) { setRecStatus('Kunde inte spara: ' + (e.message || e)); btn.disabled = false; }
 }
+// låtens längd = där huvudspåren (stämfilerna) slutar
+function songEnd() { const s = tracks.filter(t => t.kind === 'stem' && t.clip && !isEmpty(t)); return s.length ? Math.max(...s.map(t => offS(t) + tDur(t))) : duration(); }
+// klippet i låtens tid: tystnad före (beskuret om det börjar före 0) och efter, så att det börjar på 0 och räcker till låtens slut
+function padToSong(clip, offMs) {
+  const off = (offMs || 0) / 1000;
+  let c = off < 0 ? AudioEdit.crop(clip, -off, AudioEdit.duration(clip)) : off > 0 ? AudioEdit.insertSilence(clip, 0, off) : clip;
+  const rest = songEnd() - AudioEdit.duration(c);
+  if (rest > 0.001) c = AudioEdit.insertSilence(c, AudioEdit.duration(c), rest);
+  return c;
+}
+try { document.getElementById('dlFull').checked = localStorage.getItem('hv-st-dlfull') !== '0'; } catch (e) {}
+document.getElementById('dlFull').addEventListener('change', e => { try { localStorage.setItem('hv-st-dlfull', e.target.checked ? '1' : '0'); } catch (x) {} });
+document.getElementById('fillSong').addEventListener('click', () => {
+  const t = active; if (!movable(t)) return;
+  applyEdit(t, padToSong(t.clip, t.offsetMs), 0, 'Utfyllt med tystnad till hela låtens längd');
+});
 document.getElementById('dlVoice').addEventListener('click', async () => {
   const t = active; if (!t || !t.clip) return;
-  try { const { blob, ext } = await encodeTrack(await clipWithFx(t)); download(blob, `${safeName(song.title)}-${safeName(t.label)}.${ext}`); setRecStatus(''); }
+  try { const fx = await clipWithFx(t), { blob, ext } = await encodeTrack(document.getElementById('dlFull').checked ? padToSong(fx, t.offsetMs) : fx); download(blob, `${safeName(song.title)}-${safeName(t.label)}.${ext}`); setRecStatus(''); }
   catch (e) { toast('Kunde inte skapa filen: ' + (e.message || e)); }
 });
 document.getElementById('dlMix').addEventListener('click', async () => {

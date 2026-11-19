@@ -32,6 +32,22 @@
   .meter > div { height: 100%; width: 0; background: linear-gradient(90deg, #4ade80 70%, #facc15 85%, #ef4444); transition: width 0.05s linear; }
   .transport .sp { flex: 1; }
   .opt { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
+  .savestat-wrap { position: relative; display: inline-flex; }
+  .savestat { white-space: nowrap; }
+  .savestat.ok { color: #86efac; border-color: rgba(134,239,172,0.35); }
+  .savestat.dirty { color: var(--accent); border-color: var(--accent); }
+  .savestat-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; width: min(460px, 92vw); max-height: 70vh; overflow: auto; padding: 0.75rem 0.85rem; border: 1px solid var(--st-line, var(--border)); border-radius: 0.6rem; background: var(--st-panel, #1f232c); box-shadow: 0 12px 32px rgba(0,0,0,0.45); font-size: 0.84rem; }
+  .savestat-pop h4 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+  .savestat-pop .ss-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-top: 1px solid var(--st-line, var(--border)); }
+  .savestat-pop .ss-row:first-of-type { border-top: 0; }
+  .savestat-pop .ss-name { flex: 1; min-width: 0; }
+  .savestat-pop .ss-name b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .savestat-pop .ss-name small { color: var(--text-muted); }
+  .savestat-pop .ss-name small.dirty { color: var(--accent); }
+  .savestat-pop .ss-name small.ok { color: #86efac; }
+  .savestat-pop button { flex: none; height: 1.9rem; padding: 0 0.6rem; font-size: 0.78rem; width: auto; }
+  .savestat-pop .ss-foot { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px solid var(--st-line, var(--border)); }
+  .savestat-pop .ss-foot .hint { flex: 1 1 100%; margin: 0; color: var(--text-muted); font-size: 0.76rem; line-height: 1.4; }
   .opt input[type=checkbox] { width: auto; margin: 0; accent-color: var(--accent); }
   .opt select { width: auto; margin: 0; padding: 0.25rem 0.4rem; font-size: 0.82rem; }
   .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; }
@@ -401,6 +417,8 @@
       <label class="st-song"><span class="st-sr">Låt</span><select id="songSelect"><option value="">Laddar låtar…</option></select></label>
       <span class="st-sp"></span>
       <div class="title-actions">
+        <span class="savestat-wrap"><button type="button" class="btn-outline savestat" id="saveStatBtn" aria-expanded="false" aria-controls="saveStatPop" title="Vad är sparat i den här låten?">✓ Allt sparat</button>
+          <div class="savestat-pop" id="saveStatPop" hidden role="dialog" aria-label="Sparat i den här låten"></div></span>
         <button type="button" class="btn-outline" id="guideBtn" aria-expanded="false" aria-controls="guide">❔ Hjälp</button>
         <a href="/medlem/rostovning.html" class="btn btn-outline">🎤 Röstövning</a>
         <button type="button" class="btn-outline" id="stThemeBtn" title="Växla mellan svart och grått utseende" aria-label="Växla mellan svart och grått utseende"></button>
@@ -664,6 +682,7 @@ function unsavedWhy(t) {
   const own = t.kind === 'rec' && t.mine, stem = t.kind === 'stem' && isAdmin;
   if (!own && !stem) return '';
   if (own && !t.id) return 'ny, inte sparad';
+  if (t.edited && own && t.editPath && t._editClip === t.clip) return '';   // autosparad som utkast – återställs när du kommer tillbaka
   if (t.edited) return 'redigerad';
   if (t.savedOffsetMs != null && (t.offsetMs || 0) !== (t.savedOffsetMs || 0)) return `flyttad ${(t.offsetMs >= 0 ? '+' : '') + t.offsetMs} ms (sparat ${(t.savedOffsetMs >= 0 ? '+' : '') + t.savedOffsetMs} ms)`;
   return '';
@@ -1704,7 +1723,8 @@ async function saveRecording(t) {
       const { error } = await supabaseClient.from('recordings').update(row).eq('id', t.id); if (error) throw error;
     }
     t.orig = t.clip; t.edited = false; t.draft = false; t.undo = []; t.savedOffsetMs = t.offsetMs; t.savedTitle = t.label; t.savedVis = t.visibility;
-    tl.render(); setActive(t); loadMyRecs();
+    if (t.editPath) { dropEdit(t); saveStateNow(true); }
+    tl.render(); setActive(t); loadMyRecs(); updateSaveStat();
     toast(`”${t.label}” sparad – ${VIS[t.visibility]}`);
   } catch (e) { setRecStatus('Kunde inte spara: ' + (e.message || e)); btn.disabled = false; }
 }
@@ -1758,7 +1778,7 @@ async function deleteTrack(t) {
     const { error } = await supabaseClient.from('recordings').delete().eq('id', t.id);
     if (error) { toast('Kunde inte ta bort: ' + error.message); return; }
     if (t.path) supabaseClient.storage.from(REC_BUCKET).remove([t.path]);
-    loadMyRecs();
+    dropEdit(t); loadMyRecs();
   } else if (!isEmpty(t) && !confirm(`Släppa ”${t.label}”? Den är inte sparad.`)) return;
   if (sel && sel.track === t) { sel = null; tl.selection = null; }
   const i = tracks.indexOf(t);
@@ -2315,7 +2335,7 @@ async function loadSong(id) {
     tl.fit(); tick();
     const st = stRow && stRow.state;
     if (st && st.tracks) {   // fortsätt där du var
-      applyState(st);
+      applyState(st, { edits: true });
       const at = new Date(stRow.updated_at);
       stateSaved = { song: song.id, json: null, at };
       toast(`Fortsätter där du var – ${at.toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}`);
@@ -2485,13 +2505,13 @@ function captureState() {
     markers: tl.markers.map(m => round(m)),
     order: stateTracks().map(t => t.key),
     tracks: Object.fromEntries(stateTracks().map(t => [t.key, {
-      label: t.label, vol: round(t.vol ?? 1, 2), muted: !!t.muted, solo: !!t.solo, offsetMs: t.offsetMs || 0,
+      label: t.label, vol: round(t.vol ?? 1, 2), muted: !!t.muted, solo: !!t.solo, offsetMs: t.offsetMs || 0, ...(t.editPath ? { editPath: t.editPath } : {}),
       reverb: t.fx && t.fx.reverb ? { ...t.fx.reverb } : null,
     }])),
   };
 }
 // lägg på ett läge; returnerar antal spår som inte fanns (privata, borttagna eller annan låt)
-function applyState(st, { view = true } = {}) {
+function applyState(st, { view = true, edits = false } = {}) {
   if (!st || !st.tracks) return 0;
   const byKey = new Map(tracks.map(t => [t.key, t]));
   let missing = 0;
@@ -2503,6 +2523,7 @@ function applyState(st, { view = true } = {}) {
     if (s.reverb) { t.fx = t.fx || {}; t.fx.reverb = { ...Effects.REVERB_DEFAULT, ...Effects.normReverb({ ...Effects.REVERB_DEFAULT, ...s.reverb }), on: !!s.reverb.on }; }
     else if (t.fx && t.fx.reverb) t.fx.reverb.on = false;
     if (t.mine && !t.locked && s.offsetMs != null && t.clip) t.offsetMs = Math.round(Number(s.offsetMs) || 0);
+    if (edits && s.editPath && t.kind === 'rec' && t.mine && t.id && !t.draft) restoreEdit(t, s.editPath);
   });
   if (Array.isArray(st.order) && st.order.length) {
     const pos = k => { const i = st.order.indexOf(k); return i === -1 ? 1e6 : i; };
@@ -2560,13 +2581,54 @@ async function uploadDraft(t) {
     if (song && song.id === songId) { tl.render(); if (active) setActive(active); }
   } finally { t._uploading = false; }
 }
+// --- redigeringar av en redan sparad inspelning: autosparas som dold utkastversion (originalet ersätts först vid Spara) ---
+const editCandidate = t => t.kind === 'rec' && t.mine && t.id && !t.draft && t.edited && t.clip && !isEmpty(t) && !t._uploading
+  && t._editClip !== t.clip && !(rec && rec.track === t);
+async function uploadEdit(t) {
+  const clip = t.clip, songId = song.id; t._uploading = true;
+  try {
+    const blob = await AudioEdit.encodeMp3(clip, clip.channels.length > 1 ? 192 : 160);
+    const path = `${me.id}/edits/${t.id}-${Date.now().toString(36)}.mp3`, old = t.editPath;
+    const { error } = await supabaseClient.storage.from(REC_BUCKET).upload(path, blob, { contentType: 'audio/mpeg' });
+    if (error) throw error;
+    t.editPath = path; t._editClip = clip; t.editAt = new Date();
+    if (old) supabaseClient.storage.from(REC_BUCKET).remove([old]);
+    if (song && song.id === songId) await saveStateNow(true);
+  } finally { t._uploading = false; }
+}
+function dropEdit(t) {
+  if (!t || !t.editPath) return;
+  supabaseClient.storage.from(REC_BUCKET).remove([t.editPath]).catch(() => {});
+  t.editPath = null; t._editClip = null; t.editAt = null;
+}
+async function restoreEdit(t, path) {
+  try {
+    const clip = await loadClip(REC_BUCKET, path);
+    if (!tracks.includes(t)) return;
+    t.undo = t.undo || []; t.undo.push({ clip: t.clip, offsetMs: t.offsetMs });
+    t.clip = clip; setPeaks(t); t.edited = true; t.editPath = path; t._editClip = clip;
+    tl.render(); if (active) setActive(active); updateSaveStat();
+    toast(`Osparad redigering av ”${t.label}” är återställd – spara när du är klar`, 6000);
+  } catch (e) { t.editPath = null; }
+}
 async function flushDrafts() {
   if (draftBusy || !song || !me) return;
   draftBusy = true;
-  try { for (const t of tracks.filter(draftCandidate)) { try { await uploadDraft(t); } catch (e) { console.warn('Utkast kunde inte sparas', e); } } }
-  finally { draftBusy = false; }
+  try {
+    for (const t of tracks.filter(draftCandidate)) { try { await uploadDraft(t); } catch (e) { console.warn('Utkast kunde inte sparas', e); } }
+    for (const t of tracks.filter(editCandidate)) { try { await uploadEdit(t); } catch (e) { console.warn('Redigeringen kunde inte autosparas', e); } }
+    const stale = tracks.filter(t => t.editPath && !t.edited);   // ångrat tillbaka till originalet
+    if (stale.length) { stale.forEach(dropEdit); await saveStateNow(true); }
+  }
+  finally { draftBusy = false; updateSaveStat(); }
+}
+async function cleanOldEdits() {
+  const { data } = await supabaseClient.storage.from(REC_BUCKET).list(`${me.id}/edits`, { limit: 200 });
+  const old = (data || []).filter(f => f.name && f.created_at && Date.now() - new Date(f.created_at) > DRAFT_DAYS * 864e5).map(f => `${me.id}/edits/${f.name}`);
+  if (old.length) await supabaseClient.storage.from(REC_BUCKET).remove(old);
 }
 async function cleanOldDrafts() {
+  cleanOldEdits().catch(() => {});
   const before = new Date(Date.now() - DRAFT_DAYS * 864e5).toISOString();
   const { data } = await supabaseClient.from('recordings').select('id, path').eq('member_id', me.id).eq('draft', true).lt('updated_at', before);
   if (!data || !data.length) return;
@@ -2752,6 +2814,86 @@ snapEl('snapFile').addEventListener('change', e => { const f = e.target.files[0]
   }
 })();
 
+// ---------- vad är sparat? (knappen i överraden) ----------
+const sgnMs = v => ((v || 0) >= 0 ? '+' : '−') + Math.abs(v || 0) + ' ms';
+function saveItems() {
+  const out = [];
+  tracks.forEach(t => {
+    if (!t.clip || isEmpty(t)) return;
+    const own = t.kind === 'rec' && t.mine, stem = t.kind === 'stem' && isAdmin;
+    if (!own && !stem) return;
+    const moved = t.savedOffsetMs != null && (t.offsetMs || 0) !== (t.savedOffsetMs || 0);
+    let st, dirty = true, act = null, cls = 'dirty';
+    if (own) {
+      if (!t.id) { st = 'Ny – sparas strax automatiskt som privat utkast'; act = 'dialog'; }
+      else if (t.draft) { st = t.edited ? 'Utkast – ändringen autosparas strax' : 'Utkast – autosparat privat, inte sparat på riktigt'; dirty = false; cls = ''; act = 'dialog'; }
+      else if (t.edited) { st = t.editPath && t._editClip === t.clip ? 'Redigerad – autosparad som utkast, originalet är orört' : 'Redigerad – autosparas strax som utkast'; act = 'save'; }
+      else if (moved) { st = `Flyttad ${sgnMs(t.offsetMs)} (sparat ${sgnMs(t.savedOffsetMs)}) – Studion minns läget`; act = 'save'; }
+      else if (t.label !== t.savedTitle) { st = 'Nytt namn – inte sparat'; act = 'save'; }
+      else { st = '✓ Sparad · ' + (VIS[t.visibility] || ''); dirty = false; cls = 'ok'; }
+    } else {
+      if (t.edited) { st = 'Stämfilen ändrad – inte sparad'; act = 'stem'; }
+      else if (moved) { st = `Flyttad ${sgnMs(t.offsetMs)} (sparat ${sgnMs(t.savedOffsetMs)}) – synken inte sparad`; act = 'offsets'; }
+      else return;
+    }
+    out.push({ t, st, dirty, act, cls, draft: own && t.draft });
+  });
+  return out;
+}
+let saveStatSig = '';
+function updateSaveStat() {
+  const btn = document.getElementById('saveStatBtn'); if (!btn) return;
+  const items = song ? saveItems() : [], n = items.filter(x => x.dirty).length, d = items.filter(x => x.draft).length;
+  btn.hidden = !song;
+  btn.textContent = n ? `● ${n} osparad${n > 1 ? 'e' : ''}` : d ? `✓ Sparat · ${d} utkast` : '✓ Allt sparat';
+  btn.classList.toggle('dirty', !!n); btn.classList.toggle('ok', !n);
+  const pop = document.getElementById('saveStatPop');
+  const sig = items.map(x => x.t.key + x.st).join('|') + (stateSaved.at ? +stateSaved.at : '');
+  if (!pop.hidden && sig !== saveStatSig) renderSaveStat(items);
+  saveStatSig = sig;
+}
+function renderSaveStat(items = saveItems()) {
+  const pop = document.getElementById('saveStatPop');
+  const label = { save: 'Spara', dialog: 'Spara…', stem: 'Spara stämfil', offsets: 'Spara synk' };
+  const auto = stateSaved.at && stateSaved.song === (song && song.id) ? stateSaved.at.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : null;
+  const bulk = items.filter(x => x.act === 'save' || x.act === 'offsets').length;
+  pop.innerHTML = `<h4>Sparat i ”${esc(song ? song.title : '')}”</h4>
+    ${items.length ? items.map((x, i) => `<div class="ss-row"><span class="ss-name"><b>${esc(x.t.label)}</b><small class="${x.cls}">${esc(x.st)}</small></span>
+      ${x.act ? `<button type="button" class="${x.dirty ? '' : 'btn-outline'}" data-i="${i}">${label[x.act]}</button>` : ''}</div>`).join('')
+      : '<p class="hint" style="margin:0">Du har inga egna spår i låten än.</p>'}
+    <div class="ss-foot">
+      ${bulk ? `<button type="button" id="ssAll">💾 Spara alla (${bulk})</button>` : ''}
+      <p class="hint">Läget – mixer, reverb, markörer, zoom, spelhuvud och spårens ordning – autosparas${auto ? ' (senast ' + auto + ')' : ''}.
+      Nya inspelningar och redigeringar autosparas som privata utkast i ${DRAFT_DAYS} dagar. Spårhöjd, kompakt, Svart/Grå sparas bara i den här webbläsaren.
+      ${items.some(x => x.act === 'dialog' || x.act === 'stem') ? 'Utkast och stämfiler sparas en i taget, eftersom du väljer vem som ska höra dem eller ersätter låtens fil.' : ''}</p>
+    </div>`;
+  pop.querySelectorAll('[data-i]').forEach(b => b.addEventListener('click', () => runSaveAct(items[Number(b.dataset.i)])));
+  const all = pop.querySelector('#ssAll');
+  if (all) all.addEventListener('click', async () => {
+    all.disabled = true;
+    for (const x of items.filter(x => x.act === 'save')) { if (tracks.includes(x.t)) await saveRecording(x.t); }
+    if (items.some(x => x.act === 'offsets')) await saveOffsets();
+    updateSaveStat(); renderSaveStat();
+  });
+}
+async function runSaveAct(x) {
+  if (!x || !tracks.includes(x.t)) return;
+  if (x.act === 'save') await saveRecording(x.t);
+  else if (x.act === 'dialog') { closeSaveStat(); setActive(x.t); openShareDialog(x.t, 'save'); }
+  else if (x.act === 'stem') { closeSaveStat(); setActive(x.t); document.getElementById('stemSave').click(); }
+  else if (x.act === 'offsets') await saveOffsets();
+  updateSaveStat(); if (!document.getElementById('saveStatPop').hidden) renderSaveStat();
+}
+function closeSaveStat() { const p = document.getElementById('saveStatPop'); p.hidden = true; document.getElementById('saveStatBtn').setAttribute('aria-expanded', 'false'); }
+document.getElementById('saveStatBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  const p = document.getElementById('saveStatPop');
+  if (!p.hidden) { closeSaveStat(); return; }
+  p.hidden = false; e.currentTarget.setAttribute('aria-expanded', 'true'); renderSaveStat();
+});
+document.addEventListener('click', e => { if (!e.target.closest('.savestat-wrap')) closeSaveStat(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSaveStat(); });
+setInterval(updateSaveStat, 1000);
 // ---------- utseende: svart eller grått (sparas i webbläsaren) ----------
 (function () {
   const btn = document.getElementById('stThemeBtn');

@@ -651,8 +651,22 @@ const tDur = t => t.clip ? AudioEdit.duration(t.clip) : 0;
 const isEmpty = t => !!(t && t.clip && t.clip.channels[0].length <= 1);   // nytt tomt spår (inget inspelat/inklistrat än)
 const canDelete = t => t.kind === 'rec' ? (t.mine || (isAdmin && !!t.id)) : (isAdmin && stemEdit && t.kind === 'stem');
 const isAccomp = t => t.key === 'stem_backtrack_path' || /instrument|karaoke|playback|komp|backing|\bfull\b/i.test(t.label || '');
-const unsaved = () => tracks.some(t => (t.kind === 'rec' && t.mine && (t.edited || !t.id || t.offsetMs !== t.savedOffsetMs))
-  || (t.kind === 'stem' && isAdmin && (t.edited || t.offsetMs !== t.savedOffsetMs)));
+// osparat = spår med riktigt ljud som har ändrats, flyttats eller aldrig sparats (tomma spår räknas inte)
+function unsavedWhy(t) {
+  if (!t.clip || isEmpty(t)) return '';
+  const own = t.kind === 'rec' && t.mine, stem = t.kind === 'stem' && isAdmin;
+  if (!own && !stem) return '';
+  if (own && !t.id) return 'ny, inte sparad';
+  if (t.edited) return 'redigerad';
+  if (t.savedOffsetMs != null && (t.offsetMs || 0) !== (t.savedOffsetMs || 0)) return `flyttad ${(t.offsetMs >= 0 ? '+' : '') + t.offsetMs} ms (sparat ${(t.savedOffsetMs >= 0 ? '+' : '') + t.savedOffsetMs} ms)`;
+  return '';
+}
+const unsaved = () => tracks.some(t => unsavedWhy(t));
+function confirmLeave() {
+  const list = tracks.map(t => [t, unsavedWhy(t)]).filter(x => x[1]);
+  if (!list.length) return true;
+  return confirm('Osparade ändringar:\n' + list.map(([t, w]) => `• ${t.label} – ${w}`).join('\n') + '\n\nByta låt ändå? (ändringarna försvinner)');
+}
 function stemFilename(path) {
   const base = (path || '').split('/').pop(), parts = base.split('__');
   try { return decodeURIComponent(parts.length > 1 ? parts.slice(1).join('__') : base); } catch (e) { return base; }
@@ -2094,7 +2108,7 @@ async function loadShared() {
 async function openRec(songId, recId) {
   const sel = document.getElementById('songSelect');
   if (String(song && song.id) !== String(songId)) {
-    if (unsaved() && !confirm('Du har osparade inspelningar. Byta låt ändå?')) return;
+    if (!confirmLeave()) return;
     sel.value = songId; await loadSong(songId);
   }
   const t = tracks.find(x => x.id === recId);
@@ -2116,7 +2130,7 @@ async function loadMyRecs() {
   box.querySelectorAll('button[data-id]').forEach(b => b.addEventListener('click', async () => {
     if (!b.dataset.song) return;
     const sel = document.getElementById('songSelect');
-    if (String(song && song.id) !== b.dataset.song) { if (unsaved() && !confirm('Du har osparade inspelningar. Byta låt ändå?')) return; sel.value = b.dataset.song; await loadSong(b.dataset.song); }
+    if (String(song && song.id) !== b.dataset.song) { if (!confirmLeave()) return; sel.value = b.dataset.song; await loadSong(b.dataset.song); }
     const t = tracks.find(x => x.id === b.dataset.id);
     if (t) { setActive(t); document.getElementById('studio').scrollIntoView({ behavior: 'smooth' }); }
   }));
@@ -2249,7 +2263,7 @@ function fillSongSelect(selId) {
 }
 async function createSong(sel) {
   const back = () => { sel.value = song ? String(song.id) : ''; };
-  if (unsaved() && !confirm('Du har osparade inspelningar. Byta låt ändå?')) { back(); return; }
+  if (!confirmLeave()) { back(); return; }
   const title = (prompt('Namn på den nya låten:') || '').trim();
   if (!title) { back(); return; }
   const { data, error } = await supabaseClient.from('songs').insert({ title, published: false }).select().single();
@@ -2263,7 +2277,7 @@ async function createSong(sel) {
 // ---------- händelser ----------
 document.getElementById('songSelect').addEventListener('change', async e => {
   if (e.target.value === '__new') { await createSong(e.target); return; }
-  if (unsaved() && !confirm('Du har osparade inspelningar. Byta låt ändå?')) { e.target.value = song ? song.id : ''; return; }
+  if (!confirmLeave()) { e.target.value = song ? song.id : ''; return; }
   loadSong(e.target.value);
 });
 document.getElementById('playBtn').addEventListener('click', async () => {
@@ -2589,7 +2603,7 @@ async function importJson(file) {
     const s2 = songs.find(s => String(s.id) === String(st.song_id));
     if (!s2) { toast(`Ögonblicksbilden hör till en annan låt${st.song ? ` (${st.song})` : ''} som inte finns här`, 6000); return; }
     if (!confirm(`Ögonblicksbilden hör till ”${s2.title}”. Öppna den låten och lägg på inställningarna?`)) return;
-    if (unsaved() && !confirm('Du har osparade inspelningar. Byta låt ändå?')) return;
+    if (!confirmLeave()) return;
     document.getElementById('songSelect').value = s2.id; await loadSong(s2.id);
   }
   restoreSnapshot(st, st.name || file.name.replace(/\.json$/i, ''));

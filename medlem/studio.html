@@ -306,8 +306,8 @@
     #tl .wt-foot { grid-column: 1 / -1; }
     #tl .wt-grip { top: 0.4rem; }
     /* lägre spår: två rader (namn · kontroller) */
-    #tl .wt-track { min-height: 60px; }
-    #tl .wt-wave { height: 60px; }
+    #tl .wt-track { min-height: var(--st-row-h, 60px); }
+    #tl .wt-wave { height: var(--st-row-h, 60px); }
     #tl .wt-head { gap: 0.25rem; padding: 0.35rem 0.6rem; justify-content: center; }
     #tl .wt-head .t-name { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; gap: 0.35rem; font-size: 0.92rem; }
     #tl .wt-head .t-lbl { overflow: hidden; text-overflow: ellipsis; min-width: 4.5rem; flex: 0 1 auto; }
@@ -447,6 +447,11 @@
           <button type="button" class="btn-outline" id="zoomIn" title="Zooma in (+)">+</button>
           <button type="button" class="btn-outline" id="zoomFit" style="width:auto; padding:0 0.6rem; font-size:0.8rem;" title="Visa hela låten">Allt</button>
         </div>
+        <div class="zoom" role="group" aria-label="Spårhöjd">
+          <button type="button" class="btn-outline" id="rowLess" title="Lägre spår – zooma ut på höjden (Alt + scroll)">−</button>
+          <span class="zv" id="rowVal" title="Spårens höjd">↕</span>
+          <button type="button" class="btn-outline" id="rowMore" title="Högre spår – zooma in på höjden (Alt + scroll)">+</button>
+        </div>
       </div>
       <div class="zoom-bar">
         <span class="zl">Zoom</span>
@@ -454,7 +459,7 @@
         <input type="range" id="zoomRange" min="0" max="1000" step="1" value="0" aria-label="Zoom i tidslinjen" title="Dra för att zooma in eller ut">
         <button type="button" class="btn-outline" id="zoomIn2" title="Zooma in">+</button>
         <span class="zv" id="zoomVal2"></span>
-        <span class="zoom-hint desktop-only"><kbd>Ctrl</kbd> + scroll = zooma in/ut · <kbd>Shift</kbd> + scroll = bläddra i sidled</span>
+        <span class="zoom-hint desktop-only"><kbd>Ctrl</kbd> + scroll = zooma in/ut · <kbd>Alt</kbd> + scroll = spårens höjd · <kbd>Shift</kbd> + scroll = bläddra i sidled</span>
       </div>
     </div>
   </div>
@@ -1774,6 +1779,33 @@ function newEmptyTrack() {
   toast('Tomt spår tillagt – tryck ⏺ Spela in eller klistra in något');
 }
 document.getElementById('newTrackBtn').addEventListener('click', newEmptyTrack);
+// spårens höjd (zoom på höjden): knapparna och Alt + scroll, sparas per webbläsare
+(function () {
+  const H = [44, 60, 80, 110, 150, 200, 260];
+  let i = 1; try { const v = Number(localStorage.getItem('hv-st-rowh')); if (H.includes(v)) i = H.indexOf(v); } catch (e) {}
+  const less = document.getElementById('rowLess'), more = document.getElementById('rowMore'), val = document.getElementById('rowVal');
+  const apply = (redraw) => {
+    document.documentElement.style.setProperty('--st-row-h', H[i] + 'px');
+    val.textContent = '↕ ' + Math.round(H[i] / 60 * 100) + ' %';
+    less.disabled = i === 0; more.disabled = i === H.length - 1;
+    try { localStorage.setItem('hv-st-rowh', H[i]); } catch (e) {}
+    if (redraw) tracks.forEach(t => tl.drawTrack(t));
+  };
+  const step = d => {
+    const n = Math.max(0, Math.min(H.length - 1, i + d)); if (n === i) return;
+    i = n; if (document.documentElement.classList.contains('st-compact')) document.getElementById('compactBtn').click();
+    apply(true);
+  };
+  less.addEventListener('click', () => step(-1)); more.addEventListener('click', () => step(1));
+  let acc = 0;
+  document.getElementById('tl').addEventListener('wheel', e => {
+    if (!e.altKey || e.ctrlKey || e.metaKey) return;
+    e.preventDefault(); e.stopPropagation();
+    acc += e.deltaY * (e.deltaMode === 1 ? 33 : 1);
+    if (Math.abs(acc) >= 60) { step(acc < 0 ? 1 : -1); acc = 0; }
+  }, { passive: false, capture: true });
+  apply(false);
+})();
 // kompakt: en rad per spår (sparas per webbläsare)
 (function () {
   const b = document.getElementById('compactBtn');

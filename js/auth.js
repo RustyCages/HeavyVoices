@@ -25,7 +25,8 @@ function startIdleWatch() {
   function playing() { return Array.prototype.some.call(document.querySelectorAll('audio,video'), function (m) { return !m.paused && !m.ended; }); }
   async function expire() {
     try { localStorage.removeItem(KEY); } catch (e) {}
-    try { await supabaseClient.auth.signOut(); } catch (e) {}
+    // bara den här enheten – en global utloggning ogiltigförklarar inloggningen på kontots alla andra enheter
+    try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch (e) {}
     location.href = '/logga-in.html?utlogg=1';
   }
   function check() {
@@ -46,7 +47,7 @@ function startIdleWatch() {
 
 async function signOut() {
   try { localStorage.removeItem('hv-last-active'); } catch (e) {}
-  await supabaseClient.auth.signOut();
+  await supabaseClient.auth.signOut({ scope: 'local' });   // bara den här enheten
   window.location.href = '/';
 }
 

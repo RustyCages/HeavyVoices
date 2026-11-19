@@ -70,6 +70,7 @@
     let tool = 'pan', sel = null;   // pan = inget verktyg valt: dra bläddrar i sidled
     let userNav = 0;                 // senast användaren bläddrade själv – då följer vyn inte spelhuvudet en stund
     const markers = [];
+    let mk = null;   // markör som dras i linjalen: { i, x0, moved, out }
     const tracks = () => o.getTracks() || [];
     const audible = t => (o.isAudible ? o.isAudible(t) : true);
     const width = () => ruler.clientWidth || 600;
@@ -97,7 +98,11 @@
         ctx.fillStyle = 'rgba(255,255,255,0.55)';
         ctx.fillText(step < 1 ? (t < 60 ? t.toFixed(step < 0.1 ? 2 : 1) + ' s' : fmt(t, true)) : fmt(t), x + 3 * dpr, 3 * dpr);
       }
-      markers.forEach(m => { ctx.fillStyle = '#facc15'; ctx.fillText('⚑', xOf(m) * dpr - 4 * dpr, 12 * dpr); });
+      markers.forEach((m, i) => {
+        const out = mk && mk.i === i && mk.out;
+        ctx.globalAlpha = out ? 0.35 : 1; ctx.fillStyle = mk && mk.i === i ? '#fde047' : '#facc15';
+        ctx.fillText(out ? '✕' : '⚑', xOf(m) * dpr - 4 * dpr, 12 * dpr); ctx.globalAlpha = 1;
+      });
       const px = xOf(curPos()) * dpr;   // spelmarkören syns även i linjalen
       if (px >= 0 && px <= W) { ctx.fillStyle = scrubT != null ? '#E5A968' : '#fff'; ctx.fillRect(Math.round(px) - dpr, 0, 2 * dpr, H); ctx.beginPath(); ctx.moveTo(px - 6 * dpr, H - 9 * dpr); ctx.lineTo(px + 6 * dpr, H - 9 * dpr); ctx.lineTo(px, H); ctx.closePath(); ctx.fill(); }
     }
@@ -338,6 +343,51 @@
     // Nära kanten rullar vyn sakta åt sidan så att man kan dra längre. Bläddra i spåren genom att dra i dem, Shift + hjul eller sidled på styrplattan.
     { let d = null;
       const rulerLeft = () => ruler.getBoundingClientRect().left;
+      // markör (⚑) under pekaren i linjalen, eller -1
+      const markerAt = (e) => {
+        const r = ruler.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+        if (y < 8) return -1;
+        let best = -1, bd = 8;
+        markers.forEach((m, i) => { const dx = Math.abs(xOf(m) - x); if (dx <= bd) { bd = dx; best = i; } });
+        return best;
+      };
+      const mkChanged = () => { if (o.onMarkers) o.onMarkers(markers.slice()); };
+      ruler.addEventListener('pointermove', e => {
+        if (d || mk) return;
+        const hit = markerAt(e) >= 0;
+        ruler.style.cursor = hit ? 'grab' : '';
+        ruler.title = hit ? 'Markör: dra för att flytta · dra upp eller ner ur linjalen, eller dubbelklicka, för att ta bort' : 'Klicka eller dra för att flytta spelmarkören';
+      });
+      ruler.addEventListener('pointerdown', e => {
+        if (e.button) return;
+        const i = markerAt(e); if (i < 0) return;
+        e.preventDefault(); e.stopImmediatePropagation();
+        mk = { i, x0: e.clientX, moved: false, out: false };
+        ruler.setPointerCapture(e.pointerId); ruler.style.cursor = 'grabbing';
+      });
+      ruler.addEventListener('pointermove', e => {
+        if (!mk) return;
+        e.stopImmediatePropagation();
+        if (Math.abs(e.clientX - mk.x0) > 3) mk.moved = true;
+        const r = ruler.getBoundingClientRect();
+        mk.out = e.clientY < r.top - 24 || e.clientY > r.bottom + 24;
+        if (mk.moved && !mk.out) markers[mk.i] = Math.max(0, Math.min(tOf(e.clientX - r.left), Math.max(o.getDuration(), 0)));
+        draw();
+      });
+      const mkEnd = e => {
+        if (!mk) return;
+        e.stopImmediatePropagation();
+        const m = mk; mk = null; ruler.style.cursor = '';
+        if (m.out) markers.splice(m.i, 1);
+        if (m.out || m.moved) mkChanged();
+        else o.onSeek(markers[m.i]);   // klick på flaggan = hoppa dit
+        draw();
+      };
+      ruler.addEventListener('pointerup', mkEnd); ruler.addEventListener('pointercancel', mkEnd);
+      ruler.addEventListener('dblclick', e => {
+        const i = markerAt(e); if (i < 0) return;
+        e.preventDefault(); markers.splice(i, 1); mkChanged(); draw();
+      });
       const maxT = () => Math.max(o.getDuration(), 0);
       const clampT = t => Math.max(0, Math.min(t, maxT()));
       const apply = (final) => {
@@ -432,7 +482,9 @@
       get tool() { return tool; },
       get selection() { return sel; },
       set selection(s) { sel = s; tracks().forEach(drawTrack); },
-      addMarker(t) { markers.push(t); draw(); },
+      addMarker(t) { markers.push(t); draw(); if (o.onMarkers) o.onMarkers(markers.slice()); },
+      removeMarker(i) { if (i >= 0 && i < markers.length) { markers.splice(i, 1); draw(); if (o.onMarkers) o.onMarkers(markers.slice()); } },
+      clearMarkers() { markers.splice(0, markers.length); draw(); if (o.onMarkers) o.onMarkers([]); },
     };
     return api;
   }

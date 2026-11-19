@@ -197,7 +197,7 @@
   @media (max-width: 640px) { .t-ctrl { margin-left: 0; width: 100%; } .t-ctrl input[type=range] { flex: 1; } }
 
   /* ---------- Stramt utseende (test) ---------- */
-  html.studio-simple:not(.studio-more) #markBtn, html.studio-simple:not(.studio-more) #newTrackBtn,
+  html.studio-simple:not(.studio-more) #markBtn, html.studio-simple:not(.studio-more) #markClear, html.studio-simple:not(.studio-more) #newTrackBtn,
   html.studio-simple:not(.studio-more) #importBtn, html.studio-simple:not(.studio-more) .zoom-bar,
   html.studio-simple:not(.studio-more) #secSnap, html.studio-simple:not(.studio-more) .ai-home { display: none !important; }
   :where(html[data-ui="stram"]) .warn-box { background: rgba(255,255,255,0.03); border-color: var(--border); }
@@ -435,7 +435,8 @@
           <button type="button" id="toolMove" aria-pressed="false" title="Slå på för att kunna dra ett spår i sidled (ändrar synken). Klicka igen för att stänga av.">↔ Flytta</button>
           <button type="button" id="toolSelect" class="desktop-only" aria-pressed="false" title="Dra i ett spår för att markera ett område att klippa eller kopiera">▭ Markera</button>
         </div>
-        <button class="btn-outline" id="markBtn" title="Sätt en markör vid spelhuvudet (M)">⚑ Markör</button>
+        <button class="btn-outline" id="markBtn" title="Sätt en markör vid spelhuvudet (M). Flytta: dra flaggan i linjalen. Ta bort: dubbelklicka på den, dra den ur linjalen eller Shift + M (närmast spelhuvudet).">⚑ Markör</button>
+        <button class="btn-outline" id="markClear" hidden title="Ta bort alla markörer">✕ Rensa markörer</button>
         <button class="btn-outline" id="newTrackBtn" title="Lägg till ett tomt spår att spela in eller klistra in i">➕ Nytt tomt spår</button>
         <button class="btn-outline" id="importBtn" title="Ladda in en eller flera ljudfiler (MP3, WAV, M4A …) från datorn som nya spår – t.ex. en stämma som ett program sjungit. Du kan också dra filer till tidslinjen.">📂 Ladda in ljudfil</button>
         <input type="file" id="importFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" multiple hidden>
@@ -838,6 +839,7 @@ const tl = WaveTimeline.create(document.getElementById('tl'), {
   onScrub: scrubPlayhead,
   onOffset: (t, ms, live) => setOffset(t, ms, live),
   onActive: t => setActive(t),
+  onMarkers: () => updateMarkUi(),
   onSelection: s => { sel = s; panel.selInfo(); if (window.stZoomSelUi) stZoomSelUi(); },
   onView: v => { document.getElementById('zoomVal').textContent = document.getElementById('zoomVal2').textContent = v.spanLabel(); syncZoomRange(v); },
   onStretch: (t, from, to) => stretchSelection(t, from, to),
@@ -2385,6 +2387,19 @@ zoomRange.addEventListener('change', () => zoomRange.blur());
 document.getElementById('zoomIn2').addEventListener('click', () => tl.zoom(1.5));
 document.getElementById('zoomOut2').addEventListener('click', () => tl.zoom(1 / 1.5));
 document.getElementById('markBtn').addEventListener('click', () => tl.addMarker(position()));
+function updateMarkUi() { document.getElementById('markClear').hidden = !tl.markers.length; }
+function removeNearestMarker() {
+  if (!tl.markers.length) { toast('Inga markörer att ta bort'); return; }
+  const p = position(); let bi = 0;
+  tl.markers.forEach((m, i) => { if (Math.abs(m - p) < Math.abs(tl.markers[bi] - p)) bi = i; });
+  const t = tl.markers[bi]; tl.removeMarker(bi); toast(`Markören vid ${fmt(t, true)} borttagen`);
+}
+document.getElementById('markClear').addEventListener('click', () => {
+  const n = tl.markers.length; if (!n) return;
+  if (!confirm(`Ta bort ${n === 1 ? 'markören' : 'alla ' + n + ' markörer'}?`)) return;
+  tl.clearMarkers(); toast('Markörerna borttagna');
+});
+setInterval(updateMarkUi, 1000);
 document.getElementById('calibBtn').addEventListener('click', () => { const c = document.getElementById('calib'); c.hidden = !c.hidden; });
 document.getElementById('calibGo').addEventListener('click', async () => { await ensureCtx(); calibrate(); });
 document.getElementById('latency').addEventListener('change', e => { try { localStorage.setItem('hv-rec-latency', String(Math.round(Number(e.target.value) || 0))); } catch (x) {} });
@@ -2436,6 +2451,7 @@ document.addEventListener('keydown', e => {
     nudgeActive((e.key === 'ArrowRight' ? 1 : -1) * nudgeStep() * (e.shiftKey ? 10 : 1));
     return;
   }
+  if (e.key === 'M' && e.shiftKey) { removeNearestMarker(); return; }
   if (e.key === 'm' || e.key === 'M') { tl.addMarker(position()); return; }
   if (e.key === '+') { tl.zoom(2); return; }
   if (e.key === '-') { tl.zoom(0.5); return; }

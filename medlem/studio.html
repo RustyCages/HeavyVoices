@@ -295,7 +295,7 @@
     #tl .wt-scroll { max-height: calc(100vh - var(--strip-h, 0px) - var(--st-head-h, 110px) - 150px); min-height: 220px; overflow-y: auto; overflow-x: hidden; }
     #tl .wt-ruler { margin-left: var(--wt-head-w); width: calc(100% - var(--wt-head-w)); }
     #tl .wt-track { display: grid; grid-template-columns: var(--wt-head-w) minmax(0, 1fr); align-items: stretch; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--st-line); border-radius: 0; background: var(--st-row); box-shadow: none; min-height: 88px; }
-    #tl .wt-track.active { background: var(--st-row-sel); box-shadow: inset 3px 0 0 var(--accent); }
+    #tl .wt-track.active { background: var(--st-row-sel); box-shadow: inset 3px 0 0 var(--accent); outline: 1px solid var(--accent); outline-offset: -1px; position: relative; z-index: 1; }
     #tl .wt-head { flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: space-between; gap: 0.35rem; padding: 0.5rem 0.7rem; background: var(--st-panel); border-right: 1px solid var(--st-line); }
     #tl.reorder .wt-head { padding-left: 1.6rem; }
     #tl .wt-head::before { display: none; }

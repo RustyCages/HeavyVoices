@@ -398,6 +398,7 @@
     .st-foot #recRow2 > .k { display: none; }
     .st-foot #recRow2 { display: flex; flex-wrap: wrap; }
     .st-side .admin-sync { margin-top: 0.8rem; }
+    #panel > .admin-sync { order: 4; margin: 0.2rem 1rem 0.9rem; }
     .st-below { margin-top: 1rem; padding: 0.8rem; border: 1px solid var(--st-line); border-radius: 0.6rem; }
     .st-below .snap-sec { margin-top: 0; }
     .st-lib { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; margin-top: 1rem; }
@@ -2917,7 +2918,7 @@ setInterval(updateSaveStat, 1000);
   const g = id => document.getElementById(id);
   const groups = { edit: [g('secEdit'), g('stemRow'), g('backupRow')], synk: [g('syncRow'), g('tempoRow')], fx: [g('secFx')], voice: [g('secVoice')] };
   Object.keys(groups).forEach(k => groups[k].forEach(e => { if (e) e.dataset.tab = k; }));
-  const adm = g('adminSync'); if (adm) adm.dataset.tab = 'synk';
+  const adm = g('adminSync'); if (adm) { adm.dataset.tab = 'synk'; panel.appendChild(adm); }   // i Synk-fliken, ovanför spara-raden
   const foot = document.createElement('div'); foot.className = 'st-foot';
   g('recRow1').before(foot); foot.append(g('recRow1'), g('recRow2'));
   const bar = document.createElement('div'); bar.className = 'st-tabs'; bar.setAttribute('role', 'tablist'); bar.setAttribute('aria-label', 'Verktyg');

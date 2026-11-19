@@ -452,6 +452,7 @@
           <span class="zv" id="rowVal" title="Spårens höjd">↕</span>
           <button type="button" class="btn-outline" id="rowMore" title="Högre spår – zooma in på höjden (Alt + scroll)">+</button>
         </div>
+        <button type="button" class="btn-outline desktop-only" id="zoomSel" disabled title="Zooma till markeringen: det markerade området fyller bredden och spåret blir högt (Z). Tryck igen för att gå tillbaka.">🔍 Markering</button>
       </div>
       <div class="zoom-bar">
         <span class="zl">Zoom</span>
@@ -459,7 +460,7 @@
         <input type="range" id="zoomRange" min="0" max="1000" step="1" value="0" aria-label="Zoom i tidslinjen" title="Dra för att zooma in eller ut">
         <button type="button" class="btn-outline" id="zoomIn2" title="Zooma in">+</button>
         <span class="zv" id="zoomVal2"></span>
-        <span class="zoom-hint desktop-only"><kbd>Ctrl</kbd> + scroll = zooma in/ut · <kbd>Alt</kbd> + scroll = spårens höjd · <kbd>Shift</kbd> + scroll = bläddra i sidled</span>
+        <span class="zoom-hint desktop-only"><kbd>Ctrl</kbd> + scroll = zooma in/ut · <kbd>Alt</kbd> + scroll = spårens höjd · <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + scroll = båda · <kbd>Shift</kbd> + scroll = bläddra i sidled</span>
       </div>
     </div>
   </div>
@@ -837,7 +838,7 @@ const tl = WaveTimeline.create(document.getElementById('tl'), {
   onScrub: scrubPlayhead,
   onOffset: (t, ms, live) => setOffset(t, ms, live),
   onActive: t => setActive(t),
-  onSelection: s => { sel = s; panel.selInfo(); },
+  onSelection: s => { sel = s; panel.selInfo(); if (window.stZoomSelUi) stZoomSelUi(); },
   onView: v => { document.getElementById('zoomVal').textContent = document.getElementById('zoomVal2').textContent = v.spanLabel(); syncZoomRange(v); },
   onStretch: (t, from, to) => stretchSelection(t, from, to),
   getBeats: () => songBpm() && document.getElementById('optGrid').checked
@@ -1791,20 +1792,56 @@ document.getElementById('newTrackBtn').addEventListener('click', newEmptyTrack);
     try { localStorage.setItem('hv-st-rowh', H[i]); } catch (e) {}
     if (redraw) tracks.forEach(t => tl.drawTrack(t));
   };
-  const step = d => {
-    const n = Math.max(0, Math.min(H.length - 1, i + d)); if (n === i) return;
+  // behåll spåret under pekaren på samma ställe när höjden ändras
+  const setIdx = (n, clientY) => {
+    n = Math.max(0, Math.min(H.length - 1, n)); if (n === i) return;
+    const sc = document.querySelector('#tl .wt-scroll');
+    const row = clientY != null && sc ? [...document.querySelectorAll('#tl .wt-track')].find(r => { const b = r.getBoundingClientRect(); return clientY >= b.top && clientY < b.bottom; }) : null;
+    let rel = 0, y0 = 0;
+    if (row) { const b = row.getBoundingClientRect(); rel = (clientY - b.top) / b.height; y0 = clientY - sc.getBoundingClientRect().top; }
     i = n; if (document.documentElement.classList.contains('st-compact')) document.getElementById('compactBtn').click();
     apply(true);
+    if (row) sc.scrollTop = row.offsetTop - (sc.firstElementChild ? sc.firstElementChild.offsetTop : 0) + rel * row.getBoundingClientRect().height - y0;
   };
+  const step = (d, clientY) => setIdx(i + d, clientY);
+  window.stRowH = { H, get: () => i, set: setIdx };
   less.addEventListener('click', () => step(-1)); more.addEventListener('click', () => step(1));
   let acc = 0;
   document.getElementById('tl').addEventListener('wheel', e => {
-    if (!e.altKey || e.ctrlKey || e.metaKey) return;
-    e.preventDefault(); e.stopPropagation();
+    if (!e.altKey) return;
+    const both = e.ctrlKey || e.metaKey;   // Ctrl + Alt: längden zoomas av tidslinjen själv, höjden här
+    e.preventDefault(); if (!both) e.stopPropagation();
     acc += e.deltaY * (e.deltaMode === 1 ? 33 : 1);
-    if (Math.abs(acc) >= 60) { step(acc < 0 ? 1 : -1); acc = 0; }
+    if (Math.abs(acc) >= (both ? 90 : 60)) { step(acc < 0 ? 1 : -1, e.clientY); acc = 0; }
   }, { passive: false, capture: true });
   apply(false);
+})();
+// zooma till markeringen (längd + höjd), och tillbaka med samma knapp
+(function () {
+  const b = document.getElementById('zoomSel');
+  let prev = null;
+  const has = () => !!(sel && sel.track && Math.abs(sel.b - sel.a) > 0.05);
+  const ui = () => { b.disabled = !has() && !prev; b.textContent = prev ? '↩ Tillbaka' : '🔍 Markering'; };
+  window.stZoomSelUi = ui;
+  function go() {
+    if (prev) {
+      const p = prev; prev = null;
+      stRowH.set(p.h); tl.zoomTo(p.pps, 0); tl.view.t0 = p.t0; tl.draw(); ui(); return;
+    }
+    if (!has()) { toast('Markera ett område först (▭ Markera)'); return; }
+    prev = { pps: tl.view.pps, t0: tl.view.t0, h: stRowH.get() };
+    const a = Math.min(sel.a, sel.b), z = Math.max(sel.a, sel.b), span = z - a;
+    const w = document.querySelector('#tl .wt-ruler').clientWidth || 800;
+    tl.zoomTo(w / (span * 1.1), 0); tl.view.t0 = Math.max(0, a - span * 0.05); tl.draw();
+    stRowH.set(Math.max(stRowH.get(), stRowH.H.indexOf(150)));
+    const r = sel.track._row; if (r && r.scrollIntoView) r.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    ui();
+  }
+  b.addEventListener('click', () => { b.blur(); go(); });
+  document.addEventListener('keydown', e => {
+    if ((e.key === 'z' || e.key === 'Z') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.matches('input, select, textarea') && song) { e.preventDefault(); go(); }
+  });
+  ui();
 })();
 // kompakt: en rad per spår (sparas per webbläsare)
 (function () {

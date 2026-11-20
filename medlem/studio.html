@@ -323,8 +323,11 @@
     .st-top > .title-actions { order: 3; margin-left: auto; }
     .st-head > .warn-box { order: 2; margin: 0; flex: 1 1 14rem; min-width: 0; padding: 0.25rem 0.6rem; font-size: 0.76rem; line-height: 1.25; max-height: 42px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
     .st-head::after { content: ''; flex: 0 0 100%; order: 4; height: 0; }
-    .st-head > .vpiano { order: 9; flex: 0 0 100%; margin: 0.15rem 0 0.1rem; }
-    .st-head > .vpiano .vp-keys { height: 100px; }
+    .st-head > .vpiano { order: 9; flex: 0 0 100%; margin: 0.15rem 0 0.1rem; padding: 0; border: 0; background: none; }
+    .st-head > .vpiano .vp-bar, .st-head > .vpiano .vp-keys { max-width: 640px; }
+    .st-head > .vpiano .vp-bar { margin-bottom: 0.3rem; }
+    .st-head > .vpiano .vp-hint { font-size: 0.7rem; }
+    .st-head > .vpiano .vp-keys { height: 90px; }
     .st-ctl-tools { order: 5; flex: 1 1 0; display: flex; align-items: center; gap: 0.7rem; flex-wrap: nowrap; border-top: 0; min-width: 0; }
     .st-ctl-tools > .transport { margin: 0 !important; flex: none; flex-wrap: nowrap; }
     .st-ctl-main > .transport > .opt, .st-ctl-main > .transport > #calibBtn { order: 6; margin: 0; }

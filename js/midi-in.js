@@ -12,6 +12,8 @@
 //   MidiIn.recording                         → true medan inspelningen pågår
 //   await MidiIn.render(notes, sampleRate)   → AudioBuffer med enkelt pianoljud (t = 0 är första noten)
 //   MidiIn.playNote(ctx, dest, n, v, when)   → stop(when) – ett pianoljud direkt
+//   await MidiIn.loadPiano(ctx)              → laddar pianosamplingarna (/audio/piano, ~2 MB, cachas); till dess ett enkelt ljud
+//   MidiIn.setReverb(on) / MidiIn.reverb     → rumsklang på/av (sparas i webbläsaren)
 //   MidiIn.inject(n, on, v)                  → en ton från pianot på skärmen (spelas in om inspelning pågår)
 //   MidiIn.hasChords(notes)                  → true om noter ligger samtidigt (ackord / två händer)
 (function (root) {
@@ -31,8 +33,66 @@
   function hook() { if (access) access.inputs.forEach(i => { i.onmidimessage = onMsg; }); }
   function onDevices(cb) { devCb = cb; }
 
-  // ett enkelt "piano": grundton + övertoner som klingar av
+  // ---------- riktigt pianoljud: Salamander Grand Piano (CC BY 3.0), en sampling var tredje halvton ----------
+  const SAMPLE_URL = '/audio/piano/';
+  const PCS = [['C', 0], ['Ds', 3], ['Fs', 6], ['A', 9]];
+  let samples = null, loading = null;   // Map: midi-nummer → AudioBuffer
+  function loadPiano(ctx) {
+    if (samples) return Promise.resolve(true);
+    if (!loading) loading = (async () => {
+      const list = [];
+      for (let o = 0; o <= 8; o++) PCS.forEach(([p, pc]) => { const m = 12 * (o + 1) + pc; if (m >= 21 && m <= 108) list.push([p + o, m]); });
+      const map = new Map();
+      await Promise.all(list.map(async ([name, m]) => {
+        const r = await fetch(SAMPLE_URL + name + '.mp3'); if (!r.ok) throw new Error('HTTP ' + r.status);
+        map.set(m, await ctx.decodeAudioData(await r.arrayBuffer()));
+      }));
+      samples = map; return true;
+    })().catch(e => { loading = null; console.warn('Pianoljudet kunde inte laddas – enkelt ljud används', e); return false; });
+    return loading;
+  }
+  // rumsklang: ett genererat rum (ingen fil), blandas in efter torrt ljud
+  let reverbOn = true; try { reverbOn = localStorage.getItem('hv-piano-reverb') !== '0'; } catch (e) {}
+  const outs = new WeakMap();
+  function impulse(ctx, sec = 2.2) {
+    const sr = ctx.sampleRate, n = Math.floor(sr * sec), b = ctx.createBuffer(2, n, sr);
+    for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < n; i++) { const x = i / n; d[i] = (Math.random() * 2 - 1) * Math.pow(1 - x, 3.2) * (i < sr * 0.012 ? i / (sr * 0.012) : 1); } }
+    return b;
+  }
+  function out(ctx) {
+    let o = outs.get(ctx);
+    if (!o) {
+      const input = ctx.createGain(), dry = ctx.createGain(), wet = ctx.createGain(), conv = ctx.createConvolver(), pre = ctx.createDelay(0.1);
+      conv.buffer = impulse(ctx); pre.delayTime.value = 0.018;
+      input.connect(dry); dry.connect(ctx.destination);
+      input.connect(pre); pre.connect(conv); conv.connect(wet); wet.connect(ctx.destination);
+      o = { input, dry, wet }; outs.set(ctx, o);
+    }
+    o.wet.gain.value = reverbOn ? 0.32 : 0; o.dry.gain.value = reverbOn ? 0.9 : 1;
+    return o.input;
+  }
+  function setReverb(on) { reverbOn = !!on; try { localStorage.setItem('hv-piano-reverb', on ? '1' : '0'); } catch (e) {} }
+  // en ton från samplingarna (närmaste sampling, tonhöjden justeras), dämpas när tangenten släpps
+  function sampleVoice(ctx, dest, n, v, when) {
+    let best = null, bd = 99;
+    samples.forEach((buf, m) => { const d = Math.abs(n - m); if (d < bd) { bd = d; best = m; } });
+    const src = ctx.createBufferSource(), g = ctx.createGain(), amp = 0.25 + 1.75 * Math.pow((v || 90) / 127, 1.6);
+    src.buffer = samples.get(best); src.playbackRate.value = Math.pow(2, (n - best) / 12);
+    g.gain.setValueAtTime(amp, when);
+    src.connect(g); g.connect(dest); src.start(when);
+    return (end) => {
+      end = Math.max(end ?? ctx.currentTime, when + 0.02);
+      g.gain.cancelScheduledValues(end); g.gain.setValueAtTime(amp, end); g.gain.setTargetAtTime(0, end, n > 88 ? 0.3 : 0.12);   // diskanten saknar dämpare
+      try { src.stop(end + 1.5); } catch (e) {}
+    };
+  }
   function voice(ctx, dest, n, v, when) {
+    if (dest === undefined || dest === ctx.destination) dest = out(ctx);
+    if (samples) return sampleVoice(ctx, dest, n, v, when);
+    return synthVoice(ctx, dest, n, v, when);
+  }
+  // reserv tills samplingarna laddats: grundton + övertoner som klingar av
+  function synthVoice(ctx, dest, n, v, when) {
     const f = 440 * Math.pow(2, (n - 69) / 12), g = ctx.createGain(), amp = 0.06 + 0.22 * (v / 127);
     const decay = Math.max(0.6, 3.2 - (n - 40) * 0.035);   // basen klingar längre än diskanten
     g.gain.setValueAtTime(0, when);
@@ -93,13 +153,14 @@
   async function render(notes, sampleRate = 44100) {
     if (!notes.length) return null;
     const t0 = Math.min(...notes.map(x => x.t)), end = Math.max(...notes.map(x => x.t + x.d)) - t0 + 1.2;
-    const ctx = new OfflineAudioContext(1, Math.ceil(end * sampleRate), sampleRate);
-    const bus = ctx.createDynamicsCompressor(); bus.threshold.value = -14; bus.ratio.value = 4; bus.connect(ctx.destination);
+    await loadPiano(new OfflineAudioContext(1, 1, sampleRate));
+    const ctx = new OfflineAudioContext(2, Math.ceil((end + 2) * sampleRate), sampleRate);
+    const bus = ctx.createDynamicsCompressor(); bus.threshold.value = -12; bus.ratio.value = 3; bus.connect(out(ctx));
     notes.forEach(x => { const stop = voice(ctx, bus, x.n, x.v || 90, x.t - t0); stop(x.t - t0 + x.d); });
     return ctx.startRendering();
   }
   const hasChords = notes => notes.some((x, i) => i && notes.slice(0, i).some(y => y.t + y.d > x.t + 0.03));
 
-  root.MidiIn = { supported, connect, inject, onDevices, start, stop, setMonitor, render, playNote: voice, hasChords, names,
+  root.MidiIn = { supported, connect, inject, loadPiano, setReverb, get reverb() { return reverbOn; }, get pianoReady() { return !!samples; }, out, onDevices, start, stop, setMonitor, render, playNote: voice, hasChords, names,
     get recording() { return !!rec; } };
 })(window);

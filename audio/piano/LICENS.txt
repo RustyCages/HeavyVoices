@@ -1,0 +1,4 @@
+Pianoljud: Salamander Grand Piano V3 av Alexander Holm (Yamaha C5-flygel).
+Licens: Creative Commons Erkännande 3.0 (CC BY 3.0) – https://creativecommons.org/licenses/by/3.0/
+Källa: https://sfzinstruments.github.io/pianos/salamander · MP3-urval via https://github.com/Tonejs/audio (salamander).
+Används i Heavy Voices Studio och Röstövning (js/midi-in.js).

@@ -3970,6 +3970,7 @@ document.getElementById('xFromFile')?.addEventListener('click', () => document.g
     try { devs = await MidiIn.connect(); } catch (e) { xStatus('MIDI gick inte att starta: ' + (e.message || e)); return; }
     if (!devs.length) { xStatus('Inget MIDI-keyboard hittades – koppla in det med USB (slå på det först) och försök igen'); return; }
     await ensureCtx();
+    if (mon.checked) MidiIn.loadPiano(audioCtx);
     MidiIn.start({ clock: position, ctx: audioCtx, monitor: mon.checked, onNote: (n, on, cnt) => { btn.textContent = `■ Stoppa · ${cnt} noter`; } });
     btn.textContent = '■ Stoppa · 0 noter'; btn.style.cssText = 'background:#ef4444;color:#fff;border-color:#ef4444';
     xStatus(`Spelar in från ${devs[0]} till ${current.label} – spela med, tryck ■ när du är klar`);

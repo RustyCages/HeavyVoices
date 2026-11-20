@@ -42,6 +42,9 @@
   .vp-bar button { width: 1.9rem; height: 1.9rem; padding: 0; justify-content: center; }
   .vp-t { font-weight: 700; }
   .vp-oct { min-width: 4.6rem; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+  .vp-load { font-size: 0.72rem; color: var(--accent); }
+  .vp-credit { margin-top: 0.25rem; font-size: 0.64rem; color: var(--text-muted); }
+  .vp-credit a { color: inherit; }
   .vp-hint { flex: 1; color: var(--text-muted); font-size: 0.74rem; }
   .vp-hint kbd { font-size: 0.68rem; padding: 0 0.3rem; border: 1px solid var(--border); border-radius: 0.25rem; }
   .vp-keys { position: relative; height: 120px; display: flex; user-select: none; touch-action: none; }
@@ -324,7 +327,7 @@
     .st-head > .warn-box { order: 2; margin: 0; flex: 1 1 14rem; min-width: 0; padding: 0.25rem 0.6rem; font-size: 0.76rem; line-height: 1.25; max-height: 42px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
     .st-head::after { content: ''; flex: 0 0 100%; order: 4; height: 0; }
     .st-head > .vpiano { order: 9; flex: 0 0 100%; margin: 0.15rem 0 0.1rem; padding: 0; border: 0; background: none; }
-    .st-head > .vpiano .vp-bar, .st-head > .vpiano .vp-keys { max-width: 640px; }
+    .st-head > .vpiano .vp-bar, .st-head > .vpiano .vp-keys, .st-head > .vpiano .vp-credit { max-width: 640px; }
     .st-head > .vpiano .vp-bar { margin-bottom: 0.3rem; }
     .st-head > .vpiano .vp-hint { font-size: 0.7rem; }
     .st-head > .vpiano .vp-keys { height: 90px; }
@@ -525,9 +528,12 @@
         <span class="vp-t">🎹 Piano</span>
         <button type="button" class="btn-outline" id="vpDown" title="En oktav ner (Z)">−</button><span class="vp-oct" id="vpOct"></span><button type="button" class="btn-outline" id="vpUp" title="En oktav upp (X)">+</button>
         <span class="vp-hint">Mus eller tangentbord: <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd> vita · <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> svarta · <kbd>Z</kbd>/<kbd>X</kbd> oktav · <kbd>Shift</kbd> = hålla kvar</span>
+        <label class="opt" title="Rumsklang på pianoljudet – hörs både när du spelar och i det inspelade spåret"><input type="checkbox" id="vpVerb"> klang</label>
+        <span class="vp-load" id="vpLoad"></span>
         <button type="button" class="btn-outline" id="vpClose" title="Stäng pianot">✕</button>
       </div>
       <div class="vp-keys" id="vpKeys"></div>
+      <div class="vp-credit">Pianoljud: <a href="https://sfzinstruments.github.io/pianos/salamander" target="_blank" rel="noopener">Salamander Grand Piano</a> av Alexander Holm · <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a></div>
     </div>
   </div>
   <p class="hint">Sjung in en egen stämma eller idé till en låt. Du hör låtens spår i hörlurarna medan du spelar in, och kan sedan flytta, klippa och spara inspelningen. Dina inspelningar är privata tills du delar dem.</p>
@@ -1934,6 +1940,7 @@ let midiNo = 0, mt = null;   // mt = spåret som MIDI spelas in i
     if (hw) { try { devs = await MidiIn.connect(); } catch (e) { devs = []; } }
     if (!devs.length && !vpOpen()) { vpShow(true); toast('Inget MIDI-keyboard inkopplat – spela på pianot på skärmen (mus eller tangentbord)', 6000); }
     await ensureCtx();
+    if (window.stLoadPiano) stLoadPiano();
     // spåret skapas direkt: ett valt tomt spår används, annars ett nytt
     let t;
     if (isEmpty(active) && active.mine && !active.id) { t = active; mt = { t, wasEmpty: true, clip: t.clip, label: t.label }; t.label = `🎹 MIDI ${++midiNo}`; }
@@ -1969,6 +1976,7 @@ let midiNo = 0, mt = null;   // mt = spåret som MIDI spelas in i
       toast('Inga noter spelades in'); return;
     }
     t.loadingText = '♪ Gör pianoljud…'; tl.drawTrack(t);
+    if (window.stLoadPiano) await stLoadPiano();
     try {
       const buf = await MidiIn.render(notes, getCtx().sampleRate), clip = AudioEdit.fromBuffer(buf);
       Object.assign(t, { clip, orig: clip, offsetMs: Math.round(notes[0].t * 1000), midiNotes: notes, loadingText: null, edited: false });
@@ -2180,9 +2188,17 @@ let vpShow = () => {};
   window.addEventListener('blur', allOff);
   document.getElementById('vpDown').addEventListener('click', () => { base = Math.max(24, base - 12); render(); });
   document.getElementById('vpUp').addEventListener('click', () => { base = Math.min(84, base + 12); render(); });
+  const verb = document.getElementById('vpVerb'), load = document.getElementById('vpLoad');
+  verb.checked = MidiIn.reverb;
+  verb.addEventListener('change', () => { MidiIn.setReverb(verb.checked); MidiIn.out(getCtx()); });
+  window.stLoadPiano = () => {
+    if (MidiIn.pianoReady) return Promise.resolve(true);
+    load.textContent = 'laddar pianoljud…';
+    return MidiIn.loadPiano(getCtx()).then(ok => { load.textContent = ok ? '' : 'enkelt ljud (pianoljudet kunde inte laddas)'; return ok; });
+  };
   vpShow = show => {
     vpEl.hidden = !show; pbtn.setAttribute('aria-pressed', show ? 'true' : 'false');
-    if (show) render(); else allOff();
+    if (show) { render(); stLoadPiano(); } else allOff();
     try { localStorage.setItem('hv-vp-open', show ? '1' : '0'); } catch (e) {}
   };
   pbtn.addEventListener('click', () => { pbtn.blur(); vpShow(!vpOpen()); });

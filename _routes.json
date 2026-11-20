@@ -8,6 +8,7 @@
     "/css/*",
     "/icons/*",
     "/images/*",
+    "/audio/*",
     "/supabase/*",
     "/sw.js",
     "/favicon.ico",

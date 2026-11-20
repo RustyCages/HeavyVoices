@@ -136,6 +136,7 @@
   }
 
   // pianot på skärmen: samma väg som ett riktigt keyboard (ljudet spelar pianot självt)
+  function injectPedal(on) { onMsg({ data: [0xB0, 64, on ? 127 : 0], timeStamp: performance.now(), virtual: true }); }
   function inject(n, on, v = 96) { onMsg({ data: on ? [0x90, n, v] : [0x80, n, 0], timeStamp: performance.now(), virtual: true }); }
   function start({ clock, onNote, ctx, monitor } = {}) {
     rec = { c0: clock ? clock() : 0, p0: performance.now(), notes: [], open: new Map(), held: new Set(), pedal: false, onNote, ctx, monitor: !!(monitor && ctx) };
@@ -161,6 +162,6 @@
   }
   const hasChords = notes => notes.some((x, i) => i && notes.slice(0, i).some(y => y.t + y.d > x.t + 0.03));
 
-  root.MidiIn = { supported, connect, inject, loadPiano, setReverb, get reverb() { return reverbOn; }, get pianoReady() { return !!samples; }, out, onDevices, start, stop, setMonitor, render, playNote: voice, hasChords, names,
+  root.MidiIn = { supported, connect, inject, injectPedal, loadPiano, setReverb, get reverb() { return reverbOn; }, get pianoReady() { return !!samples; }, out, onDevices, start, stop, setMonitor, render, playNote: voice, hasChords, names,
     get recording() { return !!rec; } };
 })(window);

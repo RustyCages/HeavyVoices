@@ -527,7 +527,7 @@
       <div class="vp-bar">
         <span class="vp-t">🎹 Piano</span>
         <button type="button" class="btn-outline" id="vpDown" title="En oktav ner (Z)">−</button><span class="vp-oct" id="vpOct"></span><button type="button" class="btn-outline" id="vpUp" title="En oktav upp (X)">+</button>
-        <span class="vp-hint">Mus eller tangentbord: <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd> vita · <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> svarta · <kbd>Z</kbd>/<kbd>X</kbd> oktav · <kbd>Shift</kbd> = hålla kvar</span>
+        <span class="vp-hint">Mus eller tangentbord: <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd> vita · <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> svarta · <kbd>Z</kbd>/<kbd>X</kbd> oktav · håll <kbd>Shift</kbd> = pedal</span>
         <label class="opt" title="Rumsklang på pianoljudet – hörs både när du spelar och i det inspelade spåret"><input type="checkbox" id="vpVerb"> klang</label>
         <span class="vp-load" id="vpLoad"></span>
         <button type="button" class="btn-outline" id="vpClose" title="Stäng pianot">✕</button>
@@ -2155,7 +2155,8 @@ let vpShow = () => {};
   const LETTER = { Semicolon: 'Ö', Quote: 'Ä' };
   let base = 48; try { const v = Number(localStorage.getItem('hv-vp-base')); if (v >= 24 && v <= 84) base = v; } catch (e) {}
   const down = new Map();   // ton → stoppfunktion för ljudet
-  const latched = new Set();
+  const latched = new Set();   // släppta tangenter som pedalen (Shift) håller kvar
+  let pedal = false;
   const nm = n => NAMES[n % 12] + (Math.floor(n / 12) - 1);
   function on(n) {
     if (down.has(n)) return;
@@ -2169,7 +2170,10 @@ let vpShow = () => {};
     down.delete(n); stop(); MidiIn.inject(n, false);
     const k = keysEl.querySelector(`[data-n="${n}"]`); if (k) k.classList.remove('on');
   }
-  const allOff = () => { [...down.keys()].forEach(off); latched.clear(); };
+  const allOff = () => { [...down.keys()].forEach(off); latched.clear(); if (pedal) { pedal = false; MidiIn.injectPedal(false); } };
+  const release = n => { if (pedal) latched.add(n); else off(n); };
+  const setPedal = p => { if (p === pedal) return; pedal = p; MidiIn.injectPedal(p); if (!p) { [...latched].forEach(n => { if (!held.has(n)) off(n); }); latched.clear(); } };
+  const held = new Set();
   function render() {
     allOff();
     const span = 25, whites = [];
@@ -2187,24 +2191,27 @@ let vpShow = () => {};
   let ptr = false;
   const keyAt = e => { const el = document.elementFromPoint(e.clientX, e.clientY); return el && el.closest('[data-n]') && keysEl.contains(el) ? Number(el.closest('[data-n]').dataset.n) : null; };
   let cur = null;
-  keysEl.addEventListener('pointerdown', e => { e.preventDefault(); ptr = true; keysEl.setPointerCapture(e.pointerId); cur = keyAt(e); if (cur != null) on(cur); });
-  keysEl.addEventListener('pointermove', e => { if (!ptr) return; const n = keyAt(e); if (n !== cur) { if (cur != null && !latched.has(cur)) off(cur); cur = n; if (n != null) on(n); } });
-  const up = () => { if (!ptr) return; ptr = false; if (cur != null && !latched.has(cur)) off(cur); cur = null; };
+  keysEl.addEventListener('pointerdown', e => { e.preventDefault(); ptr = true; keysEl.setPointerCapture(e.pointerId); cur = keyAt(e); if (cur != null) { latched.delete(cur); if (down.has(cur)) off(cur); held.add(cur); on(cur); } });
+  keysEl.addEventListener('pointermove', e => { if (!ptr) return; const n = keyAt(e); if (n !== cur) { if (cur != null) { held.delete(cur); release(cur); } cur = n; if (n != null) { held.add(n); on(n); } } });
+  const up = () => { if (!ptr) return; ptr = false; if (cur != null) { held.delete(cur); release(cur); } cur = null; };
   keysEl.addEventListener('pointerup', up); keysEl.addEventListener('pointercancel', up);
   // datorns tangentbord (bara när pianot är öppet; tar över Studions kortkommandon för de tangenterna)
   window.addEventListener('keydown', e => {
     if (!vpOpen() || e.ctrlKey || e.metaKey || e.altKey || e.target.matches('input, select, textarea')) return;
+    if (e.key === 'Shift') { setPedal(true); return; }   // Shift = högerpedalen
     if (e.code === 'KeyZ' || e.code === 'KeyX') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) { base = Math.max(24, Math.min(84, base + (e.code === 'KeyX' ? 12 : -12))); render(); } return; }
     const i = CODES.indexOf(e.code); if (i < 0) return;
     e.preventDefault(); e.stopImmediatePropagation();
     if (e.repeat) return;
     const n = base + i;
-    if (e.shiftKey) { if (latched.has(n)) { latched.delete(n); off(n); } else { latched.add(n); on(n); } return; }
+    latched.delete(n); if (down.has(n)) off(n);   // samma ton igen: anslag på nytt
+    held.add(n);
     on(n);
   }, true);
+  window.addEventListener('keyup', e => { if (e.key === 'Shift') setPedal(false); });
   window.addEventListener('keyup', e => {
     const i = CODES.indexOf(e.code); if (i < 0 || !vpOpen()) return;
-    const n = base + i; if (!latched.has(n)) off(n);
+    const n = base + i; held.delete(n); release(n);
   }, true);
   window.addEventListener('blur', allOff);
   document.getElementById('vpDown').addEventListener('click', () => { base = Math.max(24, base - 12); render(); });

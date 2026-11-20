@@ -2999,6 +2999,7 @@ function captureState() {
     order: stateTracks().map(t => t.key),
     tracks: Object.fromEntries(stateTracks().map(t => [t.key, {
       label: t.label, vol: round(t.vol ?? 1, 2), muted: !!t.muted, solo: !!t.solo, offsetMs: t.offsetMs || 0, ...(t.editPath ? { editPath: t.editPath } : {}),
+      ...(t.midiNotes && t.midiNotes.length ? { midi: t.midiNotes.map(x => [Math.round((x.t - t.midiNotes[0].t) * 1000) / 1000, Math.round(x.d * 1000) / 1000, x.n, x.v || 90]) } : {}),
       reverb: t.fx && t.fx.reverb ? { ...t.fx.reverb } : null,
     }])),
   };
@@ -3017,6 +3018,7 @@ function applyState(st, { view = true, edits = false } = {}) {
     else if (t.fx && t.fx.reverb) t.fx.reverb.on = false;
     if (t.mine && !t.locked && s.offsetMs != null && t.clip) t.offsetMs = Math.round(Number(s.offsetMs) || 0);
     if (edits && s.editPath && t.kind === 'rec' && t.mine && t.id && !t.draft) restoreEdit(t, s.editPath);
+    if (Array.isArray(s.midi) && s.midi.length && t.kind === 'rec' && !t.midiNotes) t.midiNotes = s.midi.map(([a, d, n, v]) => ({ t: a, d, n, v }));   // MIDI-noterna följer spåret
   });
   if (Array.isArray(st.order) && st.order.length) {
     const pos = k => { const i = st.order.indexOf(k); return i === -1 ? 1e6 : i; };

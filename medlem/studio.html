@@ -1048,6 +1048,16 @@ syncBox.innerHTML = `
     <input type="number" id="tgtBpm" min="30" max="300" step="0.1" placeholder="?" title="Tempot spåret ska få – förifyllt med låtens tempo"> BPM
     <button type="button" class="btn-outline" id="bpmFit" title="Sträcker eller trycker ihop spåret så att det får måltempot – tonhöjden ändras inte">⇔ Sträck till måltempot</button>
     <span class="status" id="bpmStatus"></span>
+  </div>
+  <div class="tool-row sync-row desktop-only" id="songTempoRow" hidden>
+    <span class="k">Låtens takt</span>
+    <label class="status">Tempo <input type="number" id="stBpm" min="20" max="400" step="0.1" placeholder="BPM" title="Låtens tempo i slag per minut"></label>
+    <button type="button" class="btn-outline" id="stTap" title="Tryck i takt med musiken (minst 4 gånger) – tempot räknas ut">👆 Knacka</button>
+    <label class="status">Taktart <select id="stBpb" title="Slag per takt">${[2, 3, 4, 5, 6, 7].map(n => `<option value="${n}">${n}/4</option>`).join('')}</select></label>
+    <button type="button" class="btn-outline" id="stOne" title="Pausa på en taktetta (första slaget i en takt) och tryck – takterna räknas därifrån">⚑ Taktetta vid spelhuvudet</button>
+    <span class="status" id="stOneVal"></span>
+    <button type="button" id="stSave" disabled title="Sparar tempo, taktart och taktetta för låten – gäller Studio, Röstövning, klicket och notbladen">💾 Spara för låten</button>
+    <span class="status" id="stStatus"></span>
   </div>`;
 lockRow.after(...syncBox.children);
 const nudgeRange = document.getElementById('nudgeRange');
@@ -2012,6 +2022,61 @@ let midiNo = 0, mt = null;   // mt = spåret som MIDI spelas in i
   }
   MidiIn.onDevices(list => { if (!list.length && MidiIn.recording) toast('MIDI-keyboardet kopplades ur', 5000); });
 })();
+// ---------- låtens tempo, taktart och taktetta (admin/stämledare) – samma kolumner som Röstövning → Tempo & klick ----------
+let stSaved = null, stTaps = [];
+const stEl = id => document.getElementById(id);
+function stStatus(m, warn) { const e = stEl('stStatus'); e.textContent = m || ''; e.classList.toggle('warn', !!warn); }
+function songTempoUi() {
+  const bpm = songBpm(), bpb = Math.max(1, Number(song.beats_per_bar) || 4);
+  stEl('clickOpt').hidden = !(Number(song.bpm) >= 20); stEl('gridOpt').hidden = !bpm; stEl('bpmBadge').hidden = !bpm;
+  if (bpm) { stEl('bpmVal').textContent = (Math.round(bpm * 10) / 10).toLocaleString('sv-SE'); stEl('meterVal').textContent = `· ${bpb}/4`; }
+  stEl('stOneVal').textContent = bpm ? `ettan ${fmt(Number(song.beat_offset) || 0, true)}` : '';
+  const cur = JSON.stringify([song.bpm || null, Number(song.beat_offset) || 0, bpb]);
+  stEl('stSave').disabled = cur === stSaved;
+  if (cur !== stSaved) stStatus('Inte sparat – hör efter med Klick, spara sedan');
+  tl.draw(); if (playing) restartIfPlaying();
+}
+function songTempoLoaded() {
+  if (!song) return;
+  stEl('songTempoRow').hidden = !isAdmin;
+  stSaved = JSON.stringify([song.bpm || null, Number(song.beat_offset) || 0, Math.max(1, Number(song.beats_per_bar) || 4)]);
+  stEl('stBpm').value = songBpm() ? Math.round(songBpm() * 10) / 10 : '';
+  stEl('stBpb').value = String(Math.max(1, Number(song.beats_per_bar) || 4));
+  stStatus(songBpm() ? '' : 'Låten har inget tempo – skriv in det eller knacka, så får du taktstreck, klick och notblad');
+  songTempoUi(); stStatus(songBpm() ? '' : 'Låten har inget tempo – skriv in det eller knacka, så får du taktstreck, klick och notblad');
+}
+function setSongBpm(v) {
+  v = Math.round(Number(v) * 10) / 10;
+  song.bpm = v >= 20 && v <= 400 ? v : null;
+  if (stEl('stBpm').value !== String(v) && song.bpm) stEl('stBpm').value = v;
+  if (song.bpm && !stEl('tgtBpm').value) stEl('tgtBpm').value = song.bpm;
+  songTempoUi();
+}
+stEl('stBpm').addEventListener('change', e => setSongBpm(e.target.value));
+stEl('stBpb').addEventListener('change', e => { song.beats_per_bar = Number(e.target.value) || 4; songTempoUi(); });
+stEl('stTap').addEventListener('click', () => {
+  const now = performance.now();
+  if (stTaps.length && now - stTaps[stTaps.length - 1] > 2000) stTaps = [];
+  stTaps.push(now); if (stTaps.length > 9) stTaps.shift();
+  if (stTaps.length < 4) { stStatus(`Knacka vidare… (${stTaps.length}/4)`); return; }
+  const iv = stTaps.slice(1).map((x, i) => x - stTaps[i]).sort((a, b) => a - b), med = iv[Math.floor(iv.length / 2)];
+  setSongBpm(60000 / med); stStatus(`Knackat: ${Math.round(600000 / med) / 10} BPM – knacka fler gånger för säkrare värde`);
+});
+stEl('stOne').addEventListener('click', () => {
+  if (!songBpm()) { stStatus('Sätt tempot först', true); return; }
+  const bar = 60 / songBpm() * Math.max(1, Number(song.beats_per_bar) || 4), p = Math.max(0, position());
+  song.beat_offset = Math.round((p % bar) * 1000) / 1000;   // samma takter, räknat från låtens början
+  songTempoUi();
+});
+stEl('stSave').addEventListener('click', async () => {
+  const row = { bpm: songBpm() || null, beat_offset: Number(song.beat_offset) || 0, beats_per_bar: Math.max(1, Number(song.beats_per_bar) || 4) };
+  stEl('stSave').disabled = true; stStatus('Sparar…');
+  const { error } = await supabaseClient.from('songs').update(row).eq('id', song.id);
+  if (error) { stStatus('Kunde inte spara: ' + error.message, true); stEl('stSave').disabled = false; return; }
+  stSaved = JSON.stringify([row.bpm, row.beat_offset, row.beats_per_bar]);
+  stStatus('Sparat ✓ – gäller Studio, Röstövning, klicket och notbladen'); toast('Låtens tempo sparat');
+});
+
 // ---------- 📝 Noter: notblad av MIDI-spåret, och/eller noterna till en stämma i låten ----------
 const NB_OSMD_URL = 'https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@2.1.3/build/opensheetmusicdisplay.min.js';
 let nbOsmd = null;
@@ -2072,7 +2137,11 @@ function openMidiNotes(t) {
       <label>Tonart <select id="nbKey">${keyOpts}</select></label>
       <button type="button" id="nbMake">Skapa notblad</button>
     </div>
-    <p class="nb-st ${songBpm() ? '' : 'warn'}" id="nbSt">${songBpm() ? '' : '⚠ Låten har inget tempo – sätt tempo och taktetta (i Röstövning, 🥁 Tempo & klick) först, annars hamnar taktstrecken fel.'}</p>
+    ${!songBpm() && isAdmin ? `<div class="nb-row" id="nbTempo"><b>⚠ Låten har inget tempo.</b>
+      <label>Tempo <input type="number" id="nbBpm" min="20" max="400" step="0.1" placeholder="BPM" style="width:5.5rem;margin:0"></label>
+      <label>Taktart <select id="nbBpb">${[2, 3, 4, 5, 6, 7].map(n => `<option value="${n}" ${n === 4 ? 'selected' : ''}>${n}/4</option>`).join('')}</select></label>
+      <button type="button" id="nbTempoSave">💾 Spara för låten</button></div>` : ''}
+    <p class="nb-st ${songBpm() ? '' : 'warn'}" id="nbSt">${songBpm() ? '' : isAdmin ? 'Taktettan blir låtens början (0:00) – flytta den vid behov under Synk → Låtens takt. Spelade du till klicket hamnar noterna rätt i takterna.' : '⚠ Låten har inget tempo – be en stämledare eller admin sätta det, annars hamnar taktstrecken fel.'}</p>
     <div class="nb-prev" id="nbPrev"></div>
     <div class="nb-actions" id="nbOut" hidden><button type="button" class="btn-outline" id="nbXml">⬇ MusicXML (MuseScore)</button><button type="button" class="btn-outline" id="nbPdf">🖨 Skriv ut / PDF</button></div>
     ${isAdmin && stems.length ? `<div class="nb-sec"><h4>Lägg noterna i en stämma</h4>
@@ -2091,6 +2160,15 @@ function openMidiNotes(t) {
   back.addEventListener('click', e => { if (e.target === back) close(); });
   $('nbClose').addEventListener('click', close);
   const keyVal = () => $('nbKey').value === 'auto' ? null : { fifths: Number($('nbKey').value), minor: false };
+  if ($('nbTempoSave')) $('nbTempoSave').addEventListener('click', async () => {
+    const v = Math.round(Number($('nbBpm').value) * 10) / 10;
+    if (!(v >= 20 && v <= 400)) { st('Skriv in ett tempo (20–400 BPM)', true); return; }
+    const row = { bpm: v, beat_offset: Number(song.beat_offset) || 0, beats_per_bar: Number($('nbBpb').value) || 4 };
+    const { error } = await supabaseClient.from('songs').update(row).eq('id', song.id);
+    if (error) { st('Kunde inte spara: ' + error.message, true); return; }
+    Object.assign(song, row); songTempoLoaded();
+    $('nbTempo').remove(); st(`Tempot sparat: ${v} BPM, ${row.beats_per_bar}/4 – tryck Skapa notblad`);
+  });
   let last = null;
   $('nbMake').addEventListener('click', async () => {
     if (!songBpm()) { st('Låten har inget tempo – sätt tempo och taktetta först', true); return; }
@@ -2687,6 +2765,7 @@ async function loadSong(id) {
     document.getElementById('meterVal').textContent = `· ${Math.max(1, Number(song.beats_per_bar) || 4)}/4`;
   }
   document.getElementById('tgtBpm').value = songBpm() || ''; tempoFor = null;
+  songTempoLoaded();
   document.getElementById('studio').hidden = false;
   takeNo = tracks.filter(t => t.kind === 'rec' && t.mine).length;
   if (isAdmin) {
@@ -3284,7 +3363,7 @@ setInterval(updateSaveStat, 1000);
 (function () {
   const panel = document.getElementById('panel'); if (!panel) return;
   const g = id => document.getElementById(id);
-  const groups = { edit: [g('secEdit'), g('stemRow'), g('backupRow')], synk: [g('syncRow'), g('tempoRow')], fx: [g('secFx')], voice: [g('secVoice')] };
+  const groups = { edit: [g('secEdit'), g('stemRow'), g('backupRow')], synk: [g('syncRow'), g('tempoRow'), g('songTempoRow')], fx: [g('secFx')], voice: [g('secVoice')] };
   Object.keys(groups).forEach(k => groups[k].forEach(e => { if (e) e.dataset.tab = k; }));
   const adm = g('adminSync'); if (adm) { adm.dataset.tab = 'synk'; panel.appendChild(adm); }   // i Synk-fliken, ovanför spara-raden
   const foot = document.createElement('div'); foot.className = 'st-foot';

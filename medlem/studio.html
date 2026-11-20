@@ -389,6 +389,7 @@
     html.st-compact #tl .wt-head .t-ctrl button { width: 1.5rem; height: 1.5rem; }
     html.st-compact #tl .wt-grip { top: 0.25rem; height: 1.4rem; }
     #compactBtn[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+    .st-side { overscroll-behavior: contain; }
     .st-side { position: sticky; top: calc(var(--strip-h, 0px) + var(--st-head-h, 170px) + 10px); max-height: calc(100vh - var(--strip-h, 0px) - var(--st-head-h, 170px) - 20px); overflow-y: auto; padding: 0; border: 1px solid var(--st-line); border-radius: 0.6rem; background: var(--st-panel); scrollbar-width: thin; }
     /* högra panelen – kompakt som mockupen: rubrik, flikar, innehåll och fast spara-rad */
     #panel.tep { margin: 0; padding: 0; border: 0; background: none; gap: 0; display: flex; flex-direction: column; border-radius: 0; }
@@ -428,11 +429,14 @@
     html.st-tabs-on #secEdit .desktop-note { display: none; }
     .st-foot { order: 9; position: sticky; bottom: 0; z-index: 2; display: grid; gap: 0.5rem; padding: 0.7rem 1rem; border-top: 1px solid var(--st-line); background: var(--st-panel); margin-top: auto; }
     .st-foot .tool-row { margin: 0; padding: 0; }
-    .st-foot #recRow1 { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem; }
-    .st-foot #recRow1 > .k { grid-column: 1 / -1; }
-    .st-foot #recRow1 #recTitle { width: 100%; grid-column: 1 / -1; height: 34px; }
-    .st-foot #recRow1 #recSave { grid-column: 1 / -1; height: 42px; font-weight: 700; border-radius: 0.6rem; }
-    .st-foot #recRow1 .vis-now, .st-foot #recRow1 #recStatus { grid-column: 1 / -1; }
+    .st-foot:not(:has(> :not([hidden]))) { display: none; }
+    .st-foot { padding: 0.5rem 0.8rem; gap: 0.3rem; }
+    .st-foot #recRow1 { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.2rem 0.4rem; align-items: center; }
+    .st-foot #recRow1 > .k { display: none; }
+    .st-foot #recRow1 #recTitle { width: 100%; height: 34px; margin: 0; }
+    .st-foot #recRow1 #recSave { height: 34px; padding: 0 0.8rem; font-weight: 700; border-radius: 0.5rem; white-space: nowrap; }
+    .st-foot #recRow1 .vis-now, .st-foot #recRow1 #recStatus { grid-column: 1 / -1; font-size: 0.72rem; }
+    .st-foot #recRow1 .vis-now:empty, .st-foot #recRow1 #recStatus:empty { display: none; }
     .st-foot #recRow2 > .k { display: none; }
     .st-foot #recRow2 { display: flex; flex-wrap: wrap; }
     .st-side .admin-sync { margin-top: 0.8rem; }
@@ -3363,13 +3367,13 @@ setInterval(updateSaveStat, 1000);
 (function () {
   const panel = document.getElementById('panel'); if (!panel) return;
   const g = id => document.getElementById(id);
-  const groups = { edit: [g('secEdit'), g('stemRow'), g('backupRow')], synk: [g('syncRow'), g('tempoRow'), g('songTempoRow')], fx: [g('secFx')], voice: [g('secVoice')] };
+  const groups = { edit: [g('secEdit'), g('stemRow'), g('backupRow')], synk: [g('syncRow'), g('tempoRow'), g('songTempoRow')], fx: [g('secFx')], voice: [g('secVoice')], fil: [g('recRow2')] };
   Object.keys(groups).forEach(k => groups[k].forEach(e => { if (e) e.dataset.tab = k; }));
   const adm = g('adminSync'); if (adm) { adm.dataset.tab = 'synk'; panel.appendChild(adm); }   // i Synk-fliken, ovanför spara-raden
   const foot = document.createElement('div'); foot.className = 'st-foot';
-  g('recRow1').before(foot); foot.append(g('recRow1'), g('recRow2'));
+  g('recRow1').before(foot); foot.append(g('recRow1'));   // Fil-raden ligger i fliken Fil, spara-raden hålls låg
   const bar = document.createElement('div'); bar.className = 'st-tabs'; bar.setAttribute('role', 'tablist'); bar.setAttribute('aria-label', 'Verktyg');
-  const defs = [['edit', 'Redigera'], ['synk', 'Synk'], ['fx', 'Effekter'], ['voice', 'Röst']];
+  const defs = [['edit', 'Redigera'], ['synk', 'Synk'], ['fx', 'Effekter'], ['voice', 'Röst'], ['fil', 'Fil']];
   let cur = 'edit'; try { const v = localStorage.getItem('hv-st-tab'); if (defs.some(d => d[0] === v)) cur = v; } catch (e) {}
   defs.forEach(([k, t]) => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'tab'); b.dataset.k = k; b.textContent = t; b.addEventListener('click', () => { cur = k; try { localStorage.setItem('hv-st-tab', k); } catch (e) {} apply(); }); bar.appendChild(b); });
   (g('syncRow') || panel.firstElementChild).before(bar);

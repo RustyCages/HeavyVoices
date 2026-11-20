@@ -33,6 +33,17 @@
   .transport .sp { flex: 1; }
   .opt { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
   .midi-ctl { display: inline-flex; align-items: center; gap: 0.45rem; }
+  .tb-menu { position: relative; display: inline-flex; }
+  .tb-menu > button { white-space: nowrap; }
+  .tb-menu > button[aria-expanded=true] { border-color: var(--accent); color: var(--accent); }
+  .tb-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 70; min-width: 15rem; display: grid; gap: 0.45rem; padding: 0.6rem; border: 1px solid var(--st-line, var(--border)); border-radius: 0.6rem; background: var(--st-panel, #1f232c); box-shadow: 0 12px 30px rgba(0,0,0,0.45); }
+  .tb-pop[hidden] { display: none; }
+  .tb-pop > button { width: 100%; justify-content: flex-start; text-align: left; }
+  .tb-pop > label.opt { padding: 0.15rem 0.2rem; }
+  .tb-pop > label.opt[hidden] { display: none; }
+  .tb-sep { flex: none; width: 1px; height: 24px; background: var(--st-line, var(--border)); margin: 0 0.15rem; }
+  .zoom-bar .zrow { display: inline-flex; align-items: center; gap: 0.3rem; margin-left: 0.4rem; }
+  .zoom-bar .zrow .zv { min-width: 3.2rem; text-align: center; }
   .midi-ctl[hidden] { display: none; }
   #midiBtn.on { background: #ef4444; color: #fff; border-color: #ef4444; }
   #pianoBtn[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
@@ -1915,7 +1926,7 @@ document.getElementById('newTrackBtn').addEventListener('click', newEmptyTrack);
   const b = document.getElementById('zoomSel');
   let prev = null;
   const has = () => !!(sel && sel.track && Math.abs(sel.b - sel.a) > 0.05);
-  const ui = () => { b.disabled = !has() && !prev; b.textContent = prev ? '↩ Tillbaka' : '🔍 Markering'; };
+  const ui = () => { b.disabled = !has() && !prev; b.textContent = prev ? '↩ Tillbaka' : '🔍'; };
   window.stZoomSelUi = ui;
   function go() {
     if (prev) {
@@ -2314,6 +2325,36 @@ let vpShow = () => {};
   pbtn.addEventListener('click', () => { pbtn.blur(); vpShow(!vpOpen()); });
   document.getElementById('vpClose').addEventListener('click', () => vpShow(false));
   try { if (localStorage.getItem('hv-vp-open') === '1') vpShow(true); } catch (e) {}
+})();
+// ---------- verktygsraden: färre knappar – "Lägg till" och "Inspelning" som menyer, höjdzoom vid zoomen ----------
+(function () {
+  const g = id => document.getElementById(id), row = document.querySelector('.st-ctl-tools > .transport'); if (!row) return;
+  const open = new Set();
+  function menu(label, title, nodes) {
+    const wrap = document.createElement('span'); wrap.className = 'tb-menu';
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn-outline'; btn.textContent = label; btn.title = title; btn.setAttribute('aria-expanded', 'false');
+    const pop = document.createElement('div'); pop.className = 'tb-pop'; pop.hidden = true;
+    nodes.filter(Boolean).forEach(n => pop.appendChild(n));
+    const close = () => { pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); open.delete(close); };
+    btn.addEventListener('click', e => { e.stopPropagation(); const was = !pop.hidden; open.forEach(c => c()); if (!was) { pop.hidden = false; btn.setAttribute('aria-expanded', 'true'); open.add(close); } });
+    pop.addEventListener('click', e => { if (e.target.closest('button')) close(); });   // knappar stänger menyn, kryssrutor inte
+    wrap.append(btn, pop); return wrap;
+  }
+  document.addEventListener('click', e => { if (!e.target.closest('.tb-menu')) open.forEach(c => c()); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') open.forEach(c => c()); });
+  const sep = () => { const s = document.createElement('span'); s.className = 'tb-sep'; return s; };
+  // ➕ Lägg till: tomt spår, ljudfil
+  const add = menu('➕ Lägg till ▾', 'Lägg till ett spår', []);
+  row.insertBefore(add, g('newTrackBtn')); add.querySelector('.tb-pop').append(g('newTrackBtn'), g('importBtn'));
+  g('newTrackBtn').textContent = '➕ Nytt tomt spår'; g('importBtn').textContent = '📂 Ladda in ljudfil…';
+  // ⚙ Inspelning: inräkning, klick, taktrutnät, keyboard-ljud, kalibrera
+  const opts = menu('⚙ Inspelning ▾', 'Inräkning, klick, taktrutnät och kalibrering', [g('preRoll') && g('preRoll').closest('label'), g('clickOpt'), g('gridOpt'), g('midiMonL'), g('calibBtn')]);
+  g('midiCtl').after(opts);
+  // grupper med tunna avdelare
+  add.before(sep()); g('midiCtl').before(sep()); opts.after(sep());
+  // spårhöjd bredvid zoomreglaget (syns på dator)
+  const zb = document.querySelector('.st-ctl-tools .zoom-bar');
+  if (zb && g('rowLess')) { const z = document.createElement('span'); z.className = 'zrow'; z.title = 'Spårens höjd (Alt + scroll)'; z.append(g('rowLess'), g('rowVal'), g('rowMore')); zb.appendChild(z); if (g('zoomSel')) zb.appendChild(g('zoomSel')); }
 })();
 // kompakt: en rad per spår (sparas per webbläsare)
 (function () {

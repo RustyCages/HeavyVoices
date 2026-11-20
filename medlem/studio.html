@@ -35,6 +35,22 @@
   .midi-ctl { display: inline-flex; align-items: center; gap: 0.45rem; }
   .midi-ctl[hidden] { display: none; }
   #midiBtn.on { background: #ef4444; color: #fff; border-color: #ef4444; }
+  #pianoBtn[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+  .vpiano { margin: 0.5rem 0 0; padding: 0.6rem 0.7rem 0.7rem; border: 1px solid var(--st-line, var(--border)); border-radius: 0.6rem; background: var(--st-panel, rgba(255,255,255,0.03)); }
+  .vpiano[hidden] { display: none; }
+  .vp-bar { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 0.5rem; font-size: 0.82rem; }
+  .vp-bar button { width: 1.9rem; height: 1.9rem; padding: 0; justify-content: center; }
+  .vp-t { font-weight: 700; }
+  .vp-oct { min-width: 4.6rem; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+  .vp-hint { flex: 1; color: var(--text-muted); font-size: 0.74rem; }
+  .vp-hint kbd { font-size: 0.68rem; padding: 0 0.3rem; border: 1px solid var(--border); border-radius: 0.25rem; }
+  .vp-keys { position: relative; height: 120px; display: flex; user-select: none; touch-action: none; }
+  .vp-w { flex: 1; position: relative; margin-right: 2px; border-radius: 0 0 6px 6px; background: linear-gradient(#f4f4f2, #dcdcd8); cursor: pointer; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; font-size: 0.64rem; color: #666; }
+  .vp-w:last-child { margin-right: 0; }
+  .vp-b { position: absolute; top: 0; width: 4.2%; height: 62%; margin-left: -2.1%; z-index: 2; border-radius: 0 0 4px 4px; background: linear-gradient(#2b2b2b, #0d0d0d); cursor: pointer; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px; font-size: 0.6rem; color: #aaa; }
+  .vp-w.on { background: linear-gradient(#f3d3a5, var(--accent)); color: #111; }
+  .vp-b.on { background: linear-gradient(#a87b45, var(--accent)); color: #111; }
+  .vp-w small { position: absolute; left: 4px; bottom: 4px; color: #999; font-size: 0.58rem; }
   .savestat-wrap { position: relative; display: inline-flex; }
   .savestat { white-space: nowrap; }
   .savestat.ok { color: #86efac; border-color: rgba(134,239,172,0.35); }
@@ -462,8 +478,8 @@
         <button class="btn-outline" id="newTrackBtn" title="Lägg till ett tomt spår att spela in eller klistra in i">➕ Nytt tomt spår</button>
         <button class="btn-outline" id="importBtn" title="Ladda in en eller flera ljudfiler (MP3, WAV, M4A …) från datorn som nya spår – t.ex. en stämma som ett program sjungit. Du kan också dra filer till tidslinjen.">📂 Ladda in ljudfil</button>
         <input type="file" id="importFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" multiple hidden>
-        <span class="midi-ctl desktop-only" id="midiCtl" hidden><button class="btn-outline" id="midiBtn" title="Spela in från ett MIDI-keyboard eller digitalpiano (USB). Låten spelas medan du spelar, och du får ett nytt spår med pianoljud – och noterna som MIDI-fil.">🎹 Spela in MIDI</button>
-          <label class="opt" title="Tangenterna hörs i datorn – bra om keyboardet saknar egna högtalare. Stäng av om pianot låter själv."><input type="checkbox" id="midiMon"> hörs i datorn</label></span>
+        <span class="midi-ctl desktop-only" id="midiCtl"><button class="btn-outline" id="pianoBtn" aria-pressed="false" aria-controls="vpiano" title="Piano på skärmen – spela med musen eller datorns tangentbord. Spelas in när du trycker 🎹 Spela in MIDI.">🎹 Piano</button><button class="btn-outline" id="midiBtn" title="Spela in från ett MIDI-keyboard eller digitalpiano (USB). Låten spelas medan du spelar, och du får ett nytt spår med pianoljud – och noterna som MIDI-fil.">🎹 Spela in MIDI</button>
+          <label class="opt" id="midiMonL" title="Tangenterna på ett inkopplat MIDI-keyboard hörs i datorn – bra om keyboardet saknar egna högtalare. Stäng av om pianot låter själv."><input type="checkbox" id="midiMon"> keyboard hörs i datorn</label></span>
         <span class="sp"></span>
         <button type="button" class="btn-outline" id="compactBtn" aria-pressed="false" title="Kompakt: en rad per spår (namn, tysta och solo). Volym och resten styrs i panelen för det valda spåret.">☰ Kompakt</button>
         <div class="zoom" role="group" aria-label="Zoom">
@@ -487,6 +503,15 @@
         <span class="zv" id="zoomVal2"></span>
         <span class="zoom-hint desktop-only"><kbd>Ctrl</kbd> + scroll = zooma in/ut · <kbd>Alt</kbd> + scroll = spårens höjd · <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + scroll = båda · <kbd>Shift</kbd> + scroll = bläddra i sidled</span>
       </div>
+    </div>
+    <div class="vpiano desktop-only" id="vpiano" hidden>
+      <div class="vp-bar">
+        <span class="vp-t">🎹 Piano</span>
+        <button type="button" class="btn-outline" id="vpDown" title="En oktav ner (Z)">−</button><span class="vp-oct" id="vpOct"></span><button type="button" class="btn-outline" id="vpUp" title="En oktav upp (X)">+</button>
+        <span class="vp-hint">Mus eller tangentbord: <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd> vita · <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> svarta · <kbd>Z</kbd>/<kbd>X</kbd> oktav · <kbd>Shift</kbd> = hålla kvar</span>
+        <button type="button" class="btn-outline" id="vpClose" title="Stäng pianot">✕</button>
+      </div>
+      <div class="vp-keys" id="vpKeys"></div>
     </div>
   </div>
   <p class="hint">Sjung in en egen stämma eller idé till en låt. Du hör låtens spår i hörlurarna medan du spelar in, och kan sedan flytta, klippa och spara inspelningen. Dina inspelningar är privata tills du delar dem.</p>
@@ -1877,23 +1902,24 @@ document.getElementById('newTrackBtn').addEventListener('click', newEmptyTrack);
 // ---------- MIDI-keyboard: spela in noter medan låten spelas → nytt spår med pianoljud (+ noterna som MIDI-fil) ----------
 let midiNo = 0;
 (function () {
-  if (!window.MidiIn || !MidiIn.supported()) return;   // Safari/iPhone: knappen visas inte
-  const ctl = document.getElementById('midiCtl'), btn = document.getElementById('midiBtn'), mon = document.getElementById('midiMon');
-  ctl.hidden = false;
+  if (!window.MidiIn) return;
+  const btn = document.getElementById('midiBtn'), mon = document.getElementById('midiMon');
+  const hw = MidiIn.supported();   // Safari: inget riktigt keyboard, men pianot på skärmen fungerar
+  if (!hw) document.getElementById('midiMonL').hidden = true;
   try { mon.checked = localStorage.getItem('hv-midi-mon') !== '0'; } catch (e) { mon.checked = true; }
   mon.addEventListener('change', () => { try { localStorage.setItem('hv-midi-mon', mon.checked ? '1' : '0'); } catch (e) {} MidiIn.setMonitor(mon.checked, getCtx()); });
   const idle = () => { btn.classList.remove('on'); btn.textContent = '🎹 Spela in MIDI'; };
   async function startMidi() {
     if (!song) { toast('Välj en låt först'); return; }
     if (rec) { toast('Stoppa ljudinspelningen först'); return; }
-    let devs;
-    try { devs = await MidiIn.connect(); } catch (e) { toast('MIDI gick inte att starta: ' + (e.message || e), 6000); return; }
-    if (!devs.length) { toast('Inget MIDI-keyboard hittades – koppla in det med USB (slå på det först) och försök igen', 7000); return; }
+    let devs = [];
+    if (hw) { try { devs = await MidiIn.connect(); } catch (e) { devs = []; } }
+    if (!devs.length && !vpOpen()) { vpShow(true); toast('Inget MIDI-keyboard inkopplat – spela på pianot på skärmen (mus eller tangentbord)', 6000); }
     await ensureCtx();
     MidiIn.start({ clock: position, ctx: getCtx(), monitor: mon.checked, onNote: (n, on, cnt) => { btn.textContent = `■ Stoppa MIDI · ${cnt} noter`; } });
     btn.classList.add('on'); btn.textContent = '■ Stoppa MIDI · 0 noter';
     if (!playing) startAt(pausedPos >= duration() ? 0 : pausedPos);
-    toast(`Spelar in från ${devs[0]}${devs.length > 1 ? ' (+' + (devs.length - 1) + ')' : ''} – spela med låten, tryck ■ när du är klar`, 5000);
+    toast(`Spelar in från ${devs.length ? devs[0] + (vpOpen() ? ' och pianot på skärmen' : '') : 'pianot på skärmen'} – spela med låten, tryck ■ när du är klar`, 5000);
   }
   async function stopMidi() {
     const notes = MidiIn.stop(); idle(); pause();
@@ -1915,6 +1941,81 @@ document.getElementById('dlMidi').addEventListener('click', async () => {
   const notes = t.midiNotes.map(x => ({ ...x, t: Math.max(0, x.t + ((t.offsetMs || 0) / 1000 - t.midiNotes[0].t)) }));   // följer med om spåret flyttats
   await NoteIO.saveFile(NoteIO.toMidi(notes, { song: song.title, stem: t.label }, { bpm: songBpm() || 120 }), `${safeName(song.title)}-${safeName(t.label)}.mid`, 'audio/midi');
 });
+// ---------- piano på skärmen (mus + datorns tangentbord) ----------
+const vpEl = document.getElementById('vpiano');
+const vpOpen = () => !vpEl.hidden;
+let vpShow = () => {};
+(function () {
+  if (!window.MidiIn) return;
+  const keysEl = document.getElementById('vpKeys'), pbtn = document.getElementById('pianoBtn');
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'], BLACK = [1, 3, 6, 8, 10];
+  const CODES = ['KeyA', 'KeyW', 'KeyS', 'KeyE', 'KeyD', 'KeyF', 'KeyT', 'KeyG', 'KeyY', 'KeyH', 'KeyU', 'KeyJ', 'KeyK', 'KeyO', 'KeyL', 'KeyP', 'Semicolon', 'Quote'];
+  const LETTER = { Semicolon: 'Ö', Quote: 'Ä' };
+  let base = 48; try { const v = Number(localStorage.getItem('hv-vp-base')); if (v >= 24 && v <= 84) base = v; } catch (e) {}
+  const down = new Map();   // ton → stoppfunktion för ljudet
+  const latched = new Set();
+  const nm = n => NAMES[n % 12] + (Math.floor(n / 12) - 1);
+  function on(n) {
+    if (down.has(n)) return;
+    getCtx(); const ctx = getCtx(); if (ctx.state === 'suspended') ctx.resume();
+    down.set(n, MidiIn.playNote(ctx, ctx.destination, n, 96, ctx.currentTime));
+    MidiIn.inject(n, true, 96);
+    const k = keysEl.querySelector(`[data-n="${n}"]`); if (k) k.classList.add('on');
+  }
+  function off(n) {
+    const stop = down.get(n); if (!stop) return;
+    down.delete(n); stop(); MidiIn.inject(n, false);
+    const k = keysEl.querySelector(`[data-n="${n}"]`); if (k) k.classList.remove('on');
+  }
+  const allOff = () => { [...down.keys()].forEach(off); latched.clear(); };
+  function render() {
+    allOff();
+    const span = 25, whites = [];
+    for (let n = base; n < base + span; n++) if (!BLACK.includes(n % 12)) whites.push(n);
+    const code = n => { const i = n - base; return i >= 0 && i < CODES.length ? (LETTER[CODES[i]] || CODES[i].replace('Key', '')) : ''; };
+    keysEl.innerHTML = whites.map(n => `<div class="vp-w" data-n="${n}">${code(n)}${n % 12 === 0 ? `<small>${nm(n)}</small>` : ''}</div>`).join('');
+    for (let n = base; n < base + span; n++) if (BLACK.includes(n % 12)) {
+      const left = whites.filter(w => w < n).length / whites.length * 100;
+      keysEl.insertAdjacentHTML('beforeend', `<div class="vp-b" data-n="${n}" style="left:${left}%">${code(n)}</div>`);
+    }
+    document.getElementById('vpOct').textContent = `${nm(base)}–${nm(base + span - 1)}`;
+    try { localStorage.setItem('hv-vp-base', base); } catch (e) {}
+  }
+  // mus/finger: tryck, dra över tangenterna (glissando), släpp
+  let ptr = false;
+  const keyAt = e => { const el = document.elementFromPoint(e.clientX, e.clientY); return el && el.closest('[data-n]') && keysEl.contains(el) ? Number(el.closest('[data-n]').dataset.n) : null; };
+  let cur = null;
+  keysEl.addEventListener('pointerdown', e => { e.preventDefault(); ptr = true; keysEl.setPointerCapture(e.pointerId); cur = keyAt(e); if (cur != null) on(cur); });
+  keysEl.addEventListener('pointermove', e => { if (!ptr) return; const n = keyAt(e); if (n !== cur) { if (cur != null && !latched.has(cur)) off(cur); cur = n; if (n != null) on(n); } });
+  const up = () => { if (!ptr) return; ptr = false; if (cur != null && !latched.has(cur)) off(cur); cur = null; };
+  keysEl.addEventListener('pointerup', up); keysEl.addEventListener('pointercancel', up);
+  // datorns tangentbord (bara när pianot är öppet; tar över Studions kortkommandon för de tangenterna)
+  window.addEventListener('keydown', e => {
+    if (!vpOpen() || e.ctrlKey || e.metaKey || e.altKey || e.target.matches('input, select, textarea')) return;
+    if (e.code === 'KeyZ' || e.code === 'KeyX') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) { base = Math.max(24, Math.min(84, base + (e.code === 'KeyX' ? 12 : -12))); render(); } return; }
+    const i = CODES.indexOf(e.code); if (i < 0) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (e.repeat) return;
+    const n = base + i;
+    if (e.shiftKey) { if (latched.has(n)) { latched.delete(n); off(n); } else { latched.add(n); on(n); } return; }
+    on(n);
+  }, true);
+  window.addEventListener('keyup', e => {
+    const i = CODES.indexOf(e.code); if (i < 0 || !vpOpen()) return;
+    const n = base + i; if (!latched.has(n)) off(n);
+  }, true);
+  window.addEventListener('blur', allOff);
+  document.getElementById('vpDown').addEventListener('click', () => { base = Math.max(24, base - 12); render(); });
+  document.getElementById('vpUp').addEventListener('click', () => { base = Math.min(84, base + 12); render(); });
+  vpShow = show => {
+    vpEl.hidden = !show; pbtn.setAttribute('aria-pressed', show ? 'true' : 'false');
+    if (show) render(); else allOff();
+    try { localStorage.setItem('hv-vp-open', show ? '1' : '0'); } catch (e) {}
+  };
+  pbtn.addEventListener('click', () => { pbtn.blur(); vpShow(!vpOpen()); });
+  document.getElementById('vpClose').addEventListener('click', () => vpShow(false));
+  try { if (localStorage.getItem('hv-vp-open') === '1') vpShow(true); } catch (e) {}
+})();
 // kompakt: en rad per spår (sparas per webbläsare)
 (function () {
   const b = document.getElementById('compactBtn');

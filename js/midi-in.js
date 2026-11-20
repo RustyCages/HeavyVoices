@@ -12,6 +12,7 @@
 //   MidiIn.recording                         → true medan inspelningen pågår
 //   await MidiIn.render(notes, sampleRate)   → AudioBuffer med enkelt pianoljud (t = 0 är första noten)
 //   MidiIn.playNote(ctx, dest, n, v, when)   → stop(when) – ett pianoljud direkt
+//   MidiIn.inject(n, on, v)                  → en ton från pianot på skärmen (spelas in om inspelning pågår)
 //   MidiIn.hasChords(notes)                  → true om noter ligger samtidigt (ackord / två händer)
 (function (root) {
   let access = null, rec = null, devCb = null;
@@ -57,7 +58,7 @@
     const t = rec.c0 + ((e.timeStamp || performance.now()) - rec.p0) / 1000;
     if (cmd === 0x90 && b > 0) {   // tangent ned
       if (rec.open.has(a)) release(a, t);
-      rec.open.set(a, { t, n: a, v: b, stop: rec.monitor ? voice(rec.ctx, rec.ctx.destination, a, b, rec.ctx.currentTime) : null });
+      rec.open.set(a, { t, n: a, v: b, stop: rec.monitor && !e.virtual ? voice(rec.ctx, rec.ctx.destination, a, b, rec.ctx.currentTime) : null });
       if (rec.onNote) rec.onNote(a, true, rec.notes.length + rec.open.size);
     } else if (cmd === 0x80 || (cmd === 0x90 && b === 0)) {   // tangent upp
       if (rec.pedal) rec.held.add(a); else release(a, t);
@@ -74,8 +75,9 @@
     rec.notes.push({ t: o.t, d: Math.max(0.03, t - o.t), n: o.n, v: o.v });
   }
 
+  // pianot på skärmen: samma väg som ett riktigt keyboard (ljudet spelar pianot självt)
+  function inject(n, on, v = 96) { onMsg({ data: on ? [0x90, n, v] : [0x80, n, 0], timeStamp: performance.now(), virtual: true }); }
   function start({ clock, onNote, ctx, monitor } = {}) {
-    if (!access) throw new Error('Inte ansluten');
     rec = { c0: clock ? clock() : 0, p0: performance.now(), notes: [], open: new Map(), held: new Set(), pedal: false, onNote, ctx, monitor: !!(monitor && ctx) };
   }
   function stop() {
@@ -98,6 +100,6 @@
   }
   const hasChords = notes => notes.some((x, i) => i && notes.slice(0, i).some(y => y.t + y.d > x.t + 0.03));
 
-  root.MidiIn = { supported, connect, onDevices, start, stop, setMonitor, render, playNote: voice, hasChords, names,
+  root.MidiIn = { supported, connect, inject, onDevices, start, stop, setMonitor, render, playNote: voice, hasChords, names,
     get recording() { return !!rec; } };
 })(window);

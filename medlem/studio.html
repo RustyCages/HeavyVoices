@@ -1933,14 +1933,20 @@ let midiNo = 0, mt = null;   // mt = spåret som MIDI spelas in i
   try { mon.checked = localStorage.getItem('hv-midi-mon') !== '0'; } catch (e) { mon.checked = true; }
   mon.addEventListener('change', () => { try { localStorage.setItem('hv-midi-mon', mon.checked ? '1' : '0'); } catch (e) {} MidiIn.setMonitor(mon.checked, getCtx()); });
   const idle = () => { btn.classList.remove('on'); btn.textContent = '🎹 Spela in MIDI'; };
+  // status som syns på knappen och i spåret: { kb: 'söker' | 'ansluten' | 'saknas' | 'ej', dev, cnt }
+  let ms = null;
+  function showMidiState() {
+    if (!ms || !mt) return;
+    const kb = ms.kb === 'söker' ? ' · ansluter keyboard…' : ms.kb === 'ansluten' ? ` · ${ms.dev}` : '';
+    const pl = !MidiIn.pianoReady && (vpOpen() || mon.checked) ? ' · laddar pianoljud…' : '';
+    btn.textContent = `■ Stoppa MIDI · ${ms.cnt} ${ms.cnt === 1 ? 'ton' : 'toner'}${ms.kb === 'söker' ? ' · ansluter…' : ''}`;
+    mt.t.loadingText = `● Spelar in MIDI – ${ms.cnt} ${ms.cnt === 1 ? 'ton' : 'toner'}${kb}${pl}`; tl.drawTrack(mt.t);
+  }
   async function startMidi() {
     if (!song) { toast('Välj en låt först'); return; }
     if (rec) { toast('Stoppa ljudinspelningen först'); return; }
-    let devs = [];
-    if (hw) { try { devs = await MidiIn.connect(); } catch (e) { devs = []; } }
-    if (!devs.length && !vpOpen()) { vpShow(true); toast('Inget MIDI-keyboard inkopplat – spela på pianot på skärmen (mus eller tangentbord)', 6000); }
     await ensureCtx();
-    if (window.stLoadPiano) stLoadPiano();
+    if (window.stLoadPiano) stLoadPiano().then(showMidiState);
     // spåret skapas direkt: ett valt tomt spår används, annars ett nytt
     let t;
     if (isEmpty(active) && active.mine && !active.id) { t = active; mt = { t, wasEmpty: true, clip: t.clip, label: t.label }; t.label = `🎹 MIDI ${++midiNo}`; }
@@ -1949,16 +1955,22 @@ let midiNo = 0, mt = null;   // mt = spåret som MIDI spelas in i
         clip: null, peaks: null, offsetMs: 0, savedOffsetMs: null, visibility: 'private', undo: [], edited: false, vol: 1, muted: false, solo: false };
       tracks.push(t); mt = { t, wasEmpty: false };
     }
-    t.clip = null; t.peaks = null; t.buffer = null; t.loadingText = '● Spelar in MIDI…';
+    t.clip = null; t.peaks = null; t.buffer = null;
     tl.render(); setActive(t);
     if (t._row && t._row.scrollIntoView) t._row.scrollIntoView({ block: 'nearest' });
-    MidiIn.start({ clock: position, ctx: getCtx(), monitor: mon.checked, onNote: (n, on, cnt) => {
-      btn.textContent = `■ Stoppa MIDI · ${cnt} noter`;
-      if (mt && on) { mt.t.loadingText = `● Spelar in MIDI… ${cnt} ${cnt === 1 ? 'ton' : 'toner'}`; tl.drawTrack(mt.t); }
-    } });
-    btn.classList.add('on'); btn.textContent = '■ Stoppa MIDI · 0 noter';
+    // inspelningen startar direkt (skärmpianot fungerar på en gång) – ett riktigt keyboard ansluts i bakgrunden
+    ms = { kb: hw ? 'söker' : 'ej', dev: '', cnt: 0 };
+    MidiIn.start({ clock: position, ctx: getCtx(), monitor: mon.checked, onNote: (n, on, cnt) => { if (ms) { ms.cnt = cnt; showMidiState(); } } });
+    btn.classList.add('on'); showMidiState();
     if (!playing) startAt(pausedPos >= duration() ? 0 : pausedPos);
-    toast(`Spelar in från ${devs.length ? devs[0] + (vpOpen() ? ' och pianot på skärmen' : '') : 'pianot på skärmen'} – spela med låten, tryck ■ när du är klar`, 5000);
+    if (!hw) { if (!vpOpen()) vpShow(true); toast('Spelar in från pianot på skärmen – tryck ■ när du är klar', 5000); return; }
+    const mine = ms;
+    let devs = [];
+    try { devs = await MidiIn.connect(); } catch (e) { devs = []; }
+    if (ms !== mine || !MidiIn.recording) return;   // stoppad medan den letade
+    if (devs.length) { ms.kb = 'ansluten'; ms.dev = devs[0] + (devs.length > 1 ? ` (+${devs.length - 1})` : ''); toast(`Keyboard anslutet: ${ms.dev} – spela med låten`, 4000); }
+    else { ms.kb = 'saknas'; if (!vpOpen()) vpShow(true); toast('Inget MIDI-keyboard hittades – spela på pianot på skärmen (mus eller tangentbord)', 6000); }
+    showMidiState();
   }
   // visa det inspelade: hela området syns i bredd
   function showRange(a, b) {
@@ -1966,7 +1978,7 @@ let midiNo = 0, mt = null;   // mt = spåret som MIDI spelas in i
     tl.zoomTo(w / span, 0); tl.view.t0 = Math.max(0, a - span * 0.06); tl.draw();
   }
   async function stopMidi() {
-    const notes = MidiIn.stop(), m = mt; mt = null; idle(); pause();
+    const notes = MidiIn.stop(), m = mt; mt = null; ms = null; idle(); pause();
     if (!m) return;
     const t = m.t; t.loadingText = null;
     if (!notes.length) {
@@ -1989,6 +2001,15 @@ let midiNo = 0, mt = null;   // mt = spåret som MIDI spelas in i
     }
   }
   btn.addEventListener('click', () => { btn.blur(); MidiIn.recording ? stopMidi() : startMidi(); });
+  // sök keyboard i förväg om sidan redan fått lov (då frågar webbläsaren inte) – Windows kan ta flera sekunder första gången
+  if (hw && navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'midi' }).then(p => {
+      if (p.state !== 'granted') return;
+      MidiIn.connect().catch(() => {});
+      const warm = () => { if (window.stLoadPiano) stLoadPiano(); };
+      (window.requestIdleCallback || setTimeout)(warm, 3000);
+    }).catch(() => {});
+  }
   MidiIn.onDevices(list => { if (!list.length && MidiIn.recording) toast('MIDI-keyboardet kopplades ur', 5000); });
 })();
 // ---------- 📝 Noter: notblad av MIDI-spåret, och/eller noterna till en stämma i låten ----------

@@ -552,6 +552,8 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
             <div class="edit-tools">
               <button type="button" class="btn-outline" id="xFromFile" title="MusicXML från notprogrammet (MuseScore, Sibelius, Finale, Dorico), MIDI, UltraStar eller Heavy Voices-JSON">📂 Från fil… (MusicXML / .mid / UltraStar .txt / .json)</button>
               <input type="file" id="xFile" accept=".musicxml,.mxl,.xml,.json,.mid,.midi,.txt,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml,application/xml,text/xml,application/json,audio/midi,audio/x-midi,text/plain" hidden>
+              <button type="button" class="btn-outline" id="xMidiRec" hidden title="Spela in noterna från ett MIDI-keyboard eller digitalpiano (USB) medan stämman spelas. Noterna läggs i stämman – kontrollera och tryck Spara noter.">🎹 Spela in från keyboard</button>
+              <label class="xfer-check" id="xMidiMonL" hidden style="display:inline-flex;gap:0.35rem;align-items:center"><input type="checkbox" id="xMidiMon"> <small>hörs i datorn</small></label>
               <button type="button" class="btn-outline" id="xSyncNow" title="Synka noterna som finns i notbanan just nu mot ljudet">🎯 Synka nuvarande noter</button>
               <button type="button" class="btn-outline" id="xScoreAlign" title="Alla stämmor med notblad (MusicXML) synkas på en gång mot allas ljud – takterna hamnar exakt lika i alla stämmor. Bäst för övningsfiler där de andra stämmorna hörs i bakgrunden.">🎼 Synka alla stämmor tillsammans</button>
             </div>
@@ -799,6 +801,7 @@ if (PARTY) document.documentElement.classList.add('party-mode');</script>
 <script src="/js/cowbell.js"></script>
 <script src="/js/voice-tools.js"></script>
 <script src="/js/note-io.js"></script>
+<script src="/js/midi-in.js"></script>
 <script src="/js/notblad.js"></script>
 <script src="/js/bg-video.js"></script>
 <script src="/js/bg-video-admin.js"></script>
@@ -3946,6 +3949,33 @@ document.getElementById('xSaveLib')?.addEventListener('click', async () => {
   loadLibrary();
 });
 document.getElementById('xFromFile')?.addEventListener('click', () => document.getElementById('xFile').click());
+// MIDI-keyboard: spela in noter i stämmans tid medan den spelas → samma väg som import från fil
+(function () {
+  const btn = document.getElementById('xMidiRec'), monL = document.getElementById('xMidiMonL'), mon = document.getElementById('xMidiMon');
+  if (!btn || !window.MidiIn || !MidiIn.supported()) return;
+  btn.hidden = false; monL.hidden = false;
+  try { mon.checked = localStorage.getItem('hv-midi-mon') !== '0'; } catch (e) { mon.checked = true; }
+  mon.addEventListener('change', () => { try { localStorage.setItem('hv-midi-mon', mon.checked ? '1' : '0'); } catch (e) {} MidiIn.setMonitor(mon.checked, audioCtx); });
+  const idle = () => { btn.textContent = '🎹 Spela in från keyboard'; btn.classList.remove('on'); btn.style.cssText = ''; };
+  btn.addEventListener('click', async () => {
+    if (MidiIn.recording) {
+      const raw = MidiIn.stop(); idle(); if (playing) pause();
+      if (!raw.length) { xStatus('Inga noter spelades in'); return; }
+      const chords = MidiIn.hasChords(raw), list = chords ? NoteIO.topLine(raw) : raw;
+      applyImported(list, 'MIDI-keyboard', chords ? 'ackord – den översta tonen behölls' : '');
+      return;
+    }
+    if (!current) { xStatus('Välj en stämma först'); return; }
+    let devs;
+    try { devs = await MidiIn.connect(); } catch (e) { xStatus('MIDI gick inte att starta: ' + (e.message || e)); return; }
+    if (!devs.length) { xStatus('Inget MIDI-keyboard hittades – koppla in det med USB (slå på det först) och försök igen'); return; }
+    await ensureCtx();
+    MidiIn.start({ clock: position, ctx: audioCtx, monitor: mon.checked, onNote: (n, on, cnt) => { btn.textContent = `■ Stoppa · ${cnt} noter`; } });
+    btn.textContent = '■ Stoppa · 0 noter'; btn.style.cssText = 'background:#ef4444;color:#fff;border-color:#ef4444';
+    xStatus(`Spelar in från ${devs[0]} till ${current.label} – spela med, tryck ■ när du är klar`);
+    if (!playing) play();
+  });
+})();
 
 // ---------- Sök UltraStar-filer online (USDB via Edge Function usdb-search) ----------
 let usHits = [];

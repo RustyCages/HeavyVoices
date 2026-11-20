@@ -32,6 +32,9 @@
   .meter > div { height: 100%; width: 0; background: linear-gradient(90deg, #4ade80 70%, #facc15 85%, #ef4444); transition: width 0.05s linear; }
   .transport .sp { flex: 1; }
   .opt { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
+  .midi-ctl { display: inline-flex; align-items: center; gap: 0.45rem; }
+  .midi-ctl[hidden] { display: none; }
+  #midiBtn.on { background: #ef4444; color: #fff; border-color: #ef4444; }
   .savestat-wrap { position: relative; display: inline-flex; }
   .savestat { white-space: nowrap; }
   .savestat.ok { color: #86efac; border-color: rgba(134,239,172,0.35); }
@@ -459,6 +462,8 @@
         <button class="btn-outline" id="newTrackBtn" title="Lägg till ett tomt spår att spela in eller klistra in i">➕ Nytt tomt spår</button>
         <button class="btn-outline" id="importBtn" title="Ladda in en eller flera ljudfiler (MP3, WAV, M4A …) från datorn som nya spår – t.ex. en stämma som ett program sjungit. Du kan också dra filer till tidslinjen.">📂 Ladda in ljudfil</button>
         <input type="file" id="importFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" multiple hidden>
+        <span class="midi-ctl desktop-only" id="midiCtl" hidden><button class="btn-outline" id="midiBtn" title="Spela in från ett MIDI-keyboard eller digitalpiano (USB). Låten spelas medan du spelar, och du får ett nytt spår med pianoljud – och noterna som MIDI-fil.">🎹 Spela in MIDI</button>
+          <label class="opt" title="Tangenterna hörs i datorn – bra om keyboardet saknar egna högtalare. Stäng av om pianot låter själv."><input type="checkbox" id="midiMon"> hörs i datorn</label></span>
         <span class="sp"></span>
         <button type="button" class="btn-outline" id="compactBtn" aria-pressed="false" title="Kompakt: en rad per spår (namn, tysta och solo). Volym och resten styrs i panelen för det valda spåret.">☰ Kompakt</button>
         <div class="zoom" role="group" aria-label="Zoom">
@@ -611,6 +616,7 @@
 <script src="/js/track-edit-panel.js"></script>
 <script src="/js/wav-convert.js"></script>
 <script src="/js/note-io.js"></script>
+<script src="/js/midi-in.js"></script>
 <script src="/js/pitch-analyze.js"></script>
 <script src="/js/voice-tools.js"></script>
 <script>
@@ -945,6 +951,7 @@ const panel = TrackEditPanel.mount(document.getElementById('panel'), {
       <select id="fmt" title="Gäller bara nedladdning – det som sparas på nätet blir alltid MP3"><option value="mp3">MP3</option><option value="wav">WAV (bara på datorn)</option></select>
       <button type="button" class="btn-outline" id="dlVoice" title="Ladda ner det valda spåret">⬇ Bara spåret</button>
       <label class="opt status" style="white-space: nowrap" title="Filen börjar där låten börjar och slutar där låten slutar (tystnad där inget är inspelat), så att den hamnar rätt när den laddas in igen"><input type="checkbox" id="dlFull" checked> hela låtens längd</label>
+      <button type="button" class="btn-outline" id="dlMidi" hidden title="Noterna du spelade på MIDI-keyboardet som MIDI-fil – för MuseScore eller Röstövning (Importera från fil)">⬇ MIDI-noter</button>
       <button type="button" class="btn-outline" id="fillSong" title="Fyll ut spåret med tystnad före och efter, så att det börjar och slutar som låtens huvudspår">↔ Fyll ut till hela låten</button>
       <button type="button" class="btn-outline" id="dlMix" title="Ladda ner allt som hörs just nu, mixat till en fil">⬇ Mix av det som hörs</button>
       <button type="button" class="btn-outline" id="recDelete">🗑 Ta bort</button>
@@ -1324,6 +1331,7 @@ function updateRecTools() {
   ['recDelete'].forEach(id => { document.getElementById(id).hidden = !isRec || !(mine || (isAdmin && t.id)); });
   document.getElementById('toStem').hidden = !(isAdmin && isRec);
   document.getElementById('dlVoice').disabled = !(t && t.clip) || isEmpty(t);
+  document.getElementById('dlMidi').hidden = !(t && t.midiNotes && t.midiNotes.length);
   document.getElementById('fillSong').disabled = !movable(t) || t.readOnly || (t.offsetMs === 0 && tDur(t) >= songEnd() - 0.01);
   if (mine) {
     const ti = document.getElementById('recTitle');
@@ -1866,6 +1874,47 @@ document.getElementById('newTrackBtn').addEventListener('click', newEmptyTrack);
   });
   ui();
 })();
+// ---------- MIDI-keyboard: spela in noter medan låten spelas → nytt spår med pianoljud (+ noterna som MIDI-fil) ----------
+let midiNo = 0;
+(function () {
+  if (!window.MidiIn || !MidiIn.supported()) return;   // Safari/iPhone: knappen visas inte
+  const ctl = document.getElementById('midiCtl'), btn = document.getElementById('midiBtn'), mon = document.getElementById('midiMon');
+  ctl.hidden = false;
+  try { mon.checked = localStorage.getItem('hv-midi-mon') !== '0'; } catch (e) { mon.checked = true; }
+  mon.addEventListener('change', () => { try { localStorage.setItem('hv-midi-mon', mon.checked ? '1' : '0'); } catch (e) {} MidiIn.setMonitor(mon.checked, getCtx()); });
+  const idle = () => { btn.classList.remove('on'); btn.textContent = '🎹 Spela in MIDI'; };
+  async function startMidi() {
+    if (!song) { toast('Välj en låt först'); return; }
+    if (rec) { toast('Stoppa ljudinspelningen först'); return; }
+    let devs;
+    try { devs = await MidiIn.connect(); } catch (e) { toast('MIDI gick inte att starta: ' + (e.message || e), 6000); return; }
+    if (!devs.length) { toast('Inget MIDI-keyboard hittades – koppla in det med USB (slå på det först) och försök igen', 7000); return; }
+    await ensureCtx();
+    MidiIn.start({ clock: position, ctx: getCtx(), monitor: mon.checked, onNote: (n, on, cnt) => { btn.textContent = `■ Stoppa MIDI · ${cnt} noter`; } });
+    btn.classList.add('on'); btn.textContent = '■ Stoppa MIDI · 0 noter';
+    if (!playing) startAt(pausedPos >= duration() ? 0 : pausedPos);
+    toast(`Spelar in från ${devs[0]}${devs.length > 1 ? ' (+' + (devs.length - 1) + ')' : ''} – spela med låten, tryck ■ när du är klar`, 5000);
+  }
+  async function stopMidi() {
+    const notes = MidiIn.stop(); idle(); pause();
+    if (!notes.length) { toast('Inga noter spelades in'); return; }
+    toast('Gör pianoljud av noterna…', 20000);
+    try {
+      const buf = await MidiIn.render(notes, getCtx().sampleRate);
+      const t0 = notes[0].t;
+      const t = addGenTrack(`🎹 MIDI ${++midiNo}`, AudioEdit.fromBuffer(buf), t0 * 1000);
+      t.midiNotes = notes; updateRecTools();
+      toast(`${notes.length} noter inspelade${MidiIn.hasChords(notes) ? ' (med ackord)' : ''} – nytt spår. Spara det som inspelning, eller ⬇ MIDI-noter för Röstövning/MuseScore`, 7000);
+    } catch (e) { toast('Kunde inte göra ljud av noterna: ' + (e.message || e), 6000); }
+  }
+  btn.addEventListener('click', () => { btn.blur(); MidiIn.recording ? stopMidi() : startMidi(); });
+  MidiIn.onDevices(list => { if (!list.length && MidiIn.recording) toast('MIDI-keyboardet kopplades ur', 5000); });
+})();
+document.getElementById('dlMidi').addEventListener('click', async () => {
+  const t = active; if (!t || !t.midiNotes) return;
+  const notes = t.midiNotes.map(x => ({ ...x, t: Math.max(0, x.t + ((t.offsetMs || 0) / 1000 - t.midiNotes[0].t)) }));   // följer med om spåret flyttats
+  await NoteIO.saveFile(NoteIO.toMidi(notes, { song: song.title, stem: t.label }, { bpm: songBpm() || 120 }), `${safeName(song.title)}-${safeName(t.label)}.mid`, 'audio/midi');
+});
 // kompakt: en rad per spår (sparas per webbläsare)
 (function () {
   const b = document.getElementById('compactBtn');

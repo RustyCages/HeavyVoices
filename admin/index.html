@@ -103,6 +103,13 @@
           <p>Körinfo, kontakter, filer och dokument</p>
         </span>
       </a></li>
+      <li><a href="/admin/hemsida.html" class="nav-item">
+        <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"></path></svg></span>
+        <span class="nav-item-text">
+          <h3>Hemsida</h3>
+          <p>Nyheter &amp; sidor på info.heavyvoices.se</p>
+        </span>
+      </a></li>
       <li><a href="/admin/meddelanden.html" class="nav-item">
         <span class="card-icon-box"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
         <span class="nav-item-text">
@@ -196,6 +203,8 @@
       back.innerHTML = '&larr; Tillbaka';
       document.querySelector('.container').prepend(back);
       const ok = ['/admin/latar.html', '/medlem/rostovning.html', '/medlem/repertoar.html', '/medlem/studio.html', '/admin/info.html', '/admin/kalender.html', '/medlem/forum.html'];
+      // Stämledare som också är redaktör för hemsidan behåller Hemsida-länken
+      try { const { data: rd } = await supabaseClient.from('members').select('redaktor').eq('id', member.id).maybeSingle(); if (rd && rd.redaktor) ok.push('/admin/hemsida.html'); } catch (e) {}
       document.querySelectorAll('.nav-list > li').forEach(li => {
         const href = (li.querySelector('a') || {}).getAttribute && li.querySelector('a').getAttribute('href').split('?')[0];
         if (!ok.includes(href)) li.remove();

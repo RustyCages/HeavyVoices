@@ -272,6 +272,7 @@ async function forumDot(member) {
     loadCheckin(member);
     showParty(member);
     forumDot(member);
+    if (member.role !== 'admin') hemsidaLink(member);
     if (member.role !== 'admin' && member.stamledare) {
       const a = document.createElement('a');
       a.href = '/admin/';
@@ -288,6 +289,27 @@ async function forumDot(member) {
     }
   }
 })();
+
+// ---------- Redaktör: länk till hemsideredigeraren (info.heavyvoices.se) – i båda utseendena ----------
+async function hemsidaLink(member) {
+  try {
+    const { data } = await supabaseClient.from('members').select('redaktor').eq('id', member.id).maybeSingle();
+    if (!data || !data.redaktor) return;
+    const ic = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>';
+    const classic = document.querySelector('.nav-list');
+    if (classic) {
+      const li = document.createElement('li');
+      li.innerHTML = '<a href="/admin/hemsida.html" class="nav-item"><span class="card-icon-box">' + ic + '</span><span class="nav-item-text"><h3>Hemsida</h3><p>Nyheter och sidor på info.heavyvoices.se</p></span></a>';
+      classic.appendChild(li);
+    }
+    const mer = document.querySelector('.hv-sec-mer .hv-list');
+    if (mer) {
+      const li = document.createElement('li');
+      li.innerHTML = '<a href="/admin/hemsida.html" class="hv-row">' + ic.replace(/22/g, '20') + '<span class="hv-row-t"><b>Hemsida</b><small>Nyheter och sidor på info.heavyvoices.se</small></span><span class="hv-chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></a>';
+      mer.insertBefore(li, mer.lastElementChild);
+    }
+  } catch (e) {}
+}
 
 // ---------- Fortsätt öva (stramt utseende): senaste låten från Röstövning eller Repertoar ----------
 function showContinue() {

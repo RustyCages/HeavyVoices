@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heavy Voices – rockkör i Stockholm</title>
+<meta name="description" content="Heavy Voices är en rockkör. Här finns information om kören och nyheter.">
+<meta property="og:title" content="Heavy Voices">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="info.css">
+</head>
+<body>
+<a class="skip" href="#main">Hoppa till innehållet</a>
+<header class="top">
+  <div class="top-inner">
+    <a href="./" class="brand" aria-label="Heavy Voices – startsida">
+      <picture><source srcset="img/logo-text.webp" type="image/webp"><img src="img/logo-text.png" alt="Heavy Voices" width="480" height="220"></picture>
+    </a>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="nav">Meny</button>
+    <nav id="nav" class="nav" aria-label="Huvudmeny">
+      <a href="./" data-nav="start">Start</a>
+      <a href="?nyheter" data-nav="nyheter">Nyheter</a>
+      <span id="navPages"></span>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <p class="muted" id="loading">Laddar…</p>
+  <div id="view"></div>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-inner">
+    <span>© <span id="year"></span> Heavy Voices</span>
+    <a href="https://heavyvoices.se/" rel="noopener">Medlemssidan</a>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
+<script src="info.js"></script>
+</body>
+</html>

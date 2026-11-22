@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hemsida (info.heavyvoices.se) — Heavy Voices Admin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css">
+<script src="/js/ui-mode.js"></script>
+<style>
+  .hs-tabs { display:flex; gap:0.4rem; flex-wrap:wrap; margin:1rem 0 1.25rem; }
+  .hs-tabs button { font-size:0.92rem; }
+  .hs-toolbar { display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem; }
+  .hs-toolbar .spacer { flex:1; }
+  .hs-row { display:flex; align-items:center; gap:0.8rem; padding:0.7rem 0.3rem; border-bottom:1px solid var(--border); }
+  .hs-row:last-child { border-bottom:none; }
+  .hs-row .t { flex:1; min-width:0; }
+  .hs-row .t strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hs-row .t small { color:var(--text-muted); }
+  .hs-row .acts { display:flex; gap:0.35rem; flex-shrink:0; }
+  .st { font-size:0.75rem; padding:0.15rem 0.55rem; border-radius:999px; white-space:nowrap; }
+  .st.pub { background:rgba(74,222,128,0.15); color:var(--ok); }
+  .st.draft { background:rgba(250,204,21,0.15); color:var(--warn); }
+  .st.later { background:rgba(96,165,250,0.15); color:var(--info); }
+  .hs-grid { display:grid; grid-template-columns:1fr 1fr; gap:0 1rem; }
+  @media (max-width:640px) { .hs-grid { grid-template-columns:1fr; } }
+  .hs-form label { display:block; font-size:0.85rem; color:var(--text-muted); margin-bottom:0.25rem; }
+  .hs-check { display:flex !important; align-items:center; gap:0.5rem; color:var(--text) !important; font-size:0.95rem !important; margin:0 0 0.9rem; cursor:pointer; }
+  input[type="checkbox"] { width:auto; margin:0; accent-color:var(--accent); }
+  .cover-box { display:flex; gap:0.8rem; align-items:center; flex-wrap:wrap; margin-bottom:0.9rem; }
+  .cover-box img { max-height:90px; border-radius:6px; border:1px solid var(--border); }
+  .hs-actions { display:flex; gap:0.6rem; flex-wrap:wrap; margin-top:1rem; }
+  .hs-hint { font-size:0.82rem; color:var(--text-muted); }
+
+  /* Quill i mörkt tema */
+  .ql-toolbar.ql-snow { border:1px solid var(--border); border-radius:0.6rem 0.6rem 0 0; background:var(--surface-3); flex-wrap:wrap; }
+  .ql-container.ql-snow { border:1px solid var(--border); border-top:none; border-radius:0 0 0.6rem 0.6rem; background:rgba(18,20,24,0.8); color:var(--text); font-family:inherit; font-size:1rem; }
+  .ql-editor { min-height:320px; line-height:1.65; }
+  .ql-editor.ql-blank::before { color:var(--text-muted); font-style:normal; }
+  .ql-snow .ql-stroke { stroke:var(--text); }
+  .ql-snow .ql-fill { fill:var(--text); }
+  .ql-snow .ql-picker { color:var(--text); }
+  .ql-snow .ql-picker-options { background:var(--surface-3); border-color:var(--border) !important; }
+  .ql-snow button:hover .ql-stroke, .ql-snow button.ql-active .ql-stroke, .ql-snow .ql-picker-label:hover .ql-stroke { stroke:var(--accent); }
+  .ql-snow button:hover .ql-fill, .ql-snow button.ql-active .ql-fill { fill:var(--accent); }
+  .ql-snow .ql-picker-label:hover, .ql-snow .ql-picker-item:hover, .ql-snow .ql-picker-item.ql-selected { color:var(--accent); }
+  .ql-toolbar.ql-snow button { padding:3px 5px; width:28px; height:24px; background:none; box-shadow:none; border:none; min-width:0; }
+  .ql-snow .ql-tooltip { background:var(--surface-3); color:var(--text); border-color:var(--border); box-shadow:var(--card-shadow); z-index:5; }
+  .ql-snow .ql-tooltip input[type=text] { background:var(--bg); color:var(--text); border-color:var(--border); margin:0; width:200px; }
+  .ql-editor img { max-width:100%; }
+  .ql-editor iframe { width:100%; aspect-ratio:16/9; height:auto; }
+  #preview { margin-top:1rem; }
+  #preview .content { line-height:1.7; }
+  #preview .content img { max-width:100%; border-radius:8px; }
+  #preview .content iframe { width:100%; aspect-ratio:16/9; height:auto; border:0; }
+  .ed-list { max-height:none; }
+  .ed-row { display:flex; align-items:center; gap:0.6rem; padding:0.5rem 0.2rem; border-bottom:1px solid var(--border); }
+  .ed-row:last-child { border-bottom:none; }
+  .ed-row span { flex:1; }
+</style>
+</head>
+<body>
+
+<header class="site-header site-header--small"><a href="/admin/" class="site-logo-link" aria-label="Heavy Voices – till startsidan"><picture><source srcset="/icons/logo-text.webp" type="image/webp"><img src="/icons/logo-text.png" alt="Heavy Voices" class="site-logo-text" width="480" height="220"></picture></a></header>
+<div class="container">
+  <a href="/admin/" class="back-btn" id="backBtn">&larr; Tillbaka</a>
+  <h1>Hemsida</h1>
+  <p class="text-muted">Den publika sajten <a href="https://info.heavyvoices.se/" target="_blank" rel="noopener">info.heavyvoices.se</a> (även <a href="/info/" target="_blank" rel="noopener">heavyvoices.se/info/</a>). Allt som publiceras här syns för alla på internet.</p>
+
+  <div class="hs-tabs" role="tablist">
+    <button type="button" class="btn-outline active" data-tab="posts">📰 Nyheter</button>
+    <button type="button" class="btn-outline" data-tab="pages">📄 Sidor</button>
+    <button type="button" class="btn-outline" data-tab="start">🏠 Startsidans text</button>
+    <button type="button" class="btn-outline" data-tab="editors" id="tabEditors" hidden>✍️ Redaktörer</button>
+  </div>
+
+  <!-- Listor -->
+  <section id="listView">
+    <div class="hs-toolbar">
+      <button type="button" class="btn-gold" id="newBtn">+ Ny nyhet</button>
+      <span class="spacer"></span>
+    </div>
+    <div class="card"><div id="list"><p class="text-muted">Laddar…</p></div></div>
+  </section>
+
+  <!-- Redaktörer (bara admin) -->
+  <section id="editorsView" hidden>
+    <div class="card">
+      <h3 style="margin-top:0;">Vilka får redigera hemsidan?</h3>
+      <p class="hs-hint">Admin kan alltid. Bocka i de medlemmar som också ska få skriva nyheter och ändra sidor. De når redigeraren från sin medlemsmeny.</p>
+      <div class="ed-list" id="edList"><p class="text-muted">Laddar…</p></div>
+    </div>
+  </section>
+
+  <!-- Redigera -->
+  <section id="editView" hidden>
+    <div class="card hs-form">
+      <h3 id="edTitle" style="margin-top:0;">Ny nyhet</h3>
+      <label for="fTitle">Rubrik</label>
+      <input id="fTitle" maxlength="160" autocomplete="off">
+      <div id="slugWrap">
+        <label for="fSlug">Adress (slug)</label>
+        <input id="fSlug" maxlength="80" autocomplete="off" pattern="[a-z0-9-]+">
+        <p class="hs-hint" style="margin-top:-0.6rem;" id="slugHint"></p>
+      </div>
+
+      <div id="postFields">
+        <label for="fExcerpt">Ingress (visas på nyhetskortet)</label>
+        <textarea id="fExcerpt" rows="2" maxlength="300"></textarea>
+        <div class="hs-grid">
+          <div>
+            <label for="fDate">Publiceringsdatum</label>
+            <input id="fDate" type="datetime-local">
+          </div>
+          <div>
+            <label>Omslagsbild</label>
+            <div class="cover-box">
+              <img id="coverImg" alt="" hidden>
+              <button type="button" class="btn-outline" id="coverBtn">Välj bild</button>
+              <button type="button" class="btn-outline" id="coverDel" hidden>Ta bort</button>
+              <input type="file" id="coverFile" accept="image/*" hidden>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="pageFields" class="hs-grid">
+        <div>
+          <label for="fSort">Ordning i menyn (lägst först)</label>
+          <input id="fSort" type="number" step="1" value="100">
+        </div>
+        <div style="padding-top:1.6rem;">
+          <label class="hs-check"><input type="checkbox" id="fMenu" checked> Visa i menyn</label>
+        </div>
+      </div>
+
+      <label>Innehåll</label>
+      <div id="editor"></div>
+      <p class="hs-hint">Bilder: klicka på bildknappen i verktygsraden (förminskas automatiskt). Video: klistra in en YouTube-länk med videoknappen.</p>
+
+      <label class="hs-check" style="margin-top:0.8rem;"><input type="checkbox" id="fPub"> Publicerad (syns för alla)</label>
+
+      <div class="hs-actions">
+        <button type="button" class="btn-gold" id="saveBtn">💾 Spara</button>
+        <button type="button" class="btn-outline" id="previewBtn">👁 Förhandsgranska</button>
+        <button type="button" class="btn-outline" id="cancelBtn">Avbryt</button>
+        <a class="btn btn-outline" id="viewLink" target="_blank" rel="noopener" hidden>Visa på sajten ↗</a>
+      </div>
+      <p class="error" id="saveErr"></p>
+      <p class="hs-hint" id="savedInfo"></p>
+    </div>
+    <div class="card" id="preview" hidden></div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/supabase-config.js"></script>
+<script src="/js/auth.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
+<script>
+const BUCKET = 'heavy-voices-hemsida';
+const SITE = 'https://info.heavyvoices.se/';
+let me = null, isAdmin = false, tab = 'posts', editing = null, quill = null, coverUrl = null, slugTouched = false, dirty = false;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = d => d ? new Date(d).toLocaleString('sv-SE', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Stockholm' }) : '';
+function slugify(s) {
+  return String(s || '').toLowerCase().replace(/[åä]/g, 'a').replace(/ö/g, 'o').replace(/é/g, 'e').replace(/ü/g, 'u')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70);
+}
+function toLocalInput(d) { const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0, 16); }
+
+// Samma rensning som på den publika sajten
+DOMPurify.addHook('uponSanitizeElement', (node, data) => {
+  if (data.tagName === 'iframe' && !/^https:\/\/(www\.youtube(-nocookie)?\.com\/embed\/|player\.vimeo\.com\/video\/)/.test(node.getAttribute('src') || '')) node.remove();
+});
+const clean = html => DOMPurify.sanitize(html || '', { ADD_TAGS: ['iframe'], ADD_ATTR: ['allowfullscreen', 'frameborder', 'target', 'data-list'], FORBID_TAGS: ['style', 'form', 'input', 'button', 'script'], FORBID_ATTR: ['style'] });
+
+// ---------- Behörighet ----------
+(async () => {
+  const member = await requireAuth();
+  if (!member) return;
+  isAdmin = member.role === 'admin';
+  if (!isAdmin) {
+    const { data } = await supabaseClient.from('members').select('redaktor').eq('id', member.id).maybeSingle();
+    if (!data || !data.redaktor) { location.href = '/medlem/'; return; }
+    $('backBtn').href = '/medlem/';
+  }
+  me = member;
+  $('tabEditors').hidden = !isAdmin;
+  initQuill();
+  showTab('posts');
+})();
+
+document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {
+  if (!$('editView').hidden && dirty && !confirm('Lämna redigeringen utan att spara?')) return;
+  showTab(b.dataset.tab);
+}));
+
+function showTab(t) {
+  tab = t;
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  $('editView').hidden = true; $('preview').hidden = true;
+  $('editorsView').hidden = t !== 'editors';
+  $('listView').hidden = t === 'editors' || t === 'start';
+  if (t === 'posts') { $('newBtn').textContent = '+ Ny nyhet'; loadList(); }
+  else if (t === 'pages') { $('newBtn').textContent = '+ Ny sida'; loadList(); }
+  else if (t === 'start') openStart();
+  else if (t === 'editors') loadEditors();
+}
+
+// ---------- Listor ----------
+async function loadList() {
+  const list = $('list');
+  list.innerHTML = '<p class="text-muted">Laddar…</p>';
+  const q = tab === 'posts'
+    ? supabaseClient.from('site_posts').select('id, slug, title, published, published_at, updated_at').order('published_at', { ascending: false })
+    : supabaseClient.from('site_pages').select('id, slug, title, published, sort, show_in_menu, updated_at').neq('slug', 'start').order('sort').order('title');
+  const { data, error } = await q;
+  if (error) { list.innerHTML = `<p class="error">Kunde inte hämta: ${esc(error.message)}</p>`; return; }
+  if (!data.length) { list.innerHTML = `<p class="text-muted">${tab === 'posts' ? 'Inga nyheter än.' : 'Inga sidor än. Tips: skapa t.ex. "Om kören", "Bli medlem" och "Kontakt".'}</p>`; return; }
+  const now = Date.now();
+  list.innerHTML = data.map(r => {
+    const st = !r.published ? '<span class="st draft">Utkast</span>'
+      : (tab === 'posts' && Date.parse(r.published_at) > now ? `<span class="st later">Publiceras ${esc(fmt(r.published_at))}</span>` : '<span class="st pub">Publicerad</span>');
+    const sub = tab === 'posts' ? fmt(r.published_at) : `/${r.slug}${r.show_in_menu ? '' : ' · ej i menyn'}`;
+    return `<div class="hs-row"><div class="t"><strong>${esc(r.title)}</strong><small>${esc(sub)}</small></div>${st}
+      <div class="acts"><button type="button" class="btn-outline" data-edit="${r.id}">✎ Redigera</button>
+      <button type="button" class="btn-outline" data-act="del" data-del="${r.id}" title="Ta bort" aria-label="Ta bort ${esc(r.title)}">🗑</button></div></div>`;
+  }).join('');
+  list.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openEdit(b.dataset.edit)));
+  list.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => del(b.dataset.del, data.find(x => x.id === b.dataset.del))));
+}
+
+async function del(id, row) {
+  if (!confirm(`Ta bort "${row ? row.title : ''}"? Det går inte att ångra.`)) return;
+  const { error } = await supabaseClient.from(tab === 'posts' ? 'site_posts' : 'site_pages').delete().eq('id', id);
+  if (error) alert('Kunde inte ta bort: ' + error.message);
+  loadList();
+}
+
+$('newBtn').addEventListener('click', () => openEdit(null));
+
+// ---------- Redigerare ----------
+function initQuill() {
+  quill = new Quill('#editor', {
+    theme: 'snow',
+    placeholder: 'Skriv här…',
+    modules: {
+      toolbar: {
+        container: [[{ header: [2, 3, false] }], ['bold', 'italic', 'underline', 'strike'], [{ list: 'ordered' }, { list: 'bullet' }],
+          ['blockquote', 'link', 'image', 'video'], [{ align: [] }], ['clean']],
+        handlers: { image: () => pickImage(url => {
+          const r = quill.getSelection(true);
+          quill.insertEmbed(r ? r.index : quill.getLength(), 'image', url, 'user');
+          quill.setSelection((r ? r.index : quill.getLength()) + 1);
+        }) }
+      }
+    }
+  });
+  quill.on('text-change', (d, o, src) => { if (src === 'user') dirty = true; });
+  document.querySelector('#editView .hs-form').addEventListener('input', () => { dirty = true; });
+}
+
+function setMode(kind) {   // 'post' | 'page' | 'start'
+  $('postFields').hidden = kind !== 'post';
+  $('pageFields').hidden = kind !== 'page';
+  $('slugWrap').hidden = kind === 'start';
+}
+
+function fillForm(row, kind) {
+  editing = { kind, id: row ? row.id : null, slug: row ? row.slug : null };
+  setMode(kind);
+  $('fTitle').value = row ? row.title : '';
+  $('fSlug').value = row ? row.slug : '';
+  slugTouched = !!row;
+  $('fPub').checked = row ? !!row.published : false;
+  $('fExcerpt').value = row && row.excerpt || '';
+  $('fDate').value = toLocalInput(row && row.published_at || new Date());
+  $('fSort').value = row && row.sort != null ? row.sort : 100;
+  $('fMenu').checked = row ? row.show_in_menu !== false : true;
+  coverUrl = row && row.image_url || null; drawCover();
+  quill.setContents([]);
+  if (row && row.body_html) quill.clipboard.dangerouslyPasteHTML(clean(row.body_html), 'silent');
+  quill.history.clear();
+  $('saveErr').textContent = ''; $('savedInfo').textContent = row && row.updated_at ? 'Senast sparad ' + fmt(row.updated_at) : '';
+  $('preview').hidden = true;
+  updateSlugHint(); updateViewLink(); dirty = false;
+  $('listView').hidden = true; $('editorsView').hidden = true; $('editView').hidden = false;
+  $('edTitle').textContent = kind === 'start' ? 'Startsidans text' : (row ? 'Redigera ' : 'Ny ') + (kind === 'post' ? 'nyhet' : 'sida');
+  if (kind !== 'start') $('fTitle').focus();
+}
+
+async function openEdit(id) {
+  const kind = tab === 'posts' ? 'post' : 'page';
+  if (!id) return fillForm(null, kind);
+  const { data, error } = await supabaseClient.from(kind === 'post' ? 'site_posts' : 'site_pages').select('*').eq('id', id).single();
+  if (error) return alert('Kunde inte öppna: ' + error.message);
+  fillForm(data, kind);
+}
+
+async function openStart() {
+  const { data, error } = await supabaseClient.from('site_pages').select('*').eq('slug', 'start').maybeSingle();
+  if (error) return alert('Kunde inte öppna: ' + error.message);
+  fillForm(data || { id: null, slug: 'start', title: 'Heavy Voices', body_html: '', published: false, sort: 0, show_in_menu: false }, 'start');
+}
+
+$('fTitle').addEventListener('input', () => { if (!slugTouched && editing && editing.kind !== 'start') { $('fSlug').value = slugify($('fTitle').value); updateSlugHint(); } });
+$('fSlug').addEventListener('input', () => { slugTouched = true; $('fSlug').value = $('fSlug').value.toLowerCase().replace(/[åä]/g, 'a').replace(/ö/g, 'o').replace(/[^a-z0-9-]/g, '-'); updateSlugHint(); });
+function updateSlugHint() { const s = $('fSlug').value; $('slugHint').textContent = s ? SITE + (editing && editing.kind === 'post' ? '?n=' : '?s=') + s : ''; }
+function updateViewLink() {
+  const a = $('viewLink');
+  if (!editing || !editing.id) { a.hidden = true; return; }
+  a.href = editing.kind === 'start' ? SITE : SITE + (editing.kind === 'post' ? '?n=' : '?s=') + encodeURIComponent(editing.slug);
+  a.hidden = false;
+}
+
+$('cancelBtn').addEventListener('click', () => { if (dirty && !confirm('Lämna redigeringen utan att spara?')) return; showTab(tab); });
+window.addEventListener('beforeunload', e => { if (dirty && !$('editView').hidden) { e.preventDefault(); e.returnValue = ''; } });
+$('previewBtn').addEventListener('click', () => {
+  const p = $('preview');
+  p.innerHTML = `<p class="hs-hint">Förhandsgranskning</p>${coverUrl && editing.kind === 'post' ? `<img src="${esc(coverUrl)}" alt="" style="max-width:100%;border-radius:8px;">` : ''}<h1>${esc($('fTitle').value)}</h1><div class="content">${clean(quill.root.innerHTML)}</div>`;
+  p.hidden = false; p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+$('saveBtn').addEventListener('click', save);
+async function save() {
+  const err = $('saveErr'); err.textContent = '';
+  const kind = editing.kind;
+  const title = $('fTitle').value.trim() || (kind === 'start' ? 'Heavy Voices' : '');
+  const slug = kind === 'start' ? 'start' : slugify($('fSlug').value || title);
+  if (!title) { err.textContent = 'Skriv en rubrik.'; return; }
+  if (!slug) { err.textContent = 'Adressen (slug) saknas.'; return; }
+  if (kind === 'page' && slug === 'start') { err.textContent = 'Adressen "start" är reserverad för startsidan.'; return; }
+  const body = clean(quill.getLength() > 1 ? quill.root.innerHTML : '');
+  const row = { title, slug, body_html: body, published: $('fPub').checked, updated_at: new Date().toISOString(), updated_by: me.id };
+  if (kind === 'post') {
+    row.excerpt = $('fExcerpt').value.trim() || null;
+    row.image_url = coverUrl;
+    row.published_at = $('fDate').value ? new Date($('fDate').value).toISOString() : new Date().toISOString();
+    if (!editing.id) row.created_by = me.id;
+  } else if (kind === 'page') {
+    row.sort = parseInt($('fSort').value, 10) || 0;
+    row.show_in_menu = $('fMenu').checked;
+  } else { row.sort = 0; row.show_in_menu = false; }
+  const table = kind === 'post' ? 'site_posts' : 'site_pages';
+  $('saveBtn').disabled = true;
+  const res = editing.id
+    ? await supabaseClient.from(table).update(row).eq('id', editing.id).select().single()
+    : await supabaseClient.from(table).insert(row).select().single();
+  $('saveBtn').disabled = false;
+  if (res.error) {
+    err.textContent = /duplicate|unique/i.test(res.error.message) ? 'Adressen (slug) används redan – välj en annan.' : 'Kunde inte spara: ' + res.error.message;
+    return;
+  }
+  editing.id = res.data.id; editing.slug = res.data.slug; dirty = false;
+  $('savedInfo').textContent = 'Sparat ' + fmt(res.data.updated_at) + (res.data.published ? ' – syns på sajten.' : ' – utkast, syns inte för besökare.');
+  updateViewLink();
+}
+
+// ---------- Bilder ----------
+function pickImage(cb) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = async () => { const f = inp.files[0]; if (!f) return; const url = await uploadImage(f); if (url) cb(url); };
+  inp.click();
+}
+$('coverBtn').addEventListener('click', () => pickImage(url => { coverUrl = url; drawCover(); dirty = true; }));
+$('coverDel').addEventListener('click', () => { coverUrl = null; drawCover(); dirty = true; });
+function drawCover() { $('coverImg').hidden = !coverUrl; if (coverUrl) $('coverImg').src = coverUrl; $('coverDel').hidden = !coverUrl; }
+
+// Förminska till max 1600 px (JPEG/WebP) så att mobilbilder inte blir enorma. GIF lämnas orörda.
+async function shrink(file) {
+  if (file.type === 'image/gif' || !/^image\//.test(file.type)) return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const s = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    if (s === 1 && file.size < 900000) return file;
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const type = file.type === 'image/png' ? 'image/webp' : 'image/jpeg';
+    const blob = await new Promise(r => c.toBlob(r, type, 0.85));
+    return blob || file;
+  } catch (e) { return file; }
+}
+
+async function uploadImage(file) {
+  const f = await shrink(file);
+  if (f.size > 5 * 1024 * 1024) { alert('Bilden är för stor (max 5 MB).'); return null; }
+  const ext = ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' })[f.type] || 'jpg';
+  const path = `${new Date().getFullYear()}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabaseClient.storage.from(BUCKET).upload(path, f, { contentType: f.type, cacheControl: '31536000' });
+  if (error) { alert('Kunde inte ladda upp bilden: ' + error.message); return null; }
+  return supabaseClient.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+// ---------- Redaktörer ----------
+async function loadEditors() {
+  const box = $('edList');
+  const { data, error } = await supabaseClient.from('members').select('id, name, role, status, redaktor').eq('status', 'approved').order('name');
+  if (error) { box.innerHTML = `<p class="error">${esc(error.message)}</p>`; return; }
+  box.innerHTML = data.map(m => `<label class="ed-row"><span>${esc(m.name)}</span>${m.role === 'admin'
+    ? '<small class="text-muted">admin – alltid</small>'
+    : `<input type="checkbox" data-ed="${m.id}" ${m.redaktor ? 'checked' : ''} aria-label="Redaktör: ${esc(m.name)}">`}</label>`).join('') || '<p class="text-muted">Inga aktiva medlemmar.</p>';
+  box.querySelectorAll('[data-ed]').forEach(cb => cb.addEventListener('change', async () => {
+    cb.disabled = true;
+    const { error: e2 } = await supabaseClient.from('members').update({ redaktor: cb.checked }).eq('id', cb.dataset.ed);
+    cb.disabled = false;
+    if (e2) { alert('Kunde inte spara: ' + e2.message); cb.checked = !cb.checked; }
+  }));
+}
+</script>
+</body>
+</html>

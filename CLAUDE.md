@@ -76,6 +76,7 @@ Supabase-projekt: `scfudeyozwedohujsoua` ("heavy-voices").
 - Brevmallar ligger under Medlemmar (`admin/brevmallar.html`, tabell `letter_templates`).
 - Information: `admin/info.html` och `medlem/info.html` (tabell `choir_info`, kolumnen `upcoming` för "På gång").
 - Partyläget: `medlem/party*.html`, `js/party.js`, tabellerna `party_settings` och `party_videos`.
+- Publik info-sajt (info.heavyvoices.se): mappen `info/` (fristående – egen CSS/JS, ingen inloggning, läser bara publicerat). Redigeras i `admin/hemsida.html` (admin + medlemmar med flaggan `members.redaktor`, RLS `is_site_editor()`). Tabeller `site_pages` (slug `start` = startsidans text) och `site_posts`, bildbucket `heavy-voices-hemsida` (publik). Subdomänen går via Workern `heavy-voices-info` (`cloudflare/info-proxy/`) med service binding till `heavy-voices`.
 
 **Nödstopp (killswitch)**
 - Admin → "🚨 Nödstopp" stänger sajten (tabell `site_status`, en rad). `is_approved_member()`/`is_song_editor()` släpper då bara in admin, `r2-files` likaså.

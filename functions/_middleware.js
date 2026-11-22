@@ -7,7 +7,8 @@
 const SUPABASE_URL = 'https://scfudeyozwedohujsoua.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_lQf4A7LCOH42d_Di-B7oiw_1JzB_2sh';
 // sidor som alltid går att nå i mjukt läge
-const OPEN = /^\/(admin(\/|$)|logga-in|aterstall-losenord|satt-losenord|stangd)(\.html)?/;
+// /info/ = publika info-sajten (info.heavyvoices.se) – nödstoppet gäller medlemsdelen, inte den
+const OPEN = /^\/(admin(\/|$)|info(\/|$)|logga-in|aterstall-losenord|satt-losenord|stangd)(\.html)?/;
 
 let memo = { at: 0, closed: false };
 async function softClosed() {

@@ -6,4 +6,5 @@ node_modules
 wrangler.jsonc
 .assetsignore
 CLAUDE.md
-cloudflare
+info/_headers
+info/.assetsignore

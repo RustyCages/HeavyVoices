@@ -1,0 +1,9 @@
+{
+  // Egen Worker för info.heavyvoices.se. Byggs automatiskt från GitHub (Workers Builds, rotkatalog "info").
+  // Serverar bara den här mappen – resten av heavyvoices.se går inte att nå härifrån.
+  "name": "heavy-voices-info",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./", "html_handling": "auto-trailing-slash", "not_found_handling": "none" },
+  "routes": [{ "pattern": "info.heavyvoices.se", "custom_domain": true }],
+  "workers_dev": false
+}

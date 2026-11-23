@@ -71,11 +71,9 @@
     <div id="fileList"><p class="text-muted">Laddar...</p></div>
   </div>
 
-  <h2 style="margin-top:2rem;">Fildelning</h2>
-  <p class="text-muted" style="font-size:0.85rem;">Filer som kören delar här. De raderas automatiskt 30 dagar efter att de lagts upp.</p>
-  <div class="card">
-    <div id="fdList"><p class="text-muted">Laddar...</p></div>
-  </div>
+  <h2 style="margin-top:2rem;" id="fildelning">Fildelning</h2>
+  <p class="text-muted" style="font-size:0.85rem;">Filer som delats med dig. Du ser bara det som delats med dig, din stämma eller hela kören.</p>
+  <div id="fdApp"></div>
 
   <div class="card faq-card" style="margin-top: 1.5rem;">
     <h3>Fråga om kören</h3>
@@ -109,6 +107,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/auth.js"></script>
+<script src="/js/fildelning.js"></script>
 <script src="/js/faq.js" defer></script>
 <script>
 const MIC_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>';
@@ -285,55 +284,12 @@ async function loadFiles() {
   });
 }
 
-// =========================================================
-// Fildelning (skrivskyddad). RLS i Supabase släpper bara igenom det som delats till den inloggade.
-// =========================================================
-const FD_BUCKET = 'heavy-voices-fildelning';
-async function fdSignedUrl(f, download) {
-  const { data, error } = await supabaseClient.storage.from(FD_BUCKET).createSignedUrl(f.path, 3600, download ? { download: f.name } : undefined);
-  if (error || !data) { toast('Fel: ' + (error ? error.message : 'kunde inte skapa länken')); return null; }
-  return data.signedUrl;
-}
-async function fdOpen(f) {
-  const win = window.open('', '_blank');
-  const url = await fdSignedUrl(f, false);
-  if (!url) { if (win) win.close(); return; }
-  const finalUrl = OFFICE_EXT.test(f.name) ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}` : url;
-  if (win) win.location.href = finalUrl; else window.location.href = finalUrl;
-}
-async function fdDownload(f) {
-  const url = await fdSignedUrl(f, true);
-  if (!url) return;
-  const a = document.createElement('a');
-  a.href = url; document.body.appendChild(a); a.click(); a.remove();
-}
-async function loadShared() {
-  const listEl = document.getElementById('fdList');
-  const { data, error } = await supabaseClient.from('shared_files').select('*').order('created_at', { ascending: false });
-  if (error) { listEl.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`; return; }
-  if (!data || !data.length) { listEl.innerHTML = '<p class="text-muted">Inga filer delade just nu.</p>'; return; }
-  listEl.innerHTML = '';
-  data.forEach(f => {
-    const row = document.createElement('div');
-    row.className = 'file-row clickable';
-    row.title = 'Öppna ' + f.name;
-    row.innerHTML = `
-      ${fileIconSvg}
-      <span class="file-name">${escapeHtml(f.name)}</span>
-      <span class="file-meta">${fmtSize(f.size)} · raderas ${fmtDate(f.expires_at)}</span>
-      <button class="btn-outline icon-btn downloadBtn" title="Ladda ner">${downloadIconSvg}</button>`;
-    row.addEventListener('click', e => { if (!e.target.closest('button')) fdOpen(f); });
-    row.querySelector('.downloadBtn').addEventListener('click', () => fdDownload(f));
-    listEl.appendChild(row);
-  });
-}
-
 (async () => {
   const member = await requireAuth();
   if (member) {
     loadInfo();
     loadFiles();
-    loadShared();
+    Fildelning.mount(document.getElementById('fdApp'), member);
   }
 })();
 </script>

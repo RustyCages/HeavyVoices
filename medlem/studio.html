@@ -131,6 +131,9 @@
   .ai-home .ai-progs p { margin: 0.3rem 0 0; color: var(--text-muted); font-size: 0.88rem; }
   .ai-home .ai-progs small { color: var(--text-muted); }
   .wav-card summary { cursor: pointer; list-style: revert; }
+  #panel > details.wav-card { margin: 0; padding: 0.7rem 1rem; border: 0; border-top: 1px solid var(--st-line, var(--border)); border-radius: 0; background: none; box-shadow: none; }
+  #panel > details.wav-card summary h2 { font-size: 0.92rem !important; }
+  #panel > details.wav-card .ai-steps { font-size: 0.84rem; }
   .vt > * { min-width: 0; }
   .vt { display: grid; gap: 0.55rem; padding: 0.6rem 0 0.2rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
   .admin-sync { margin-top: 1rem; padding: 0.8rem 0.9rem; border: 1px dashed rgba(229,169,104,0.5); border-radius: 0.6rem; display: grid; gap: 0.5rem; }
@@ -640,7 +643,7 @@
 
   </div>
 
-  <details class="card static wav-card ai-home" style="margin-top:1.5rem;">
+  <details class="card static wav-card ai-home" id="aiHome" style="margin-top:1.5rem;">
     <summary><h2 style="display:inline; margin:0; font-size:1.15rem;">🤖 Låt datorn sjunga stämman – gratis program hemma</h2></summary>
     <p class="hint" style="margin:0.6rem 0 0.8rem;">Med gratisprogram kan du låta datorn sjunga låtens stämmor – bra för att höra hur en stämma eller harmoni ska låta. Du laddar ner noterna här, låter programmet sjunga dem och laddar sedan in ljudet i Studio som ett eget spår. Programmen körs på din egen dator och kostar ingenting.</p>
     <ol class="ai-steps">
@@ -659,7 +662,7 @@
     </ol>
   </details>
 
-  <details class="card static wav-card" style="margin-top:1.5rem;">
+  <details class="card static wav-card" id="wavHome" style="margin-top:1.5rem;">
     <summary><h2 style="display:inline; margin:0; font-size:1.15rem;">🔄 Konvertera WAV till MP3</h2></summary>
     <p class="hint" style="margin:0.6rem 0 0.7rem;">Gör om stora WAV-filer till MP3 och spara dem på datorn. Allt sker i din webbläsare – inget skickas iväg. WAV-filer sparas aldrig på nätet: laddar du in en WAV i Studio och sparar den görs den om till MP3 automatiskt.</p>
     <div id="wavConvert"></div>
@@ -3410,7 +3413,8 @@ setInterval(updateSaveStat, 1000);
 (function () {
   const panel = document.getElementById('panel'); if (!panel) return;
   const g = id => document.getElementById(id);
-  const groups = { edit: [g('secEdit'), g('stemRow'), g('backupRow')], synk: [g('syncRow'), g('tempoRow'), g('songTempoRow')], fx: [g('secFx')], voice: [g('secVoice')], fil: [g('recRow2')] };
+  const groups = { edit: [g('secEdit'), g('stemRow'), g('backupRow')], synk: [g('syncRow'), g('tempoRow'), g('songTempoRow')], fx: [g('secFx')], voice: [g('secVoice'), g('aiHome')], fil: [g('recRow2'), g('wavHome')] };
+  ['aiHome', 'wavHome'].forEach(id => { const d = g(id); if (d) { d.style.marginTop = ''; panel.appendChild(d); } });   // i flikarna Röst och Fil
   Object.keys(groups).forEach(k => groups[k].forEach(e => { if (e) e.dataset.tab = k; }));
   const adm = g('adminSync'); if (adm) { adm.dataset.tab = 'synk'; panel.appendChild(adm); }   // i Synk-fliken, ovanför spara-raden
   const foot = document.createElement('div'); foot.className = 'st-foot';

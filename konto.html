@@ -17,6 +17,8 @@
     .card { margin-top: 1rem !important; }
   }
   .success { color: #4ade80; font-size: 0.9rem; }
+  .p-lbl { display: block; margin: 0.6rem 0 0.25rem; font-size: 0.85rem; color: var(--text-muted); }
+  .p-hint { margin: 0.25rem 0 0.4rem; font-size: 0.8rem; }
 </style>
 </head>
 <body>
@@ -28,6 +30,26 @@
   <a href="#" id="backLink" class="back-btn">&larr; Tillbaka</a>
   <h1>Mitt konto</h1>
   <p class="text-muted" id="welcome"></p>
+
+  <div class="card" style="max-width: 360px; margin-top: 1.5rem;">
+    <h3>Min profil</h3>
+    <form id="profileForm">
+      <label class="p-lbl" for="pName">Namn</label>
+      <input type="text" id="pName" maxlength="100" required autocomplete="name">
+      <label class="p-lbl" for="pStamma">Stämma</label>
+      <select id="pStamma"><option value="">Ej vald</option><option>Sopran</option><option>Alt</option><option>Tenor</option><option>Bas</option><option>Osäker</option></select>
+      <label class="p-lbl" for="pEmail">E-post</label>
+      <input type="email" id="pEmail" disabled>
+      <p class="text-muted p-hint">Vill du byta e-postadress? Hör av dig till en admin.</p>
+      <label class="p-lbl" for="pPn">Personnummer <span class="text-muted">(valfritt)</span></label>
+      <input type="text" id="pPn" inputmode="numeric" maxlength="15" placeholder="ÅÅÅÅMMDD-NNNN" autocomplete="off">
+      <p class="text-muted p-hint">Fyll bara i om körledningen har bett om det. Det syns bara för admin och du kan ta bort det när du vill.</p>
+      <button type="submit">Spara profil</button>
+      <button type="button" class="btn-outline" id="pPnClear" hidden style="margin-left: 0.5rem;">Ta bort personnummer</button>
+      <p class="error" id="profileError"></p>
+      <p class="success" id="profileSuccess"></p>
+    </form>
+  </div>
 
   <div class="card" style="max-width: 360px; margin-top: 1.5rem;">
     <h3>Byt lösenord</h3>
@@ -79,6 +101,44 @@
     document.getElementById('welcome').textContent = `Inloggad som ${member.name}`;
     document.getElementById('backLink').href = member.role === 'admin' ? '/admin/' : '/medlem/';
   }
+})();
+
+// ---------- Min profil ----------
+(async () => {
+  const f = document.getElementById('profileForm');
+  const err = document.getElementById('profileError'), ok = document.getElementById('profileSuccess');
+  const pn = document.getElementById('pPn'), clr = document.getElementById('pPnClear');
+  let hadPn = false;
+  async function loadProfile() {
+    const { data, error } = await supabaseClient.rpc('get_my_profile');
+    if (error || !data || !data[0]) { err.textContent = 'Kunde inte hämta din profil.'; return; }
+    const p = data[0];
+    document.getElementById('pName').value = p.name || '';
+    document.getElementById('pStamma').value = p.stamma || '';
+    document.getElementById('pEmail').value = p.email || '';
+    pn.value = p.personnummer || ''; hadPn = !!p.personnummer; clr.hidden = !hadPn;
+  }
+  await loadProfile();
+  f.addEventListener('submit', async (e) => {
+    e.preventDefault(); err.textContent = ''; ok.textContent = '';
+    const { error } = await supabaseClient.rpc('update_my_profile', {
+      p_name: document.getElementById('pName').value, p_stamma: document.getElementById('pStamma').value || null,
+      p_personnummer: pn.value.trim() || null, p_clear_pn: false
+    });
+    if (error) { err.textContent = (error.message || 'Kunde inte spara.').replace(/^.*?exception:\s*/i, ''); return; }
+    ok.textContent = 'Profilen är sparad.';
+    document.getElementById('welcome').textContent = 'Inloggad som ' + document.getElementById('pName').value.trim();
+    await loadProfile();
+  });
+  clr.addEventListener('click', async () => {
+    if (!confirm('Ta bort ditt personnummer?')) return;
+    err.textContent = ''; ok.textContent = '';
+    const { error } = await supabaseClient.rpc('update_my_profile', {
+      p_name: document.getElementById('pName').value, p_stamma: document.getElementById('pStamma').value || null, p_personnummer: null, p_clear_pn: true
+    });
+    if (error) { err.textContent = 'Kunde inte ta bort: ' + error.message; return; }
+    ok.textContent = 'Personnumret är borttaget.'; await loadProfile();
+  });
 })();
 
 document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {

@@ -33,6 +33,8 @@
   .transport .sp { flex: 1; }
   .opt { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
   .midi-ctl { display: inline-flex; align-items: center; gap: 0.45rem; }
+  .ana-out { display: inline-flex; flex-wrap: wrap; gap: 0.4rem; }
+  .ana-out[hidden] { display: none; }
   .tb-menu { position: relative; display: inline-flex; }
   .tb-menu > button { white-space: nowrap; }
   .tb-menu > button[aria-expanded=true] { border-color: var(--accent); color: var(--accent); }
@@ -337,7 +339,9 @@
     .st-ctl-main > .transport > .play-btn, .st-ctl-main > .transport > #backBtn, .st-ctl-main > .transport > .rec-btn, .st-ctl-main > .transport > .meter, .st-ctl-main > .transport > .time, .st-ctl-main > .transport > .bpm-badge { order: 2; margin: 0; }
     .st-ctl-main > .transport > .meter { width: 40px; flex: none; }
     .st-ctl-main > .transport > .sp { display: none; }
-    .st-top > .title-actions { order: 3; margin-left: auto; }
+    .st-top > .title-actions { order: 3; margin-left: auto; flex: none; flex-wrap: nowrap; }
+    .st-head > .warn-box { flex: 1 1 0 !important; min-width: 7rem; }
+    @media (max-width: 2099px) { .title-actions .ta-l { display: none; } }
     .st-head > .warn-box { order: 2; margin: 0; flex: 1 1 14rem; min-width: 0; padding: 0.25rem 0.6rem; font-size: 0.76rem; line-height: 1.25; max-height: 42px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
     .st-head::after { content: ''; flex: 0 0 100%; order: 4; height: 0; }
     .st-head > .vpiano { order: 9; flex: 0 0 100%; margin: 0.15rem 0 0.1rem; padding: 0; border: 0; background: none; }
@@ -477,7 +481,7 @@
         <span class="savestat-wrap"><button type="button" class="btn-outline savestat" id="saveStatBtn" aria-expanded="false" aria-controls="saveStatPop" title="Vad är sparat i den här låten?">✓ Allt sparat</button>
           <div class="savestat-pop" id="saveStatPop" hidden role="dialog" aria-label="Sparat i den här låten"></div></span>
         <button type="button" class="btn-outline" id="guideBtn" aria-expanded="false" aria-controls="guide">❔ Hjälp</button>
-        <a href="/medlem/rostovning.html" class="btn btn-outline">🎤 Röstövning</a>
+        <a href="/medlem/rostovning.html" class="btn btn-outline" title="Röstövning">🎤 <span class="ta-l">Röstövning</span></a>
         <button type="button" class="btn-outline" id="stThemeBtn" title="Växla mellan svart och grått utseende" aria-label="Växla mellan svart och grått utseende"></button>
       </div>
     </div>
@@ -2133,6 +2137,63 @@ document.addEventListener('DOMContentLoaded', function () {   // raden skapas av
   });
 });
 
+// ---------- 🎼 förenklad notanalys: valt spår → noter (samma analys som Röstövning) ----------
+document.addEventListener('DOMContentLoaded', function () {
+  const g = id => document.getElementById(id), go = g('anaGo'); if (!go || !window.PitchAnalyze) return;
+  const st = m => { g('anaSt').textContent = m || ''; };
+  let lastFor = null;
+  const ui = () => {
+    const t = active, ok = !!(t && t.clip && !isEmpty(t));
+    go.disabled = !ok || go._busy;
+    const has = !!(t && t.midiNotes && t.midiNotes.length && t._anaNotes === t.midiNotes);
+    g('anaOut').hidden = !has;
+    g('anaSave').hidden = !(has && isAdmin && t.kind === 'stem');
+    if (lastFor !== t) { lastFor = t; if (!has) st(ok ? '' : 'Välj ett spår med ljud'); }
+  };
+  setInterval(ui, 700);
+  go.addEventListener('click', async () => {
+    const t = active; if (!t || !t.clip || isEmpty(t)) return;
+    go._busy = true; ui();
+    try {
+      const lab = g('anaRange').value || t.label;
+      st('Analyserar… 0 %');
+      const res = await PitchAnalyze.analyze(VoiceTools.toMono16k(t.clip), PitchAnalyze.rangeForLabel(lab), p => st(`Analyserar… ${Math.round(p * 100)} %`));
+      const q = PitchAnalyze.foldOctaves ? PitchAnalyze.foldOctaves(res) : res;
+      const off = offS(t), notes = (q.notes || []).map(x => ({ t: Math.round((x.t + off) * 1000) / 1000, d: x.d, n: Math.round(x.n), v: 90 })).filter(x => x.t >= 0 && x.d >= 0.06);
+      if (!notes.length) { st('Hittade inga tydliga toner – är det sång eller ett instrument med en ton i taget?'); return; }
+      t.midiNotes = notes; t._anaNotes = notes; t._anaRaw = res;
+      const lo = Math.min(...notes.map(x => x.n)), hi = Math.max(...notes.map(x => x.n)), key = PitchAnalyze.detectKey(notes);
+      st(`✓ ${notes.length} noter · ${PitchAnalyze.midiToName ? PitchAnalyze.midiToName(lo) + '–' + PitchAnalyze.midiToName(hi) : ''}${key && key.name ? ' · ' + key.name : ''}. Noterna följer spåret – även ⬇ MIDI-noter under Fil.`);
+      updateRecTools();
+    } catch (e) { st('Kunde inte analysera: ' + (e.message || e)); }
+    finally { go._busy = false; ui(); }
+  });
+  g('anaNotes').addEventListener('click', () => openMidiNotes(active));
+  g('anaSing').addEventListener('click', async () => {
+    const t = active; if (!t || !t.midiNotes) return;
+    const ins = /sopran|alt\b|alto/i.test(t.label + ' ' + g('anaRange').value) ? 'dam' : /tenor|bas\b|bass/i.test(t.label + ' ' + g('anaRange').value) ? 'herr' : 'kor';
+    st('Sjunger…');
+    try {
+      const notes = midiSongNotes(t), buf = await MidiIn.render(notes, getCtx().sampleRate, ins);
+      const nt = addGenTrack(`🎶 ${t.label} (${MidiIn.INSTR[ins].name})`, AudioEdit.fromBuffer(buf), notes[0].t * 1000);
+      nt.midiNotes = notes; updateRecTools(); st('✓ Nytt spår med noterna sjungna');
+    } catch (e) { st('Kunde inte: ' + (e.message || e)); }
+  });
+  g('anaSave').addEventListener('click', async () => {
+    const t = active; if (!t || t.kind !== 'stem' || !t._anaRaw) return;
+    if (pitchRaw[t.key] && pitchRaw[t.key].edited_notes && !confirm(`${t.label} har redigerade noter i Röstövning. Den nya analysen ersätter dem (de sparas som säkerhetskopia). Fortsätta?`)) return;
+    const now = new Date().toISOString(), data = { ...t._anaRaw, created_at: now };
+    if (pitchRaw[t.key] && pitchRaw[t.key].edited_notes) data.edited_notes_backup = pitchRaw[t.key].edited_notes;
+    st('Sparar…');
+    const { error } = await supabaseClient.from('song_pitch').upsert({ song_id: song.id, stem_key: t.key, stem_path: t.path, data, updated_at: now });
+    if (error) { st('Kunde inte spara: ' + error.message); return; }
+    pitchRaw[t.key] = data;
+    const q = PitchAnalyze.foldOctaves ? PitchAnalyze.foldOctaves(data) : data;
+    pitchByKey[t.key] = { notes: q.notes, midi: q.midi || [], hop: q.hop || 0.02 };
+    st(`✓ Sparat som ${t.label}s noter – syns i Röstövning, Sjung stämman och notbladen`);
+  });
+});
+
 // ---------- 📝 Noter: notblad av MIDI-spåret, och/eller noterna till en stämma i låten ----------
 const NB_OSMD_URL = 'https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@2.1.3/build/opensheetmusicdisplay.min.js';
 let nbOsmd = null;
@@ -3018,7 +3079,7 @@ window.addEventListener('beforeunload', e => { if (rec || unsaved()) { e.prevent
 
 (() => {
   const g = document.getElementById('guide'), b = document.getElementById('guideBtn');
-  const set = open => { g.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? '✕ Stäng guiden' : '❔ Så funkar det'; };
+  const set = open => { g.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.innerHTML = open ? '✕ <span class="ta-l">Stäng guiden</span>' : '❔ <span class="ta-l">Så funkar det</span>'; b.title = open ? 'Stäng guiden' : 'Så funkar det'; };
   let seen = null; try { seen = localStorage.getItem('hv-studio-guide'); } catch (e) {}
   set(!seen);   // visas automatiskt första gången
   if (!seen) { try { localStorage.setItem('hv-studio-guide', '1'); } catch (e) {} }
@@ -3461,7 +3522,18 @@ setInterval(updateSaveStat, 1000);
     <button type="button" class="btn-outline" id="singGo" title="Gör ett nytt spår där stämmans noter sjungs – bra för att höra hur stämman eller en harmoni ska låta">🎶 Sjung</button>
     <span class="status" id="singSt"></span>`;
   panel.appendChild(sing);
-  const groups = { edit: [g('secEdit'), g('stemRow'), g('backupRow')], synk: [g('syncRow'), g('tempoRow'), g('songTempoRow')], fx: [g('secFx')], voice: [g('singRow'), g('secVoice'), g('aiHome')], fil: [g('recRow2'), g('wavHome')] };
+  const ana = document.createElement('div'); ana.className = 'tool-row'; ana.id = 'anaRow';
+  ana.innerHTML = `<span class="k">🎼 Notanalys</span>
+    <select id="anaRange" title="Röstläge – hjälper analysen att inte hamna en oktav fel"><option value="">Röstläge: efter spårets namn</option><option value="sopran">Sopran</option><option value="alt">Alt</option><option value="tenor">Tenor</option><option value="bas">Bas</option></select>
+    <button type="button" class="btn-outline" id="anaGo" title="Lyssnar på det valda spåret och gör noter av tonerna (en ton i taget, som en sångstämma)">🎼 Analysera noter</button>
+    <span class="status" id="anaSt"></span>
+    <span class="ana-out" id="anaOut" hidden>
+      <button type="button" class="btn-outline" id="anaNotes" title="Notblad, eller lägg noterna i en stämma">📝 Noter…</button>
+      <button type="button" class="btn-outline" id="anaSing" title="Nytt spår där noterna sjungs med kör">🎶 Sjung noterna</button>
+      <button type="button" class="btn-outline" id="anaSave" hidden title="Spara som stämmans notanalys – samma som Analysera i Röstövning">💾 Spara som stämmans noter</button>
+    </span>`;
+  panel.appendChild(ana);
+  const groups = { edit: [g('secEdit'), g('stemRow'), g('backupRow')], synk: [g('syncRow'), g('tempoRow'), g('songTempoRow')], fx: [g('secFx')], voice: [g('anaRow'), g('singRow'), g('secVoice'), g('aiHome')], fil: [g('recRow2'), g('wavHome')] };
   ['aiHome', 'wavHome'].forEach(id => { const d = g(id); if (d) { d.style.marginTop = ''; panel.appendChild(d); } });   // i flikarna Röst och Fil
   Object.keys(groups).forEach(k => groups[k].forEach(e => { if (e) e.dataset.tab = k; }));
   const adm = g('adminSync'); if (adm) { adm.dataset.tab = 'synk'; panel.appendChild(adm); }   // i Synk-fliken, ovanför spara-raden

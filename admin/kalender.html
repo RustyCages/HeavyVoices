@@ -91,6 +91,26 @@
   .att-member .by-admin { font-size: 0.7rem; color: var(--text-muted); }
   .att-group { grid-column: 1 / -1; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 0.4rem; }
   .event-notes { white-space: pre-wrap; }
+  .frm-btn { padding: 0.3rem 0.7rem; font-size: 0.85rem; background: transparent; border: 1px solid var(--border); color: var(--text); justify-content: center; }
+  .frm-btn.has { border-color: var(--accent); color: var(--accent); }
+  .frm-btn.open { background: var(--accent); color: #111317; border-color: var(--accent); }
+  .frm-panel { flex-basis: 100%; background: rgba(255,255,255,0.03); border-radius: 0.6rem; padding: 0.75rem 0.9rem; }
+  .frm-panel h4 { margin: 0.8rem 0 0.4rem; font-size: 0.95rem; }
+  .frm-panel h4:first-child { margin-top: 0; }
+  .frm-row { display: grid; grid-template-columns: 1fr 9rem; gap: 0.4rem; margin-bottom: 0.4rem; }
+  .frm-field { border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.5rem; margin-bottom: 0.5rem; }
+  .frm-field input, .frm-field select, .frm-panel textarea, .frm-panel input[type=datetime-local], .frm-panel input[type=number] { margin-bottom: 0.3rem; }
+  .frm-field .frm-tools { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; font-size: 0.85rem; }
+  .frm-field .frm-tools label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+  .frm-field .frm-tools input[type=checkbox], .frm-opts input[type=checkbox] { width: auto; margin: 0; accent-color: var(--accent); }
+  .frm-field .frm-tools button, .frm-actions button { padding: 0.25rem 0.6rem; font-size: 0.85rem; }
+  .frm-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.8rem; margin: 0.4rem 0; }
+  .frm-opts label { display: flex; flex-direction: column; font-size: 0.8rem; color: var(--text-muted); }
+  .frm-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+  .frm-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .frm-table th, .frm-table td { text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .frm-table-wrap { overflow-x: auto; }
+  @media (max-width: 520px) { .frm-row, .frm-opts { grid-template-columns: 1fr; } }
   .att-export { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
   .att-export button { padding: 0.3rem 0.7rem; font-size: 0.85rem; }
   .att-member .absent { font-size: 0.7rem; color: #f87171; }
@@ -490,6 +510,166 @@ function initAttExport() {
 
 function escapeAtt(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 
+
+// ---------- Anmälningsblanketter ----------
+let formByEvent = new Map();   // event_id -> form
+let formCounts = new Map();    // event_id -> antal svar
+const openFormPanels = new Set();
+async function loadFormData() {
+  const [f, c] = await Promise.all([
+    supabaseClient.from('event_forms').select('*'),
+    supabaseClient.rpc('event_form_counts'),
+  ]);
+  formByEvent = new Map((f.data || []).map(r => [String(r.event_id), r]));
+  formCounts = new Map((c.data || []).map(r => [String(r.event_id), Number(r.n)]));
+}
+const FTYPES = { text: 'Kort text', long: 'Lång text', choice: 'Val (en av flera)', checkbox: 'Ja/Nej-ruta', number: 'Tal' };
+function newFieldId() { return 'f' + Math.random().toString(36).slice(2, 8); }
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function answerText(f, v) {
+  if (v === undefined || v === null || v === '') return '';
+  if (f.type === 'checkbox') return v ? 'Ja' : 'Nej';
+  return String(v);
+}
+
+function initFormButtons() {
+  document.querySelectorAll('.frm-btn').forEach(btn => {
+    const id = btn.dataset.id;
+    const panel = document.querySelector(`.frm-panel[data-panel-frm="${CSS.escape(id)}"]`);
+    const label = () => `📝 Anmälan${formByEvent.has(id) ? ' (' + (formCounts.get(id) || 0) + ')' : ''}`;
+    const setState = open => {
+      panel.hidden = !open;
+      btn.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', open);
+      btn.textContent = label() + (open ? ' ▴' : ' ▾');
+      if (open) { openFormPanels.add(id); renderFormPanel(id, panel); } else openFormPanels.delete(id);
+    };
+    if (openFormPanels.has(id)) setState(true);
+    btn.addEventListener('click', () => setState(panel.hidden));
+  });
+}
+
+async function renderFormPanel(evId, panel) {
+  const ev = allEvents.get(String(evId));
+  const existing = formByEvent.get(String(evId));
+  const form = existing ? JSON.parse(JSON.stringify(existing)) : { intro: '', fields: [], deadline: null, max_responses: null, is_open: true };
+  const draft = form.fields;
+
+  const draw = () => {
+    panel.innerHTML = `
+      <h4>${existing ? 'Anmälningsblankett' : 'Ny anmälningsblankett'} – ${escapeAtt(ev?.title || '')}</h4>
+      <label class="field-label">Inledande text (visas för medlemmarna)</label>
+      <textarea class="f-intro" rows="2" placeholder="T.ex. Anmäl dig till konserten senast...">${escapeAtt(form.intro || '')}</textarea>
+      <div class="frm-opts">
+        <label>Sista anmälningstid (valfritt)<input type="datetime-local" class="f-deadline" value="${toLocalInput(form.deadline)}"></label>
+        <label>Max antal anmälda (valfritt)<input type="number" min="1" class="f-max" value="${form.max_responses ?? ''}"></label>
+        <label style="flex-direction:row;align-items:center;gap:.4rem;color:var(--text)"><input type="checkbox" class="f-open" ${form.is_open ? 'checked' : ''}> Anmälan öppen</label>
+      </div>
+      <h4>Frågor</h4>
+      <p class="att-summary">Namn och stämma hämtas automatiskt från medlemmen. Lägg bara till extra frågor (t.ex. allergier, skjuts, antal gäster).</p>
+      <div class="f-fields">${draft.map((f, i) => `
+        <div class="frm-field" data-i="${i}">
+          <div class="frm-row">
+            <input type="text" class="ff-label" placeholder="Fråga" value="${escapeAtt(f.label)}">
+            <select class="ff-type">${Object.entries(FTYPES).map(([k, v]) => `<option value="${k}" ${f.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+          </div>
+          ${f.type === 'choice' ? `<input type="text" class="ff-options" placeholder="Alternativ, separera med komma" value="${escapeAtt((f.options || []).join(', '))}">` : ''}
+          <div class="frm-tools">
+            <label><input type="checkbox" class="ff-req" ${f.required ? 'checked' : ''}> Obligatorisk</label>
+            <button type="button" class="ff-up" ${i === 0 ? 'disabled' : ''}>↑</button>
+            <button type="button" class="ff-down" ${i === draft.length - 1 ? 'disabled' : ''}>↓</button>
+            <button type="button" class="btn-danger ff-del">Ta bort</button>
+          </div>
+        </div>`).join('') || '<p class="text-muted">Inga extra frågor – medlemmen anmäler sig bara med ett klick.</p>'}</div>
+      <div class="frm-actions">
+        <button type="button" class="f-add">+ Lägg till fråga</button>
+        <button type="button" class="f-save">Spara blankett</button>
+        ${existing ? '<button type="button" class="btn-danger f-delete">Ta bort blankett</button>' : ''}
+      </div>
+      <p class="error f-msg" hidden></p>
+      <div class="f-resp"></div>`;
+    wire();
+    if (existing) renderResponses();
+  };
+  const sync = () => {
+    form.intro = panel.querySelector('.f-intro').value;
+    const dl = panel.querySelector('.f-deadline').value;
+    form.deadline = dl ? new Date(dl).toISOString() : null;
+    const mx = parseInt(panel.querySelector('.f-max').value, 10);
+    form.max_responses = mx > 0 ? mx : null;
+    form.is_open = panel.querySelector('.f-open').checked;
+    panel.querySelectorAll('.frm-field').forEach(el => {
+      const f = draft[+el.dataset.i];
+      f.label = el.querySelector('.ff-label').value;
+      f.type = el.querySelector('.ff-type').value;
+      f.required = el.querySelector('.ff-req').checked;
+      const o = el.querySelector('.ff-options');
+      if (f.type === 'choice') f.options = o ? o.value.split(',').map(x => x.trim()).filter(Boolean) : (f.options || []);
+    });
+  };
+  const wire = () => {
+    panel.querySelector('.f-add').onclick = () => { sync(); draft.push({ id: newFieldId(), label: '', type: 'text', required: false, options: [] }); draw(); };
+    panel.querySelectorAll('.frm-field').forEach(el => {
+      const i = +el.dataset.i;
+      el.querySelector('.ff-type').onchange = () => { sync(); if (draft[i].type === 'choice' && !draft[i].options) draft[i].options = []; draw(); };
+      el.querySelector('.ff-del').onclick = () => { sync(); draft.splice(i, 1); draw(); };
+      el.querySelector('.ff-up').onclick = () => { sync(); [draft[i - 1], draft[i]] = [draft[i], draft[i - 1]]; draw(); };
+      el.querySelector('.ff-down').onclick = () => { sync(); [draft[i + 1], draft[i]] = [draft[i], draft[i + 1]]; draw(); };
+    });
+    const msg = t => { const m = panel.querySelector('.f-msg'); m.textContent = t || ''; m.hidden = !t; };
+    panel.querySelector('.f-save').onclick = async () => {
+      sync(); msg('');
+      for (const f of draft) {
+        if (!f.label.trim()) { msg('Alla frågor måste ha en text.'); return; }
+        if (f.type === 'choice' && (f.options || []).length < 2) { msg(`Frågan "${f.label}" behöver minst två alternativ.`); return; }
+      }
+      const row = { event_id: evId, intro: form.intro.trim() || null, fields: draft.map(f => ({ id: f.id, label: f.label.trim(), type: f.type, required: !!f.required, ...(f.type === 'choice' ? { options: f.options } : {}) })),
+        deadline: form.deadline, max_responses: form.max_responses, is_open: form.is_open, updated_at: new Date().toISOString() };
+      const { error } = await supabaseClient.from('event_forms').upsert(row, { onConflict: 'event_id' });
+      if (error) { msg(error.message); return; }
+      await loadFormData(); loadEvents();
+    };
+    const del = panel.querySelector('.f-delete');
+    if (del) del.onclick = async () => {
+      const n = formCounts.get(String(evId)) || 0;
+      if (!confirm(n ? `Ta bort blanketten OCH alla ${n} svar?` : 'Ta bort blanketten?')) return;
+      const { error } = await supabaseClient.from('event_forms').delete().eq('event_id', evId);
+      if (error) { msg(error.message); return; }
+      openFormPanels.delete(String(evId));
+      await loadFormData(); loadEvents();
+    };
+  };
+  const renderResponses = async () => {
+    const box = panel.querySelector('.f-resp');
+    box.innerHTML = '<p class="text-muted">Hämtar svar…</p>';
+    const { data, error } = await supabaseClient.rpc('admin_event_responses', { p_event: evId });
+    if (error) { box.innerHTML = `<p class="error">${escapeAtt(error.message)}</p>`; return; }
+    const rows = (data || []).sort((a, b) => (stammaRank(a.stamma) - stammaRank(b.stamma)) || svCollator.compare(a.name || '', b.name || ''));
+    const fields = existing.fields || [];
+    const mx = existing.max_responses;
+    box.innerHTML = `<h4>Svar (${rows.length}${mx ? ' av ' + mx : ''})</h4>` + (rows.length ? `
+      <div class="frm-table-wrap"><table class="frm-table"><thead><tr><th>Namn</th><th>Stämma</th>${fields.map(f => `<th>${escapeAtt(f.label)}</th>`).join('')}<th></th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td>${escapeAtt(r.name)}</td><td>${escapeAtt(r.stamma || '')}</td>${fields.map(f => `<td>${escapeAtt(answerText(f, r.answers?.[f.id]))}</td>`).join('')}<td><button type="button" class="btn-danger r-del" data-m="${r.member_id}" style="padding:.15rem .5rem;font-size:.8rem">Ta bort</button></td></tr>`).join('')}</tbody></table></div>
+      <div class="att-export"><button type="button" class="r-csv">Ladda ner CSV</button></div>` : '<p class="text-muted">Inga anmälningar än.</p>');
+    box.querySelectorAll('.r-del').forEach(b => b.onclick = async () => {
+      if (!confirm('Ta bort den här anmälan?')) return;
+      const { error: e2 } = await supabaseClient.rpc('admin_remove_event_response', { p_event: evId, p_member: b.dataset.m });
+      if (e2) { alert(e2.message); return; }
+      await loadFormData(); loadEvents();
+    });
+    const csv = box.querySelector('.r-csv');
+    if (csv) csv.onclick = () => downloadCsv(
+      [['Namn', 'Stämma', 'E-post', ...fields.map(f => f.label), 'Anmäld'],
+       ...rows.map(r => [r.name, r.stamma || '', r.email || '', ...fields.map(f => answerText(f, r.answers?.[f.id])), new Date(r.updated_at).toLocaleString('sv-SE')])],
+      `Anmälningar ${ev?.event_date || ''} ${ev?.title || ''}`.trim());
+  };
+  draw();
+}
+
 const EMPTY_LABELS = { rep: 'Inga kommande repetitioner.', konsert: 'Inga kommande konserter.', mote: 'Inga kommande möten.', ovrigt: 'Inget kommande inlagt.' };
 const moteInvites = new Map(); // event_id -> [{ name, response }]
 let isFullAdmin = false;       // stämledare ser möten men får bara avboka som admin
@@ -517,6 +697,7 @@ function eventHtml(ev) {
       </div>
       <div class="event-actions">
         ${ev.event_date <= todayStr ? `<button type="button" class="att-btn" data-id="${ev.id}" aria-expanded="false">Närvaro (${attCount(ev.id)}) ▾</button>` : ''}
+        ${ev.event_type === 'mote' ? '' : `<button type="button" class="frm-btn ${formByEvent.has(String(ev.id)) ? 'has' : ''}" data-id="${ev.id}" aria-expanded="false">📝 Anmälan${formByEvent.has(String(ev.id)) ? ' (' + (formCounts.get(String(ev.id)) || 0) + ')' : ''} ▾</button>`}
         <button type="button" class="mn-btn mn-open" data-id="${ev.id}" aria-expanded="false">🎙 Anteckningar</button>
         ${ev.event_type === 'mote'
           ? (isFullAdmin ? `<button type="button" class="btn-danger mote-cancel" data-id="${ev.id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Avboka</button>` : '')
@@ -525,6 +706,7 @@ function eventHtml(ev) {
         ${ev.series_id ? `<button type="button" class="btn-danger deleteEventBtn" data-series="${ev.series_id}" style="padding: 0.3rem 0.7rem; font-size: 0.85rem;">Ta bort serie</button>` : ''}
       </div>
       <div class="att-panel" data-panel-att="${ev.id}" hidden></div>
+      <div class="frm-panel" data-panel-frm="${ev.id}" hidden></div>
       <div class="mn-panel" data-panel-mn="${ev.id}" hidden></div>
     </div>`;
 }
@@ -580,6 +762,7 @@ async function loadEvents() {
     supabaseClient.from('events').select('*, booker:members!events_created_by_fkey(name)').order('event_date').order('event_time'),
     supabaseClient.from('meeting_invites').select('event_id, response, members(name)'),
     loadAttendanceData(),
+    loadFormData(),
   ]);
 
   if (error) {
@@ -616,6 +799,7 @@ async function loadEvents() {
   }));
   renderMonth();
   initAttExport();
+  initFormButtons();
 
   document.querySelectorAll('.att-btn').forEach(btn => {
     const id = btn.dataset.id;

@@ -8,6 +8,7 @@
 //     renderHead(track, headEl),   // knappar/namn ovanför vågformen (sidans egna)
 //     renderFoot(track, footEl),   // valfri rad under vågformen
 //     getBeats(),                  // valfritt: { bpm, offset, bpb } ritar taktrutnät i spåren
+//     onMoveSel(track, {a,b}, d),     // valfritt: dra inuti markeringen för att flytta det markerade ljudet d sekunder (låttid)
 //     onStretch(track, {a,b}, {a,b}),  // valfritt: dra i markeringens kant för att sträcka det markerade (låttid i s)
 //     onReorder(from, to),         // valfritt: handtag till vänster – dra spåret upp/ner (index i getTracks())
 //     onScrub(t, fas),             // valfritt: spelmarkören dras sidledes (fas 'start' | 'move' | 'end') – spåren står still. Utan den hoppar markören först när man släpper.
@@ -171,6 +172,17 @@
         ctx.fillText(hint, 10 * dpr, mid - 10 * dpr);
       }
       ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, mid, W, 1);
+      if (msel && msel.track === tr && msel.d) {   // förhandsvisning: det markerade ljudet flyttas hit
+        const o0 = xOf(msel.a) * dpr, o1 = xOf(msel.b) * dpr, n0 = xOf(msel.a + msel.d) * dpr, n1 = xOf(msel.b + msel.d) * dpr;
+        ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(o0, 0, o1 - o0, H);
+        ctx.fillStyle = 'rgba(229,169,104,0.25)'; ctx.fillRect(n0, 0, n1 - n0, H);
+        ctx.fillStyle = 'rgba(229,169,104,0.95)'; ctx.fillRect(n0, 0, 2 * dpr, H); ctx.fillRect(n1 - 2 * dpr, 0, 2 * dpr, H);
+        const label = `${msel.d >= 0 ? '+' : '−'}${Math.abs(msel.d).toFixed(2).replace('.', ',')} s`;
+        ctx.font = `600 ${12 * dpr}px DM Sans, sans-serif`; ctx.textBaseline = 'top';
+        const tw = ctx.measureText(label).width + 12 * dpr, lx = Math.max(2 * dpr, Math.min(W - tw - 2 * dpr, (n0 + n1) / 2 - tw / 2));
+        ctx.fillStyle = 'rgba(17,19,23,0.92)'; ctx.fillRect(lx, 4 * dpr, tw, 20 * dpr);
+        ctx.fillStyle = '#E5A968'; ctx.fillText(label, lx + 6 * dpr, 8 * dpr);
+      }
       if (stretch && stretch.track === tr) {   // förhandsvisning medan man drar: ny längd och tempo
         const n0 = xOf(stretch.a) * dpr, n1 = xOf(stretch.b) * dpr;
         ctx.fillStyle = 'rgba(229,169,104,0.22)'; ctx.fillRect(n0, 0, n1 - n0, H);
@@ -199,7 +211,9 @@
     }
 
     // sträck markeringen: dra i dess vänstra eller högra kant (fäster mot slagen när taktrutnätet visas, Alt = fritt)
-    let stretch = null;
+    let stretch = null, msel = null;   // msel = markerat ljud som dras till ny plats i spåret
+    const canMoveSel = tr => !!(o.onMoveSel && tr.clip && !tr.readOnly);
+    const insideSel = (tr, x) => sel && sel.track === tr && Math.abs(sel.b - sel.a) >= 0.02 && x > xOf(Math.min(sel.a, sel.b)) + 7 && x < xOf(Math.max(sel.a, sel.b)) - 7;
     const canStretch = tr => !!(o.onStretch && tr.clip && !tr.readOnly);
     const MIN_RATE = 0.5, MAX_RATE = 2;
     function stretchEdgeAt(tr, x) {
@@ -226,8 +240,10 @@
       c.addEventListener('pointermove', e => {   // muspekaren visar ↔ över markeringens kanter
         if (drag || stretch) return;
         const edge = stretchEdgeAt(tr, e.clientX - c.getBoundingClientRect().left);
-        c.style.cursor = edge ? 'ew-resize' : '';
-        c.title = edge ? 'Dra för att sträcka det markerade (ändrar tempot, inte tonhöjden). Alt = utan att fästa mot slagen.' : '';
+        const inside = !edge && tool === 'select' && canMoveSel(tr) && insideSel(tr, e.clientX - c.getBoundingClientRect().left);
+        c.style.cursor = edge ? 'ew-resize' : inside ? 'grab' : '';
+        c.title = edge ? 'Dra för att sträcka det markerade (ändrar tempot, inte tonhöjden). Alt = utan att fästa mot slagen.'
+          : inside ? 'Dra för att flytta det markerade ljudet i spåret – resten av spåret ligger kvar. Alt = utan att fästa mot slagen.' : '';
       });
       c.addEventListener('pointerdown', e => {
         const r = c.getBoundingClientRect(), x = e.clientX - r.left;
@@ -249,6 +265,25 @@
             const st = stretch; stretch = null;
             if (st && Math.abs((st.b - st.a) - (st.b0 - st.a0)) > 0.005) o.onStretch(tr, { a: st.a0, b: st.b0 }, { a: st.a, b: st.b });
             else drawTrack(tr);
+          };
+          c.addEventListener('pointermove', mv); c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+          return;
+        }
+        if (!e.button && tool === 'select' && canMoveSel(tr) && insideSel(tr, x)) {   // flytta det markerade ljudet
+          e.preventDefault(); e.stopPropagation();
+          const a = Math.min(sel.a, sel.b), b = Math.max(sel.a, sel.b);
+          msel = { track: tr, a, b, d: 0, x0: e.clientX };
+          c.setPointerCapture(e.pointerId); c.classList.add('dragging'); c.style.cursor = 'grabbing';
+          const mv = ev => {
+            let d = (ev.clientX - msel.x0) / view.pps;
+            const na = snapT(a + d, ev.altKey); d = na - a;
+            msel.d = Math.max(-a, d); drawTrack(tr);
+          };
+          const up = () => {
+            c.removeEventListener('pointermove', mv); c.removeEventListener('pointerup', up); c.removeEventListener('pointercancel', up);
+            c.classList.remove('dragging'); c.style.cursor = '';
+            const m = msel; msel = null;
+            if (m && Math.abs(m.d) > 0.005) o.onMoveSel(tr, { a: m.a, b: m.b }, m.d); else drawTrack(tr);
           };
           c.addEventListener('pointermove', mv); c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
           return;

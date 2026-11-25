@@ -944,6 +944,7 @@ const tl = WaveTimeline.create(document.getElementById('tl'), {
   onSelection: s => { sel = s; panel.selInfo(); if (window.stZoomSelUi) stZoomSelUi(); },
   onView: v => { document.getElementById('zoomVal').textContent = document.getElementById('zoomVal2').textContent = v.spanLabel(); syncZoomRange(v); },
   onStretch: (t, from, to) => stretchSelection(t, from, to),
+  onMoveSel: (t, r, d) => moveSelection(t, r, d),
   getBeats: () => songBpm() && document.getElementById('optGrid').checked
     ? { bpm: songBpm(), offset: Number(song.beat_offset) || 0, bpb: Math.max(1, Number(song.beats_per_bar) || 4) } : null,
   renderHead,
@@ -954,7 +955,7 @@ const tl = WaveTimeline.create(document.getElementById('tl'), {
   },
   renderFoot: (t, foot) => { if (t.kind === 'stem' && isAdmin) { foot.innerHTML = '<div class="suggestion" hidden></div>'; t._sugg = foot.firstChild; } },
 });
-const MAX_OFFSET_MS = 30000;
+const MAX_OFFSET_MS = 4 * 3600 * 1000;   // spåret kan placeras fritt (gränsen finns bara mot orimliga värden)
 function setOffset(t, ms, live) {
   if (t.locked) return;
   ms = Math.round(Math.max(-MAX_OFFSET_MS, Math.min(MAX_OFFSET_MS, Number(ms) || 0)));
@@ -1496,6 +1497,21 @@ async function analysisFor(t) {
     p => vtStatus(`Analyserar tonerna i ${t.label}… ${Math.round(p * 100)} %`));
   t._an = { clip: t.clip, res };
   return res;
+}
+// flytta det markerade ljudet d sekunder inom spåret – resten av spåret (och spårets synk) ligger kvar
+function moveSelection(t, r, d) {
+  if (!t || !t.clip || t.readOnly) return;
+  const off = offS(t), dur = tDur(t);
+  const fa = Math.max(0, r.a - off), fb = Math.min(dur, r.b - off);
+  if (fb - fa < 0.01) { toast('Markeringen innehåller inget ljud i spåret'); return; }
+  const part = AudioEdit.crop(t.clip, fa, fb);
+  let base = AudioEdit.silence(t.clip, fa, fb), at = fa + d, newOff = null;
+  if (at < 0) { base = AudioEdit.insertSilence(base, 0, -at); newOff = Math.round((off + at) * 1000); at = 0; }   // flyttat före spårets början: spåret börjar tidigare, resten står still
+  let clip = AudioEdit.paste(base, at, part, 'mix');
+  AudioEdit.fadeEdges(clip, at, 4); AudioEdit.fadeEdges(clip, at + (fb - fa), 4);
+  const na = (newOff != null ? newOff / 1000 : off) + at;
+  applyEdit(t, clip, newOff, `Det markerade flyttat ${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(2)} s`);
+  sel = { track: t, a: na, b: na + (fb - fa) }; tl.selection = sel; panel.selInfo();
 }
 function addGenTrack(label, clip, offsetMs) {
   const t = { kind: 'rec', key: 'gen-' + (++genNo), label, color: REC_COLOR, mine: true, memberId: me.id,

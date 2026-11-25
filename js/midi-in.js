@@ -37,11 +37,17 @@
 
   // ---------- inspelade ljud: en sampling var tredje halvton, tonerna däremellan räknas fram ----------
   //   piano: Salamander Grand Piano (Alexander Holm, CC BY 3.0)
+  //   dam/herr/kor: Sonatina Symphonic Orchestra, Mattias Westlund (CC Sampling Plus 1.0)
   //   aah/ooh: körljud ur FluidR3 GM (Frank Wen, via midi-js-soundfonts, CC BY 3.0) – loopas så att tonen kan hållas
   const INSTR = {
     piano: { name: 'Piano', dir: '/audio/piano/', pcs: [['C', 0], ['Ds', 3], ['Fs', 6], ['A', 9]], lo: 21, hi: 108 },
     aah: { name: 'Kör "aah"', dir: '/audio/choir/aah/', pcs: [['C', 0], ['Eb', 3], ['Gb', 6], ['A', 9]], lo: 36, hi: 84, loop: true },
     ooh: { name: 'Kör "ooh"', dir: '/audio/choir/ooh/', pcs: [['C', 0], ['Eb', 3], ['Gb', 6], ['A', 9]], lo: 36, hi: 84, loop: true },
+    // Sonatina Symphonic Orchestra (Mattias Westlund, CC Sampling Plus 1.0): riktig dam- och herrkör
+    dam: { name: 'Damkör', dir: '/audio/choir/dam/', files: [['G4', 67], ['As4', 70], ['Cs5', 73], ['E5', 76], ['G5', 79], ['As5', 82], ['C6', 84]], loop: true },
+    herr: { name: 'Herrkör', dir: '/audio/choir/herr/', files: [['G2', 43], ['As2', 46], ['Cs3', 49], ['E3', 52], ['G3', 55], ['As3', 58], ['Cs4', 61], ['E4', 64]], loop: true },
+    // blandad: herrkör under D4, damkör från D4 – som en riktig kör
+    kor: { name: 'Blandad kör', mix: [['herr', 0, 61], ['dam', 62, 127]], loop: true },
   };
   const bank = {}, banking = {};   // ljud → Map(midi → { buf, a, b })
   let instr = 'piano'; try { const v = localStorage.getItem('hv-midi-instr'); if (INSTR[v]) instr = v; } catch (e) {}
@@ -61,8 +67,9 @@
     const def = INSTR[name]; if (!def) return Promise.resolve(false);
     if (bank[name]) return Promise.resolve(true);
     if (!banking[name]) banking[name] = (async () => {
-      const list = [];
-      for (let o = 0; o <= 8; o++) def.pcs.forEach(([p, pc]) => { const m = 12 * (o + 1) + pc; if (m >= def.lo && m <= def.hi) list.push([p + o, m]); });
+      if (def.mix) { const ok = await Promise.all(def.mix.map(([k]) => loadInstrument(ctx, k))); if (ok.includes(false)) throw new Error('delljud saknas'); bank[name] = true; return true; }
+      const list = def.files ? def.files.slice() : [];
+      if (!def.files) for (let o = 0; o <= 8; o++) def.pcs.forEach(([p, pc]) => { const m = 12 * (o + 1) + pc; if (m >= def.lo && m <= def.hi) list.push([p + o, m]); });
       const map = new Map();
       await Promise.all(list.map(async ([file, m]) => {
         const r = await fetch(def.dir + file + '.mp3'); if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -98,6 +105,7 @@
   function setReverb(on) { reverbOn = !!on; try { localStorage.setItem('hv-piano-reverb', on ? '1' : '0'); } catch (e) {} }
   // en ton från samplingarna (närmaste sampling, tonhöjden justeras). Piano: dämpas vid släpp. Kör: loopas så länge tonen hålls, tonar ut vid släpp.
   function sampleVoice(ctx, dest, n, v, when, name) {
+    if (INSTR[name].mix) { const part = INSTR[name].mix.find(([, a, b]) => n >= a && n <= b); return sampleVoice(ctx, dest, n, v, when, part[0]); }
     const map = bank[name], def = INSTR[name];
     let best = null, bd = 99;
     map.forEach((_, m) => { const d = Math.abs(n - m); if (d < bd) { bd = d; best = m; } });

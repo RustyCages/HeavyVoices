@@ -35,7 +35,7 @@
       <div class="tool-row desktop-only" data-g="edit">
         <span class="k">Klipp</span>
         <button type="button" class="btn-outline" data-a="mute" title="Ersätt det markerade med tystnad – resten av spåret ligger kvar på samma plats (Delete)">🔇 Tysta markerat</button>
-        <button type="button" class="btn-outline" data-a="cut" title="Ta bort det markerade och dra ihop – allt efter flyttas tidigare (Shift+Delete)">✂ Ta bort och dra ihop</button>
+        <button type="button" class="btn-outline" data-a="cut" title="Ta bort det markerade och dra ihop – allt efter flyttas tidigare, även om markeringen ligger i tomrummet före inspelningen (Shift+Delete)">✂ Ta bort och dra ihop</button>
         <button type="button" class="btn-outline" data-a="crop" title="Behåll bara det markerade – det ligger kvar på samma plats i låten">⌗ Beskär till markerat</button>
         <span class="status" data-r="sel">Markera ett område med ▭ Markera</span>
       </div>
@@ -111,7 +111,19 @@
     const sil = () => Math.max(0.01, Math.min(60, Number($('[data-r=sil]').value) || 0.5));
     const act = {
       mute() { const r = needSel(); if (!r) return; const tr = o.getTrack(); o.onEdit(tr, AudioEdit.silence(tr.clip, r[0], r[1]), null, `${(r[1] - r[0]).toFixed(2)} s tystat – resten ligger kvar`); },
-      cut() { const r = needSel(); if (!r) return; const tr = o.getTrack(); const c = AudioEdit.cut(tr.clip, r[0], r[1]); AudioEdit.fadeEdges(c, r[0]); o.onEdit(tr, c, null, `${(r[1] - r[0]).toFixed(2)} s borttaget`); },
+      // ta bort tiden och dra ihop: det som ligger efter i spåret flyttas tidigare – även när markeringen ligger i tomrummet före inspelningen
+      cut() {
+        const tr = o.getTrack(), s = o.getSelection();
+        if (!s || s.track !== tr || Math.abs(s.b - s.a) < 0.01) { toast('Markera först ett område i det valda spåret (▭ Markera och dra)'); return; }
+        const a = Math.min(s.a, s.b), b = Math.max(s.a, s.b), off = offS(tr), end = off + dur(tr);
+        const ca = Math.max(a, off) - off, cb = Math.min(b, end) - off;      // den del som ligger i ljudet (filens tid)
+        const before = Math.max(0, Math.min(b, off) - a);                     // tomrum före ljudet som tas bort
+        if (a >= end) { toast('Markeringen ligger efter ljudet – där finns inget att dra ihop'); return; }
+        let c = tr.clip;
+        if (cb - ca > 0.005) { c = AudioEdit.cut(c, ca, cb); AudioEdit.fadeEdges(c, ca); }
+        const newOff = before > 0.0005 ? Math.round((off - before) * 1000) : null;
+        o.onEdit(tr, c, newOff, `${(b - a).toFixed(2)} s borttaget` + (before > 0.0005 ? ' – inspelningen flyttades tidigare' : ''));
+      },
       // det som blir kvar ska ligga kvar på samma ställe i låten → förskjutningen flyttas med
       crop() { const r = needSel(); if (!r) return; const tr = o.getTrack(); o.onEdit(tr, AudioEdit.crop(tr.clip, r[0], r[1]), (tr.offsetMs || 0) + Math.round(r[0] * 1000), 'Beskuret'); },
       silStart() { const tr = o.getTrack(); o.onEdit(tr, AudioEdit.insertSilence(tr.clip, 0, sil()), null, `${sil()} s tystnad i början`); },

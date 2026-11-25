@@ -546,13 +546,13 @@
         <span class="vp-t">🎹 Piano</span>
         <button type="button" class="btn-outline" id="vpDown" title="En oktav ner (Z)">−</button><span class="vp-oct" id="vpOct"></span><button type="button" class="btn-outline" id="vpUp" title="En oktav upp (X)">+</button>
         <span class="vp-hint">Mus eller tangentbord: <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd> vita · <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> svarta · <kbd>Z</kbd>/<kbd>X</kbd> oktav · håll <kbd>Shift</kbd> = pedal</span>
-        <label class="opt" title="Vilket ljud tangenterna har – gäller också MIDI-spåret som skapas">Ljud <select id="vpInstr"><option value="piano">Piano</option><option value="aah">Kör "aah"</option><option value="ooh">Kör "ooh"</option></select></label>
+        <label class="opt" title="Vilket ljud tangenterna har – gäller också MIDI-spåret som skapas">Ljud <select id="vpInstr"><option value="piano">Piano</option><option value="kor">Blandad kör</option><option value="dam">Damkör</option><option value="herr">Herrkör</option><option value="aah">Kör "aah" (syntkör)</option><option value="ooh">Kör "ooh" (syntkör)</option></select></label>
         <label class="opt" title="Rumsklang på pianoljudet – hörs både när du spelar och i det inspelade spåret"><input type="checkbox" id="vpVerb"> klang</label>
         <span class="vp-load" id="vpLoad"></span>
         <button type="button" class="btn-outline" id="vpClose" title="Stäng pianot">✕</button>
       </div>
       <div class="vp-keys" id="vpKeys"></div>
-      <div class="vp-credit">Pianoljud: <a href="https://sfzinstruments.github.io/pianos/salamander" target="_blank" rel="noopener">Salamander Grand Piano</a> av Alexander Holm · Körljud: FluidR3 GM av Frank Wen via <a href="https://github.com/gleitz/midi-js-soundfonts" target="_blank" rel="noopener">midi-js-soundfonts</a> · båda <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a></div>
+      <div class="vp-credit">Pianoljud: <a href="https://sfzinstruments.github.io/pianos/salamander" target="_blank" rel="noopener">Salamander Grand Piano</a> av Alexander Holm · Syntkör: FluidR3 GM av Frank Wen via <a href="https://github.com/gleitz/midi-js-soundfonts" target="_blank" rel="noopener">midi-js-soundfonts</a> (<a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>) · Dam-/herrkör: <a href="https://github.com/peastman/sso" target="_blank" rel="noopener">Sonatina Symphonic Orchestra</a> av Mattias Westlund (<a href="https://creativecommons.org/licenses/sampling+/1.0/" target="_blank" rel="noopener">CC Sampling Plus 1.0</a>)</div>
     </div>
   </div>
   <p class="hint">Sjung in en egen stämma eller idé till en låt. Du hör låtens spår i hörlurarna medan du spelar in, och kan sedan flytta, klippa och spara inspelningen. Dina inspelningar är privata tills du delar dem.</p>
@@ -2111,7 +2111,9 @@ document.addEventListener('DOMContentLoaded', function () {   // raden skapas av
   };
   ['focus', 'pointerdown'].forEach(ev => sel.addEventListener(ev, fill));
   setInterval(() => { if (!sel.options.length || (sel.options.length === 1 && !sel.value)) fill(); }, 2000);
-  snd.value = MidiIn.instrument === 'piano' ? 'aah' : MidiIn.instrument;
+  snd.value = 'auto';
+  // sopran/alt → damkör, tenor/bas → herrkör, annars efter tonläget
+  const autoSnd = (stem, notes) => /sopran|alt\b|alto/i.test(stem.label) ? 'dam' : /tenor|bas\b|bass|baryton/i.test(stem.label) ? 'herr' : 'kor';
   go.addEventListener('click', async () => {
     fill();
     const stem = tracks.find(t => t.key === sel.value), p = stem && pitchByKey[stem.key];
@@ -2120,8 +2122,9 @@ document.addEventListener('DOMContentLoaded', function () {   // raden skapas av
     if (!notes.length) return;
     go.disabled = true; st.textContent = `Sjunger ${notes.length} noter…`;
     try {
-      const buf = await MidiIn.render(notes, getCtx().sampleRate, snd.value);
-      const t = addGenTrack(`🎶 ${stem.label} (${MidiIn.INSTR[snd.value].name})`, AudioEdit.fromBuffer(buf), notes[0].t * 1000);
+      const ins = snd.value === 'auto' ? autoSnd(stem, notes) : snd.value;
+      const buf = await MidiIn.render(notes, getCtx().sampleRate, ins);
+      const t = addGenTrack(`🎶 ${stem.label} (${MidiIn.INSTR[ins].name})`, AudioEdit.fromBuffer(buf), notes[0].t * 1000);
       t.midiNotes = notes; updateRecTools();
       st.textContent = '✓ Nytt spår – spara det, eller ladda ner noterna under Fil';
       toast(`${stem.label} sjungs nu i spåret ”${t.label}”`, 4000);
@@ -3454,7 +3457,7 @@ setInterval(updateSaveStat, 1000);
   const sing = document.createElement('div'); sing.className = 'tool-row'; sing.id = 'singRow';
   sing.innerHTML = `<span class="k">🎶 Sjung stämman</span>
     <select id="singStem" title="Stämma med noter (från notanalysen i Röstövning)"></select>
-    <select id="singSnd"><option value="aah">Kör "aah"</option><option value="ooh">Kör "ooh"</option><option value="piano">Piano</option></select>
+    <select id="singSnd"><option value="auto">Kör efter stämma (dam/herr)</option><option value="kor">Blandad kör</option><option value="dam">Damkör</option><option value="herr">Herrkör</option><option value="aah">Kör "aah" (syntkör)</option><option value="ooh">Kör "ooh" (syntkör)</option><option value="piano">Piano</option></select>
     <button type="button" class="btn-outline" id="singGo" title="Gör ett nytt spår där stämmans noter sjungs – bra för att höra hur stämman eller en harmoni ska låta">🎶 Sjung</button>
     <span class="status" id="singSt"></span>`;
   panel.appendChild(sing);

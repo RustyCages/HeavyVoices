@@ -518,7 +518,7 @@
         <button class="btn-outline" id="markClear" hidden title="Ta bort alla markörer">✕ Rensa markörer</button>
         <button class="btn-outline" id="newTrackBtn" title="Lägg till ett tomt spår att spela in eller klistra in i">➕ Nytt tomt spår</button>
         <button class="btn-outline" id="importBtn" title="Ladda in en eller flera ljudfiler (MP3, WAV, M4A …) från datorn som nya spår – t.ex. en stämma som ett program sjungit. Du kan också dra filer till tidslinjen.">📂 Ladda in ljudfil</button>
-        <input type="file" id="importFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" multiple hidden>
+        <input type="file" id="importFile" data-keep-wav accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" multiple hidden>
         <span class="midi-ctl desktop-only" id="midiCtl"><button class="btn-outline" id="pianoBtn" aria-pressed="false" aria-controls="vpiano" title="Piano på skärmen – spela med musen eller datorns tangentbord. Spelas in när du trycker 🎹 Spela in MIDI.">🎹 Piano</button><button class="btn-outline" id="midiBtn" title="Spela in från ett MIDI-keyboard eller digitalpiano (USB). Låten spelas medan du spelar, och du får ett nytt spår med pianoljud – och noterna som MIDI-fil.">🎹 Spela in MIDI</button>
           <label class="opt" id="midiMonL" title="Tangenterna på ett inkopplat MIDI-keyboard hörs i datorn – bra om keyboardet saknar egna högtalare. Stäng av om pianot låter själv."><input type="checkbox" id="midiMon"> keyboard hörs i datorn</label></span>
         <span class="sp"></span>
@@ -591,7 +591,7 @@
       <div class="st-grid">
         <div class="st-tracks">
       <div class="lyric" id="lyric" hidden><div class="now" id="lyNow">&nbsp;</div><div class="next" id="lyNext"></div></div>
-      <div id="tl"></div>
+      <div id="tl" data-keep-wav></div>
         </div>
         <aside class="st-side" aria-label="Verktyg för valt spår">
       <div id="panel"></div>
@@ -674,7 +674,7 @@
   <details class="card static wav-card" id="wavHome" style="margin-top:1.5rem;">
     <summary><h2 style="display:inline; margin:0; font-size:1.15rem;">🔄 Konvertera WAV till MP3</h2></summary>
     <p class="hint" style="margin:0.6rem 0 0.7rem;">Gör om stora WAV-filer till MP3 och spara dem på datorn. Allt sker i din webbläsare – inget skickas iväg. WAV-filer sparas aldrig på nätet: laddar du in en WAV i Studio och sparar den görs den om till MP3 automatiskt.</p>
-    <div id="wavConvert"></div>
+    <div id="wavConvert" data-keep-wav></div>
   </details>
 </div>
 

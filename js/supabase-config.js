@@ -139,3 +139,55 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
   setInterval(check, 30000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
 })();
+
+// ---------- WAV/AIFF/FLAC sparas aldrig på nätet: görs om till MP3 direkt när någon väljer eller drar in en sådan fil ----------
+// Gäller alla filväljare och släppytor på sidorna. Undantag: element (eller förälder) med data-keep-wav – t.ex. Studio, som
+// arbetar med ljudet lokalt och själv sparar MP3, och WAV→MP3-verktyget.
+(function () {
+  const RX = /\.(wav|wave|aif|aiff|aifc|flac)$/i;
+  const isRaw = f => !!f && (RX.test(f.name || '') || /^audio\/(x-)?(wav|wave|aiff|flac)$/i.test(f.type || ''));
+  let libP = null;
+  const lib = () => window.AudioEdit && AudioEdit.toMp3File ? Promise.resolve() : (libP = libP || new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = '/js/audio-edit.js'; s.onload = res; s.onerror = () => { libP = null; rej(new Error('kunde inte ladda ljudverktyget')); }; document.head.appendChild(s);
+  }));
+  let box = null;
+  const note = (msg, done) => {
+    if (!box) { box = document.createElement('div'); box.style.cssText = 'position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);z-index:99999;background:#1f232c;color:#fff;border:1px solid #E5A968;border-radius:0.6rem;padding:0.6rem 1rem;font:500 0.9rem system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:90vw'; document.body.appendChild(box); }
+    box.textContent = msg; box.hidden = false;
+    clearTimeout(box._t); if (done) box._t = setTimeout(() => { box.hidden = true; }, 4000);
+  };
+  async function convertAll(files) {
+    await lib();
+    const out = [];
+    for (const f of files) {
+      if (!isRaw(f)) { out.push(f); continue; }
+      note(`${f.name} är okomprimerat ljud – gör om till MP3…`);
+      out.push(await AudioEdit.toMp3File(f, 192, p => note(`Gör om ${f.name} till MP3… ${Math.round(p * 100)} %`)));
+    }
+    note(`✓ Gjort om till MP3 (WAV sparas inte på nätet)`, true);
+    return out;
+  }
+  const toList = files => { const dt = new DataTransfer(); files.forEach(f => dt.items.add(f)); return dt; };
+  // filväljare
+  document.addEventListener('change', async e => {
+    const inp = e.target;
+    if (!(inp instanceof HTMLInputElement) || inp.type !== 'file' || inp._wavDone || inp.closest('[data-keep-wav]')) return;
+    const files = [...(inp.files || [])]; if (!files.some(isRaw)) return;
+    e.stopImmediatePropagation();
+    try { const conv = await convertAll(files); inp.files = toList(conv).files; }
+    catch (err) { note('Kunde inte göra om till MP3: ' + (err.message || err), true); inp.value = ''; return; }
+    inp._wavDone = true; inp.dispatchEvent(new Event('change', { bubbles: true })); inp._wavDone = false;
+  }, true);
+  // dra och släpp
+  document.addEventListener('drop', async e => {
+    if (e._wavDone || !e.dataTransfer || e.target.closest && e.target.closest('[data-keep-wav]')) return;
+    const files = [...(e.dataTransfer.files || [])]; if (!files.some(isRaw)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const target = e.target, x = e.clientX, y = e.clientY;
+    try {
+      const dt = toList(await convertAll(files));
+      const ev = new DragEvent('drop', { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: dt });
+      ev._wavDone = true; target.dispatchEvent(ev);
+    } catch (err) { note('Kunde inte göra om till MP3: ' + (err.message || err), true); }
+  }, true);
+})();

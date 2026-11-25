@@ -114,12 +114,6 @@
     </form>
   </div>
 
-  <div class="card">
-    <h3>Konvertera WAV till MP3</h3>
-    <p class="text-muted" style="margin: 0 0 0.6rem; font-size: 0.9rem;">Gör om stora WAV-filer till MP3 och spara dem på datorn. Allt sker i din webbläsare, inget skickas iväg. (WAV-filer som laddas upp som stämfiler görs om till MP3 automatiskt – WAV sparas aldrig på nätet.)</p>
-    <div id="wavConvert"></div>
-  </div>
-
   <h3 style="margin: 1.5rem 0 0.75rem;">Låtar</h3>
   <div id="songList"><p class="text-muted">Laddar...</p></div>
 </div>
@@ -1102,7 +1096,5 @@ document.getElementById('addSongForm').addEventListener('submit', async (e) => {
 })();
 </script>
 
-<script src="/js/wav-convert.js"></script>
-<script>WavConvert.mount(document.getElementById('wavConvert'));</script>
 </body>
 </html>

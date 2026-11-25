@@ -157,11 +157,11 @@
         <thead>
           <tr>
             <th class="col-check"><input type="checkbox" id="checkAll" title="Markera alla"></th>
-            <th class="sortable" data-sort="name">Namn</th><th class="sortable" data-sort="email">E-post</th><th class="sortable" data-sort="stamma">Stämma</th><th class="sortable col-paid" data-sort="fee_paid">Betald</th><th class="sortable col-reg" data-sort="created_at" title="När kontot skapades (registrering eller inbjudan)">Registrerad</th><th class="sortable" data-sort="status">Status</th><th class="sortable" data-sort="role">Roll</th><th></th>
+            <th class="sortable" data-sort="name">Namn</th><th class="sortable" data-sort="email">E-post</th><th class="sortable" data-sort="stamma">Stämma</th><th title="Visas dolt. Tryck på Visa för att se hela. Varje visning loggas.">Personnr</th><th class="sortable col-paid" data-sort="fee_paid">Betald</th><th class="sortable col-reg" data-sort="created_at" title="När kontot skapades (registrering eller inbjudan)">Registrerad</th><th class="sortable" data-sort="status">Status</th><th class="sortable" data-sort="role">Roll</th><th></th>
           </tr>
         </thead>
         <tbody id="membersTableBody">
-          <tr><td colspan="9" class="text-muted">Laddar...</td></tr>
+          <tr><td colspan="10" class="text-muted">Laddar...</td></tr>
         </tbody>
       </table>
     </div>
@@ -249,6 +249,16 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('sv-SE');
 }
 
+// Personnummer: listan får bara födelsedatum (resten visas först när admin trycker Visa, och det loggas)
+const pnMap = new Map();
+async function loadPnOverview() {
+  pnMap.clear();
+  try {
+    const { data } = await supabaseClient.rpc('admin_personnummer_overview');
+    (data || []).forEach(r => pnMap.set(r.member_id, r.birth));
+  } catch (e) {}
+}
+
 async function loadMembers(attempt = 0) {
   const tbody = document.getElementById('membersTableBody');
   let res;
@@ -264,17 +274,18 @@ async function loadMembers(attempt = 0) {
     ]);
   } catch (e) {
     if (attempt < 1) return loadMembers(attempt + 1);
-    tbody.innerHTML = '<tr><td colspan="9" class="error">Medlemslistan svarar inte. <button type="button" class="btn-outline" onclick="location.reload()">Ladda om sidan</button></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="error">Medlemslistan svarar inte. <button type="button" class="btn-outline" onclick="location.reload()">Ladda om sidan</button></td></tr>';
     return;
   }
   const { data, error } = res;
 
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="9" class="error">Kunde inte hämta medlemmar: ${esc(error.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="error">Kunde inte hämta medlemmar: ${esc(error.message)}</td></tr>`;
     return;
   }
 
   members = data || [];
+  await loadPnOverview();
   // släng markeringar för medlemmar som inte finns kvar
   [...selected].forEach(id => { if (!members.some(m => m.id === id)) selected.delete(id); });
 
@@ -335,7 +346,7 @@ function renderMembers() {
   document.getElementById('listCount').textContent = list.length === members.length ? '' : `Visar ${list.length} av ${members.length}`;
 
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-muted">${members.length ? 'Inga medlemmar matchar.' : 'Inga medlemmar än.'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="text-muted">${members.length ? 'Inga medlemmar matchar.' : 'Inga medlemmar än.'}</td></tr>`;
     updateSummary();
     updateSelectionUi();
     return;
@@ -355,6 +366,7 @@ function renderMembers() {
       <td>${esc(m.name)}${req}</td>
       <td>${esc(m.email || '—')}</td>
       <td><select data-id="${m.id}" class="stammaSelect" aria-label="Stämma för ${esc(m.name)}">${stammaOptions(m.stamma)}</select></td>
+      <td class="pnCell" style="white-space:nowrap;font-variant-numeric:tabular-nums">${pnMap.has(m.id) ? `<span class="pnVal" data-id="${m.id}">${esc(pnMap.get(m.id))}-••••</span> <button type="button" class="btn-outline pnShow" data-id="${m.id}" style="padding:.1rem .45rem;font-size:.75rem">Visa</button>` : '<span class="text-muted">—</span>'}</td>
       <td class="col-paid">
         <input type="checkbox" class="paidCheck" data-id="${m.id}" ${m.fee_paid ? 'checked' : ''} title="${m.fee_paid && m.fee_paid_at ? 'Betald ' + fmtDate(m.fee_paid_at) : 'Ej betald'}" aria-label="Avgift betald för ${esc(m.name)}">
       </td>
@@ -457,6 +469,18 @@ function renderMembers() {
       sel.disabled = false;
       if (error) { alert('Kunde inte ändra stämma: ' + error.message); sel.value = prev || ''; return; }
       if (m) m.stamma = value;
+    });
+  });
+
+  tbody.querySelectorAll('.pnShow').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id, span = tbody.querySelector('.pnVal[data-id="' + id + '"]');
+      btn.disabled = true;
+      const { data, error } = await supabaseClient.rpc('admin_reveal_personnummer', { p_member: id });
+      btn.disabled = false;
+      if (error || !data) { alert('Kunde inte visa personnumret.'); return; }
+      span.textContent = data; btn.hidden = true;
+      setTimeout(() => { span.textContent = (pnMap.get(id) || '') + '-••••'; btn.hidden = false; }, 15000);   // döljs igen efter 15 s
     });
   });
 
@@ -1029,6 +1053,10 @@ document.getElementById('inviteForm').addEventListener('submit', async (e) => {
     <p class="muted" style="font-size:.8rem;margin:0 0 .6rem">Byter du e-post ändras även inloggningen. Personen loggar då in med den nya adressen.</p>
     <label class="muted" for="editStamma">Stämma</label>
     <select id="editStamma" style="width:100%;margin-bottom:.8rem"></select>
+    <label class="muted" for="editPn">Personnummer</label>
+    <input type="text" id="editPn" inputmode="numeric" maxlength="15" autocomplete="off" placeholder="ÅÅÅÅMMDD-NNNN" style="width:100%;margin-bottom:.2rem">
+    <p class="muted" id="editPnHint" style="font-size:.8rem;margin:0 0 .4rem">Lämna tomt för att inte ändra. Ändringar loggas.</p>
+    <label id="editPnClearRow" class="muted" style="display:none;align-items:center;gap:.4rem;margin:0 0 .8rem;font-size:.85rem"><input type="checkbox" id="editPnClear" style="width:auto;margin:0"> Ta bort personnumret</label>
     <p class="error" id="editError"></p>
     <div style="display:flex;gap:.6rem;justify-content:flex-end">
       <button type="button" class="btn-outline" id="editCancel">Avbryt</button>
@@ -1084,6 +1112,11 @@ function openEdit(id) {
   document.getElementById('editEmail').value = m.email || '';
   document.getElementById('editStamma').innerHTML = stammaOptions(m.stamma);
   document.getElementById('editError').textContent = '';
+  const hasPn = pnMap.has(id);
+  document.getElementById('editPn').value = '';
+  document.getElementById('editPn').placeholder = hasPn ? 'Finns. Skriv nytt för att ersätta' : 'ÅÅÅÅMMDD-NNNN';
+  document.getElementById('editPnClear').checked = false;
+  document.getElementById('editPnClearRow').style.display = hasPn ? 'flex' : 'none';
   document.getElementById('editDlg').showModal();
 }
 document.getElementById('editCancel').addEventListener('click', () => document.getElementById('editDlg').close());
@@ -1106,6 +1139,12 @@ document.getElementById('editForm').addEventListener('submit', async (e) => {
     });
     const r = await res.json().catch(() => ({}));
     if (!res.ok) { err.textContent = r.error || ('Fel ' + res.status); return; }
+    // Personnummer (admin): ändra eller ta bort, loggas i databasen
+    const pnVal = document.getElementById('editPn').value.trim(), pnClear = document.getElementById('editPnClear').checked;
+    if (pnVal || pnClear) {
+      const { error: pe } = await supabaseClient.rpc('admin_set_personnummer', { p_member: editingId, p_personnummer: pnClear ? null : pnVal, p_clear: pnClear });
+      if (pe) { err.textContent = 'Övrigt sparades, men personnumret inte: ' + (pe.message || 'fel'); await loadMembers(); return; }
+    }
     document.getElementById('editDlg').close();
     await loadMembers();
     if (typeof toast === 'function') toast('Sparat ✓');

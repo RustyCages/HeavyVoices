@@ -581,7 +581,7 @@
     <h3>Vem hör min inspelning?</h3>
     <p class="g-p"><b>Bara jag</b> – ingen annan. <b>Körledningen</b> – admin och stämledare, bra när du vill visa en idé. <b>Hela kören</b> – alla kan lyssna i Studio, och låten i Repertoar visar att det finns inspelningar från kören. Du väljer när du sparar, och kan ändra det när du vill med <b>Dela</b> på spårets rad.</p>
     <div class="tips">
-      <b>Tips:</b> Sjung in en stämma i taget och lyssna på den tillsammans med originalstämman. Sänk låtens volym eller tysta sångspåren om du vill höra dig själv tydligare. Kortkommandon på dator: <b>R</b> = spela in, <b>mellanslag</b> = spela/stoppa, <b>Enter</b>/<b>Home</b> = till början, <b>,</b> / <b>.</b> = 5 s bakåt/framåt, <b>M</b> = markör, <b>Z</b> = zooma till markering, <b>Ctrl+Z</b> = ångra, <b>Ctrl+C / Ctrl+V</b> = kopiera / klistra in vid spelhuvudet, <b>Ctrl+Shift+C</b> / <b>Ctrl+Shift+X</b> = kopiera / klipp ut markerat till nytt spår. Dra i en markerings kant för att sträcka biten (ändrar tempot, inte tonhöjden). <b>📸 Ögonblicksbilder</b> under spåren sparar namngivna lägen som du kan dela med körledningen.
+      <b>Tips:</b> Sjung in en stämma i taget och lyssna på den tillsammans med originalstämman. Sänk låtens volym eller tysta sångspåren om du vill höra dig själv tydligare. Kortkommandon på dator: <b>R</b> = spela in, <b>mellanslag</b> = spela/stoppa, <b>Enter</b>/<b>Home</b> = till början, <b>,</b> / <b>.</b> = 5 s bakåt/framåt, <b>M</b> = markör, <b>Z</b> = zooma till markering, <b>Ctrl+Z</b> = ångra, <b>Ctrl+C / Ctrl+V</b> = kopiera / klistra in vid spelhuvudet, <b>Ctrl+Shift+C</b> / <b>Ctrl+Shift+X</b> = kopiera / klipp ut markerat till nytt spår. Dra <i>inuti</i> en markering för att flytta det markerade ljudet. <b>Shift</b> + dra i markeringens kant sträcker biten (ändrar tempot, inte tonhöjden). <b>📸 Ögonblicksbilder</b> under spåren sparar namngivna lägen som du kan dela med körledningen.
     </div>
   </div>
 
@@ -972,7 +972,7 @@ const panel = TrackEditPanel.mount(document.getElementById('panel'), {
     const cut = !!(opt && opt.cut);
     const c = addGenTrack(`${t.label} (${cut ? 'utklipp ' : ''}${fmt(offsetMs / 1000, true)}–${fmt(offsetMs / 1000 + len, true)})`, clip, offsetMs);
     c._row && c._row.scrollIntoView && c._row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    toast(cut ? `${len.toFixed(2)} s utklippt från ${t.label} till ett nytt spår – markera det och dra i kanten för att ändra tempot`
+    toast(cut ? `${len.toFixed(2)} s utklippt från ${t.label} till ett nytt spår – markera det och håll Shift och dra i kanten för att ändra tempot`
       : `${len.toFixed(2)} s från ${t.label} i ett nytt spår – på samma plats i låten`);
   },
   canUndo: t => !!(t && t.undo && t.undo.length), isEdited: t => !!(t && t.edited),

@@ -213,11 +213,12 @@
     // sträck markeringen: dra i dess vänstra eller högra kant (fäster mot slagen när taktrutnätet visas, Alt = fritt)
     let stretch = null, msel = null;   // msel = markerat ljud som dras till ny plats i spåret
     const canMoveSel = tr => !!(o.onMoveSel && tr.clip && !tr.readOnly);
-    const insideSel = (tr, x) => sel && sel.track === tr && Math.abs(sel.b - sel.a) >= 0.02 && x > xOf(Math.min(sel.a, sel.b)) + 7 && x < xOf(Math.max(sel.a, sel.b)) - 7;
+    const insideSel = (tr, x) => sel && sel.track === tr && Math.abs(sel.b - sel.a) >= 0.02 && x >= xOf(Math.min(sel.a, sel.b)) - 2 && x <= xOf(Math.max(sel.a, sel.b)) + 2;
     const canStretch = tr => !!(o.onStretch && tr.clip && !tr.readOnly);
     const MIN_RATE = 0.5, MAX_RATE = 2;
-    function stretchEdgeAt(tr, x) {
-      if (!sel || sel.track !== tr || !canStretch(tr) || Math.abs(sel.b - sel.a) < 0.02) return null;
+    // sträckning bara med Shift nere – utan Shift flyttar man alltid det markerade, även nära kanten
+    function stretchEdgeAt(tr, x, shift) {
+      if (!shift || !sel || sel.track !== tr || !canStretch(tr) || Math.abs(sel.b - sel.a) < 0.02) return null;
       const a = Math.min(sel.a, sel.b), b = Math.max(sel.a, sel.b);
       if (Math.abs(x - xOf(b)) <= 7) return 'r';
       if (Math.abs(x - xOf(a)) <= 7) return 'l';
@@ -229,6 +230,14 @@
       const per = 60 / g.bpm, off = g.offset || 0, k = Math.round((t - off) / per), st = off + k * per;
       return Math.abs(xOf(st) - xOf(t)) <= 12 ? st : t;   // fäst bara när man är nära ett slag
     }
+    // Shift trycks ned/släpps medan pekaren står still: byt muspekare direkt
+    let lastHover = null;
+    ['keydown', 'keyup'].forEach(ev => window.addEventListener(ev, e => {
+      if (e.key !== 'Shift' || !lastHover) return;
+      const { tr, c, x } = lastHover, edge = stretchEdgeAt(tr, x, ev === 'keydown');
+      if (edge) c.style.cursor = 'ew-resize';
+      else if (tool === 'select' && canMoveSel(tr) && insideSel(tr, x)) c.style.cursor = 'grab';
+    }));
     function stretchLabel(st) {
       const len0 = st.b0 - st.a0, len = st.b - st.a, pct = (len0 / len - 1) * 100;
       const g = o.getBeats && o.getBeats();
@@ -238,16 +247,17 @@
     function wire(tr, c) {
       let drag = null;
       c.addEventListener('pointermove', e => {   // muspekaren visar ↔ över markeringens kanter
+        lastHover = { tr, c, x: e.clientX - c.getBoundingClientRect().left };
         if (drag || stretch) return;
-        const edge = stretchEdgeAt(tr, e.clientX - c.getBoundingClientRect().left);
+        const edge = stretchEdgeAt(tr, e.clientX - c.getBoundingClientRect().left, e.shiftKey);
         const inside = !edge && tool === 'select' && canMoveSel(tr) && insideSel(tr, e.clientX - c.getBoundingClientRect().left);
         c.style.cursor = edge ? 'ew-resize' : inside ? 'grab' : '';
-        c.title = edge ? 'Dra för att sträcka det markerade (ändrar tempot, inte tonhöjden). Alt = utan att fästa mot slagen.'
-          : inside ? 'Dra för att flytta det markerade ljudet i spåret – resten av spåret ligger kvar. Alt = utan att fästa mot slagen.' : '';
+        c.title = edge ? '⇔ Sträck: dra kanten (ändrar tempot, inte tonhöjden). Alt = utan att fästa mot slagen.'
+          : inside ? 'Dra för att flytta det markerade ljudet i spåret – resten ligger kvar. Shift + dra i kanten = sträck (ändrar tempot).' : '';
       });
       c.addEventListener('pointerdown', e => {
         const r = c.getBoundingClientRect(), x = e.clientX - r.left;
-        const edge = !e.button && stretchEdgeAt(tr, x);
+        const edge = !e.button && stretchEdgeAt(tr, x, e.shiftKey);
         if (edge) {
           e.preventDefault(); e.stopPropagation();
           const a = Math.min(sel.a, sel.b), b = Math.max(sel.a, sel.b);
@@ -263,8 +273,11 @@
             c.removeEventListener('pointermove', mv); c.removeEventListener('pointerup', up); c.removeEventListener('pointercancel', up);
             c.classList.remove('dragging');
             const st = stretch; stretch = null;
-            if (st && Math.abs((st.b - st.a) - (st.b0 - st.a0)) > 0.005) o.onStretch(tr, { a: st.a0, b: st.b0 }, { a: st.a, b: st.b });
-            else drawTrack(tr);
+            if (st && Math.abs((st.b - st.a) - (st.b0 - st.a0)) > 0.005) {
+              Promise.resolve(o.onStretch(tr, { a: st.a0, b: st.b0 }, { a: st.a, b: st.b })).then(() => {   // släpp markeringen så att nästa grepp inte sträcker igen av misstag
+                sel = null; if (o.onSelection) o.onSelection(null); drawTrack(tr);
+              });
+            } else drawTrack(tr);
           };
           c.addEventListener('pointermove', mv); c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
           return;

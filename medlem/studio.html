@@ -546,12 +546,13 @@
         <span class="vp-t">🎹 Piano</span>
         <button type="button" class="btn-outline" id="vpDown" title="En oktav ner (Z)">−</button><span class="vp-oct" id="vpOct"></span><button type="button" class="btn-outline" id="vpUp" title="En oktav upp (X)">+</button>
         <span class="vp-hint">Mus eller tangentbord: <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd> vita · <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> svarta · <kbd>Z</kbd>/<kbd>X</kbd> oktav · håll <kbd>Shift</kbd> = pedal</span>
+        <label class="opt" title="Vilket ljud tangenterna har – gäller också MIDI-spåret som skapas">Ljud <select id="vpInstr"><option value="piano">Piano</option><option value="aah">Kör "aah"</option><option value="ooh">Kör "ooh"</option></select></label>
         <label class="opt" title="Rumsklang på pianoljudet – hörs både när du spelar och i det inspelade spåret"><input type="checkbox" id="vpVerb"> klang</label>
         <span class="vp-load" id="vpLoad"></span>
         <button type="button" class="btn-outline" id="vpClose" title="Stäng pianot">✕</button>
       </div>
       <div class="vp-keys" id="vpKeys"></div>
-      <div class="vp-credit">Pianoljud: <a href="https://sfzinstruments.github.io/pianos/salamander" target="_blank" rel="noopener">Salamander Grand Piano</a> av Alexander Holm · <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a></div>
+      <div class="vp-credit">Pianoljud: <a href="https://sfzinstruments.github.io/pianos/salamander" target="_blank" rel="noopener">Salamander Grand Piano</a> av Alexander Holm · Körljud: FluidR3 GM av Frank Wen via <a href="https://github.com/gleitz/midi-js-soundfonts" target="_blank" rel="noopener">midi-js-soundfonts</a> · båda <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a></div>
     </div>
   </div>
   <p class="hint">Sjung in en egen stämma eller idé till en låt. Du hör låtens spår i hörlurarna medan du spelar in, och kan sedan flytta, klippa och spara inspelningen. Dina inspelningar är privata tills du delar dem.</p>
@@ -2020,6 +2021,7 @@ let midiNo = 0, mt = null;   // mt = spåret som MIDI spelas in i
     try {
       const buf = await MidiIn.render(notes, getCtx().sampleRate), clip = AudioEdit.fromBuffer(buf);
       Object.assign(t, { clip, orig: clip, offsetMs: Math.round(notes[0].t * 1000), midiNotes: notes, loadingText: null, edited: false });
+      if (MidiIn.instrument !== 'piano') t.label = t.label.replace('🎹', '🎶') + ` (${MidiIn.INSTR[MidiIn.instrument].name})`;
       setPeaks(t); tl.render(); setActive(t); restartIfPlaying(); updateSaveState();
       showRange(notes[0].t, Math.max(...notes.map(x => x.t + x.d)));
       toast(`${notes.length} noter inspelade${MidiIn.hasChords(notes) ? ' (med ackord)' : ''}. Spara spåret som inspelning, eller ⬇ MIDI-noter för Röstövning/MuseScore`, 7000);
@@ -2093,6 +2095,39 @@ stEl('stSave').addEventListener('click', async () => {
   if (error) { stStatus('Kunde inte spara: ' + error.message, true); stEl('stSave').disabled = false; return; }
   stSaved = JSON.stringify([row.bpm, row.beat_offset, row.beats_per_bar]);
   stStatus('Sparat ✓ – gäller Studio, Röstövning, klicket och notbladen'); toast('Låtens tempo sparat');
+});
+
+// ---------- 🎶 Sjung stämman: stämmans noter (notanalysen) med kör- eller pianoljud som nytt spår ----------
+document.addEventListener('DOMContentLoaded', function () {   // raden skapas av flik-koden längre ner
+  const sel = document.getElementById('singStem'), snd = document.getElementById('singSnd'), go = document.getElementById('singGo'), st = document.getElementById('singSt');
+  if (!sel || !window.MidiIn) return;
+  const fill = () => {
+    const list = tracks.filter(t => t.kind === 'stem' && pitchByKey[t.key] && pitchByKey[t.key].notes.length && !isAccomp(t));
+    const prev = sel.value;
+    sel.innerHTML = list.length ? list.map(t => `<option value="${esc(t.key)}">${esc(t.label)}</option>`).join('') : '<option value="">Inga stämmor med noter</option>';
+    if (list.some(t => t.key === prev)) sel.value = prev;
+    go.disabled = !list.length;
+    st.textContent = list.length ? '' : 'Notanalysera stämmorna i Röstövning först';
+  };
+  ['focus', 'pointerdown'].forEach(ev => sel.addEventListener(ev, fill));
+  setInterval(() => { if (!sel.options.length || (sel.options.length === 1 && !sel.value)) fill(); }, 2000);
+  snd.value = MidiIn.instrument === 'piano' ? 'aah' : MidiIn.instrument;
+  go.addEventListener('click', async () => {
+    fill();
+    const stem = tracks.find(t => t.key === sel.value), p = stem && pitchByKey[stem.key];
+    if (!p) return;
+    const off = offS(stem), notes = p.notes.map(x => ({ t: Math.round((x.t + off) * 1000) / 1000, d: x.d, n: x.n, v: 90 })).filter(x => x.t >= 0 && x.d > 0.03);
+    if (!notes.length) return;
+    go.disabled = true; st.textContent = `Sjunger ${notes.length} noter…`;
+    try {
+      const buf = await MidiIn.render(notes, getCtx().sampleRate, snd.value);
+      const t = addGenTrack(`🎶 ${stem.label} (${MidiIn.INSTR[snd.value].name})`, AudioEdit.fromBuffer(buf), notes[0].t * 1000);
+      t.midiNotes = notes; updateRecTools();
+      st.textContent = '✓ Nytt spår – spara det, eller ladda ner noterna under Fil';
+      toast(`${stem.label} sjungs nu i spåret ”${t.label}”`, 4000);
+    } catch (e) { st.textContent = 'Kunde inte: ' + (e.message || e); }
+    go.disabled = false;
+  });
 });
 
 // ---------- 📝 Noter: notblad av MIDI-spåret, och/eller noterna till en stämma i låten ----------
@@ -2315,9 +2350,12 @@ let vpShow = () => {};
   const verb = document.getElementById('vpVerb'), load = document.getElementById('vpLoad');
   verb.checked = MidiIn.reverb;
   verb.addEventListener('change', () => { MidiIn.setReverb(verb.checked); MidiIn.out(getCtx()); });
+  const ins = document.getElementById('vpInstr');
+  ins.value = MidiIn.instrument;
+  ins.addEventListener('change', () => { allOff(); MidiIn.setInstrument(ins.value); stLoadPiano(); ins.blur(); });
   window.stLoadPiano = () => {
     if (MidiIn.pianoReady) return Promise.resolve(true);
-    load.textContent = 'laddar pianoljud…';
+    load.textContent = `laddar ${MidiIn.INSTR[MidiIn.instrument].name.toLowerCase()}…`;
     return MidiIn.loadPiano(getCtx()).then(ok => { load.textContent = ok ? '' : 'enkelt ljud (pianoljudet kunde inte laddas)'; return ok; });
   };
   vpShow = show => {
@@ -3413,7 +3451,14 @@ setInterval(updateSaveStat, 1000);
 (function () {
   const panel = document.getElementById('panel'); if (!panel) return;
   const g = id => document.getElementById(id);
-  const groups = { edit: [g('secEdit'), g('stemRow'), g('backupRow')], synk: [g('syncRow'), g('tempoRow'), g('songTempoRow')], fx: [g('secFx')], voice: [g('secVoice'), g('aiHome')], fil: [g('recRow2'), g('wavHome')] };
+  const sing = document.createElement('div'); sing.className = 'tool-row'; sing.id = 'singRow';
+  sing.innerHTML = `<span class="k">🎶 Sjung stämman</span>
+    <select id="singStem" title="Stämma med noter (från notanalysen i Röstövning)"></select>
+    <select id="singSnd"><option value="aah">Kör "aah"</option><option value="ooh">Kör "ooh"</option><option value="piano">Piano</option></select>
+    <button type="button" class="btn-outline" id="singGo" title="Gör ett nytt spår där stämmans noter sjungs – bra för att höra hur stämman eller en harmoni ska låta">🎶 Sjung</button>
+    <span class="status" id="singSt"></span>`;
+  panel.appendChild(sing);
+  const groups = { edit: [g('secEdit'), g('stemRow'), g('backupRow')], synk: [g('syncRow'), g('tempoRow'), g('songTempoRow')], fx: [g('secFx')], voice: [g('singRow'), g('secVoice'), g('aiHome')], fil: [g('recRow2'), g('wavHome')] };
   ['aiHome', 'wavHome'].forEach(id => { const d = g(id); if (d) { d.style.marginTop = ''; panel.appendChild(d); } });   // i flikarna Röst och Fil
   Object.keys(groups).forEach(k => groups[k].forEach(e => { if (e) e.dataset.tab = k; }));
   const adm = g('adminSync'); if (adm) { adm.dataset.tab = 'synk'; panel.appendChild(adm); }   // i Synk-fliken, ovanför spara-raden

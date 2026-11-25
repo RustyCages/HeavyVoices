@@ -1,0 +1,4 @@
+Körljud ("Choir Aahs" och "Voice Oohs") ur FluidR3 GM SoundFont av Frank Wen.
+Färdiga MP3-filer per ton från https://github.com/gleitz/midi-js-soundfonts (FluidR3_GM),
+licens: Creative Commons Erkännande 3.0 (CC BY 3.0) – https://creativecommons.org/licenses/by/3.0/
+Används i Heavy Voices Studio (js/midi-in.js): pianot på skärmen och "Sjung stämman".

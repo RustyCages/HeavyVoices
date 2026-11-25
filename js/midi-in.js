@@ -12,7 +12,9 @@
 //   MidiIn.recording                         → true medan inspelningen pågår
 //   await MidiIn.render(notes, sampleRate)   → AudioBuffer med enkelt pianoljud (t = 0 är första noten)
 //   MidiIn.playNote(ctx, dest, n, v, when)   → stop(when) – ett pianoljud direkt
-//   await MidiIn.loadPiano(ctx)              → laddar pianosamplingarna (/audio/piano, ~2 MB, cachas); till dess ett enkelt ljud
+//   await MidiIn.loadPiano(ctx)              → laddar det valda ljudet (piano ~2 MB, kör ~0,5 MB, cachas); till dess ett enkelt ljud
+//   MidiIn.setInstrument('piano'|'aah'|'ooh') / MidiIn.instrument / MidiIn.INSTR
+//   await MidiIn.render(notes, sr, instrument) → AudioBuffer med valt ljud
 //   MidiIn.setReverb(on) / MidiIn.reverb     → rumsklang på/av (sparas i webbläsaren)
 //   MidiIn.inject(n, on, v)                  → en ton från pianot på skärmen (spelas in om inspelning pågår)
 //   MidiIn.hasChords(notes)                  → true om noter ligger samtidigt (ackord / två händer)
@@ -33,24 +35,46 @@
   function hook() { if (access) access.inputs.forEach(i => { i.onmidimessage = onMsg; }); }
   function onDevices(cb) { devCb = cb; }
 
-  // ---------- riktigt pianoljud: Salamander Grand Piano (CC BY 3.0), en sampling var tredje halvton ----------
-  const SAMPLE_URL = '/audio/piano/';
-  const PCS = [['C', 0], ['Ds', 3], ['Fs', 6], ['A', 9]];
-  let samples = null, loading = null;   // Map: midi-nummer → AudioBuffer
-  function loadPiano(ctx) {
-    if (samples) return Promise.resolve(true);
-    if (!loading) loading = (async () => {
-      const list = [];
-      for (let o = 0; o <= 8; o++) PCS.forEach(([p, pc]) => { const m = 12 * (o + 1) + pc; if (m >= 21 && m <= 108) list.push([p + o, m]); });
-      const map = new Map();
-      await Promise.all(list.map(async ([name, m]) => {
-        const r = await fetch(SAMPLE_URL + name + '.mp3'); if (!r.ok) throw new Error('HTTP ' + r.status);
-        map.set(m, await ctx.decodeAudioData(await r.arrayBuffer()));
-      }));
-      samples = map; return true;
-    })().catch(e => { loading = null; console.warn('Pianoljudet kunde inte laddas – enkelt ljud används', e); return false; });
-    return loading;
+  // ---------- inspelade ljud: en sampling var tredje halvton, tonerna däremellan räknas fram ----------
+  //   piano: Salamander Grand Piano (Alexander Holm, CC BY 3.0)
+  //   aah/ooh: körljud ur FluidR3 GM (Frank Wen, via midi-js-soundfonts, CC BY 3.0) – loopas så att tonen kan hållas
+  const INSTR = {
+    piano: { name: 'Piano', dir: '/audio/piano/', pcs: [['C', 0], ['Ds', 3], ['Fs', 6], ['A', 9]], lo: 21, hi: 108 },
+    aah: { name: 'Kör "aah"', dir: '/audio/choir/aah/', pcs: [['C', 0], ['Eb', 3], ['Gb', 6], ['A', 9]], lo: 36, hi: 84, loop: true },
+    ooh: { name: 'Kör "ooh"', dir: '/audio/choir/ooh/', pcs: [['C', 0], ['Eb', 3], ['Gb', 6], ['A', 9]], lo: 36, hi: 84, loop: true },
+  };
+  const bank = {}, banking = {};   // ljud → Map(midi → { buf, a, b })
+  let instr = 'piano'; try { const v = localStorage.getItem('hv-midi-instr'); if (INSTR[v]) instr = v; } catch (e) {}
+  // loopa ett stycke mitt i tonen; slutet av stycket blandas mjukt in mot det som ligger före starten → inget klick vid hoppet
+  function makeLoop(ctx, buf) {
+    const sr = buf.sampleRate, len = buf.length, a = Math.floor(sr * Math.min(0.9, buf.duration * 0.3)), b = Math.floor(len - sr * 0.35), x = Math.floor(sr * 0.25);
+    if (b - a < sr * 0.6 || a < x) return { buf, a: 0, b: 0 };
+    const out = ctx.createBuffer(buf.numberOfChannels, len, sr);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const d = buf.getChannelData(c).slice();
+      for (let k = 0; k < x; k++) { const w = k / x, i = b - x + k; d[i] = d[i] * Math.sqrt(1 - w) + d[a - x + k] * Math.sqrt(w); }
+      out.copyToChannel(d, c);
+    }
+    return { buf: out, a: a / sr, b: b / sr };
   }
+  function loadInstrument(ctx, name = instr) {
+    const def = INSTR[name]; if (!def) return Promise.resolve(false);
+    if (bank[name]) return Promise.resolve(true);
+    if (!banking[name]) banking[name] = (async () => {
+      const list = [];
+      for (let o = 0; o <= 8; o++) def.pcs.forEach(([p, pc]) => { const m = 12 * (o + 1) + pc; if (m >= def.lo && m <= def.hi) list.push([p + o, m]); });
+      const map = new Map();
+      await Promise.all(list.map(async ([file, m]) => {
+        const r = await fetch(def.dir + file + '.mp3'); if (!r.ok) throw new Error('HTTP ' + r.status);
+        const buf = await ctx.decodeAudioData(await r.arrayBuffer());
+        map.set(m, def.loop ? makeLoop(ctx, buf) : { buf, a: 0, b: 0 });
+      }));
+      bank[name] = map; return true;
+    })().catch(e => { banking[name] = null; console.warn(`Ljudet ${def.name} kunde inte laddas – enkelt ljud används`, e); return false; });
+    return banking[name];
+  }
+  const loadPiano = (ctx) => loadInstrument(ctx, instr);   // det valda ljudet (namnet kvar för äldre anrop)
+  function setInstrument(name) { if (INSTR[name]) { instr = name; try { localStorage.setItem('hv-midi-instr', name); } catch (e) {} } }
   // rumsklang: ett genererat rum (ingen fil), blandas in efter torrt ljud
   let reverbOn = true; try { reverbOn = localStorage.getItem('hv-piano-reverb') !== '0'; } catch (e) {}
   const outs = new WeakMap();
@@ -72,23 +96,35 @@
     return o.input;
   }
   function setReverb(on) { reverbOn = !!on; try { localStorage.setItem('hv-piano-reverb', on ? '1' : '0'); } catch (e) {} }
-  // en ton från samplingarna (närmaste sampling, tonhöjden justeras), dämpas när tangenten släpps
-  function sampleVoice(ctx, dest, n, v, when) {
+  // en ton från samplingarna (närmaste sampling, tonhöjden justeras). Piano: dämpas vid släpp. Kör: loopas så länge tonen hålls, tonar ut vid släpp.
+  function sampleVoice(ctx, dest, n, v, when, name) {
+    const map = bank[name], def = INSTR[name];
     let best = null, bd = 99;
-    samples.forEach((buf, m) => { const d = Math.abs(n - m); if (d < bd) { bd = d; best = m; } });
-    const src = ctx.createBufferSource(), g = ctx.createGain(), amp = 0.25 + 1.75 * Math.pow((v || 90) / 127, 1.6);
-    src.buffer = samples.get(best); src.playbackRate.value = Math.pow(2, (n - best) / 12);
-    g.gain.setValueAtTime(amp, when);
-    src.connect(g); g.connect(dest); src.start(when);
+    map.forEach((_, m) => { const d = Math.abs(n - m); if (d < bd) { bd = d; best = m; } });
+    const smp = map.get(best), rate = Math.pow(2, (n - best) / 12), g = ctx.createGain();
+    const amp = def.loop ? 0.5 + 0.9 * ((v || 90) / 127) : 0.25 + 1.75 * Math.pow((v || 90) / 127, 1.6);
+    const srcs = [];
+    const add = (cents, delay, gain) => {
+      const src = ctx.createBufferSource(), sg = ctx.createGain();
+      src.buffer = smp.buf; src.playbackRate.value = rate * Math.pow(2, cents / 1200);
+      if (smp.b > smp.a) { src.loop = true; src.loopStart = smp.a; src.loopEnd = smp.b; }
+      sg.gain.value = gain; src.connect(sg); sg.connect(g); src.start(when + delay); srcs.push(src);
+    };
+    add(0, 0, 1);
+    if (def.loop) add(7, 0.018, 0.55);   // en till sångare, lite ostämd och sen – mer körkänsla
+    g.gain.setValueAtTime(def.loop ? 0 : amp, when);
+    if (def.loop) g.gain.linearRampToValueAtTime(amp, when + 0.07);
+    g.connect(dest);
     return (end) => {
       end = Math.max(end ?? ctx.currentTime, when + 0.02);
-      g.gain.cancelScheduledValues(end); g.gain.setValueAtTime(amp, end); g.gain.setTargetAtTime(0, end, n > 88 ? 0.3 : 0.12);   // diskanten saknar dämpare
-      try { src.stop(end + 1.5); } catch (e) {}
+      g.gain.cancelScheduledValues(end); g.gain.setValueAtTime(amp, end);
+      g.gain.setTargetAtTime(0, end, def.loop ? 0.09 : n > 88 ? 0.3 : 0.12);   // pianots diskant saknar dämpare
+      srcs.forEach(src => { try { src.stop(end + 1.5); } catch (e) {} });
     };
   }
-  function voice(ctx, dest, n, v, when) {
+  function voice(ctx, dest, n, v, when, name = instr) {
     if (dest === undefined || dest === ctx.destination) dest = out(ctx);
-    if (samples) return sampleVoice(ctx, dest, n, v, when);
+    if (bank[name]) return sampleVoice(ctx, dest, n, v, when, name);
     return synthVoice(ctx, dest, n, v, when);
   }
   // reserv tills samplingarna laddats: grundton + övertoner som klingar av
@@ -151,17 +187,18 @@
   }
   function setMonitor(on, ctx) { if (rec) { rec.monitor = !!(on && (ctx || rec.ctx)); if (ctx) rec.ctx = ctx; } }
 
-  async function render(notes, sampleRate = 44100) {
+  async function render(notes, sampleRate = 44100, name = instr) {
     if (!notes.length) return null;
     const t0 = Math.min(...notes.map(x => x.t)), end = Math.max(...notes.map(x => x.t + x.d)) - t0 + 1.2;
-    await loadPiano(new OfflineAudioContext(1, 1, sampleRate));
+    await loadInstrument(new OfflineAudioContext(1, 1, sampleRate), name);
     const ctx = new OfflineAudioContext(2, Math.ceil((end + 2) * sampleRate), sampleRate);
     const bus = ctx.createDynamicsCompressor(); bus.threshold.value = -12; bus.ratio.value = 3; bus.connect(out(ctx));
-    notes.forEach(x => { const stop = voice(ctx, bus, x.n, x.v || 90, x.t - t0); stop(x.t - t0 + x.d); });
+    notes.forEach(x => { const stop = voice(ctx, bus, x.n, x.v || 90, x.t - t0, name); stop(x.t - t0 + x.d); });
     return ctx.startRendering();
   }
+
   const hasChords = notes => notes.some((x, i) => i && notes.slice(0, i).some(y => y.t + y.d > x.t + 0.03));
 
-  root.MidiIn = { supported, connect, inject, injectPedal, loadPiano, setReverb, get reverb() { return reverbOn; }, get pianoReady() { return !!samples; }, out, onDevices, start, stop, setMonitor, render, playNote: voice, hasChords, names,
+  root.MidiIn = { supported, connect, inject, injectPedal, loadPiano, loadInstrument, setInstrument, INSTR, get instrument() { return instr; }, setReverb, get reverb() { return reverbOn; }, get pianoReady() { return !!bank[instr]; }, out, onDevices, start, stop, setMonitor, render, playNote: voice, hasChords, names,
     get recording() { return !!rec; } };
 })(window);
